@@ -1,0 +1,27 @@
+[
+  {
+    "id": 20,
+    "category": "latency-20-words",
+    "input": "So um yesterday I talked to the team about the release, and they said the backend is basically ready. But."
+  },
+  {
+    "id": 45,
+    "category": "latency-45-words",
+    "input": "So um yesterday I talked to the team about the release, and they said the backend is basically ready. But the mobile app still needs like another week of testing. I think we should, you know, not ship until both are done, because last time."
+  },
+  {
+    "id": 90,
+    "category": "latency-90-words",
+    "input": "So um yesterday I talked to the team about the release, and they said the backend is basically ready. But the mobile app still needs like another week of testing. I think we should, you know, not ship until both are done, because last time we shipped early it was a mess. Customers were really upset, and support spent two days answering tickets. Uh, can you send me the updated plan by Friday so I can review it before the call? Also we need to decide who owns the rollout."
+  },
+  {
+    "id": 150,
+    "category": "latency-150-words",
+    "input": "So um yesterday I talked to the team about the release, and they said the backend is basically ready. But the mobile app still needs like another week of testing. I think we should, you know, not ship until both are done, because last time we shipped early it was a mess. Customers were really upset, and support spent two days answering tickets. Uh, can you send me the updated plan by Friday so I can review it before the call? Also we need to decide who owns the rollout checklist, and I would rather it be someone from the platform group. Let's meet at 3, no, 4 on Tuesday to go through the open risks together. If the numbers look good we can announce it the following week, otherwise we wait another sprint. \u00c4hm, one more thing, the budget for the next quarter is still not approved, so please."
+  },
+  {
+    "id": 250,
+    "category": "latency-250-words",
+    "input": "So um yesterday I talked to the team about the release, and they said the backend is basically ready. But the mobile app still needs like another week of testing. I think we should, you know, not ship until both are done, because last time we shipped early it was a mess. Customers were really upset, and support spent two days answering tickets. Uh, can you send me the updated plan by Friday so I can review it before the call? Also we need to decide who owns the rollout checklist, and I would rather it be someone from the platform group. Let's meet at 3, no, 4 on Tuesday to go through the open risks together. If the numbers look good we can announce it the following week, otherwise we wait another sprint. \u00c4hm, one more thing, the budget for the next quarter is still not approved, so please hold off on new hires. Thanks for the help, and let me know if anything changes on your side. So um yesterday I talked to the team about the release, and they said the backend is basically ready. But the mobile app still needs like another week of testing. I think we should, you know, not ship until both are done, because last time we shipped early it was a mess. Customers were really upset, and support spent two days answering tickets. Uh, can you send me the updated plan by Friday so I can review it before the call?."
+  }
+]

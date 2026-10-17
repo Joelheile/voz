@@ -1,0 +1,15 @@
+name: Release stable
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    uses: ./.github/workflows/release.yml
+    with:
+      channel: stable
+    secrets: inherit

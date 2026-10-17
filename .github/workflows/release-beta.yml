@@ -1,0 +1,18 @@
+name: Release beta
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - appcast.xml
+      - "**.md"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    uses: ./.github/workflows/release.yml
+    with:
+      channel: beta
+    secrets: inherit
