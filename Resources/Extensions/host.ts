@@ -1,45 +1,45 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { EventEmitter } from "node:events";
 import { basename, extname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
-
-export type App = { bundleID?: string; name?: string };
-export type InsertEvent = { text: string; raw: string; app: App };
-export type InsertResult = { text?: string } | void;
-export type CommandContext = {
-  text: string;
-  app: App;
-  insert(text: string): void;
-  press(key: string): void;
-};
-export type ExtensionAPI = {
-  name: string;
-  config: Record<string, unknown>;
-  on(
-    event: "beforeInsert",
-    handler: (event: InsertEvent) => InsertResult | Promise<InsertResult>,
-  ): void;
-  registerCommand(
-    phrase: string,
-    handler: (ctx: CommandContext) => void | Promise<void>,
-  ): void;
-  log(message: string): void;
-};
-export type Extension = (voz: ExtensionAPI) => void | Promise<void>;
+import type {
+  App,
+  BeforeInsertEvent,
+  BeforeInsertResult,
+  CommandEvent,
+  Context,
+  Extension,
+  ExtensionAPI,
+} from "./voz.d.ts";
 
 type Launch = {
+  home: string;
   settings: string;
   extensionsDirectory: string;
   packages: string[];
 };
 type InsertHandler = {
   extension: string;
-  run: (event: InsertEvent) => InsertResult | Promise<InsertResult>;
+  run: (
+    event: BeforeInsertEvent,
+    ctx: Context,
+  ) => BeforeInsertResult | Promise<BeforeInsertResult>;
 };
 type Command = {
   extension: string;
   phrase: string;
-  run: (ctx: CommandContext) => void | Promise<void>;
+  run: (event: CommandEvent, ctx: Context) => void | Promise<void>;
 };
+type InsertRequest = BeforeInsertEvent & { app: App };
+type CommandRequest = CommandEvent & { phrase: string; app: App };
 
 const send = (message: object) =>
   process.stdout.write(JSON.stringify(message) + "\n");
@@ -57,6 +57,35 @@ const insertHandlers: InsertHandler[] = [];
 const commands = new Map<string, Command>();
 const loaded: string[] = [];
 const errors: string[] = [];
+const bus = new EventEmitter();
+
+Bun.plugin({
+  name: "voz",
+  setup(build) {
+    build.module("voz", () => ({
+      exports: { defineExtension: (extension: Extension) => extension },
+      loader: "object",
+    }));
+  },
+});
+
+function installTypes() {
+  const directory = join(launch.home, "node_modules", "voz");
+  mkdirSync(directory, { recursive: true });
+  copyFileSync(join(import.meta.dir, "voz.d.ts"), join(directory, "index.d.ts"));
+  writeFileSync(
+    join(directory, "package.json"),
+    JSON.stringify({ name: "voz", private: true, types: "index.d.ts" }),
+  );
+}
+
+function context(app: App): Context {
+  return {
+    app,
+    insert: (text) => send({ method: "insert", params: { text } }),
+    press: (key) => send({ method: "press", params: { key } }),
+  };
+}
 
 function readJSON(path: string): any {
   return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : undefined;
@@ -104,10 +133,17 @@ function packageEntries(directory: string): { name: string; path: string }[] {
   return entry ? [{ name, path: entry }] : [];
 }
 
-function api(name: string, config: Record<string, unknown>): ExtensionAPI {
+function api(name: string, config: ExtensionAPI["config"]): ExtensionAPI {
+  const data = join(launch.home, "data", name);
+  mkdirSync(data, { recursive: true });
   return {
     name,
     config,
+    paths: { home: launch.home, data },
+    events: {
+      on: (event, handler) => bus.on(event, handler),
+      emit: (event, payload) => bus.emit(event, payload),
+    },
     on(event, handler) {
       if (event !== "beforeInsert") throw new Error(`Unknown event "${event}"`);
       insertHandlers.push({ extension: name, run: handler });
@@ -144,11 +180,12 @@ async function load() {
   }
 }
 
-async function beforeInsert(event: InsertEvent) {
-  let text = event.text;
+async function beforeInsert({ text, raw, app }: InsertRequest) {
+  const ctx = context(app);
   for (const handler of insertHandlers) {
     try {
-      const result = await handler.run({ ...event, text });
+      const result = await handler.run({ text, raw }, ctx);
+      if (result && "handled" in result) return { text: "" };
       if (result && typeof result.text === "string") text = result.text;
     } catch (error) {
       log(`${handler.extension} beforeInsert failed: ${describe(error)}`);
@@ -157,23 +194,20 @@ async function beforeInsert(event: InsertEvent) {
   return { text };
 }
 
-async function command(params: { phrase: string; text: string; app: App }) {
-  const match = commands.get(params.phrase.trim().toLowerCase());
+async function command({ phrase, text, app }: CommandRequest) {
+  const match = commands.get(phrase.trim().toLowerCase());
   if (!match) return { handled: false };
-  await match.run({
-    text: params.text,
-    app: params.app,
-    insert: (text) => send({ method: "insert", params: { text } }),
-    press: (key) => send({ method: "press", params: { key } }),
-  });
+  await match.run({ text }, context(app));
   return { handled: true };
 }
 
 const methods: Record<string, (params: any) => Promise<object>> = {
   beforeInsert,
   command,
+  ping: async () => ({}),
 };
 
+installTypes();
 await load();
 send({
   method: "ready",

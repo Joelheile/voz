@@ -11,6 +11,8 @@ final class ExtensionService {
     private static let insertTimeout: Duration = .milliseconds(300)
     private static let commandTimeout: Duration = .seconds(10)
     private static let maxRestarts = 3
+    private static let watchdogInterval: Duration = .seconds(5)
+    private static let pingTimeout: Duration = .seconds(2)
 
     private let home = VozHome()
     private let output: TextOutput
@@ -19,6 +21,7 @@ final class ExtensionService {
     private var restarts = 0
     private var observer: NSObjectProtocol?
     private var reloading: Task<Void, Never>?
+    private var watchdog: Task<Void, Never>?
 
     init(output: TextOutput) {
         self.output = output
@@ -37,6 +40,7 @@ final class ExtensionService {
     func reload() {
         reloading = Task { [previous = reloading] in
             await previous?.value
+            watchdog?.cancel()
             await host?.stop()
             host = nil
             commands = []
@@ -85,6 +89,19 @@ final class ExtensionService {
         Log.app.notice("Extensions loaded: \(manifest.extensions.joined(separator: ", "), privacy: .public)")
         self.host = host
         commands = manifest.commands
+        watchdog = Task { [weak self] in await self?.watch(host) }
+    }
+
+    private func watch(_ host: ExtensionHost) async {
+        while !Task.isCancelled {
+            try? await Task.sleep(for: Self.watchdogInterval)
+            guard !Task.isCancelled, self.host === host else { return }
+            if await host.ping(timeout: Self.pingTimeout) { continue }
+            guard !Task.isCancelled, self.host === host else { return }
+            await host.stop()
+            hostExited(-1)
+            return
+        }
     }
 
     private func perform(_ action: HostAction) async {
@@ -101,6 +118,7 @@ final class ExtensionService {
     }
 
     private func hostExited(_ status: Int32) {
+        watchdog?.cancel()
         host = nil
         commands = []
         guard restarts < Self.maxRestarts else {

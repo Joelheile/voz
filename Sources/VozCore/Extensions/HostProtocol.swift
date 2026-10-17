@@ -25,6 +25,7 @@ public enum HostAction: Equatable, Sendable {
 }
 
 struct HostLaunchArguments: Encodable {
+    let home: String
     let settings: String
     let extensionsDirectory: String
     let packages: [String]
@@ -73,6 +74,8 @@ struct PressParams: Decodable {
 struct InsertResult: Decodable {
     let text: String
 }
+
+struct EmptyParams: Codable {}
 
 struct CommandResult: Decodable {
     let handled: Bool

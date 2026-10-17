@@ -50,6 +50,14 @@ public enum PackageSource: Equatable, Sendable, CustomStringConvertible {
         }
     }
 
+    public var isPinned: Bool {
+        switch self {
+        case .npm(let name, let spec): spec != name
+        case .git(_, _, let ref): ref != nil
+        case .local: false
+        }
+    }
+
     public var cloneURL: String? {
         guard case .git(let host, let path, _) = self else { return nil }
         return "https://\(host)/\(path)"

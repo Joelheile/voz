@@ -33,7 +33,7 @@ struct ExtensionHostTests {
 
     @Test func handlersSeeAppAndConfig() async throws {
         try writeFile(#"{"config":{"tag":{"suffix":" #voz"}}}"#, named: "settings.json", in: home.root)
-        try extensionFile("tag.ts", #"export default (voz) => voz.on("beforeInsert", (e) => ({ text: `${e.text} [${e.app.name}]${voz.config.suffix}` }))"#)
+        try extensionFile("tag.ts", #"export default (voz) => voz.on("beforeInsert", (e, ctx) => ({ text: `${e.text} [${ctx.app.name}]${voz.config.suffix}` }))"#)
         let host = makeHost()
         _ = try await host.start()
         #expect(await host.beforeInsert(text: "hi", raw: "hi", app: app, timeout: .seconds(2)) == "hi [Slack] #voz")
@@ -61,7 +61,7 @@ struct ExtensionHostTests {
     }
 
     @Test func commandsRunAndSendActions() async throws {
-        try extensionFile("send.ts", #"export default (voz) => voz.registerCommand("send it", async (ctx) => { ctx.insert(`[${ctx.text}]`); ctx.press("cmd+return") })"#)
+        try extensionFile("send.ts", #"export default (voz) => voz.registerCommand("send it", async (e, ctx) => { ctx.insert(`[${e.text}]`); ctx.press("cmd+return") })"#)
         let actions = RecordedActions()
         let host = makeHost(actions: actions)
         let manifest = try await host.start()
@@ -69,6 +69,39 @@ struct ExtensionHostTests {
 
         #expect(await host.runCommand(phrase: "send it", text: "hello", app: app, timeout: .seconds(2)))
         #expect(actions.all == [.insert("[hello]"), .press("cmd+return")])
+        await host.stop()
+    }
+
+    @Test func handledStopsTheChainAndInsertsNothing() async throws {
+        try extensionFile("a-route.ts", #"export default (voz) => voz.on("beforeInsert", (e, ctx) => { ctx.insert("elsewhere"); return { handled: true } })"#)
+        try extensionFile("b-never.ts", #"export default (voz) => voz.on("beforeInsert", () => ({ text: "should not run" }))"#)
+        let actions = RecordedActions()
+        let host = makeHost(actions: actions)
+        _ = try await host.start()
+        #expect(await host.beforeInsert(text: "hello", raw: "hello", app: app, timeout: .seconds(2)) == "")
+        #expect(actions.all == [.insert("elsewhere")])
+        await host.stop()
+    }
+
+    @Test func vozModuleEventBusAndDataPathWork() async throws {
+        try extensionFile("a-emit.ts", #"import { defineExtension } from "voz"; export default defineExtension((voz) => voz.on("beforeInsert", (e) => { voz.events.emit("seen", e.text) }))"#)
+        try extensionFile("b-listen.ts", #"import { writeFileSync } from "node:fs"; export default (voz) => { let seen = ""; voz.events.on("seen", (t) => { seen = t }); voz.on("beforeInsert", () => { writeFileSync(`${voz.paths.data}/seen`, seen); return { text: seen.toUpperCase() } }) }"#)
+        let host = makeHost()
+        let manifest = try await host.start()
+        #expect(manifest.errors.isEmpty)
+        #expect(await host.beforeInsert(text: "bus", raw: "bus", app: app, timeout: .seconds(2)) == "BUS")
+        #expect(fileContents(home.root.appendingPathComponent("data/b-listen/seen")) == "bus")
+        #expect(fileContents(home.root.appendingPathComponent("node_modules/voz/index.d.ts"))?.contains("defineExtension") == true)
+        await host.stop()
+    }
+
+    @Test func pingFailsWhileTheEventLoopIsBlocked() async throws {
+        try extensionFile("spin.ts", #"export default (voz) => voz.registerCommand("spin", () => { while (true) {} })"#)
+        let host = makeHost()
+        _ = try await host.start()
+        #expect(await host.ping(timeout: .seconds(2)))
+        _ = await host.runCommand(phrase: "spin", text: "", app: app, timeout: .milliseconds(100))
+        #expect(await !host.ping(timeout: .milliseconds(300)))
         await host.stop()
     }
 

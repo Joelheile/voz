@@ -48,4 +48,13 @@ struct PackageSourceTests {
         #expect(try PackageSource(parsing: "npm:@acme/voz-slack@1", relativeTo: base).name == "@acme/voz-slack")
         #expect(try PackageSource(parsing: "/opt/my-pack", relativeTo: base).name == "my-pack")
     }
+
+    @Test func versionsAndRefsPinPackages() throws {
+        #expect(try PackageSource(parsing: "npm:voz-jira@2.1.0", relativeTo: base).isPinned)
+        #expect(try PackageSource(parsing: "npm:@acme/voz-slack@1", relativeTo: base).isPinned)
+        #expect(try PackageSource(parsing: "git:github.com/acme/voz-jira@v1", relativeTo: base).isPinned)
+        #expect(try !PackageSource(parsing: "npm:@acme/voz-slack", relativeTo: base).isPinned)
+        #expect(try !PackageSource(parsing: "git:github.com/acme/voz-jira", relativeTo: base).isPinned)
+        #expect(try !PackageSource(parsing: "/opt/my-pack", relativeTo: base).isPinned)
+    }
 }

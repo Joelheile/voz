@@ -48,7 +48,7 @@ enum PackageCLI {
         case .npm(_, let spec):
             let bun = try await BunRuntime.ensure()
             try preparePackagesManifest()
-            try execute(bun.path, ["add", "--ignore-scripts", spec], in: home.packages)
+            try execute(bun.path, ["add", "--ignore-scripts", "--exact", spec], in: home.packages)
         case .git(_, _, let ref):
             guard !FileManager.default.fileExists(atPath: directory.path) else { throw PackageCLIError.alreadyInstalled(directory.path) }
             let bun = try await BunRuntime.ensure()
@@ -92,14 +92,17 @@ enum PackageCLI {
     private static func update() async throws {
         let packages = try installed()
         let bun = try await BunRuntime.ensure()
-        if packages.contains(where: { if case .npm = $0.source { true } else { false } }) {
-            try execute(bun.path, ["update", "--ignore-scripts"], in: home.packages)
-        }
-        for package in packages {
-            guard case .git(_, _, nil) = package.source else { continue }
-            let directory = package.source.directory(in: home)
-            try execute(git, ["-C", directory.path, "pull", "--ff-only"])
-            try installDependencies(in: directory, bun: bun)
+        for package in packages where !package.source.isPinned {
+            switch package.source {
+            case .npm(let name, _):
+                try execute(bun.path, ["add", "--ignore-scripts", "--exact", "\(name)@latest"], in: home.packages)
+            case .git:
+                let directory = package.source.directory(in: home)
+                try execute(git, ["-C", directory.path, "pull", "--ff-only"])
+                try installDependencies(in: directory, bun: bun)
+            case .local:
+                break
+            }
         }
         notifyApp()
         print("Updated \(packages.count) package\(packages.count == 1 ? "" : "s")")

@@ -87,6 +87,10 @@ public actor ExtensionHost {
         return decodeResult(CommandResult.self, from: data)?.handled ?? false
     }
 
+    public func ping(timeout: Duration) async -> Bool {
+        decodeResult(EmptyParams.self, from: await request("ping", EmptyParams(), timeout: timeout)) != nil
+    }
+
     public func stop() {
         process?.terminationHandler = nil
         process?.terminate()
@@ -97,6 +101,7 @@ public actor ExtensionHost {
 
     private func launchArguments() throws -> String {
         let arguments = HostLaunchArguments(
+            home: launch.home.root.path,
             settings: launch.home.settings.path,
             extensionsDirectory: launch.home.extensions.path,
             packages: launch.packageDirectories.map(\.path)
