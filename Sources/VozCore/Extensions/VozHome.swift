@@ -34,6 +34,13 @@ public struct VozHome: Sendable {
         try packageSources().map { try PackageSource(parsing: $0, relativeTo: root).directory(in: self) }
     }
 
+    public func localPackageDirectories() throws -> [URL] {
+        try packageSources().compactMap {
+            guard case .local(let url) = try PackageSource(parsing: $0, relativeTo: root) else { return nil }
+            return url
+        }
+    }
+
     private func readSettings() throws -> [String: Any] {
         guard FileManager.default.fileExists(atPath: settings.path) else { return [:] }
         return try JSONSerialization.jsonObject(with: Data(contentsOf: settings)) as? [String: Any] ?? [:]

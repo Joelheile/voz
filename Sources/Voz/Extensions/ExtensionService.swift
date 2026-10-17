@@ -22,6 +22,7 @@ final class ExtensionService {
     private var observer: NSObjectProtocol?
     private var reloading: Task<Void, Never>?
     private var watchdog: Task<Void, Never>?
+    private var watcher: FileWatcher?
 
     init(output: TextOutput) {
         self.output = output
@@ -44,11 +45,12 @@ final class ExtensionService {
             await host?.stop()
             host = nil
             commands = []
+            watch()
             guard home.hasExtensions else { return }
             do {
                 try await launch()
             } catch {
-                Log.app.error("Extensions failed to start: \(String(describing: error), privacy: .public)")
+                Log.extensions.error("Extensions failed to start: \(String(describing: error), privacy: .public)")
             }
         }
     }
@@ -65,13 +67,13 @@ final class ExtensionService {
         guard let host else { return }
         Task {
             let handled = await host.runCommand(phrase: command, text: text, app: app.hostApp, timeout: Self.commandTimeout)
-            if !handled { Log.app.error("Voice command was not handled: \(command, privacy: .public)") }
+            if !handled { Log.extensions.error("Voice command was not handled: \(command, privacy: .public)") }
         }
     }
 
     private func launch() async throws {
         guard let script = Bundle.main.url(forResource: "host", withExtension: "ts", subdirectory: "Extensions") else {
-            Log.app.error("Extension host script missing from app bundle")
+            Log.extensions.error("Extension host script missing from app bundle")
             return
         }
         let host = ExtensionHost(
@@ -79,17 +81,26 @@ final class ExtensionService {
             onAction: { [weak self] action in
                 Task { @MainActor in await self?.perform(action) }
             },
-            onLog: { message in Log.app.notice("Extensions: \(message, privacy: .public)") },
+            onLog: { message in Log.extensions.notice("\(message, privacy: .public)") },
             onExit: { [weak self] status in
                 Task { @MainActor in self?.hostExited(status) }
             }
         )
         let manifest = try await host.start()
-        for error in manifest.errors { Log.app.error("Extension failed to load: \(error, privacy: .public)") }
-        Log.app.notice("Extensions loaded: \(manifest.extensions.joined(separator: ", "), privacy: .public)")
+        for error in manifest.errors { Log.extensions.error("Extension failed to load: \(error, privacy: .public)") }
+        Log.extensions.notice("Extensions loaded: \(manifest.extensions.joined(separator: ", "), privacy: .public)")
         self.host = host
         commands = manifest.commands
         watchdog = Task { [weak self] in await self?.watch(host) }
+    }
+
+    private func watch() {
+        try? FileManager.default.createDirectory(at: home.extensions, withIntermediateDirectories: true)
+        let paths = [home.extensions.path] + ((try? home.localPackageDirectories()) ?? []).map(\.path)
+        watcher = FileWatcher(paths: paths) { [weak self] in
+            self?.restarts = 0
+            self?.reload()
+        }
     }
 
     private func watch(_ host: ExtensionHost) async {
@@ -112,7 +123,7 @@ final class ExtensionService {
             do {
                 output.press(try KeyChord(parsing: key))
             } catch {
-                Log.app.error("Extension pressed an unknown key: \(key, privacy: .public)")
+                Log.extensions.error("Extension pressed an unknown key: \(key, privacy: .public)")
             }
         }
     }
@@ -122,11 +133,11 @@ final class ExtensionService {
         host = nil
         commands = []
         guard restarts < Self.maxRestarts else {
-            Log.app.error("Extension host keeps exiting, last status \(status), extensions stay off until the next change")
+            Log.extensions.error("Extension host keeps exiting, last status \(status), extensions stay off until the next change")
             return
         }
         restarts += 1
-        Log.app.error("Extension host exited with status \(status), restarting")
+        Log.extensions.error("Extension host exited with status \(status), restarting")
         reload()
     }
 }

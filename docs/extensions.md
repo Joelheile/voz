@@ -21,7 +21,15 @@ export default defineExtension((voz) => {
 
 voz writes the types to `~/.voz/node_modules/voz`, so editors type-check files in `~/.voz/extensions`. The factory can be `async`. voz waits for it before it loads the next extension.
 
-voz reloads extensions when you install, remove or update a package. After you edit a file in `~/.voz/extensions`, quit and reopen voz.
+voz reloads extensions when you save a file in `~/.voz/extensions` or in a local package, and when you install, remove or update a package. Keep an extension's own files in `voz.paths.data`, not next to its code, or every write reloads it.
+
+To work on an extension or package in another folder, run:
+
+```
+voz dev ./my-extension
+```
+
+voz loads it, reloads it on save and prints extension logs, including `console.log`. Press Ctrl-C to unload it.
 
 ## API
 
@@ -73,6 +81,7 @@ voz install git:github.com/user/voz-jira@v1.0.0
 voz install ./my-package
 voz list
 voz update
+voz dev ./my-package
 voz remove voz-jira
 ```
 

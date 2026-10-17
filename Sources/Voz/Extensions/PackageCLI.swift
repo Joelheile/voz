@@ -10,7 +10,7 @@ enum PackageCLIError: Error, CustomStringConvertible {
 
     var description: String {
         switch self {
-        case .usage: "usage: voz install <npm:name | git:host/owner/repo[@ref] | https URL | path>\n       voz remove <source or name>\n       voz list\n       voz update"
+        case .usage: "usage: voz install <npm:name | git:host/owner/repo[@ref] | https URL | path>\n       voz remove <source or name>\n       voz list\n       voz update\n       voz dev <path>"
         case .alreadyInstalled(let path): "Already installed at \(path). Run voz update or voz remove first."
         case .notInstalled(let name): "No installed package matches \(name)."
         case .missing(let url): "No package at \(url.path)."
@@ -24,13 +24,14 @@ enum PackageCLI {
     private static let git = "/usr/bin/git"
 
     static func run(_ arguments: [String]) async -> Int32? {
-        guard arguments.count > 1, ["install", "remove", "list", "update"].contains(arguments[1]) else { return nil }
+        guard arguments.count > 1, ["install", "remove", "list", "update", "dev"].contains(arguments[1]) else { return nil }
         do {
             switch (arguments[1], arguments.dropFirst(2).first) {
             case ("install", let source?): try await install(source)
             case ("remove", let target?): try remove(target)
             case ("list", nil): try list()
             case ("update", nil): try await update()
+            case ("dev", let path?): try develop(path)
             default: throw PackageCLIError.usage
             }
             return 0
@@ -106,6 +107,22 @@ enum PackageCLI {
         }
         notifyApp()
         print("Updated \(packages.count) package\(packages.count == 1 ? "" : "s")")
+    }
+
+    private static func develop(_ raw: String) throws {
+        let source = try PackageSource(parsing: raw, relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
+        guard case .local(let url) = source else { throw PackageCLIError.usage }
+        guard FileManager.default.fileExists(atPath: url.path) else { throw PackageCLIError.missing(url) }
+        let sources = try home.packageSources()
+        let added = !sources.contains(source.description)
+        if added { try home.setPackageSources(sources + [source.description]) }
+        notifyApp()
+        print("Loaded \(url.path). voz reloads it when you save. Press Ctrl-C to stop.")
+        signal(SIGINT) { _ in }
+        _ = try BunRuntime.run("/usr/bin/log", ["stream", "--style", "compact", "--predicate", "subsystem == \"\(Log.subsystem)\" AND category == \"extensions\""])
+        if added { try home.setPackageSources(try home.packageSources().filter { $0 != source.description }) }
+        notifyApp()
+        print("\nUnloaded \(url.path)")
     }
 
     private static func installed() throws -> [(raw: String, source: PackageSource)] {
