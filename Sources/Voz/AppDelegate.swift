@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     private lazy var output = TextOutput(settings: settings)
     private let cleaner = TextCleaner()
+    private lazy var extensions = ExtensionService(output: output)
     private lazy var dictation = Dictation(
         pipeline: DictationPipeline(
             engine: SpeechEngine(parakeet: transcriber),
@@ -23,7 +24,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             history: history,
             output: output,
             editObserver: EditObserver(vocabulary: history.vocabulary),
-            analytics: analytics
+            analytics: analytics,
+            extensions: extensions
         ),
         settings: settings,
         output: output,
@@ -69,6 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         dictation.recoverFromPreviousRun()
+        extensions.start()
         let statusItemController = StatusItemController(
             dictation: dictation,
             settings: settings,

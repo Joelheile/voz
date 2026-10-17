@@ -33,6 +33,12 @@ voz never reads secure text fields such as password inputs.
 - Settings cover the hotkey, language, cleanup, output, vocabulary and updates.
 - Recordings under 0.3 seconds or without speech are discarded.
 
+## Extensions
+
+Extensions are TypeScript files that change text before voz inserts it or add voice commands, such as "send it" to press Return. Put them in `~/.voz/extensions`, or install packages with `voz install npm:<name>`. See [docs/extensions.md](docs/extensions.md).
+
+Extensions run with your permissions and can read your transcripts. Install only packages you trust.
+
 ## Build from source
 
 You need macOS 26, the Swift 6.2 toolchain and a code signing identity.
@@ -61,8 +67,9 @@ What leaves your Mac:
 - Anonymous usage events to PostHog (EU). They carry timings, counts, app and macOS version, chip and a random install ID. They never carry transcript text, vocabulary or app names. You can turn this off in onboarding or Settings.
 - Update checks and downloads from GitHub through Sparkle.
 - One-time speech model downloads from Hugging Face.
+- Bun, from GitHub, the first time you use an extension. Packages you install, from npm or git.
 
-voz makes no other network requests.
+voz makes no other network requests. Extensions you install can make their own.
 
 ## License
 

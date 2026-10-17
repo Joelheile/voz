@@ -4,6 +4,10 @@ import VozCore
 
 let arguments = CommandLine.arguments
 
+if let exitCode = await PackageCLI.run(arguments) {
+    exit(exitCode)
+}
+
 if let exitCode = await Headless.run(arguments) {
     exit(exitCode)
 }

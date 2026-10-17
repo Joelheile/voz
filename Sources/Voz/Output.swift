@@ -27,11 +27,28 @@ final class TextOutput {
             Log.app.error("No key produces v on the current keyboard layout, text copied but not pasted")
             return
         }
-        Self.postPaste(keyCode: CGKeyCode(keyCode))
+        Self.post(keyCode: CGKeyCode(keyCode), flags: .maskCommand)
         guard let snapshot else { return }
         try? await Task.sleep(for: .seconds(ClipboardRestoreGuard.delay))
         if ClipboardRestoreGuard.shouldRestore(changeCountAtWrite: changeCountAtWrite, currentChangeCount: pasteboard.changeCount) {
             Self.restore(snapshot, to: pasteboard)
+        }
+    }
+
+    func press(_ chord: KeyChord) {
+        guard AXIsProcessTrusted() else {
+            Log.app.error("Accessibility not granted, key press skipped")
+            return
+        }
+        switch chord.key {
+        case .code(let code):
+            Self.post(keyCode: CGKeyCode(code), flags: chord.modifiers.eventFlags)
+        case .character(let character):
+            guard let code = KeyboardLayout.keyCode(producing: character) else {
+                Log.app.error("No key produces \(character, privacy: .public) on the current keyboard layout")
+                return
+            }
+            Self.post(keyCode: CGKeyCode(code), flags: chord.modifiers.eventFlags)
         }
     }
 
@@ -70,11 +87,11 @@ final class TextOutput {
         pasteboard.writeObjects(items)
     }
 
-    private static func postPaste(keyCode: CGKeyCode) {
+    private static func post(keyCode: CGKeyCode, flags: CGEventFlags) {
         let source = CGEventSource(stateID: .combinedSessionState)
         for keyDown in [true, false] {
             let event = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: keyDown)
-            event?.flags = .maskCommand
+            event?.flags = flags
             event?.post(tap: .cghidEventTap)
         }
     }

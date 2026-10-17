@@ -10,6 +10,7 @@ final class DictationPipeline {
     private let output: TextOutput
     private let editObserver: EditObserver
     private let analytics: Analytics
+    private let extensions: ExtensionService
 
     init(
         engine: SpeechEngine,
@@ -18,7 +19,8 @@ final class DictationPipeline {
         history: HistoryStore,
         output: TextOutput,
         editObserver: EditObserver,
-        analytics: Analytics
+        analytics: Analytics,
+        extensions: ExtensionService
     ) {
         self.engine = engine
         self.cleaner = cleaner
@@ -27,6 +29,7 @@ final class DictationPipeline {
         self.output = output
         self.editObserver = editObserver
         self.analytics = analytics
+        self.extensions = extensions
     }
 
     func collectLearnedWords() {
@@ -52,11 +55,15 @@ final class DictationPipeline {
                 return .discarded
             }
             Log.app.notice("Transcribed \(transcript.audioSeconds, format: .fixed(precision: 1))s with \(transcript.model): \(transcript.segmentCount) segments, \(transcript.cleanedInTime) cleaned in time, tail STT \(transcript.sttMs) ms, cleanup wait \(transcript.cleaned.milliseconds) ms")
+            let delivery = await extensions.prepare(transcript.cleaned.text, raw: transcript.raw, app: recording.app)
             let insertStarted = ContinuousClock.now
-            await output.deliver(transcript.cleaned.text)
+            if !delivery.text.isEmpty {
+                await output.deliver(delivery.text)
+                if settings.insertIntoApp { editObserver.observe(inserted: delivery.text) }
+            }
             let insertMs = (ContinuousClock.now - insertStarted).wholeMilliseconds
-            if settings.insertIntoApp { editObserver.observe(inserted: transcript.cleaned.text) }
-            let record = save(transcript, app: recording.app, released: released)
+            if let command = delivery.command { extensions.run(command, text: delivery.text, app: recording.app) }
+            let record = save(transcript, finalText: delivery.text.isEmpty ? transcript.cleaned.text : delivery.text, app: recording.app, released: released)
             report(record, model: transcript.model, insertMs: insertMs, trigger: recording.trigger)
             return .done
         } catch {
@@ -96,10 +103,10 @@ final class DictationPipeline {
         )))
     }
 
-    private func save(_ transcript: StreamedTranscript, app: FrontApp, released: ContinuousClock.Instant) -> TranscriptRecord {
+    private func save(_ transcript: StreamedTranscript, finalText: String, app: FrontApp, released: ContinuousClock.Instant) -> TranscriptRecord {
         let record = TranscriptRecord(
             rawText: transcript.raw,
-            finalText: transcript.cleaned.text,
+            finalText: finalText,
             audioSeconds: transcript.audioSeconds,
             sttMs: transcript.sttMs,
             totalMs: (ContinuousClock.now - released).wholeMilliseconds,
