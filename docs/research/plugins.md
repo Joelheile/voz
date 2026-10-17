@@ -143,6 +143,29 @@ A Packages section in `SettingsView`: installed list, enable toggle, remove, upd
 - Plugin-provided speech engines. These would run as a child process that streams audio. Hard to fit in the latency budget.
 - Analytics: count installs per package name, never package contents.
 
+## Framework: stay in Swift or move to Tauri
+
+Added 2026-10-17. Question: should voz move to Tauri and Rust so it can run TypeScript extensions?
+
+Answer: no. Tauri does not run user TypeScript any better than Swift does, and a rewrite loses the native parts voz depends on.
+
+- **Tauri has no TypeScript runtime for plugins.** A Tauri app is a Rust core plus a web UI in the system WebView, WKWebView on macOS. It ships no Node runtime [23]. To run npm-based extensions, Tauri bundles Node as a sidecar binary [24]. A Swift app can start the same Node process. The extension story is identical in both stacks.
+- **voz's core is Swift-only API.** FoundationModels cleanup, FluidAudio Parakeet on the Neural Engine, the CGEventTap hotkey, the notch `NSPanel` and Accessibility paste all live in Swift today. From Rust each needs a bridge: young FoundationModels crates [25], `tauri-nspanel` for panels, a third-party event tap plugin because the default global shortcut plugin loses to system shortcuts [26]. Tauri's Swift plugin bridge is documented for iOS, not macOS desktop [27].
+- **Raycast ruled Tauri out for the same reason.** Raycast 2.0 kept a native Swift shell on macOS and said Tauri "gives you less control on the native side" [28].
+- **Raycast v1 is the model to copy.** A Swift app runs extensions in a child Node process that Raycast downloads and checks itself. Each extension gets a worker thread. JSON-RPC over stdio carries the messages. A custom React reconciler sends a JSON render tree that Swift draws with AppKit [9]. Raycast first tried JavaScriptCore and moved to Node because developers wanted npm packages and polyfills piled up [9].
+- **Raycast 2.0 is the cost of going further.** It moved UI into WKWebView with a long-lived Node backend. Memory went from about 200 to 300 MB to about 350 to 450 MB [28]. voz should not pay that for dictation.
+- **Tauri works for dictation when cross-platform is the goal.** Handy is a Tauri dictation app with a Rust backend and a React settings UI [29]. Wispr Flow ships on Electron [30]. VoiceInk is native Swift with FluidAudio and per-app modes, like voz [31]. Choose Tauri only if Windows and Linux become requirements. Even then, Raycast's path is a native shell per platform.
+
+### Runtime for the extension host
+
+| Runtime | Runs `.ts` directly | Size | Notes |
+| --- | --- | --- | --- |
+| Node | Yes, type stripping in recent releases | About 34 MB for a hello-world SEA binary [32] | Raycast's choice. Largest ecosystem compatibility. |
+| Bun | Yes | About 50 to 90 MB compiled, one project's figure [33] | Fast start, bundles a test runner and package manager. |
+| JavaScriptCore | No, needs a transpile step | 0, part of macOS | No npm or Node APIs. Raycast abandoned it [9]. |
+
+Recommendation: a managed Node runtime, downloaded on first extension install and checked against a pinned checksum, as Raycast v1 did [9]. Users with no extensions download nothing.
+
 ## Open questions
 
 - Should cleanup modes replace the single cleanup prompt, or add to it?
@@ -173,3 +196,14 @@ A Packages section in `SettingsView`: installed list, enable toggle, remove, upd
 20. Apple, AppExtensionPoint, and forum thread 805437. https://developer.apple.com/documentation/extensionfoundation/appextensionpoint and https://developer.apple.com/forums/thread/805437
 21. Kodeco, JavaScriptCore tutorial. https://www.kodeco.com/1227-javascriptcore-tutorial-for-ios-getting-started
 22. Extism. https://extism.org
+23. Tauri architecture. https://v2.tauri.app/concept/architecture/
+24. Tauri, Node.js as a sidecar. https://v2.tauri.app/learn/sidecar-nodejs/
+25. fm-rs, Rust bindings for FoundationModels. https://docs.rs/crate/fm-rs/latest
+26. tauri-plugin-macos-input-monitor. https://github.com/yigitkonur/tauri-plugin-macos-input-monitor and tauri-nspanel. https://github.com/capsoftware/tauri-nspanel
+27. Tauri 2.0 roadmap, Swift and Kotlin plugin bindings. https://v2.tauri.app/blog/roadmap-to-tauri-2-0/
+28. Raycast, "A technical deep dive into the new Raycast". https://www.raycast.com/blog/a-technical-deep-dive-into-the-new-raycast
+29. Handy. https://github.com/cjpais/Handy
+30. Desktop Insights, Wispr Flow. https://desktopinsights.com/apps/wispr-flow
+31. VoiceInk. https://gittrend.io/repo/Beingpax/VoiceInk
+32. Packaging Node.js code into executables. https://www.sheshbabu.com/posts/packaging-node-js-code-into-cross-platform-executables/
+33. Bun executables. https://bun.com/docs/bundler/executables
