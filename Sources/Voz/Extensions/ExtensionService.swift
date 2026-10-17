@@ -13,11 +13,13 @@ final class ExtensionService {
     private static let maxRestarts = 3
     private static let watchdogInterval: Duration = .seconds(5)
     private static let pingTimeout: Duration = .seconds(2)
+    private static let eventTimeout: Duration = .seconds(30)
 
     private let home = VozHome()
     private let output: TextOutput
     private var host: ExtensionHost?
     private var commands: [String] = []
+    private var events: Set<String> = []
     private var restarts = 0
     private var observer: NSObjectProtocol?
     private var reloading: Task<Void, Never>?
@@ -45,6 +47,7 @@ final class ExtensionService {
             await host?.stop()
             host = nil
             commands = []
+            events = []
             watch()
             guard home.hasExtensions else { return }
             do {
@@ -61,6 +64,27 @@ final class ExtensionService {
         let dictated = match?.leadingText ?? text
         let transformed = dictated.isEmpty ? "" : await host.beforeInsert(text: dictated, raw: raw, app: app.hostApp, timeout: Self.insertTimeout)
         return ExtensionDelivery(text: transformed, command: match?.phrase)
+    }
+
+    func recorded(_ samples: [Float], app: FrontApp) {
+        guard let host, events.contains("recording") else { return }
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("voz-recording-\(UUID().uuidString).wav")
+        let seconds = Double(samples.count) / RecordingFilter.sampleRate
+        Task.detached {
+            do {
+                try WAVEncoder.encode(samples, sampleRate: Int(RecordingFilter.sampleRate)).write(to: file)
+            } catch {
+                Log.extensions.error("Recording file write failed: \(error.localizedDescription, privacy: .public)")
+                return
+            }
+            await host.emit(.recording(path: file.path, seconds: seconds), app: app.hostApp, timeout: Self.eventTimeout)
+            try? FileManager.default.removeItem(at: file)
+        }
+    }
+
+    func inserted(_ text: String, raw: String, app: FrontApp) {
+        guard let host, events.contains("afterInsert") else { return }
+        Task { await host.emit(.afterInsert(text: text, raw: raw), app: app.hostApp, timeout: Self.eventTimeout) }
     }
 
     func run(_ command: String, text: String, app: FrontApp) {
@@ -91,6 +115,7 @@ final class ExtensionService {
         Log.extensions.notice("Extensions loaded: \(manifest.extensions.joined(separator: ", "), privacy: .public)")
         self.host = host
         commands = manifest.commands
+        events = Set(manifest.events)
         watchdog = Task { [weak self] in await self?.watch(host) }
     }
 
@@ -132,6 +157,7 @@ final class ExtensionService {
         watchdog?.cancel()
         host = nil
         commands = []
+        events = []
         guard restarts < Self.maxRestarts else {
             Log.extensions.error("Extension host keeps exiting, last status \(status), extensions stay off until the next change")
             return

@@ -26,10 +26,11 @@ type Launch = {
   extensionsDirectory: string;
   packages: string[];
 };
-type InsertHandler = {
+type EventName = "beforeInsert" | "recording" | "afterInsert";
+type Handler = {
   extension: string;
   run: (
-    event: BeforeInsertEvent,
+    event: object,
     ctx: Context,
   ) => BeforeInsertResult | Promise<BeforeInsertResult>;
 };
@@ -39,6 +40,7 @@ type Command = {
   run: (event: CommandEvent, ctx: Context) => void | Promise<void>;
 };
 type InsertRequest = BeforeInsertEvent & { app: App };
+type EmitRequest = { event: EventName; payload: object; app: App };
 type CommandRequest = CommandEvent & { phrase: string; app: App };
 
 const send = (message: object) =>
@@ -53,7 +55,8 @@ console.log =
     (...parts: unknown[]) => log(parts.map(String).join(" "));
 
 const launch: Launch = JSON.parse(process.argv[2]);
-const insertHandlers: InsertHandler[] = [];
+const eventNames: EventName[] = ["beforeInsert", "recording", "afterInsert"];
+const handlers = new Map<EventName, Handler[]>();
 const commands = new Map<string, Command>();
 const loaded: string[] = [];
 const errors: string[] = [];
@@ -144,9 +147,13 @@ function api(name: string, config: ExtensionAPI["config"]): ExtensionAPI {
       on: (event, handler) => bus.on(event, handler),
       emit: (event, payload) => bus.emit(event, payload),
     },
-    on(event, handler) {
-      if (event !== "beforeInsert") throw new Error(`Unknown event "${event}"`);
-      insertHandlers.push({ extension: name, run: handler });
+    on(event: EventName, handler: Handler["run"]) {
+      if (!eventNames.includes(event))
+        throw new Error(`Unknown event "${event}"`);
+      handlers.set(event, [
+        ...(handlers.get(event) ?? []),
+        { extension: name, run: handler },
+      ]);
     },
     registerCommand(phrase, handler) {
       const key = phrase.trim().toLowerCase();
@@ -182,7 +189,7 @@ async function load() {
 
 async function beforeInsert({ text, raw, app }: InsertRequest) {
   const ctx = context(app);
-  for (const handler of insertHandlers) {
+  for (const handler of handlers.get("beforeInsert") ?? []) {
     try {
       const result = await handler.run({ text, raw }, ctx);
       if (result && "handled" in result) return { text: "" };
@@ -192,6 +199,20 @@ async function beforeInsert({ text, raw, app }: InsertRequest) {
     }
   }
   return { text };
+}
+
+async function emit({ event, payload, app }: EmitRequest) {
+  const ctx = context(app);
+  await Promise.all(
+    (handlers.get(event) ?? []).map(async (handler) => {
+      try {
+        await handler.run(payload, ctx);
+      } catch (error) {
+        log(`${handler.extension} ${event} failed: ${describe(error)}`);
+      }
+    }),
+  );
+  return {};
 }
 
 async function command({ phrase, text, app }: CommandRequest) {
@@ -204,6 +225,7 @@ async function command({ phrase, text, app }: CommandRequest) {
 const methods: Record<string, (params: any) => Promise<object>> = {
   beforeInsert,
   command,
+  emit,
   ping: async () => ({}),
 };
 
@@ -213,7 +235,7 @@ send({
   method: "ready",
   params: {
     extensions: loaded,
-    events: insertHandlers.length > 0 ? ["beforeInsert"] : [],
+    events: [...handlers.keys()],
     commands: [...commands.values()].map((command) => command.phrase),
     errors,
   },

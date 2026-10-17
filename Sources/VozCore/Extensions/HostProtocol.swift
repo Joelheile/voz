@@ -19,6 +19,32 @@ public struct HostManifest: Decodable, Equatable, Sendable {
     public static let beforeInsert = "beforeInsert"
 }
 
+public enum HostEvent: Encodable, Sendable {
+    case recording(path: String, seconds: Double)
+    case afterInsert(text: String, raw: String)
+
+    public var name: String {
+        switch self {
+        case .recording: "recording"
+        case .afterInsert: "afterInsert"
+        }
+    }
+
+    private enum Keys: String, CodingKey { case path, seconds, text, raw }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: Keys.self)
+        switch self {
+        case .recording(let path, let seconds):
+            try container.encode(path, forKey: .path)
+            try container.encode(seconds, forKey: .seconds)
+        case .afterInsert(let text, let raw):
+            try container.encode(text, forKey: .text)
+            try container.encode(raw, forKey: .raw)
+        }
+    }
+}
+
 public enum HostAction: Equatable, Sendable {
     case insert(String)
     case press(String)
@@ -76,6 +102,12 @@ struct InsertResult: Decodable {
 }
 
 struct EmptyParams: Codable {}
+
+struct EmitParams: Encodable {
+    let event: String
+    let payload: HostEvent
+    let app: HostApp
+}
 
 struct CommandResult: Decodable {
     let handled: Bool

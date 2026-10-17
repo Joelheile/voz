@@ -11,6 +11,8 @@ export type Context = {
 export type BeforeInsertEvent = { text: string; raw: string };
 export type BeforeInsertResult = { text: string } | { handled: true } | void;
 export type CommandEvent = { text: string };
+export type RecordingEvent = { path: string; seconds: number };
+export type AfterInsertEvent = { text: string; raw: string };
 
 type Awaitable<T> = T | Promise<T>;
 
@@ -30,6 +32,14 @@ export type ExtensionAPI = {
       event: BeforeInsertEvent,
       ctx: Context,
     ) => Awaitable<BeforeInsertResult>,
+  ): void;
+  on(
+    event: "recording",
+    handler: (event: RecordingEvent, ctx: Context) => Awaitable<void>,
+  ): void;
+  on(
+    event: "afterInsert",
+    handler: (event: AfterInsertEvent, ctx: Context) => Awaitable<void>,
   ): void;
   registerCommand(
     phrase: string,

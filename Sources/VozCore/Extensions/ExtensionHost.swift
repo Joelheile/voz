@@ -87,6 +87,11 @@ public actor ExtensionHost {
         return decodeResult(CommandResult.self, from: data)?.handled ?? false
     }
 
+    public func emit(_ event: HostEvent, app: HostApp, timeout: Duration) async {
+        guard manifest?.events.contains(event.name) == true else { return }
+        _ = decodeResult(EmptyParams.self, from: await request("emit", EmitParams(event: event.name, payload: event, app: app), timeout: timeout))
+    }
+
     public func ping(timeout: Duration) async -> Bool {
         decodeResult(EmptyParams.self, from: await request("ping", EmptyParams(), timeout: timeout)) != nil
     }

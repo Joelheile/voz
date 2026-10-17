@@ -58,7 +58,7 @@ Headless modes for testing: `voz --transcribe <audio file>`, `voz --clean <text>
 
 What stays on your Mac:
 
-- Audio. voz keeps it in memory and never writes it to disk.
+- Audio. voz keeps it in memory and does not write it to disk unless an extension listens for recordings. Then voz writes each one to a temporary file and deletes it after the extension finishes.
 - Transcripts, history, vocabulary and stats. They live in `~/Library/Application Support/voz`, readable only by your user.
 - Speech recognition and cleanup. Both run on device.
 

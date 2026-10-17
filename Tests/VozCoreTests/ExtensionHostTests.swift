@@ -105,6 +105,18 @@ struct ExtensionHostTests {
         await host.stop()
     }
 
+    @Test func emittedEventsReachEveryHandlerAndOnlySubscribedEventsAreSent() async throws {
+        try extensionFile("observe.ts", #"export default (voz) => { voz.on("recording", (e, ctx) => ctx.insert(`${e.path} ${e.seconds} ${ctx.app.name}`)); voz.on("recording", () => { throw new Error("ignored") }) }"#)
+        let actions = RecordedActions()
+        let host = makeHost(actions: actions)
+        let manifest = try await host.start()
+        #expect(manifest.events == ["recording"])
+        await host.emit(.recording(path: "/tmp/a.wav", seconds: 1.5), app: app, timeout: .seconds(2))
+        await host.emit(.afterInsert(text: "hi", raw: "hi"), app: app, timeout: .seconds(2))
+        #expect(actions.all == [.insert("/tmp/a.wav 1.5 Slack")])
+        await host.stop()
+    }
+
     @Test func packagesLoadFromManifestAndConsoleLogDoesNotBreakProtocol() async throws {
         let package = home.packages.appendingPathComponent("git/github.com/acme/voz-pack")
         try writeFile(#"{"name":"voz-pack","voz":{"extensions":["src/main.ts"]}}"#, named: "package.json", in: package)
