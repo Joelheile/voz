@@ -27,7 +27,6 @@ enum Theme {
         static let section: CGFloat = 32
         static let block: CGFloat = 24
         static let item: CGFloat = 16
-        static let tight: CGFloat = 8
     }
 
     enum Motion {

@@ -14,7 +14,6 @@ enum IndicatorMotion {
     static let exitBlur: CGFloat = 4
     static let hiddenScaleX: CGFloat = 0.4
     static let hiddenScaleY: CGFloat = 0.85
-    static let shakeDuration = 0.4
 }
 
 struct NotchContentEffect: ViewModifier {

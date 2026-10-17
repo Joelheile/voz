@@ -11,8 +11,6 @@ final class HotkeyMonitor {
     private let isRecording: @MainActor () -> Bool
     private let onAction: @MainActor (HotkeyAction) -> Void
 
-    var isRunning: Bool { tap != nil }
-
     init(
         hotkey: Hotkey,
         holdToTalk: Bool,
