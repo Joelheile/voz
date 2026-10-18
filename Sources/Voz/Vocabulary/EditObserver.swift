@@ -5,6 +5,7 @@ import VozCore
 @MainActor
 final class EditObserver {
     static let readDelay = Duration.seconds(20)
+    private static let messagingTimeout: Float = 0.25
 
     private struct Observation {
         let element: AXUIElement
@@ -57,10 +58,14 @@ final class EditObserver {
     }
 
     private static func focusedElement() -> AXUIElement? {
+        let systemWide = AXUIElementCreateSystemWide()
+        AXUIElementSetMessagingTimeout(systemWide, messagingTimeout)
         var value: CFTypeRef?
-        let status = AXUIElementCopyAttributeValue(AXUIElementCreateSystemWide(), kAXFocusedUIElementAttribute as CFString, &value)
+        let status = AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &value)
         guard status == .success, let value, CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
-        return (value as! AXUIElement)
+        let element = value as! AXUIElement
+        AXUIElementSetMessagingTimeout(element, messagingTimeout)
+        return element
     }
 
     private static func isSecure(_ element: AXUIElement) -> Bool {

@@ -6,6 +6,7 @@ final class TextOutput {
     private static let pasteDelay: TimeInterval = 0.05
 
     private let settings: AppSettings
+    private var pendingRestore: (snapshot: [[NSPasteboard.PasteboardType: Data]], task: Task<Void, Never>)?
 
     init(settings: AppSettings) {
         self.settings = settings
@@ -15,7 +16,9 @@ final class TextOutput {
         let output = settings.output
         guard output.copyToClipboard || output.pasteIntoActiveApp else { return }
         let pasteboard = NSPasteboard.general
-        let snapshot = output.needsClipboardRestore ? Self.snapshot(of: pasteboard) : nil
+        pendingRestore?.task.cancel()
+        let snapshot = output.needsClipboardRestore ? pendingRestore?.snapshot ?? Self.snapshot(of: pasteboard) : nil
+        pendingRestore = nil
         let changeCountAtWrite = write(text, to: pasteboard, markers: PasteboardMarkers.types(copyToClipboard: output.copyToClipboard))
         guard output.pasteIntoActiveApp else { return }
         guard AXIsProcessTrusted() else {
@@ -29,10 +32,14 @@ final class TextOutput {
         }
         Self.post(keyCode: CGKeyCode(keyCode), flags: .maskCommand)
         guard let snapshot else { return }
-        try? await Task.sleep(for: .seconds(ClipboardRestoreGuard.delay))
-        if ClipboardRestoreGuard.shouldRestore(changeCountAtWrite: changeCountAtWrite, currentChangeCount: pasteboard.changeCount) {
-            Self.restore(snapshot, to: pasteboard)
+        let task = Task { [weak self] in
+            guard (try? await Task.sleep(for: .seconds(ClipboardRestoreGuard.delay))) != nil else { return }
+            self?.pendingRestore = nil
+            if ClipboardRestoreGuard.shouldRestore(changeCountAtWrite: changeCountAtWrite, currentChangeCount: pasteboard.changeCount) {
+                Self.restore(snapshot, to: pasteboard)
+            }
         }
+        pendingRestore = (snapshot, task)
     }
 
     func press(_ chord: KeyChord) {

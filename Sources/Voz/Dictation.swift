@@ -98,7 +98,6 @@ final class Dictation {
     }
 
     private func start(trigger: DictationTrigger) {
-        pipeline.collectLearnedWords()
         guard Permissions.microphoneGranted else {
             Log.app.error("Microphone access not granted")
             analytics.capture(.dictationFailed(stage: .recording, errorCode: .microphoneDenied))
@@ -125,6 +124,7 @@ final class Dictation {
         recordingApp = app
         recordingTrigger = trigger
         phase = .recording
+        pipeline.collectLearnedWords()
         if settings.muteWhileRecording { mute(after: cuePlayed ? .milliseconds(150) : .zero) }
     }
 
