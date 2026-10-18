@@ -11,6 +11,7 @@ What leaves your Mac:
 - Anonymous usage events, sent to PostHog (EU). They contain timings, counts, the app and macOS version, the chip, and a random install ID. They do not contain transcript text, dictionary words, or app names. To turn them off, use onboarding or Settings.
 - Update checks and downloads, from GitHub through Sparkle.
 - Speech model downloads, from Hugging Face.
+- The extension list, from the npm registry, when you open Extensions.
 - Bun, from GitHub, the first time you use an extension. Packages you install, from npm or git.
 
 voz makes no other network requests. Extensions you install can make their own.

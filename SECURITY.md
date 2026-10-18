@@ -21,7 +21,14 @@ Only the latest stable release and the latest beta receive fixes.
 
 ## Network
 
-voz connects only to PostHog (EU) for analytics, GitHub for Sparkle updates, and Hugging Face for model downloads.
+voz connects only to PostHog (EU) for analytics, GitHub for Sparkle updates and the Bun runtime, Hugging Face for model downloads, and the npm registry or git hosts for extensions you browse or install.
+
+## Extensions
+
+- Installs never run package scripts and pin exact npm versions.
+- voz rejects package names, git paths and refs that could pass a command-line flag or leave the packages directory.
+- voz checks the Bun download against a pinned SHA-256 checksum.
+- The Extensions page asks you to confirm each install and links to the package source.
 
 ## Updates
 

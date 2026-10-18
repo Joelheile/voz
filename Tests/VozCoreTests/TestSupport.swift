@@ -24,6 +24,10 @@ final class SettingsFixture {
     }
 }
 
+func utf8Data(_ text: String) -> Data {
+    Data(text.utf8)
+}
+
 func makeRecord(_ text: String, at seconds: Double = 0) -> TranscriptRecord {
     TranscriptRecord(
         createdAt: Date(timeIntervalSince1970: seconds),
