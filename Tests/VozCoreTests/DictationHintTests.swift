@@ -23,7 +23,7 @@ import Testing
     }
 
     @Test func recordingHints() {
-        #expect(DictationHint.recording(hotkey: .rightCommand, holdToTalk: true) == "Release right ⌘ to finish")
-        #expect(DictationHint.recording(hotkey: .rightCommand, holdToTalk: false) == "Tap right ⌘ again to finish")
+        #expect(DictationHint.recording(hotkey: .rightCommand, holdToTalk: true) == "Release right ⌘ to stop")
+        #expect(DictationHint.recording(hotkey: .rightCommand, holdToTalk: false) == "Tap right ⌘ again to stop")
     }
 }

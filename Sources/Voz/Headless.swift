@@ -27,30 +27,32 @@ enum Headless {
         if let path = value(of: "--transcribe", in: arguments) {
             return await transcribe(URL(fileURLWithPath: path), arguments: arguments)
         }
+        if let seconds = value(of: "--measure-recorder", in: arguments).flatMap(Double.init) {
+            return await measureRecorder(seconds: seconds)
+        }
         if let path = value(of: "--simulate-dictation", in: arguments) {
             return await simulateDictation(URL(fileURLWithPath: path), arguments: arguments)
         }
-        if ["--transcribe", "--clean", "--eval", "--simulate-dictation", "--render-design"].contains(where: arguments.contains) {
-            printError("usage: voz --transcribe <audio file> [--language automatic|english] [--engine apple] [--vocab a,b]\n       voz --clean <text> [--vocab a,b]\n       voz --eval <cases.json> [--repeat n] [--budget-ms n]\n       voz --simulate-dictation <audio file> [--language automatic|english] [--speed n] [--no-cleanup]")
+        if ["--transcribe", "--clean", "--eval", "--simulate-dictation", "--render-design", "--measure-recorder"].contains(where: arguments.contains) {
+            printError("usage: voz --transcribe <audio file> [--model parakeet-ultra|parakeet-redux|parakeet-tdt-v2|apple-speech] [--vocab a,b]\n       voz --clean <text> [--vocab a,b]\n       voz --eval <cases.json> [--repeat n] [--budget-ms n]\n       voz --simulate-dictation <audio file> [--model parakeet-ultra|parakeet-redux|parakeet-tdt-v2|apple-speech] [--speed n] [--no-cleanup]")
             return 64
         }
         return nil
     }
 
     private static func transcribe(_ url: URL, arguments: [String]) async -> Int32 {
-        let mode = value(of: "--language", in: arguments).flatMap(LanguageMode.init) ?? .automatic
-        let forceApple = value(of: "--engine", in: arguments) == "apple"
+        let model = speechModel(in: arguments)
         let words = vocabulary(in: arguments)
         let transcriber = Transcriber()
-        let engine = SpeechEngine(parakeet: transcriber, forceApple: forceApple)
+        let engine = SpeechEngine(parakeet: transcriber)
         let loadStart = Date()
         do {
-            if !forceApple {
-                try await transcriber.prepare(mode)
+            if model != .appleSpeech {
+                try await transcriber.prepare(model)
                 try await transcriber.prepareVocabulary(words)
             }
             let loadSeconds = Date().timeIntervalSince(loadStart)
-            let result = try await engine.transcribeFile(url, mode: mode, vocabulary: words)
+            let result = try await engine.transcribeFile(url, model: model, vocabulary: words)
             print(result.text)
             print(String(
                 format: "engine %@, load %.2fs, audio %.2fs, transcription %.3fs",
@@ -64,13 +66,13 @@ enum Headless {
     }
 
     private static func simulateDictation(_ url: URL, arguments: [String]) async -> Int32 {
-        let mode = value(of: "--language", in: arguments).flatMap(LanguageMode.init) ?? .automatic
+        let model = speechModel(in: arguments)
         let speed = value(of: "--speed", in: arguments).flatMap(Double.init) ?? 1
         let cleanupEnabled = !arguments.contains("--no-cleanup")
         let transcriber = Transcriber()
         let cleaner = TextCleaner()
         do {
-            try await transcriber.prepare(mode)
+            try await transcriber.prepare(model)
             try await transcriber.prepareVocabulary([])
             let samples = try AudioConverter().resampleAudioFile(url)
             cleaner.prewarm(vocabulary: [])
@@ -79,7 +81,7 @@ enum Headless {
             let session = StreamingDictation(
                 engine: SpeechEngine(parakeet: transcriber),
                 cleaner: cleaner,
-                mode: mode,
+                model: model,
                 vocabulary: [],
                 cleanupEnabled: cleanupEnabled
             )
@@ -107,6 +109,36 @@ enum Headless {
         }
     }
 
+    private static func measureRecorder(seconds: Double) async -> Int32 {
+        setvbuf(stdout, nil, _IONBF, 0)
+        let recorder = Recorder()
+        for prepared in [false, true, true] {
+            if prepared {
+                recorder.prepare()
+                try? await Task.sleep(for: .seconds(1))
+                print("mic_running_while_prepared=\(InputDevice.isRunningSomewhere())")
+            }
+            let clock = ContinuousClock()
+            let firstSample = FirstSample()
+            recorder.onSamples = { _ in firstSample.mark() }
+            let begin = clock.now
+            do {
+                try recorder.start()
+            } catch {
+                printError("recorder failed: \(error)")
+                return 1
+            }
+            let started = clock.now
+            try? await Task.sleep(for: .seconds(seconds))
+            let samples = recorder.stop()
+            let first = firstSample.elapsed(since: begin, clock: clock)
+            print("prepared=\(prepared) start_call_ms=\((started - begin).wholeMilliseconds) first_sample_ms=\(first.map { String($0.wholeMilliseconds) } ?? "none") samples=\(samples.count)")
+            try? await Task.sleep(for: .milliseconds(500))
+            print("mic_running_after_stop=\(InputDevice.isRunningSomewhere())")
+        }
+        return 0
+    }
+
     private static func clean(_ text: String, vocabulary: [String]) async -> Int32 {
         let cleaner = TextCleaner()
         cleaner.prewarm(vocabulary: vocabulary)
@@ -122,11 +154,28 @@ enum Headless {
         return arguments[index + 1]
     }
 
+    private static func speechModel(in arguments: [String]) -> SpeechModel {
+        value(of: "--model", in: arguments).flatMap(SpeechModel.init) ?? .parakeetUltra
+    }
+
     private static func vocabulary(in arguments: [String]) -> [String] {
         value(of: "--vocab", in: arguments)?.split(separator: ",").map(String.init) ?? []
     }
 
     private static func printError(_ message: String) {
         FileHandle.standardError.write(Data((message + "\n").utf8))
+    }
+}
+
+final class FirstSample: @unchecked Sendable {
+    private let lock = NSLock()
+    private var instant: ContinuousClock.Instant?
+
+    func mark() {
+        lock.withLock { if instant == nil { instant = .now } }
+    }
+
+    func elapsed(since begin: ContinuousClock.Instant, clock: ContinuousClock) -> Duration? {
+        lock.withLock { instant.map { $0 - begin } }
     }
 }

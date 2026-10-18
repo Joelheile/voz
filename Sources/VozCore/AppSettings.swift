@@ -7,7 +7,7 @@ public enum SettingsKey {
     public static let muteWhileRecording = "muteWhileRecording"
     public static let copyToClipboard = "copyToClipboard"
     public static let insertIntoApp = "insertIntoApp"
-    public static let languageMode = "languageMode"
+    public static let speechModel = "speechModel"
     public static let indicatorStyle = "indicatorStyle"
     public static let soundCues = "soundCues"
     public static let launchAtLogin = "launchAtLogin"
@@ -36,8 +36,8 @@ public final class AppSettings: ObservableObject {
     @Published public var insertIntoApp: Bool {
         didSet { defaults.set(insertIntoApp, forKey: SettingsKey.insertIntoApp) }
     }
-    @Published public var languageMode: LanguageMode {
-        didSet { defaults.set(languageMode.rawValue, forKey: SettingsKey.languageMode) }
+    @Published public var speechModel: SpeechModel {
+        didSet { defaults.set(speechModel.rawValue, forKey: SettingsKey.speechModel) }
     }
     @Published public var indicatorStyle: IndicatorStyle {
         didSet { defaults.set(indicatorStyle.rawValue, forKey: SettingsKey.indicatorStyle) }
@@ -76,7 +76,7 @@ public final class AppSettings: ObservableObject {
             SettingsKey.muteWhileRecording: true,
             SettingsKey.copyToClipboard: true,
             SettingsKey.insertIntoApp: true,
-            SettingsKey.languageMode: LanguageMode.automatic.rawValue,
+            SettingsKey.speechModel: SpeechModel.parakeetUltra.rawValue,
             SettingsKey.indicatorStyle: IndicatorStyle.notch.rawValue,
             SettingsKey.soundCues: false,
             SettingsKey.launchAtLogin: true,
@@ -91,7 +91,7 @@ public final class AppSettings: ObservableObject {
         muteWhileRecording = defaults.bool(forKey: SettingsKey.muteWhileRecording)
         copyToClipboard = defaults.bool(forKey: SettingsKey.copyToClipboard)
         insertIntoApp = defaults.bool(forKey: SettingsKey.insertIntoApp)
-        languageMode = defaults.string(forKey: SettingsKey.languageMode).flatMap(LanguageMode.init) ?? .automatic
+        speechModel = defaults.string(forKey: SettingsKey.speechModel).flatMap(SpeechModel.init) ?? .parakeetUltra
         indicatorStyle = defaults.string(forKey: SettingsKey.indicatorStyle).flatMap(IndicatorStyle.init) ?? .notch
         soundCues = defaults.bool(forKey: SettingsKey.soundCues)
         launchAtLogin = defaults.bool(forKey: SettingsKey.launchAtLogin)

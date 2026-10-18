@@ -50,6 +50,6 @@ public enum SystemShortcuts {
     ]
 
     public static func warning(for hotkey: Hotkey) -> String? {
-        reserved[hotkey].map { "\(hotkey.displayName) is a system shortcut for \($0). It will also trigger that action." }
+        reserved[hotkey].map { "\(hotkey.displayName) is a system shortcut for \($0). It also triggers that action." }
     }
 }

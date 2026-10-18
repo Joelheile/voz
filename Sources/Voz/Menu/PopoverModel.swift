@@ -9,16 +9,16 @@ enum PermissionFix: Equatable {
 
     var detail: String {
         switch self {
-        case .microphone, .microphoneBlocked: "voz needs the microphone to hear you."
-        case .accessibility: "voz needs Accessibility to type into other apps."
+        case .microphone, .microphoneBlocked: "Allow microphone access to dictate."
+        case .accessibility: "Allow Accessibility to insert text into other apps."
         }
     }
 
     var buttonTitle: String {
         switch self {
         case .microphone: "Allow microphone"
-        case .microphoneBlocked: "Open Microphone settings"
-        case .accessibility: "Grant Accessibility"
+        case .microphoneBlocked: "Open microphone settings"
+        case .accessibility: "Allow Accessibility"
         }
     }
 }
@@ -36,19 +36,41 @@ enum PopoverStatus: Equatable {
         case .ready: "Ready"
         case .recording: "Recording"
         case .transcribing: "Transcribing"
-        case .loadingModel: "Model loading"
+        case .loadingModel: "Loading model"
         case .modelFailed: "Model unavailable"
         case .permissionNeeded: "Permission needed"
         }
     }
 }
 
+enum PopoverPage {
+    case home
+    case settings
+    case dictionary
+    case insights
+    case extensions
+
+    var title: String {
+        switch self {
+        case .home: "voz"
+        case .settings: "Settings"
+        case .dictionary: "Dictionary"
+        case .insights: "Insights"
+        case .extensions: "Extensions"
+        }
+    }
+
+    var parent: PopoverPage {
+        [.dictionary, .extensions].contains(self) ? .settings : .home
+    }
+}
+
 struct PopoverActions {
     var copy: (TranscriptRecord) -> Void = { _ in }
     var retry: () -> Void = {}
-    var openApp: () -> Void = {}
-    var openSettings: () -> Void = {}
     var fixPermission: (PermissionFix) -> Void = { _ in }
+    var checkForUpdates: () -> Void = {}
+    var finishSetup: () -> Void = {}
     var quit: () -> Void = {}
 }
 
@@ -58,13 +80,17 @@ final class PopoverModel: ObservableObject {
 
     @Published var status = PopoverStatus.ready
     @Published var hint = ""
-    @Published var wordsThisWeek = 0
-    @Published var transcripts: [TranscriptRecord] = []
     @Published var canRetry = false
+    @Published var page = PopoverPage.home
+    @Published var needsSetup = false
     @Published private(set) var copiedID: UUID?
 
     var actions = PopoverActions()
     private var copiedReset: Task<Void, Never>?
+
+    func goBack() {
+        page = page.parent
+    }
 
     func copy(_ record: TranscriptRecord) {
         actions.copy(record)

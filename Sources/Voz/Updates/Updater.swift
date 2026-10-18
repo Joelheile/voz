@@ -22,4 +22,8 @@ final class Updater: NSObject, SPUUpdaterDelegate {
     nonisolated func allowedChannels(for updater: SPUUpdater) -> Set<String> {
         MainActor.assumeIsolated { settings.receiveBetaUpdates ? [UpdateChannel.beta.rawValue] : [] }
     }
+
+    nonisolated func updaterWillRelaunchApplication(_ updater: SPUUpdater) {
+        LaunchAgent.bootOut()
+    }
 }

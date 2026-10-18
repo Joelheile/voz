@@ -9,90 +9,93 @@ struct TranscriptionResult: Sendable {
     let model: String
 }
 
-actor Transcriber {
-    typealias StatusReport = @Sendable (LanguageMode, ModelState) -> Void
+enum TranscriberError: Error {
+    case notParakeet(String)
+}
 
-    private var loaded: (mode: LanguageMode, manager: AsrManager)?
-    private var loading: (mode: LanguageMode, task: Task<AsrManager, Error>)?
+actor Transcriber {
+    typealias StatusReport = @Sendable (SpeechModel, ModelState) -> Void
+
+    private var loaded: (model: SpeechModel, manager: AsrManager)?
+    private var loading: (model: SpeechModel, task: Task<AsrManager, Error>)?
     private let report: StatusReport
     private let booster = VocabularyBooster()
+    private static let downloadableVersions: [AsrModelVersion] = [.ultra, .redux, .v2, .v3]
 
     init(report: @escaping StatusReport = { _, _ in }) {
         self.report = report
     }
 
-    func isReady(_ mode: LanguageMode) -> Bool {
-        loaded?.mode == mode
+    func isReady(_ model: SpeechModel) -> Bool {
+        loaded?.model == model
     }
 
     func prepareVocabulary(_ words: [String]) async throws {
         try await booster.prepare(words: words)
     }
 
-    func prepare(_ mode: LanguageMode) async throws {
-        _ = try await manager(for: mode)
+    func prepare(_ model: SpeechModel) async throws {
+        _ = try await manager(for: model)
     }
 
-    func removeUnusedModels(keeping mode: LanguageMode) {
-        for other in LanguageMode.allCases where other != mode && loading?.mode != other {
-            let directory = AsrModels.defaultCacheDirectory(for: other.modelVersion)
+    func removeUnusedModels(keeping model: SpeechModel) {
+        let inUse = [model.modelVersion, loading?.model.modelVersion].compactMap { $0 }
+        for version in Self.downloadableVersions where !inUse.contains(version) {
+            let directory = AsrModels.defaultCacheDirectory(for: version)
             guard FileManager.default.fileExists(atPath: directory.path) else { continue }
             do {
                 try FileManager.default.removeItem(at: directory)
-                report(other, .notLoaded)
-                Log.app.notice("Removed unused model \(other.modelName)")
+                if let removed = SpeechModel.allCases.first(where: { $0.modelVersion == version }) {
+                    report(removed, .notLoaded)
+                }
+                Log.app.notice("Removed unused model \(directory.lastPathComponent)")
             } catch {
-                Log.app.error("Removing unused model \(other.modelName) failed: \(error.localizedDescription, privacy: .private)")
+                Log.app.error("Removing unused model \(directory.lastPathComponent) failed: \(error.localizedDescription, privacy: .private)")
             }
         }
     }
 
-    func transcribe(_ samples: [Float], mode: LanguageMode, vocabulary: [String]) async throws -> TranscriptionResult {
-        let manager = try await manager(for: mode)
+    func transcribe(_ samples: [Float], model: SpeechModel, vocabulary: [String]) async throws -> TranscriptionResult {
+        let manager = try await manager(for: model)
         var decoderState = TdtDecoderState.make()
         let result = try await manager.transcribe(samples, decoderState: &decoderState)
         let text = await booster.rescore(result, samples: samples, words: vocabulary)
-        return TranscriptionResult(text: text, audioSeconds: result.duration, processingSeconds: result.processingTime, model: mode.modelName)
+        return TranscriptionResult(text: text, audioSeconds: result.duration, processingSeconds: result.processingTime, model: model.rawValue)
     }
 
-    func transcribeFile(_ url: URL, mode: LanguageMode, vocabulary: [String]) async throws -> TranscriptionResult {
-        let samples = try AudioConverter().resampleAudioFile(url)
-        return try await transcribe(samples, mode: mode, vocabulary: vocabulary)
-    }
-
-    private func manager(for mode: LanguageMode) async throws -> AsrManager {
-        if let loaded, loaded.mode == mode { return loaded.manager }
+    private func manager(for model: SpeechModel) async throws -> AsrManager {
+        if let loaded, loaded.model == model { return loaded.manager }
         let task: Task<AsrManager, Error>
-        if let loading, loading.mode == mode {
+        if let loading, loading.model == model {
             task = loading.task
         } else {
-            task = makeLoadTask(for: mode)
-            loading = (mode, task)
+            task = makeLoadTask(for: model)
+            loading = (model, task)
         }
         do {
             let manager = try await task.value
-            loaded = (mode, manager)
-            if loading?.mode == mode { loading = nil }
+            loaded = (model, manager)
+            if loading?.model == model { loading = nil }
             return manager
         } catch {
-            if loading?.mode == mode { loading = nil }
-            report(mode, .failed(error.localizedDescription))
+            if loading?.model == model { loading = nil }
+            report(model, .failed(error.localizedDescription))
             throw error
         }
     }
 
-    private func makeLoadTask(for mode: LanguageMode) -> Task<AsrManager, Error> {
+    private func makeLoadTask(for model: SpeechModel) -> Task<AsrManager, Error> {
         let report = report
-        let version = mode.modelVersion
         return Task {
+            guard let version = model.modelVersion else { throw TranscriberError.notParakeet(model.rawValue) }
             let loadStart = ContinuousClock.now
-            report(mode, .downloading(fraction: 0))
+            report(model, .downloading(fraction: 0))
             let models = try await AsrModels.downloadAndLoad(version: version) { progress in
                 switch progress.phase {
                 case .listing, .downloading:
-                    report(mode, .downloading(fraction: progress.fractionCompleted))
+                    report(model, .downloading(fraction: progress.fractionCompleted))
                 case .compiling:
-                    report(mode, .compiling)
+                    report(model, .compiling)
                 }
             }
             let manager = AsrManager(config: .default)
@@ -101,8 +104,8 @@ actor Transcriber {
             let warmStart = ContinuousClock.now
             await Self.warmUp(manager)
             let warmMs = (ContinuousClock.now - warmStart).wholeMilliseconds
-            Log.app.notice("Parakeet \(mode.modelName) cold load \(loadMs) ms, warm-up \(warmMs) ms")
-            report(mode, .ready(bytes: Self.directorySize(AsrModels.defaultCacheDirectory(for: version))))
+            Log.app.notice("Parakeet \(model.rawValue) cold load \(loadMs) ms, warm-up \(warmMs) ms")
+            report(model, .ready(bytes: Self.directorySize(AsrModels.defaultCacheDirectory(for: version))))
             return manager
         }
     }
@@ -126,15 +129,18 @@ actor Transcriber {
     }
 }
 
-extension LanguageMode {
+extension SpeechModel {
     var isDownloaded: Bool {
-        AsrModels.modelsExist(at: AsrModels.defaultCacheDirectory(for: modelVersion), version: modelVersion)
+        guard let modelVersion else { return true }
+        return AsrModels.modelsExist(at: AsrModels.defaultCacheDirectory(for: modelVersion), version: modelVersion)
     }
 
-    var modelVersion: AsrModelVersion {
+    var modelVersion: AsrModelVersion? {
         switch self {
-        case .automatic: .v3
-        case .english: .v2
+        case .parakeetUltra: .ultra
+        case .parakeetRedux: .redux
+        case .parakeetV2: .v2
+        case .appleSpeech: nil
         }
     }
 }

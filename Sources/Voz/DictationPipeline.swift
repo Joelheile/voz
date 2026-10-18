@@ -40,7 +40,7 @@ final class DictationPipeline {
         StreamingDictation(
             engine: engine,
             cleaner: cleaner,
-            mode: settings.languageMode,
+            model: settings.speechModel,
             vocabulary: vocabularyWords(),
             cleanupEnabled: settings.cleanupEnabled
         )
@@ -97,7 +97,7 @@ final class DictationPipeline {
             insertMs: insertMs,
             totalMs: record.totalMs,
             model: model,
-            languageMode: settings.languageMode,
+            selectedModel: settings.speechModel,
             cleanupUsed: settings.cleanupEnabled,
             cleanupTimedOut: record.cleanupTimedOut,
             trigger: trigger,

@@ -12,13 +12,14 @@ enum ModelState: Equatable, Sendable {
 
 @MainActor
 final class ModelStatus: ObservableObject {
-    @Published private var states: [LanguageMode: ModelState] = [:]
+    @Published private var states: [SpeechModel: ModelState] = [:]
 
-    func state(for mode: LanguageMode) -> ModelState {
-        states[mode] ?? .notLoaded
+    func state(for model: SpeechModel) -> ModelState {
+        if model == .appleSpeech { return .ready(bytes: 0) }
+        return states[model] ?? .notLoaded
     }
 
-    func update(_ mode: LanguageMode, _ state: ModelState) {
-        states[mode] = state
+    func update(_ model: SpeechModel, _ state: ModelState) {
+        states[model] = state
     }
 }

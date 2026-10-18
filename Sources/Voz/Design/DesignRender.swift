@@ -15,31 +15,35 @@ enum DesignRender {
         for (suffix, name) in appearances {
             let appearance = NSAppearance(named: name)!
             for (title, status, hint) in popoverStates {
-                let model = fixture.popoverModel(status: status, hint: hint)
-                try write(PopoverView(model: model).padding(28).background(Theme.canvas), size: nil, to: outputDirectory, name: "popover-\(title)-\(suffix)", appearance: appearance)
+                try write(fixture.popover(status: status, hint: hint), to: outputDirectory, name: "popover-\(title)-\(suffix)", appearance: appearance)
             }
-            for section in MainSection.allCases {
-                let size = section == .home ? MainView.windowSize : CGSize(width: MainView.windowSize.width, height: 1500)
-                try write(fixture.mainView(section: section), size: size, to: outputDirectory, name: "main-\(section.rawValue)-\(suffix)", appearance: appearance)
+            for (title, page) in pages {
+                try write(fixture.popover(page: page), to: outputDirectory, name: "popover-\(title)-\(suffix)", appearance: appearance)
             }
-            for (index, view) in fixture.onboardingSteps().enumerated() {
-                try write(view, size: OnboardingView.windowSize, to: outputDirectory, name: "onboarding-\(index + 1)-\(suffix)", appearance: appearance)
-            }
+            try write(fixture.popover(needsSetup: true), to: outputDirectory, name: "popover-setup-\(suffix)", appearance: appearance)
         }
     }
 
     private static let popoverStates: [(String, PopoverStatus, String)] = [
         ("ready", .ready, ""),
         ("recording", .recording, ""),
-        ("transcribing", .transcribing, "Cleaning up your text"),
-        ("loading", .loadingModel(detail: "Downloading the speech model, 42%", progress: 0.42), "Downloading the speech model, 42%"),
+        ("transcribing", .transcribing, "Processing your recording"),
+        ("loading", .loadingModel(detail: "Downloading speech model, 42%", progress: 0.42), "Downloading speech model, 42%"),
         ("permission", .permissionNeeded(.accessibility), PermissionFix.accessibility.detail),
     ]
 
-    private static func write(_ view: some View, size: CGSize?, to directory: URL, name: String, appearance: NSAppearance) throws {
-        let host = NSHostingView(rootView: view)
+    private static let pages: [(String, PopoverPage)] = [
+        ("settings", .settings),
+        ("dictionary", .dictionary),
+        ("insights", .insights),
+    ]
+
+    private static func write(_ view: some View, to directory: URL, name: String, appearance: NSAppearance) throws {
+        let host = NSHostingView(rootView: view.padding(28).background(Theme.canvas))
         host.appearance = appearance
-        let resolved = size ?? host.fittingSize
+        host.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+        let resolved = host.fittingSize
         host.frame = NSRect(origin: .zero, size: resolved)
         let window = NSWindow(contentRect: host.frame, styleMask: .borderless, backing: .buffered, defer: false)
         window.appearance = appearance
@@ -70,9 +74,7 @@ private final class Fixture {
     let settings: AppSettings
     let status = ModelStatus()
     let history: HistoryStore
-    let historyModel: HistoryModel
-    let statsModel: StatsModel
-    let vocabularyModel: VocabularyModel
+    let sources: PopoverSources
     let analytics = Analytics(enabled: false, installID: UUID())
     let records: [TranscriptRecord]
 
@@ -85,43 +87,25 @@ private final class Fixture {
         for record in records { try history.insert(record) }
         for word in ["Joel", "Parakeet", "GRDB", "Sparkle", "Wispr Flow", "Heil-Escobar"] { try history.vocabulary.add(word, source: .manual) }
         for word in ["Voz", "FluidAudio"] { try history.vocabulary.suggest(word) }
-        historyModel = HistoryModel(store: history, copy: { _ in })
-        statsModel = StatsModel(store: history)
-        vocabularyModel = VocabularyModel(store: history.vocabulary, analytics: analytics)
-        status.update(.automatic, .ready(bytes: 483_000_000))
+        sources = PopoverSources(
+            settings: settings,
+            modelStatus: status,
+            history: HistoryModel(store: history),
+            stats: StatsModel(store: history),
+            vocabulary: VocabularyModel(store: history.vocabulary, analytics: analytics),
+            setup: SetupModel(analytics: analytics)
+        )
+        status.update(.parakeetUltra, .ready(bytes: 632_000_000))
     }
 
-    func popoverModel(status: PopoverStatus, hint: String) -> PopoverModel {
+    func popover(status: PopoverStatus = .ready, hint: String = "", page: PopoverPage = .home, needsSetup: Bool = false) -> some View {
         let model = PopoverModel()
         model.status = status
         model.hint = hint.isEmpty ? Self.hint(for: status, settings: settings) : hint
-        model.wordsThisWeek = statsModel.stats.wordsThisWeek
-        model.transcripts = Array(records.prefix(3))
         model.canRetry = true
-        return model
-    }
-
-    func mainView(section: MainSection) -> some View {
-        let model = MainWindowModel()
-        model.section = section
-        return MainView(
-            model: model,
-            settings: settings,
-            status: status,
-            history: historyModel,
-            stats: statsModel,
-            vocabulary: vocabularyModel,
-            checkForUpdates: {}
-        )
-        .frame(width: MainView.windowSize.width)
-    }
-
-    func onboardingSteps() -> [AnyView] {
-        OnboardingStep.allCases.indices.map { stepIndex in
-            let model = OnboardingModel(analytics: analytics, onLanguageChosen: {}, onFinish: {})
-            for _ in 0..<stepIndex { model.next() }
-            return AnyView(OnboardingView(model: model, settings: settings, modelStatus: status).frame(width: OnboardingView.windowSize.width, height: OnboardingView.windowSize.height))
-        }
+        model.page = page
+        model.needsSetup = needsSetup
+        return PopoverView(model: model, sources: sources)
     }
 
     private static func hint(for status: PopoverStatus, settings: AppSettings) -> String {
@@ -164,7 +148,7 @@ private final class Fixture {
             audioSeconds: Double(text.split(separator: " ").count) / 2.6,
             sttMs: 180,
             totalMs: 420,
-            model: "parakeet-tdt-v3",
+            model: "parakeet-ultra",
             appBundleID: nil,
             appName: app,
             fillerWordsRemoved: text.count % 4

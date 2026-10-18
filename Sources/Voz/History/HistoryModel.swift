@@ -8,12 +8,10 @@ final class HistoryModel: ObservableObject {
     @Published private(set) var records: [TranscriptRecord] = []
 
     private let store: HistoryStore
-    private let copy: (String) -> Void
     private var subscription: AnyCancellable?
 
-    init(store: HistoryStore, copy: @escaping (String) -> Void) {
+    init(store: HistoryStore) {
         self.store = store
-        self.copy = copy
         subscription = $query
             .removeDuplicates()
             .debounce(for: .milliseconds(150), scheduler: DispatchQueue.main)
@@ -27,10 +25,6 @@ final class HistoryModel: ObservableObject {
                 },
                 receiveValue: { [weak self] in self?.records = $0 }
             )
-    }
-
-    func copyText(of record: TranscriptRecord) {
-        copy(record.finalText)
     }
 
     func delete(_ record: TranscriptRecord) {

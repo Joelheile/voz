@@ -24,3 +24,14 @@ struct TapHealthTests {
         #expect(decide(enabled: false, enableSucceeded: false) == .recreate)
     }
 }
+
+struct TapHealthScheduleTests {
+    @Test func missingTapIsRetriedQuickly() {
+        #expect(TapHealthSchedule.interval(hasTap: false) < TapHealthSchedule.interval(hasTap: true))
+        #expect(TapHealthSchedule.interval(hasTap: false) == 2)
+    }
+
+    @Test func healthyTapIsCheckedSeldom() {
+        #expect(TapHealthSchedule.interval(hasTap: true) == 30)
+    }
+}

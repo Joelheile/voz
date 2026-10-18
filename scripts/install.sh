@@ -8,7 +8,7 @@ PREVIOUS=/Applications/.voz-previous.app
 
 scripts/make-app.sh "$@"
 
-osascript -e 'tell application id "com.joelheile.voz" to quit' 2>/dev/null || true
+launchctl bootout "gui/$(id -u)/com.joelheile.voz.relaunch" 2>/dev/null || true
 for _ in $(seq 1 50); do
     pgrep -x voz >/dev/null || break
     sleep 0.1

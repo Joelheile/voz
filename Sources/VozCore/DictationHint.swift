@@ -5,14 +5,14 @@ public enum DictationHint {
 
     public static func recording(hotkey: Hotkey, holdToTalk: Bool) -> String {
         holdToTalk
-            ? "Release \(keyPhrase(hotkey)) to finish"
-            : "\(verb(hotkey: hotkey, holdToTalk: false)) \(keyPhrase(hotkey)) again to finish"
+            ? "Release \(keyPhrase(hotkey)) to stop"
+            : "\(verb(hotkey: hotkey, holdToTalk: false)) \(keyPhrase(hotkey)) again to stop"
     }
 
     public static func instruction(hotkey: Hotkey, holdToTalk: Bool) -> String {
         holdToTalk
-            ? "Hold \(keyPhrase(hotkey)), say something, then release."
-            : "\(verb(hotkey: hotkey, holdToTalk: false)) \(keyPhrase(hotkey)), say something, then \(verb(hotkey: hotkey, holdToTalk: false).lowercased()) it again."
+            ? "Hold \(keyPhrase(hotkey)), speak, then release."
+            : "\(verb(hotkey: hotkey, holdToTalk: false)) \(keyPhrase(hotkey)), speak, then \(verb(hotkey: hotkey, holdToTalk: false).lowercased()) it again."
     }
 
     private static func verb(hotkey: Hotkey, holdToTalk: Bool) -> String {

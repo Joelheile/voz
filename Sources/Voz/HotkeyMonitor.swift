@@ -2,11 +2,43 @@ import CoreGraphics
 import Foundation
 import VozCore
 
+private final class TapRelay: @unchecked Sendable {
+    var port: CFMachPort?
+    let deliver: @Sendable (HotkeyInput) -> Void
+    let disabled: @Sendable () -> Void
+
+    init(deliver: @escaping @Sendable (HotkeyInput) -> Void, disabled: @escaping @Sendable () -> Void) {
+        self.deliver = deliver
+        self.disabled = disabled
+    }
+
+    func handle(type: CGEventType, event: CGEvent) {
+        let time = ProcessInfo.processInfo.systemUptime
+        let keyCode = UInt16(truncatingIfNeeded: event.getIntegerValueField(.keyboardEventKeycode))
+        switch type {
+        case .tapDisabledByTimeout, .tapDisabledByUserInput:
+            if let port { CGEvent.tapEnable(tap: port, enable: true) }
+            disabled()
+        case .flagsChanged:
+            deliver(.flagsChanged(keyCode: keyCode, flags: event.flags, time: time))
+        case .keyDown:
+            let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
+            deliver(.keyDown(keyCode: keyCode, flags: event.flags, time: time, isRepeat: isRepeat))
+        case .keyUp:
+            deliver(.keyUp(keyCode: keyCode, time: time))
+        case .leftMouseDown, .rightMouseDown, .otherMouseDown:
+            deliver(.pointerDown)
+        default:
+            break
+        }
+    }
+}
+
 @MainActor
 final class HotkeyMonitor {
     private var machine: HotkeyStateMachine
     private var tap: CFMachPort?
-    private var runLoopSource: CFRunLoopSource?
+    private var relay: TapRelay?
     private var healthTimer: Timer?
     private let isRecording: @MainActor () -> Bool
     private let onAction: @MainActor (HotkeyAction) -> Void
@@ -31,10 +63,19 @@ final class HotkeyMonitor {
         let mask: CGEventMask = [
             CGEventType.flagsChanged, .keyDown, .keyUp, .leftMouseDown, .rightMouseDown, .otherMouseDown,
         ].reduce(0) { $0 | (1 << $1.rawValue) }
+        let relay = TapRelay(
+            deliver: { [weak self] input in
+                DispatchQueue.main.async { MainActor.assumeIsolated { self?.handle(input) } }
+            },
+            disabled: { [weak self] in
+                Log.app.warning("Event tap disabled, re-enabled")
+                DispatchQueue.main.async { MainActor.assumeIsolated { self?.machine.reset() } }
+            }
+        )
         let callback: CGEventTapCallBack = { _, type, event, userInfo in
-            guard let userInfo else { return Unmanaged.passUnretained(event) }
-            let monitor = Unmanaged<HotkeyMonitor>.fromOpaque(userInfo).takeUnretainedValue()
-            MainActor.assumeIsolated { monitor.handle(type: type, event: event) }
+            if let userInfo {
+                Unmanaged<TapRelay>.fromOpaque(userInfo).takeUnretainedValue().handle(type: type, event: event)
+            }
             return Unmanaged.passUnretained(event)
         }
         guard let tap = CGEvent.tapCreate(
@@ -43,23 +84,29 @@ final class HotkeyMonitor {
             options: .listenOnly,
             eventsOfInterest: mask,
             callback: callback,
-            userInfo: Unmanaged.passUnretained(self).toOpaque()
+            userInfo: Unmanaged.passUnretained(relay).toOpaque()
         ) else {
             return false
         }
+        relay.port = tap
         let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
-        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+        let thread = Thread {
+            CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
+            withExtendedLifetime(relay) { CFRunLoopRun() }
+        }
+        thread.name = "voz.hotkey-tap"
+        thread.qualityOfService = .userInteractive
+        thread.start()
         CGEvent.tapEnable(tap: tap, enable: true)
         self.tap = tap
-        runLoopSource = source
+        self.relay = relay
         return true
     }
 
     func stop() {
-        if let runLoopSource { CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes) }
         if let tap { CFMachPortInvalidate(tap) }
         tap = nil
-        runLoopSource = nil
+        relay = nil
     }
 
     func recreate() {
@@ -69,22 +116,12 @@ final class HotkeyMonitor {
         Log.app.notice("Event tap recreated: \(started)")
     }
 
-    func reset() {
-        machine.reset()
-        if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
-    }
-
-    func startHealthChecks(interval: TimeInterval = 30) {
-        healthTimer?.invalidate()
-        let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.checkHealth() }
-        }
-        timer.tolerance = interval / 6
-        RunLoop.main.add(timer, forMode: .common)
-        healthTimer = timer
+    func startHealthChecks() {
+        checkHealth()
     }
 
     func checkHealth() {
+        defer { scheduleNextHealthCheck() }
         let isEnabled = tap.map { CGEvent.tapIsEnabled(tap: $0) } ?? false
         var enableSucceeded = false
         if let tap, !isEnabled {
@@ -105,34 +142,25 @@ final class HotkeyMonitor {
             stop()
         case .create:
             let started = start()
-            Log.app.notice("Accessibility available, event tap created: \(started)")
+            if started { Log.app.notice("Hotkey tap started") }
         case .recreate:
             Log.app.warning("Event tap could not be re-enabled, recreating")
             recreate()
         }
     }
 
-    private func handle(type: CGEventType, event: CGEvent) {
-        let time = ProcessInfo.processInfo.systemUptime
-        let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
-        let input: HotkeyInput
-        switch type {
-        case .tapDisabledByTimeout, .tapDisabledByUserInput:
-            Log.app.warning("Event tap disabled, re-enabling")
-            reset()
-            return
-        case .flagsChanged:
-            input = .flagsChanged(keyCode: keyCode, flags: event.flags, time: time)
-        case .keyDown:
-            let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
-            input = .keyDown(keyCode: keyCode, flags: event.flags, time: time, isRepeat: isRepeat)
-        case .keyUp:
-            input = .keyUp(keyCode: keyCode, time: time)
-        case .leftMouseDown, .rightMouseDown, .otherMouseDown:
-            input = .pointerDown
-        default:
-            return
+    private func scheduleNextHealthCheck() {
+        healthTimer?.invalidate()
+        let interval = TapHealthSchedule.interval(hasTap: tap != nil)
+        let timer = Timer(timeInterval: interval, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.checkHealth() }
         }
+        timer.tolerance = interval / 6
+        RunLoop.main.add(timer, forMode: .common)
+        healthTimer = timer
+    }
+
+    private func handle(_ input: HotkeyInput) {
         let action = machine.handle(input, isRecording: isRecording())
         if action != .none { onAction(action) }
     }

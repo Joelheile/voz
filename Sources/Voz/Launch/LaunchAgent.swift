@@ -20,6 +20,18 @@ enum LaunchAgent {
         }
     }
 
+    static func bootOut() {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        process.arguments = ["bootout", "gui/\(getuid())/\(label)"]
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            Log.app.error("launchctl bootout failed: \(error.localizedDescription, privacy: .private)")
+        }
+    }
+
     static func handOver() async -> Bool {
         guard isInstalledCopy, !launchedByLaunchd else { return false }
         removeLegacyLoginItem()

@@ -4,7 +4,8 @@ import SwiftUI
 import VozCore
 
 final class PopoverPanel: NSPanel {
-    var onDismiss: () -> Void = {}
+    var onCancel: () -> Void = {}
+    var onResignKey: () -> Void = {}
 
     init() {
         super.init(
@@ -28,12 +29,21 @@ final class PopoverPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 
     override func cancelOperation(_ sender: Any?) {
-        onDismiss()
+        onCancel()
     }
 
     override func resignKey() {
         super.resignKey()
-        onDismiss()
+        onResignKey()
+    }
+}
+
+final class PopoverHostingView: NSHostingView<PopoverView> {
+    var onResize: () -> Void = {}
+
+    override func invalidateIntrinsicContentSize() {
+        super.invalidateIntrinsicContentSize()
+        DispatchQueue.main.async { [weak self] in self?.onResize() }
     }
 }
 
@@ -47,15 +57,14 @@ final class StatusItemController: NSObject {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private let model = PopoverModel()
     private let panel = PopoverPanel()
-    private let hosting: NSHostingView<PopoverView>
+    private let hosting: PopoverHostingView
     private let dictation: Dictation
     private let settings: AppSettings
     private let modelStatus: ModelStatus
-    private let history: HistoryStore
-    private let stats: StatsModel
-    private let openApp: () -> Void
-    private let openSettings: () -> Void
+    private let history: HistoryModel
+    private let analytics: Analytics
     private let checkForUpdates: () -> Void
+    private let quitApp: () -> Void
     private var cancellables: Set<AnyCancellable> = []
     private var outsideClickMonitor: Any?
     private var permissionPoll: Timer?
@@ -63,37 +72,42 @@ final class StatusItemController: NSObject {
 
     init(
         dictation: Dictation,
-        settings: AppSettings,
-        modelStatus: ModelStatus,
-        history: HistoryStore,
-        stats: StatsModel,
-        openApp: @escaping () -> Void,
-        openSettings: @escaping () -> Void,
-        checkForUpdates: @escaping () -> Void
+        sources: PopoverSources,
+        analytics: Analytics,
+        checkForUpdates: @escaping () -> Void,
+        finishSetup: @escaping () -> Void,
+        quit: @escaping () -> Void
     ) {
         self.dictation = dictation
-        self.settings = settings
-        self.modelStatus = modelStatus
-        self.history = history
-        self.stats = stats
-        self.openApp = openApp
-        self.openSettings = openSettings
+        settings = sources.settings
+        modelStatus = sources.modelStatus
+        history = sources.history
+        self.analytics = analytics
         self.checkForUpdates = checkForUpdates
-        hosting = NSHostingView(rootView: PopoverView(model: model))
+        quitApp = quit
+        hosting = PopoverHostingView(rootView: PopoverView(model: model, sources: sources))
         super.init()
         hosting.sizingOptions = [.intrinsicContentSize]
+        hosting.onResize = { [weak self] in
+            guard let self, self.panel.isVisible else { return }
+            self.layoutPanel()
+        }
         panel.contentView = hosting
-        panel.onDismiss = { [weak self] in self?.closePanel() }
+        panel.onCancel = { [weak self] in self?.cancel() }
+        panel.onResignKey = { [weak self] in self?.dismissUnlessPinned() }
         model.actions = PopoverActions(
             copy: { [dictation] in dictation.copy($0.finalText) },
             retry: { [weak self] in
                 self?.closePanel()
                 self?.dictation.retryLast()
             },
-            openApp: { [weak self] in self?.dismissThen(openApp) },
-            openSettings: { [weak self] in self?.dismissThen(openSettings) },
             fixPermission: { [weak self] in self?.fix($0) },
-            quit: { NSApp.terminate(nil) }
+            checkForUpdates: { [weak self] in self?.dismissThen(checkForUpdates) },
+            finishSetup: { [weak self] in
+                self?.closePanel()
+                finishSetup()
+            },
+            quit: quit
         )
         if let button = statusItem.button {
             button.target = self
@@ -110,37 +124,32 @@ final class StatusItemController: NSObject {
         let status = currentStatus()
         model.status = status
         model.hint = hint(for: status)
-        model.wordsThisWeek = stats.stats.wordsThisWeek
         model.canRetry = dictation.hasLastRecording && dictation.phase == .idle
-    }
-
-    func reloadTranscripts() {
-        do {
-            model.transcripts = try history.recent(limit: 3)
-        } catch {
-            Log.app.error("History read failed: \(error.localizedDescription, privacy: .private)")
-        }
+        model.needsSetup = !settings.onboardingCompleted
     }
 
     func dictationChanged() {
         refresh()
-        if dictation.phase == .idle { reloadTranscripts() }
+    }
+
+    func open(_ page: PopoverPage = .home) {
+        model.page = page
+        guard !panel.isVisible else { return }
+        showPanel()
     }
 
     private func observeSources() {
-        Publishers.Merge3(
+        Publishers.Merge(
             settings.objectWillChange.map { _ in () },
-            modelStatus.objectWillChange.map { _ in () },
-            stats.$stats.map { _ in () }
+            modelStatus.objectWillChange.map { _ in () }
         )
         .receive(on: DispatchQueue.main)
         .sink { [weak self] in self?.refresh() }
         .store(in: &cancellables)
-        model.objectWillChange
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] in
-                guard let self, self.panel.isVisible else { return }
-                self.layoutPanel()
+        model.$page
+            .removeDuplicates()
+            .sink { [weak self] page in
+                if page == .insights { self?.analytics.capture(.statsOpened) }
             }
             .store(in: &cancellables)
     }
@@ -157,13 +166,13 @@ final class StatusItemController: NSObject {
         default: break
         }
         if !Permissions.accessibilityGranted { return .permissionNeeded(.accessibility) }
-        switch modelStatus.state(for: settings.languageMode) {
+        switch modelStatus.state(for: settings.speechModel) {
         case .ready: return .ready
-        case .notLoaded: return .loadingModel(detail: "Starting up", progress: nil)
+        case .notLoaded: return .loadingModel(detail: "Starting", progress: nil)
         case let .downloading(fraction):
             let percent = fraction.formatted(.percent.precision(.fractionLength(0)))
-            return .loadingModel(detail: "Downloading the speech model, \(percent)", progress: fraction)
-        case .compiling: return .loadingModel(detail: "Preparing the speech model for first use", progress: nil)
+            return .loadingModel(detail: "Downloading speech model, \(percent)", progress: fraction)
+        case .compiling: return .loadingModel(detail: "Preparing speech model for first use", progress: nil)
         case let .failed(message): return .modelFailed(message)
         }
     }
@@ -172,7 +181,7 @@ final class StatusItemController: NSObject {
         switch status {
         case .ready: DictationHint.idle(hotkey: settings.hotkey, holdToTalk: settings.holdToTalk)
         case .recording: DictationHint.recording(hotkey: settings.hotkey, holdToTalk: settings.holdToTalk)
-        case .transcribing: "Cleaning up your text"
+        case .transcribing: "Processing your recording"
         case let .loadingModel(detail, _): detail
         case let .modelFailed(message): message
         case let .permissionNeeded(fix): fix.detail
@@ -194,13 +203,23 @@ final class StatusItemController: NSObject {
         } else if panel.isVisible {
             closePanel()
         } else if Date().timeIntervalSince(closedAt) > Self.reopenGuard {
-            showPanel()
+            open()
         }
+    }
+
+    private func cancel() {
+        guard model.needsSetup || model.page == .home else { return model.goBack() }
+        closePanel()
+    }
+
+    private func dismissUnlessPinned() {
+        guard !model.needsSetup else { return }
+        closePanel()
     }
 
     private func showPanel() {
         refresh()
-        reloadTranscripts()
+        if !model.needsSetup { analytics.capture(.historyOpened) }
         layoutPanel()
         panel.alphaValue = 0
         panel.makeKeyAndOrderFront(nil)
@@ -210,7 +229,7 @@ final class StatusItemController: NSObject {
         }
         statusItem.button?.highlight(true)
         outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
-            MainActor.assumeIsolated { self?.closePanel() }
+            MainActor.assumeIsolated { self?.dismissUnlessPinned() }
         }
         permissionPoll = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
@@ -226,6 +245,7 @@ final class StatusItemController: NSObject {
         outsideClickMonitor = nil
         permissionPoll?.invalidate()
         permissionPoll = nil
+        history.query = ""
     }
 
     private func dismissThen(_ action: () -> Void) {
@@ -246,7 +266,6 @@ final class StatusItemController: NSObject {
 
     private func showFallbackMenu() {
         let menu = NSMenu()
-        menu.addItem(menuItem("Open voz", #selector(openAppClicked)))
         menu.addItem(menuItem("Settings…", #selector(openSettingsClicked), key: ","))
         menu.addItem(menuItem("Check for Updates…", #selector(checkForUpdatesClicked)))
         menu.addItem(.separator())
@@ -262,8 +281,7 @@ final class StatusItemController: NSObject {
         return item
     }
 
-    @objc private func openAppClicked() { openApp() }
-    @objc private func openSettingsClicked() { openSettings() }
+    @objc private func openSettingsClicked() { open(.settings) }
     @objc private func checkForUpdatesClicked() { checkForUpdates() }
-    @objc private func quit() { NSApp.terminate(nil) }
+    @objc private func quit() { quitApp() }
 }

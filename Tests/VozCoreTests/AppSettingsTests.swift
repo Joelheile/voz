@@ -10,7 +10,7 @@ import Testing
         #expect(settings.muteWhileRecording)
         #expect(settings.copyToClipboard)
         #expect(settings.insertIntoApp)
-        #expect(settings.languageMode == .automatic)
+        #expect(settings.speechModel == .parakeetUltra)
         #expect(settings.indicatorStyle == .notch)
         #expect(!settings.soundCues)
         #expect(settings.launchAtLogin)
@@ -28,7 +28,7 @@ import Testing
         settings.muteWhileRecording = false
         settings.copyToClipboard = false
         settings.insertIntoApp = false
-        settings.languageMode = .english
+        settings.speechModel = .parakeetV2
         settings.indicatorStyle = .pill
         settings.soundCues = true
         settings.launchAtLogin = false
@@ -43,7 +43,7 @@ import Testing
         #expect(!reloaded.muteWhileRecording)
         #expect(!reloaded.copyToClipboard)
         #expect(!reloaded.insertIntoApp)
-        #expect(reloaded.languageMode == .english)
+        #expect(reloaded.speechModel == .parakeetV2)
         #expect(reloaded.indicatorStyle == .pill)
         #expect(reloaded.soundCues)
         #expect(!reloaded.launchAtLogin)
@@ -51,7 +51,7 @@ import Testing
         #expect(!reloaded.cleanupEnabled)
         #expect(!reloaded.analyticsEnabled)
         #expect(reloaded.receiveBetaUpdates)
-        #expect(fixture.storedString(forKey: "languageMode") == "english")
+        #expect(fixture.storedString(forKey: "speechModel") == "parakeet-tdt-v2")
         #expect(fixture.storedString(forKey: "indicatorStyle") == "pill")
     }
 

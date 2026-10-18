@@ -32,40 +32,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         analytics: analytics
     )
     private var cancellables: Set<AnyCancellable> = []
-    private let mainModel = MainWindowModel()
-    private lazy var historyModel = HistoryModel(store: history, copy: { [output] in output.copy($0) })
+    private lazy var historyModel = HistoryModel(store: history)
     private lazy var statsModel = StatsModel(store: history)
     private lazy var vocabularyModel = VocabularyModel(store: history.vocabulary, analytics: analytics)
-    private lazy var mainWindow = HostedWindow(
-        title: "voz",
-        size: MainView.windowSize,
-        minSize: MainView.minimumSize,
-        content: MainView(
-            model: mainModel,
-            settings: settings,
-            status: modelStatus,
-            history: historyModel,
-            stats: statsModel,
-            vocabulary: vocabularyModel,
-            checkForUpdates: { [weak self] in self?.updater.checkForUpdates() }
-        )
-    )
-    private lazy var onboardingWindow = HostedWindow(
-        title: "Welcome to voz",
-        size: OnboardingView.windowSize,
-        content: OnboardingView(
-            model: OnboardingModel(
-                analytics: analytics,
-                onLanguageChosen: { [weak self] in self.map { $0.warmUpModel($0.settings.languageMode) } },
-                onFinish: { [weak self] in self?.finishOnboarding() }
-            ),
-            settings: settings,
-            modelStatus: modelStatus
-        )
-    )
+    private lazy var setupModel = SetupModel(analytics: analytics)
     private var statusItemController: StatusItemController?
     private var hotkeyMonitor: HotkeyMonitor?
-    private var permissionPoll: Timer?
+    private var quitRequested = false
     private let indicator = IndicatorController()
     private lazy var updater = Updater(settings: settings)
 
@@ -74,17 +47,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         extensions.start()
         let statusItemController = StatusItemController(
             dictation: dictation,
-            settings: settings,
-            modelStatus: modelStatus,
-            history: history,
-            stats: statsModel,
-            openApp: { [weak self] in self?.showMain(.home) },
-            openSettings: { [weak self] in self?.showMain(.settings) },
-            checkForUpdates: { [weak self] in self?.updater.checkForUpdates() }
+            sources: PopoverSources(
+                settings: settings,
+                modelStatus: modelStatus,
+                history: historyModel,
+                stats: statsModel,
+                vocabulary: vocabularyModel,
+                setup: setupModel
+            ),
+            analytics: analytics,
+            checkForUpdates: { [weak self] in self?.updater.checkForUpdates() },
+            finishSetup: { [weak self] in self?.finishSetup() },
+            quit: { [weak self] in self?.quitFromMenu() }
         )
         self.statusItemController = statusItemController
         dictation.onChange = { [weak statusItemController] in statusItemController?.dictationChanged() }
-        observeSections()
         hotkeyMonitor = HotkeyMonitor(
             hotkey: settings.hotkey,
             holdToTalk: settings.holdToTalk,
@@ -100,15 +77,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         observeSettings()
         observeVocabulary()
         if settings.onboardingCompleted {
-            Task { await Permissions.requestMicrophone() }
-            warmUpModel(settings.languageMode)
+            Task {
+                await Permissions.requestMicrophone()
+                dictation.prepareRecorder()
+            }
+            warmUpModel(settings.speechModel)
             if !Permissions.accessibilityGranted {
                 Permissions.promptForAccessibility()
             }
         } else {
-            onboardingWindow.show()
+            statusItemController.open()
         }
-        startHotkeyWhenPermitted()
+        hotkeyMonitor?.startHealthChecks()
         settingChangeReporter = SettingChangeReporter(settings: settings, analytics: analytics)
         let launchMs = LaunchTimer.millisecondsSinceProcessStart()
         if let updateEvent = InstalledUpdateReporter(defaults: .standard).event(currentVersion: SystemContext.properties["app_version"] ?? "unknown") {
@@ -125,6 +105,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard await LaunchAgent.handOver() else { return }
             NSApp.perform(#selector(NSApplication.terminate(_:)), with: nil, afterDelay: 0)
         }
+    }
+
+    private func quitFromMenu() {
+        quitRequested = true
+        NSApp.terminate(nil)
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        if quitRequested { LaunchAgent.bootOut() }
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -158,11 +147,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .dropFirst()
             .sink { [weak self] _ in self?.manageLaunchAgent() }
             .store(in: &cancellables)
-        settings.$languageMode
+        settings.$speechModel
             .dropFirst()
-            .sink { [weak self] mode in
+            .sink { [weak self] model in
                 guard let self, self.settings.onboardingCompleted else { return }
-                self.warmUpModel(mode)
+                self.warmUpModel(model)
             }
             .store(in: &cancellables)
     }
@@ -201,44 +190,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func showMain(_ section: MainSection) {
-        mainModel.section = section
-        mainWindow.show()
-    }
-
-    private func observeSections() {
-        mainModel.$section
-            .removeDuplicates()
-            .dropFirst()
-            .sink { [weak self] section in
-                switch section {
-                case .home: self?.analytics.capture(.historyOpened)
-                case .insights: self?.analytics.capture(.statsOpened)
-                case .dictionary, .settings: break
-                }
-            }
-            .store(in: &cancellables)
-    }
-
-    private func finishOnboarding() {
+    private func finishSetup() {
+        setupModel.reportPermissions()
         settings.onboardingCompleted = true
-        onboardingWindow.close()
+        warmUpModel(settings.speechModel)
     }
 
-    private func warmUpModel(_ mode: LanguageMode) {
-        guard let model = SpeechModel(rawValue: mode.modelName) else {
-            Log.app.error("Unknown speech model: \(mode.modelName)")
-            return
-        }
-        let wasDownloaded = mode.isDownloaded
+    private func warmUpModel(_ model: SpeechModel) {
+        let wasDownloaded = model.isDownloaded
         Task {
             let started = Date()
             do {
-                try await transcriber.prepare(mode)
-                await transcriber.removeUnusedModels(keeping: mode)
+                if model != .appleSpeech { try await transcriber.prepare(model) }
+                await transcriber.removeUnusedModels(keeping: model)
                 let seconds = Date().timeIntervalSince(started)
-                Log.app.notice("Model \(mode.modelName) ready in \(seconds, format: .fixed(precision: 1))s")
-                reportModelReady(model, wasDownloaded: wasDownloaded, seconds: seconds, mode: mode)
+                Log.app.notice("Model \(model.rawValue) ready in \(seconds, format: .fixed(precision: 1))s")
+                reportModelReady(model, wasDownloaded: wasDownloaded, seconds: seconds)
             } catch {
                 Log.app.error("Model load failed: \(error.localizedDescription, privacy: .private)")
                 if !wasDownloaded {
@@ -248,36 +215,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func reportModelReady(_ model: SpeechModel, wasDownloaded: Bool, seconds: Double, mode: LanguageMode) {
+    private func reportModelReady(_ model: SpeechModel, wasDownloaded: Bool, seconds: Double) {
         guard !wasDownloaded else {
             return analytics.capture(.modelLoad(model: model, coldMs: Int(seconds * 1000)))
         }
-        guard case let .ready(bytes) = modelStatus.state(for: mode) else {
+        guard case let .ready(bytes) = modelStatus.state(for: model) else {
             Log.app.error("Model size unavailable after download: \(model.rawValue)")
             return
         }
         analytics.capture(.modelDownload(model: model, seconds: Int(seconds), success: true, bytes: Int(bytes)))
-    }
-
-    private func startHotkeyWhenPermitted() {
-        if tryStartHotkey() { return }
-        permissionPoll = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self, self.tryStartHotkey() else { return }
-                self.permissionPoll?.invalidate()
-                self.permissionPoll = nil
-            }
-        }
-    }
-
-    private func tryStartHotkey() -> Bool {
-        guard Permissions.accessibilityGranted, let hotkeyMonitor else { return false }
-        let started = hotkeyMonitor.start()
-        if started {
-            Log.app.notice("Hotkey tap started")
-            hotkeyMonitor.startHealthChecks()
-        }
-        return started
     }
 
     private func observeWake() {
@@ -287,6 +233,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.hotkeyMonitor?.recreate() }
+        }
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.sessionDidBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.hotkeyMonitor?.recreate() }
+        }
+        DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("com.apple.accessibility.api"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                MainActor.assumeIsolated { self?.hotkeyMonitor?.checkHealth() }
+            }
         }
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.willSleepNotification,

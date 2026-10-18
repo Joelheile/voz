@@ -7,7 +7,7 @@ public enum SettingChange: Equatable, Sendable {
     case launchAtLogin(Bool)
     case cleanupEnabled(Bool)
     case analyticsEnabled(Bool)
-    case languageMode(LanguageMode)
+    case speechModel(SpeechModel)
     case indicatorStyle(IndicatorStyle)
     case hotkey(Hotkey)
 
@@ -21,7 +21,7 @@ public enum SettingChange: Equatable, Sendable {
         case .launchAtLogin: "launch_at_login"
         case .cleanupEnabled: "cleanup_enabled"
         case .analyticsEnabled: "analytics_enabled"
-        case .languageMode: "language_mode"
+        case .speechModel: "speech_model"
         case .indicatorStyle: "indicator_style"
         case .hotkey: "hotkey"
         }
@@ -33,7 +33,7 @@ public enum SettingChange: Equatable, Sendable {
              let .insertIntoApp(flag), let .soundCues(flag), let .launchAtLogin(flag),
              let .cleanupEnabled(flag), let .analyticsEnabled(flag):
             .flag(flag)
-        case let .languageMode(mode): .label(mode.rawValue)
+        case let .speechModel(model): .label(model.rawValue)
         case let .indicatorStyle(style): .label(style.rawValue)
         case let .hotkey(hotkey): .label(hotkey.kind.rawValue)
         }

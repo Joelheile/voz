@@ -1,7 +1,6 @@
 public enum AnalyticsEvent: Equatable, Sendable {
     case appInstalled(launchMs: Int)
     case appLaunched(launchMs: Int)
-    case onboardingStepCompleted(step: OnboardingStep, seconds: Int)
     case permissionResult(permission: PermissionName, granted: Bool)
     case dictationCompleted(DictationMetrics)
     case dictationFailed(stage: DictationStage, errorCode: DictationErrorCode)
@@ -19,7 +18,6 @@ public enum AnalyticsEvent: Equatable, Sendable {
         switch self {
         case .appInstalled: "app_installed"
         case .appLaunched: "app_launched"
-        case .onboardingStepCompleted: "onboarding_step_completed"
         case .permissionResult: "permission_result"
         case .dictationCompleted: "dictation_completed"
         case .dictationFailed: "dictation_failed"
@@ -39,8 +37,6 @@ public enum AnalyticsEvent: Equatable, Sendable {
         switch self {
         case let .appInstalled(launchMs), let .appLaunched(launchMs):
             ["launch_ms": .integer(launchMs)]
-        case let .onboardingStepCompleted(step, seconds):
-            ["step": .label(step.rawValue), "seconds": .integer(seconds)]
         case let .permissionResult(permission, granted):
             ["permission": .label(permission.rawValue), "granted": .flag(granted)]
         case let .dictationCompleted(metrics):
@@ -73,7 +69,7 @@ public enum AnalyticsEvent: Equatable, Sendable {
             "insert_ms": .integer(metrics.insertMs),
             "total_ms": .integer(metrics.totalMs),
             "model": .label(metrics.model.rawValue),
-            "language_mode": .label(metrics.languageMode.rawValue),
+            "selected_model": .label(metrics.selectedModel.rawValue),
             "cleanup_used": .flag(metrics.cleanupUsed),
             "cleanup_timed_out": .flag(metrics.cleanupTimedOut),
             "trigger": .label(metrics.trigger.rawValue),

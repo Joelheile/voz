@@ -8,24 +8,18 @@ enum Theme {
     static let inkSecondary = Color(light: 0x5F5C55, dark: 0xA5A29A)
     static let inkTertiary = Color(light: 0x7B7870, dark: 0x7F7C75)
     static let hairline = Color(light: 0x141414, dark: 0xFFFFFF, lightAlpha: 0.08, darkAlpha: 0.09)
-    static let hover = Color(light: 0xF7F5F1, dark: 0xFFFFFF, lightAlpha: 1, darkAlpha: 0.04)
     static let selected = Color(light: 0xE9E6DF, dark: 0xFFFFFF, lightAlpha: 1, darkAlpha: 0.09)
-    static let hero = Color(light: 0x0D0D0E, dark: 0x26262A)
-    static let accent = Color(light: 0xDC3E42, dark: 0xF0555A)
-    static let accentOnBlack = Color(hex: 0xF0555A)
+    static let accent = Color(light: 0x5163F9, dark: 0x6475FA)
+    static let accentOnBlack = Color(hex: 0x7A8CFF)
     static let onInk = Color(light: 0xFFFFFF, dark: 0x141414)
 
     enum Radius {
         static let control: CGFloat = 8
         static let row: CGFloat = 12
-        static let card: CGFloat = 16
         static let panel: CGFloat = 22
     }
 
     enum Spacing {
-        static let page: CGFloat = 44
-        static let section: CGFloat = 32
-        static let block: CGFloat = 24
         static let item: CGFloat = 16
     }
 
@@ -33,14 +27,6 @@ enum Theme {
         static let press = Animation.easeOut(duration: 0.12)
         static let hover = Animation.easeOut(duration: 0.15)
         static let section = Animation.easeOut(duration: 0.18)
-    }
-
-    static let accentNSColor = NSColor(name: nil) { appearance in
-        isDark(appearance) ? NSColor(hex: 0xF0555A) : NSColor(hex: 0xDC3E42)
-    }
-
-    static let canvasNSColor = NSColor(name: nil) { appearance in
-        isDark(appearance) ? NSColor(hex: 0x161618) : NSColor(hex: 0xF6F4EF)
     }
 
     fileprivate static func isDark(_ appearance: NSAppearance) -> Bool {
@@ -76,7 +62,5 @@ extension Font {
         .system(size: size, weight: weight, design: .serif)
     }
 
-    static let body14 = Font.system(size: 14)
-    static let rowTitle = Font.system(size: 14, weight: .medium)
     static let meta = Font.system(size: 12.5)
 }

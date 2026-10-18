@@ -18,7 +18,7 @@ final class SettingChangeReporter {
             if case let .analyticsEnabled(enabled) = $0 { analytics.setEnabled(enabled) }
             report($0)
         }
-        observe(settings.$languageMode, SettingChange.languageMode, report)
+        observe(settings.$speechModel, SettingChange.speechModel, report)
         observe(settings.$indicatorStyle, SettingChange.indicatorStyle, report)
         observe(settings.$hotkey, SettingChange.hotkey, report)
     }

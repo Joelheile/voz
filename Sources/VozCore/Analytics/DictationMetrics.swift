@@ -6,7 +6,7 @@ public struct DictationMetrics: Equatable, Sendable {
     public var insertMs: Int
     public var totalMs: Int
     public var model: SpeechModel
-    public var languageMode: LanguageMode
+    public var selectedModel: SpeechModel
     public var cleanupUsed: Bool
     public var cleanupTimedOut: Bool
     public var trigger: DictationTrigger
@@ -20,7 +20,7 @@ public struct DictationMetrics: Equatable, Sendable {
         insertMs: Int,
         totalMs: Int,
         model: SpeechModel,
-        languageMode: LanguageMode,
+        selectedModel: SpeechModel,
         cleanupUsed: Bool,
         cleanupTimedOut: Bool,
         trigger: DictationTrigger,
@@ -33,7 +33,7 @@ public struct DictationMetrics: Equatable, Sendable {
         self.insertMs = insertMs
         self.totalMs = totalMs
         self.model = model
-        self.languageMode = languageMode
+        self.selectedModel = selectedModel
         self.cleanupUsed = cleanupUsed
         self.cleanupTimedOut = cleanupTimedOut
         self.trigger = trigger

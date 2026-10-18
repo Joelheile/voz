@@ -35,21 +35,23 @@ if [[ -n "$BUILD" ]]; then
     /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" "$APP/Contents/Info.plist"
 fi
 ditto "$BIN_PATH/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
+SPARKLE="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"
+rm -rf "$SPARKLE/XPCServices" "$SPARKLE/Headers" "$SPARKLE/PrivateHeaders" "$SPARKLE/Modules"
+find "$SPARKLE/Resources" -maxdepth 1 -name '*.lproj' ! -name 'Base.lproj' ! -name 'de.lproj' -exec rm -rf {} +
+rm -f "$APP/Contents/Frameworks/Sparkle.framework"/{XPCServices,Headers,PrivateHeaders,Modules}
 if [[ "$CONFIGURATION" == "release" ]]; then
     strip -x "$APP/Contents/MacOS/voz"
 fi
 install_name_tool -add_rpath @executable_path/../Frameworks "$APP/Contents/MacOS/voz"
 cp -R Resources/Sounds "$APP/Contents/Resources/Sounds"
 cp -R Resources/Extensions "$APP/Contents/Resources/Extensions"
+cp Resources/AppIcon.icns Resources/MenuBarIcon.png "$APP/Contents/Resources/"
 for bundle in "$BIN_PATH"/*.bundle; do
-    [[ -e "$bundle" ]] && cp -R "$bundle" "$APP/Contents/Resources/"
+    [[ -e "$bundle" && "$bundle" != *FluidAudio_FluidAudio.bundle ]] && cp -R "$bundle" "$APP/Contents/Resources/"
 done
 
 # Sparkle signing order: https://sparkle-project.org/documentation/sandboxing/#code-signing
-SPARKLE="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"
 sign() { codesign --force --options runtime --timestamp="$TIMESTAMP" --sign "$SIGNING_IDENTITY" "$@"; }
-sign "$SPARKLE/XPCServices/Installer.xpc"
-sign --preserve-metadata=entitlements "$SPARKLE/XPCServices/Downloader.xpc"
 sign "$SPARKLE/Autoupdate"
 sign "$SPARKLE/Updater.app"
 sign "$APP/Contents/Frameworks/Sparkle.framework"

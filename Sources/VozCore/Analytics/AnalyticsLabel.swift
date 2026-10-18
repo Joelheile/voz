@@ -1,16 +1,7 @@
 public protocol AnalyticsLabel: RawRepresentable, CaseIterable, Sendable where RawValue == String {}
 
-extension LanguageMode: AnalyticsLabel {}
+extension SpeechModel: AnalyticsLabel {}
 extension IndicatorStyle: AnalyticsLabel {}
-
-public enum OnboardingStep: String, AnalyticsLabel {
-    case microphone
-    case accessibility
-    case inputMonitoring = "input_monitoring"
-    case language
-    case analytics
-    case test
-}
 
 public enum PermissionName: String, AnalyticsLabel {
     case microphone
@@ -45,12 +36,6 @@ public enum DeliveryOutput: String, AnalyticsLabel {
     case clipboard
 }
 
-public enum SpeechModel: String, AnalyticsLabel {
-    case parakeetV3 = "parakeet-tdt-v3"
-    case parakeetV2 = "parakeet-tdt-v2"
-    case appleSpeech = "apple-speech"
-}
-
 public enum HotkeyKind: String, AnalyticsLabel {
     case modifierKey = "modifier_key"
     case keyCombination = "key_combination"
@@ -59,9 +44,7 @@ public enum HotkeyKind: String, AnalyticsLabel {
 public enum AnalyticsLabels {
     public static let allValues: Set<String> = {
         var values: [String] = []
-        values += rawValues(LanguageMode.self)
         values += rawValues(IndicatorStyle.self)
-        values += rawValues(OnboardingStep.self)
         values += rawValues(PermissionName.self)
         values += rawValues(DictationStage.self)
         values += rawValues(DictationErrorCode.self)

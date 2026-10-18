@@ -6,7 +6,19 @@ enum InputDevice {
         return allDevices().first { transportType($0) == kAudioDeviceTransportTypeBuiltIn && hasInputStreams($0) }
     }
 
-    private static func defaultInput() -> AudioDeviceID? {
+    static func isRunningSomewhere() -> Bool {
+        guard let device = defaultInput() else { return false }
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceIsRunningSomewhere,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var running: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        return AudioObjectGetPropertyData(device, &address, 0, nil, &size, &running) == noErr && running != 0
+    }
+
+    static func defaultInput() -> AudioDeviceID? {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDefaultInputDevice,
             mScope: kAudioObjectPropertyScopeGlobal,

@@ -41,7 +41,7 @@ enum PackageCLI {
         }
     }
 
-    private static func install(_ raw: String) async throws {
+    static func install(_ raw: String) async throws {
         let source = try PackageSource(parsing: raw, relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
         let directory = source.directory(in: home)
         print("Packages run code on your Mac with your permissions and can read your transcripts. Review the source before you install.")
@@ -66,7 +66,7 @@ enum PackageCLI {
         print("Installed \(source.description)")
     }
 
-    private static func remove(_ target: String) throws {
+    static func remove(_ target: String) throws {
         let packages = try installed()
         guard let match = packages.first(where: { $0.raw == target || $0.source.name == target }) else { throw PackageCLIError.notInstalled(target) }
         switch match.source {

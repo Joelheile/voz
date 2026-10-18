@@ -63,6 +63,11 @@ final class Dictation {
         recorder.onInterrupted = { [weak self] in self?.stopIfRecording() }
     }
 
+    func prepareRecorder() {
+        guard Permissions.microphoneGranted else { return }
+        recorder.prepare()
+    }
+
     func recoverFromPreviousRun() {
         muter.restoreLeftoverMute()
     }

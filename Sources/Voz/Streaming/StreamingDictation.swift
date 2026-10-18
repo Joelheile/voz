@@ -30,7 +30,7 @@ private final class Segment {
 final class StreamingDictation {
     private let engine: SpeechEngine
     private let cleaner: TextCleaner
-    private let mode: LanguageMode
+    private let model: SpeechModel
     private let vocabulary: [String]
     private let cleanupEnabled: Bool
     private var detector = PauseDetector()
@@ -40,10 +40,10 @@ final class StreamingDictation {
     private var releaseDeadline: ContinuousClock.Instant?
     private var closed = false
 
-    init(engine: SpeechEngine, cleaner: TextCleaner, mode: LanguageMode, vocabulary: [String], cleanupEnabled: Bool) {
+    init(engine: SpeechEngine, cleaner: TextCleaner, model: SpeechModel, vocabulary: [String], cleanupEnabled: Bool) {
         self.engine = engine
         self.cleaner = cleaner
-        self.mode = mode
+        self.model = model
         self.vocabulary = vocabulary
         self.cleanupEnabled = cleanupEnabled
     }
@@ -98,7 +98,7 @@ final class StreamingDictation {
     }
 
     private func assemble(raws: [String], results: [TranscriptionResult], tailResult: TranscriptionResult?, samples: [Float], cleanupWait: Duration) -> StreamedTranscript {
-        let lowercase = mode == .english
+        let lowercase = model == .parakeetV2
         var cleanedTexts: [String?] = []
         var fallbacks: [String] = []
         var fillersRemoved = 0
@@ -129,7 +129,7 @@ final class StreamingDictation {
             raw: SegmentJoiner.join(raws, lowercaseContinuations: lowercase),
             cleaned: cleaned,
             sttMs: Int((tailResult?.processingSeconds ?? 0) * 1000),
-            model: results.last?.model ?? mode.modelName,
+            model: results.last?.model ?? model.rawValue,
             audioSeconds: Double(samples.count) / RecordingFilter.sampleRate,
             segmentCount: raws.filter { !$0.isEmpty }.count,
             cleanedInTime: cleanedInTime
@@ -138,11 +138,11 @@ final class StreamingDictation {
 
     private func makeSegment(_ audio: [Float]) -> Segment {
         let engine = engine
-        let mode = mode
+        let model = model
         let vocabulary = vocabulary
         let transcription = Task { () -> TranscriptionResult? in
             do {
-                return try await engine.transcribe(audio, mode: mode, vocabulary: vocabulary)
+                return try await engine.transcribe(audio, model: model, vocabulary: vocabulary)
             } catch {
                 Log.app.error("Segment transcription failed: \(error.localizedDescription, privacy: .private)")
                 return nil
