@@ -55,7 +55,7 @@ Local-first macOS dictation app. Menu bar only. Research: `docs/research/stack.m
 ## Storage and privacy
 
 - SwiftData in Application Support. Transcripts only, never audio.
-- PostHog EU (`https://eu.i.posthog.com`, project token `phc_pprHknWQHntzTK6vR4vzHK9B6hWNv4nKXbAYpkYcoLXS`). On by default, opt-out in onboarding and settings. Never send transcript text, vocabulary or app IDs.
+- PostHog EU (`https://eu.i.posthog.com`, project token `phc_pprHknWQHntzTK6vR4vzHK9B6hWNv4nKXbAYpkYcoLXS`). Off by default, opt-in in onboarding and settings. A separate version ping on install and update is on by default, with an opt-out in settings. Never send transcript text, vocabulary or app IDs.
 
 | Event                            | Properties                                                                                                                                                   |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |

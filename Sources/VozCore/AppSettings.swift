@@ -15,6 +15,7 @@ public enum SettingsKey {
     public static let cleanupEnabled = "cleanupEnabled"
     public static let analyticsEnabled = "analyticsEnabled"
     public static let receiveBetaUpdates = "receiveBetaUpdates"
+    public static let versionPingEnabled = "versionPingEnabled"
 }
 
 @MainActor
@@ -60,6 +61,9 @@ public final class AppSettings: ObservableObject {
     @Published public var receiveBetaUpdates: Bool {
         didSet { defaults.set(receiveBetaUpdates, forKey: SettingsKey.receiveBetaUpdates) }
     }
+    @Published public var versionPingEnabled: Bool {
+        didSet { defaults.set(versionPingEnabled, forKey: SettingsKey.versionPingEnabled) }
+    }
     @Published public var isCapturingHotkey = false
 
     public var output: OutputSettings {
@@ -84,6 +88,7 @@ public final class AppSettings: ObservableObject {
             SettingsKey.cleanupEnabled: true,
             SettingsKey.analyticsEnabled: false,
             SettingsKey.receiveBetaUpdates: false,
+            SettingsKey.versionPingEnabled: true,
         ])
         hotkey = defaults.data(forKey: SettingsKey.hotkey)
             .flatMap { try? JSONDecoder().decode(Hotkey.self, from: $0) } ?? .rightCommand
@@ -99,6 +104,7 @@ public final class AppSettings: ObservableObject {
         cleanupEnabled = defaults.bool(forKey: SettingsKey.cleanupEnabled)
         analyticsEnabled = defaults.bool(forKey: SettingsKey.analyticsEnabled)
         receiveBetaUpdates = defaults.bool(forKey: SettingsKey.receiveBetaUpdates)
+        versionPingEnabled = defaults.bool(forKey: SettingsKey.versionPingEnabled)
     }
 
     private func store(_ hotkey: Hotkey) {

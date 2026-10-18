@@ -73,6 +73,7 @@ voz limits the damage it can control:
 
 - Recording, transcription and cleanup run on your Mac.
 - Audio stays in memory. voz writes a recording to disk only when an extension listens for it, and deletes it afterwards.
+- voz sends its version number to PostHog on install and after each update, with no ID. You can turn this off in Settings.
 - voz sends anonymous usage counts to PostHog only if you opt in, and checks GitHub for updates.
 
 Details: [docs/privacy.md](docs/privacy.md).

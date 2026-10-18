@@ -122,6 +122,9 @@ struct SettingsPage: View {
             PanelRow(title: "Share anonymous usage stats", detail: "Counts and timings, never text or audio") {
                 Toggle("Share anonymous usage stats", isOn: $settings.analyticsEnabled).labelsHidden()
             }
+            PanelRow(title: "Send version on install and update", detail: "Version number only, no ID") {
+                Toggle("Send version on install and update", isOn: $settings.versionPingEnabled).labelsHidden()
+            }
             PanelRow(title: "Beta updates") {
                 Toggle("Beta updates", isOn: $settings.receiveBetaUpdates).labelsHidden()
             }

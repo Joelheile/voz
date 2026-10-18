@@ -91,8 +91,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeyMonitor?.startHealthChecks()
         settingChangeReporter = SettingChangeReporter(settings: settings, analytics: analytics)
         let launchMs = LaunchTimer.millisecondsSinceProcessStart()
-        if let updateEvent = InstalledUpdateReporter(defaults: .standard).event(currentVersion: SystemContext.properties["app_version"] ?? "unknown") {
+        let version = SystemContext.properties["app_version"] ?? "unknown"
+        let previousVersion = InstalledUpdateReporter(defaults: .standard).recordLaunch(of: version)
+        if let updateEvent = UpdateDetector.installedUpdate(previousVersion: previousVersion, currentVersion: version) {
             analytics.capture(updateEvent)
+        }
+        if settings.versionPingEnabled, let ping = VersionPing.kind(isNewInstall: installID.isNew, previousVersion: previousVersion, currentVersion: version) {
+            VersionPinger.send(ping, version: version)
         }
         updater.start()
         analytics.capture(installID.isNew ? .appInstalled(launchMs: launchMs) : .appLaunched(launchMs: launchMs))

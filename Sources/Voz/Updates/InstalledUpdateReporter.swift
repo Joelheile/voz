@@ -6,9 +6,9 @@ struct InstalledUpdateReporter {
 
     let defaults: UserDefaults
 
-    func event(currentVersion: String) -> AnalyticsEvent? {
+    func recordLaunch(of currentVersion: String) -> String? {
         let previous = defaults.string(forKey: Self.key)
         defaults.set(currentVersion, forKey: Self.key)
-        return UpdateDetector.installedUpdate(previousVersion: previous, currentVersion: currentVersion)
+        return previous
     }
 }

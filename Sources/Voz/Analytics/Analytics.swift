@@ -4,8 +4,8 @@ import VozCore
 
 @MainActor
 final class Analytics {
-    private static let projectToken = "phc_pprHknWQHntzTK6vR4vzHK9B6hWNv4nKXbAYpkYcoLXS"
-    private static let host = "https://eu.i.posthog.com"
+    nonisolated static let projectToken = "phc_pprHknWQHntzTK6vR4vzHK9B6hWNv4nKXbAYpkYcoLXS"
+    nonisolated static let host = "https://eu.i.posthog.com"
     private static let debugVariable = "VOZ_ANALYTICS_DEBUG"
 
     private let installID: UUID

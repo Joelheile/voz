@@ -18,6 +18,7 @@ import Testing
         #expect(settings.cleanupEnabled)
         #expect(!settings.analyticsEnabled)
         #expect(!settings.receiveBetaUpdates)
+        #expect(settings.versionPingEnabled)
     }
 
     @Test func persistsEveryKey() {

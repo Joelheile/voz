@@ -8,7 +8,8 @@ What stays on your Mac:
 
 What leaves your Mac:
 
-- Anonymous usage events, sent to PostHog (EU). They contain timings, counts, the app and macOS version, the chip, and a random install ID. They do not contain transcript text, dictionary words, or app names. To turn them off, use onboarding or Settings.
+- A version ping, sent to PostHog (EU) once on install and once after each update. It contains the version number and whether it is an install or an update, with a new random ID each time. To turn it off, use Settings.
+- Anonymous usage events, sent to PostHog (EU) only if you opt in. They contain timings, counts, the app and macOS version, the chip, and a random install ID. They do not contain transcript text, dictionary words, or app names. To turn them on or off, use onboarding or Settings.
 - Update checks and downloads, from GitHub through Sparkle.
 - Speech model downloads, from Hugging Face.
 - The extension list, from the npm registry, when you open Extensions.
