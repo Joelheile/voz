@@ -29,7 +29,10 @@ guard instance.claim(waiting: LaunchAgent.launchedByLaunchd ? .seconds(5) : .zer
     Log.app.notice("Another voz is running, exiting")
     exit(0)
 }
+application.setActivationPolicy(.accessory)
+if AppMover.shouldOffer {
+    AppMover.offer()
+}
 let delegate = AppDelegate()
 application.delegate = delegate
-application.setActivationPolicy(.accessory)
 application.run()
