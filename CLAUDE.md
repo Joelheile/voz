@@ -15,6 +15,7 @@ voz is the fastest, most reliable, simplest and most extensible voice transcribe
 - Extensions have full access: UI, voice and paths. No sandbox.
 - UI access is through native primitives that Swift renders: toast/HUD, panel rows and actions, settings forms from a JSON schema. No webviews, no React renderer.
 - No extensions installed: no Bun download, no child process, no cost.
+- Contributions: PRs to core only for what every user needs on every dictation (speed, reliability, fixes, languages, extension points). Features some users want ship as npm packages with the `voz-package` keyword. No review registry.
 - A crashed or slow extension never blocks dictation. Steps that change output have a timeout and fall back to the original. Observe-only events never wait.
 
 ## Appearance

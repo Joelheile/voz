@@ -2,17 +2,17 @@
 
 Every push to `main` publishes a beta. Every tag `vMAJOR.MINOR.PATCH` publishes a stable release. Both are GitHub Releases. Beta releases are marked as prereleases.
 
-Updates reach users through Sparkle. The appcast is `appcast.xml` in the repo root, served from `https://raw.githubusercontent.com/Joelheile/voz/main/appcast.xml`. The workflow commits to it after each release and keeps the last 10 entries per channel. Beta entries carry `<sparkle:channel>beta</sparkle:channel>`, so only users with "Receive beta updates" turned on see them.
+Sparkle delivers updates. The appcast is `appcast.xml` in the repo root, served from `https://raw.githubusercontent.com/Joelheile/voz/main/appcast.xml`. The workflow commits to it after each release and keeps the last 10 entries per channel. Beta entries have `<sparkle:channel>beta</sparkle:channel>`, so only users who turn on "Beta updates" see them.
 
 ## Versions
 
 - Stable: `CFBundleShortVersionString` is the tag without `v`.
 - Beta: latest stable version plus `-beta.<build>`, for example `0.2.0-beta.41`.
-- `CFBundleVersion` is the commit count on the checked-out commit. It only grows, and Sparkle compares it.
+- `CFBundleVersion` is the commit count on the checked-out commit. It only increases. Sparkle compares it.
 
 ## Secrets
 
-Add these under Settings, Secrets and variables, Actions.
+Add these secrets under Settings, Secrets and variables, Actions.
 
 | Secret | Value | How to create it |
 | --- | --- | --- |
@@ -20,20 +20,20 @@ Add these under Settings, Secrets and variables, Actions.
 | `VOZ_SIGNING_P12_PASSWORD` | The password you typed into that script | Same run. |
 | `SPARKLE_PRIVATE_KEY` | Sparkle EdDSA private key | Run `.build/artifacts/sparkle/Sparkle/bin/generate_keys -x sparkle-private.key` and paste the file contents. Delete the file. |
 
-The CI build must use the same signing identity as local builds. macOS keeps microphone and accessibility permissions across updates only when the signing identity stays the same.
+The CI build must use the same signing identity as local builds. macOS keeps microphone and Accessibility permissions across updates only when the signing identity stays the same.
 
-The public key in `Resources/Info.plist` (`SUPublicEDKey`) belongs to the key in your login keychain. If you generate a new key pair, update `SUPublicEDKey`. Apps built with the old key cannot verify updates signed with the new one.
+`SUPublicEDKey` in `Resources/Info.plist` is the public key for the private key in your login keychain. If you generate a new key pair, update `SUPublicEDKey`. Apps built with the old key cannot verify updates signed with the new key.
 
-Optional, for notarization: `APPLE_ID`, `APPLE_APP_PASSWORD`, `APPLE_TEAM_ID`, `DEVELOPER_ID_P12`, `DEVELOPER_ID_P12_PASSWORD`.
+For notarization, add these optional secrets: `APPLE_ID`, `APPLE_APP_PASSWORD`, `APPLE_TEAM_ID`, `DEVELOPER_ID_P12`, `DEVELOPER_ID_P12_PASSWORD`.
 
 ## Repository settings
 
-- Actions need read and write permission for the workflow token (Settings, Actions, General, Workflow permissions). The workflows request `contents: write` themselves.
+- Give the workflow token read and write permission (Settings, Actions, General, Workflow permissions). The workflows request `contents: write` themselves.
 - If `main` is protected, allow the `github-actions` bot to push to it. The workflow pushes the appcast commit directly.
 
 ## Cut a stable release
 
-1. Make sure `main` has the commit you want and its beta build is green.
+1. Confirm that `main` has the commit you want and that its beta build passes.
 2. Tag and push:
 
    ```
@@ -49,18 +49,18 @@ Optional, for notarization: `APPLE_ID`, `APPLE_APP_PASSWORD`, `APPLE_TEAM_ID`, `
 curl -s https://raw.githubusercontent.com/Joelheile/voz/main/appcast.xml
 ```
 
-Open voz, choose "Check for Updates…" from the menu bar icon.
+Then open voz and choose "Check for Updates…" from the menu bar icon.
 
 ## Add notarization later
 
-The workflow already has an optional "Notarize" step. It runs only when all five notarization secrets are set.
+The workflow has an optional "Notarize" step. It runs only when all five notarization secrets are set.
 
 1. Join the Apple Developer Program and create a "Developer ID Application" certificate.
 2. Export it as a p12 from Keychain Access and encode it with `base64 -i cert.p12`.
 3. Create an app-specific password at appleid.apple.com.
 4. Add `APPLE_ID`, `APPLE_APP_PASSWORD`, `APPLE_TEAM_ID`, `DEVELOPER_ID_P12` and `DEVELOPER_ID_P12_PASSWORD`.
 
-The step rebuilds the app with the Developer ID identity, submits it with `notarytool`, and staples the ticket. The signing identity changes at that point, so every user is asked for microphone and accessibility permissions once more after the first notarized update. After that, remove `com.apple.security.cs.disable-library-validation` from `Resources/voz.entitlements` only if Sparkle and every other framework are signed with the Developer ID identity. Test before you remove it.
+The step rebuilds the app with the Developer ID identity, submits it with `notarytool`, and staples the ticket. The signing identity changes, so macOS asks every user for microphone and Accessibility permissions again after the first notarized update. Remove `com.apple.security.cs.disable-library-validation` from `Resources/voz.entitlements` only if Sparkle and every other framework are signed with the Developer ID identity. Test before you remove it.
 
 ## Local build with a version
 
@@ -72,13 +72,13 @@ The arguments are optional and override `CFBundleShortVersionString` and `CFBund
 
 ## Entitlements
 
-`Resources/voz.entitlements` has two entries.
+`Resources/voz.entitlements` has two entitlements.
 
 - `com.apple.security.device.audio-input` lets voz record from the microphone under the hardened runtime.
-- `com.apple.security.cs.disable-library-validation` lets voz load `Sparkle.framework`. Library validation only accepts frameworks signed by Apple or by the same team ID as the app. The "voz Dev" identity is self-signed and has no team ID, so macOS rejects the framework without this entitlement. Remove it after the app and Sparkle are signed with a Developer ID certificate, then test an update end to end.
+- `com.apple.security.cs.disable-library-validation` lets voz load `Sparkle.framework`. Library validation only accepts frameworks signed by Apple or by the same team ID as the app. The "voz Dev" identity is self-signed and has no team ID, so macOS rejects the framework without this entitlement. After you sign the app and Sparkle with a Developer ID certificate, remove this entitlement and test an update end to end.
 
 ## Launch agent
 
-voz registers `Contents/Library/LaunchAgents/com.joelheile.voz.relaunch.plist` with `SMAppService.agent` when "Launch at login" is on. launchd relaunches voz after a crash or a signal. A Quit from the menu exits with code 0, so voz stays quit.
+When "Launch at login" is on, voz registers `Contents/Library/LaunchAgents/com.joelheile.voz.relaunch.plist` with `SMAppService.agent`. launchd relaunches voz after a crash or a signal. "Quit voz" in the menu exits with code 0, so voz stays closed.
 
-launchd binds the agent to the signature of the registered binary when the app has no team ID. After an update with a self-signed identity, launchd can refuse to start the new binary. voz then keeps running unmanaged and logs "Launch agent did not start". Signing with a Developer ID certificate removes this limit. Verify it with `kill -9` after the first Developer ID release.
+When the app has no team ID, launchd binds the agent to the signature of the registered binary. After an update with a self-signed identity, launchd can refuse to start the new binary. voz then runs unmanaged and logs "Launch agent did not start". A Developer ID certificate removes this limit. After the first Developer ID release, verify it with `kill -9`.

@@ -1,76 +1,100 @@
 # voz
 
-voz is a dictation app for the Mac menu bar. Press a hotkey, speak, and voz types the cleaned text into the app you are using.
+voz is a local-first dictation app for the Mac. Press a shortcut, speak, and the text appears at your cursor.
 
-Transcription and cleanup run on your Mac. voz needs macOS 26 and Apple Silicon.
+voz is a small core you extend with TypeScript. The core records, transcribes, cleans up, inserts and keeps history, all on your Mac. Extensions do the rest: voice commands, per-app rewrites, snippets, anything that hooks into a recording.
+
+voz has no cloud mode, no account and no sandbox for extensions.
 
 ## Install
 
-Download the latest zip from the [releases page](https://github.com/Joelheile/voz/releases), unzip it and move `voz.app` to `/Applications`. Open it once. voz then starts at login and restarts if it crashes. Choose Quit from the menu bar icon to stop it until the next login or launch.
+Download the latest zip from [releases](https://github.com/Joelheile/voz/releases), unzip it and move `voz.app` to `/Applications`. voz needs macOS 26 and Apple Silicon.
 
-To install from source:
+voz is not notarized yet. Run this once so macOS opens it:
 
 ```
-scripts/install.sh
+xattr -cr /Applications/voz.app
 ```
 
-This builds a release, quits the running voz, replaces `/Applications/voz.app` and opens it.
-
-## Permissions
-
-| Permission | Why |
-| --- | --- |
-| Microphone | Record your voice while you dictate. |
-| Accessibility | Paste text into the active app and read edits to suggest vocabulary. |
-| Input Monitoring | Detect the hotkey. |
-
-voz never reads secure text fields such as password inputs.
+To build from source, run `scripts/install.sh`.
 
 ## Use
 
-- Default hotkey: right Command. Tap to start, tap again to stop. Hold to talk is a setting.
-- Pressing the hotkey while voz transcribes does nothing and shakes the indicator.
-- Settings cover the hotkey, language, cleanup, output, vocabulary and updates.
-- Recordings under 0.3 seconds or without speech are discarded.
+Tap right Command, speak, tap again. voz inserts the text into the front app. Click the menu bar icon for history, stats, dictionary and settings.
+
+voz asks for three permissions:
+
+- Microphone, to record.
+- Accessibility, to insert text.
+- Input Monitoring, to detect the shortcut.
 
 ## Extensions
 
-Extensions are TypeScript files that change text before voz inserts it or add voice commands, such as "send it" to press Return. Put them in `~/.voz/extensions`, or install packages with `voz install npm:<name>`. See [docs/extensions.md](docs/extensions.md).
+Put a `.ts` file in `~/.voz/extensions`:
 
-Extensions run with your permissions and can read your transcripts. Install only packages you trust.
+```ts
+import { defineExtension } from "voz";
 
-## Build from source
+export default defineExtension((voz) => {
+  voz.registerCommand("send it", (event, ctx) => ctx.press("return"));
 
-You need macOS 26, the Swift 6.2 toolchain and a code signing identity.
+  voz.on("beforeInsert", (event, ctx) => {
+    if (ctx.app.bundleID !== "com.tinyspeck.slackmacgap") return;
+    return { text: event.text.replace(/\bjira (\d+)/gi, "JIRA-$1") };
+  });
+});
+```
+
+Say "let's ship it, send it" in any app. voz types "Let's ship it" and presses Return.
+
+Or install a package from npm, git or a folder:
+
+```
+voz install npm:<name>
+voz install git:github.com/<user>/<repo>@v1
+voz dev ./my-extension
+```
+
+voz reloads extensions when you save. With no extensions, voz does not start Bun and costs nothing. Full API: [docs/extensions.md](docs/extensions.md).
+
+The `voz` command is `/Applications/voz.app/Contents/MacOS/voz`.
+
+## Security
+
+Extensions run with your user's permissions. They can read your transcripts, your recordings, your files and the network. Install only packages you trust, and read the source first.
+
+voz limits the damage it can control:
+
+- Installs never run package scripts.
+- Installs pin exact versions. Packages change only when you run `voz update`.
+- A crashed or slow extension never blocks dictation. voz times it out, inserts the original text and restarts the extension.
+
+## Privacy
+
+- Recording, transcription and cleanup run on your Mac.
+- Audio stays in memory. voz writes a recording to disk only when an extension listens for it, and deletes it afterwards.
+- voz sends anonymous usage counts to PostHog only if you opt in, and checks GitHub for updates.
+
+Details: [docs/privacy.md](docs/privacy.md).
+
+## Contributing
+
+voz keeps its core small. Where a change goes depends on who needs it:
+
+- **Pull request to voz:** changes every user needs on every dictation. Speed, reliability, bug fixes, languages and new extension points.
+- **Extension package:** features only some users want, such as snippets, per-app tone or integrations. Publish it to npm with the `voz-package` keyword. You do not need anyone's approval.
+
+Pull requests that add a feature a package could provide are closed with a pointer to [docs/extensions.md](docs/extensions.md). If a package needs something the extension API lacks, open an issue for the missing extension point.
+
+To build and test:
 
 ```
 scripts/test.sh
 scripts/make-app.sh
 ```
 
-`scripts/make-app.sh` builds `build/voz.app`. Set `SIGNING_IDENTITY` to use your own identity. A stable identity keeps macOS permissions across rebuilds.
-
-`scripts/run.sh` runs a debug build from `build/voz.app` and stops the installed launch agent. Use it only for development. Run `scripts/install.sh` to return to the normal setup.
-
-Headless modes for testing: `voz --transcribe <audio file>`, `voz --clean <text>`, `voz --simulate-dictation <audio file>`.
-
-## Privacy
-
-What stays on your Mac:
-
-- Audio. voz keeps it in memory and does not write it to disk unless an extension listens for recordings. Then voz writes each one to a temporary file and deletes it after the extension finishes.
-- Transcripts, history, vocabulary and stats. They live in `~/Library/Application Support/voz`, readable only by your user.
-- Speech recognition and cleanup. Both run on device.
-
-What leaves your Mac:
-
-- Anonymous usage events to PostHog (EU). They carry timings, counts, app and macOS version, chip and a random install ID. They never carry transcript text, vocabulary or app names. You can turn this off in onboarding or Settings.
-- Update checks and downloads from GitHub through Sparkle.
-- One-time speech model downloads from Hugging Face.
-- Bun, from GitHub, the first time you use an extension. Packages you install, from npm or git.
-
-voz makes no other network requests. Extensions you install can make their own.
+Release process: [docs/releasing.md](docs/releasing.md). Design: [docs/design.md](docs/design.md).
 
 ## License
 
-See the repository for license terms.
+[MIT](LICENSE)

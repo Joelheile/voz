@@ -26,7 +26,11 @@ Local-first macOS dictation app. Menu bar only. Research: `docs/research/stack.m
 
 ## Transcription
 
-- FluidAudio. Parakeet TDT v3 for "Automatic", Parakeet TDT v2 for "English only". Chosen in onboarding, only that model downloads.
+- FluidAudio. Four speech models, chosen in onboarding and Settings. Only the chosen model downloads:
+  - Parakeet Ultra, the default: most accurate, 25 languages, 630 MB.
+  - Parakeet Redux: 25 languages, 220 MB, a bit less accurate in English.
+  - Parakeet English (TDT v2): English only, 500 MB.
+  - Apple Speech: built into macOS, no download.
 - Apple SpeechAnalyzer used while Parakeet downloads or compiles.
 - Last recording kept in memory only for "Retry last", cleared on next recording.
 
@@ -47,7 +51,7 @@ Local-first macOS dictation app. Menu bar only. Research: `docs/research/stack.m
 - History window: search, raw and cleaned text, copy.
 - Stats (like Wispr Flow): words today, week, total; average WPM; time saved vs typing at 40 WPM; day streak; top apps (local only); filler words removed; 30-day chart.
 - Indicator built from scratch, no notch library. Setting: notch shape or floating pill on the screen with the active window. Spring expansion from the notch, live level meter.
-- Onboarding, short: Microphone, Accessibility, Input Monitoring, then "Automatic or English only", then analytics switch, then a test dictation.
+- Onboarding, short: Microphone, Accessibility, Input Monitoring, then the speech model, then analytics switch, then a test dictation.
 
 ## Storage and privacy
 
@@ -57,9 +61,8 @@ Local-first macOS dictation app. Menu bar only. Research: `docs/research/stack.m
 | Event                            | Properties                                                                                                                                                   |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `app_installed`, `app_launched`  | `launch_ms`                                                                                                                                                  |
-| `onboarding_step_completed`      | `step`, `seconds`                                                                                                                                            |
 | `permission_result`              | `permission`, `granted`                                                                                                                                      |
-| `dictation_completed`            | `audio_s`, `word_count`, `stt_ms`, `cleanup_ms`, `insert_ms`, `total_ms`, `model`, `language_mode`, `cleanup_used`, `cleanup_timed_out`, `trigger`, `output` |
+| `dictation_completed`            | `audio_s`, `word_count`, `stt_ms`, `cleanup_ms`, `insert_ms`, `total_ms`, `model`, `selected_model`, `cleanup_used`, `cleanup_timed_out`, `trigger`, `output` |
 | `dictation_failed`               | `stage`, `error_code`                                                                                                                                        |
 | `dictation_discarded`            | `reason`                                                                                                                                                     |
 | `retry_used`                     |                                                                                                                                                              |

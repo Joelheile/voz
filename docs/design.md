@@ -1,25 +1,24 @@
 # voz design
 
-voz is calm, editorial and premium. It takes the structure of Wispr Flow (warm canvas, sidebar, white content card, black hero card, serif numbers) and makes it bolder: larger type, stronger contrast, one confident accent.
+voz has a quiet, editorial look. It borrows from Wispr Flow (warm canvas, white panel, serif numbers) and adds stronger contrast and one brand color.
 
 ## Reference notes
 
 - Wispr Flow uses a warm off-white canvas, a sidebar with line icons and a soft gray active pill, and one large rounded white card for content.
-- Headlines mix roman and italic serif. Stats are big serif numbers with a small sans unit.
+- Headlines mix roman and italic serif. Stats are large serif numbers with a small sans unit.
 - History is grouped under small uppercase date labels. Rows show a muted time column and the transcript. Actions appear on hover.
-- The primary button is a single warm orange.
-- Research was limited to the product screenshot. The marketing site exposes no CSS values.
+- The primary button is warm orange.
+- The research used only the product screenshot. The marketing site does not expose CSS values.
 
 ## Accent
 
-Two candidates:
+| Name   | Light   | Dark    | On black |
+| ------ | ------- | ------- | -------- |
+| Indigo | #5163F9 | #6475FA | #7A8CFF  |
 
-| Name      | Light   | Dark    | Notes                                                                       |
-| --------- | ------- | ------- | --------------------------------------------------------------------------- |
-| Vermilion | #DC3E42 | #F0555A | Warm red. Matches the recording dot. White text passes 4.5:1 in light mode. |
-| Clay rose | #CF4A6C | #E8648A | Cooler pink-red. Reads softer, less tied to recording.                      |
+The brand accent is the blue from the app icon. voz uses it for the status dot and the Insights bars.
 
-Chosen: Vermilion. It is clearly different from Wispr's orange, stays warm, and the recording dot, active states and primary actions share one color. It is used for the recording dot, the active sidebar marker, chart bars, switch tint, the hero accent word and the accent button. Everything else is ink and gray.
+Controls use the macOS accent color (`Color.accentColor`): toggles, the accent button, checkmarks and the Copied label. They follow the color you pick in System Settings. Everything else is ink and gray.
 
 ## Color
 
@@ -31,12 +30,10 @@ Chosen: Vermilion. It is clearly different from Wispr's orange, stays warm, and 
 | inkSecondary        | #5F5C55  | #A5A29A  |
 | inkTertiary         | #7B7870  | #7F7C75  |
 | hairline            | black 8% | white 9% |
-| hover               | #F7F5F1  | white 4% |
-| selected (nav pill) | #E9E6DF  | white 9% |
-| hero                | #0D0D0E  | #26262A  |
-| accent              | #DC3E42  | #F0555A  |
+| selected            | #E9E6DF  | white 9% |
+| accent              | #5163F9  | #6475FA  |
 
-The notch and pill stay black. Their recording dot uses the dark accent. Bars stay white.
+The notch and pill stay black. Their recording dot uses the on-black accent. The bars stay white.
 
 ## Type
 
@@ -45,47 +42,61 @@ The notch and pill stay black. Their recording dot uses the dark accent. Bars st
 
 | Role          | Font                                                      |
 | ------------- | --------------------------------------------------------- |
-| Page title    | serif 40, semibold, tracking -0.8                         |
-| Hero headline | serif 34, regular, italic accent word                     |
-| Big number    | serif 44 to 72, regular, tabular, numeric text transition |
-| Section title | serif 22, semibold                                        |
-| Body          | SF 14, regular                                            |
-| Row title     | SF 14, medium                                             |
+| Page title    | serif 20, semibold                                        |
+| Insights line | serif 24, semibold, tabular, numeric text transition      |
+| Body          | SF 13, regular                                            |
+| Row title     | SF 13, medium                                             |
 | Meta          | SF 12.5, regular, inkTertiary                             |
-| Date label    | SF 11.5, semibold, tracking 1.2, uppercase                |
+| Section label | SF 12.5, regular, inkSecondary, sentence case             |
 
 ## Radii and spacing
 
-- Radii: 8 controls, 12 rows and chips, 16 inner cards, 22 content card and hero.
-- Spacing scale: 4, 8, 12, 16, 24, 32, 44.
-- Window 1100 x 720, minimum 900 x 600. Sidebar 232. Content card inset 12 from the window edge. Content padding 44.
+- Radii: 8 controls and row highlights, 12 chips, 22 panel.
+- Spacing scale: 4, 8, 12, 16.
+- Panel width 360, padding 16. Scroll areas cap at 520 so the panel stays on screen.
 
 ## Depth
 
-Hairline borders only. No drop shadows. The content card sits on the canvas with a hairline.
+Hairline borders only. The panel has the system window shadow and a hairline border. Settings groups are bordered cards. The home list sits flat on the panel.
 
 ## Motion
 
-- Press: scale 0.97, 120 ms ease-out.
+- Press: scale to 0.97, 120 ms ease-out.
 - Hover: background fade, 150 ms ease-out. Row actions fade in.
-- Section change: cross-fade, 180 ms.
+- Page change: cross-fade, 180 ms.
 - Numbers: `.contentTransition(.numericText())` with `.smooth`.
-- Indicator timing is unchanged.
-- Reduce motion drops scale and keeps fades.
+- Indicator timing does not change.
+- With Reduce Motion on, scale is removed and fades stay.
 
 ## Components
 
-- Sidebar item: icon, label, soft pill when active, accent dot marker.
-- Card: surface fill, hairline, radius 16.
-- Stat number: serif number plus sans unit.
-- Section label: uppercase tracked date style.
-- Primary button: ink capsule. Accent button: accent capsule. Hero button: white capsule.
-- Setting row: title and description left, control right, hairline between rows.
+- Page bar: back chevron and serif title. Esc and Cmd+[ go back.
+- Group: section label above one card with a hairline border, radius 12. Rows inside are split by hairlines. No fill.
+- Row: title and short description left, control right.
+- Section label: sentence case, small regular.
+- Indicator picker: two tiles side by side, Notch and Pill. Each tile shows a small looping preview. The selected tile has a 2 pt accent border.
+- Primary button: ink capsule. Accent button: accent capsule.
 
-## Windows
+## Menu bar panel
 
-One main window with a sidebar: Home, Insights, Dictionary, Settings. The menu items History, Stats and Settings open the matching section. Onboarding uses the same canvas, serif headlines and ink button, one step per screen.
+voz has no main window. Everything lives in the panel under the menu bar icon.
+
+- Home: status dot, status and shortcut hint, the last 5 transcripts, a stats line, and a footer with the language menu, retry, settings and quit. Search shows once there are more than 5 transcripts and takes focus when the panel opens. Return copies the first result.
+- Click a transcript to copy it. Right-click to copy or delete.
+- Transcript rows have no dividers. Hover shows a rounded highlight.
+- Insights reads as sentences: a serif line with this week's words, then today, total, time saved, pace, streak and filler words. A 30-day chart and top apps follow.
+- The stats line opens Insights. The gear opens Settings. Settings links to Dictionary.
+- Settings has three groups: Dictation (shortcut, mode, language with model status, clean up, dictionary), Output and General. Permissions shows only while one is missing.
+- Inline lists join with commas. No middle dots.
+- First launch: the panel opens on its own with a setup checklist for the three permissions, language and usage stats. It stays open while you switch to System Settings. Done closes it and starts the model download.
 
 ## Menu bar icon
 
-A template glyph of four level bars drawn in code. Recording draws the bars in the accent color. Transcribing draws short flat bars.
+The icon is the full-color mouth from the app icon, `Resources/MenuBarIcon.png`, shown 16 pt tall. While transcribing, it drops to 45% opacity.
+
+## Copy
+
+- Use plain, short sentences. Write in active voice and present tense.
+- Use sentence case for headings, labels, and buttons. Menu items follow macOS title case.
+- Use one term per concept: dictate and dictation, transcript, shortcut, Dictionary, insert (for text that voz places in an app), recording.
+- Hints that mention the shortcut use the configured shortcut name.

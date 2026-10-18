@@ -4,29 +4,29 @@
 
 Open a private security advisory at https://github.com/Joelheile/voz/security/advisories/new. Do not open a public issue.
 
-Include the voz version, macOS version and steps to reproduce. You get a first answer within 7 days.
+Include the voz version, macOS version and steps to reproduce. You receive a first response within 7 days.
 
 ## Supported versions
 
-Only the latest stable release and the latest beta get fixes.
+Only the latest stable release and the latest beta receive fixes.
 
 ## Data handling
 
-- Audio stays in memory. voz never writes it to disk. It is released after each dictation, except the last recording that "Retry last" needs.
-- Transcripts, vocabulary and stats are stored in `~/Library/Application Support/voz`. The directory is mode 0700 and the database is mode 0600.
+- Audio stays in memory. voz does not write it to disk. voz releases it after each dictation, except the last recording that "Retry last" needs.
+- Transcripts, dictionary words, and stats are stored in `~/Library/Application Support/voz`. The directory has mode 0700 and the database has mode 0600.
 - Log messages that can contain user text or error details are marked private.
-- voz marks text it pastes without keeping a copy as transient and concealed on the pasteboard, so clipboard managers skip it. It restores your previous clipboard afterwards.
-- Edit learning never reads secure text fields.
-- Analytics never include transcript text, vocabulary or app names.
+- When voz inserts text without keeping a copy, it marks the text as transient and concealed on the pasteboard, so clipboard managers skip it. voz then restores your previous clipboard.
+- Edit learning does not read secure text fields.
+- Analytics do not include transcript text, dictionary words, or app names.
 
 ## Network
 
-voz connects only to PostHog (EU), GitHub for Sparkle updates, and Hugging Face for model downloads.
+voz connects only to PostHog (EU) for analytics, GitHub for Sparkle updates, and Hugging Face for model downloads.
 
 ## Updates
 
-Updates are signed with an EdDSA key and checked by Sparkle before install.
+Updates are signed with an EdDSA key. Sparkle verifies the signature before it installs an update.
 
 ## Entitlements
 
-voz requests microphone access and `com.apple.security.cs.disable-library-validation`. See `docs/releasing.md` for why the second one exists.
+voz requests microphone access and `com.apple.security.cs.disable-library-validation`. `docs/releasing.md` explains why voz needs the second entitlement.
