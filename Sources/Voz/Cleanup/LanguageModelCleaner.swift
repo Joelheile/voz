@@ -10,7 +10,7 @@ enum CleanupError: Error {
 final class LanguageModelCleaner {
     private let model = SystemLanguageModel(guardrails: .permissiveContentTransformations)
     private let examples: [CleanupExample]
-    private var vocabulary: [String] = []
+    private var instructions = ""
     private var warmSession: LanguageModelSession?
 
     init(examples: [CleanupExample]) {
@@ -24,17 +24,17 @@ final class LanguageModelCleaner {
         }
     }
 
-    func prewarm(vocabulary: [String]) {
+    func prewarm(instructions: String) {
         guard availabilityDescription == nil else { return }
-        if warmSession != nil, vocabulary == self.vocabulary { return }
-        self.vocabulary = vocabulary
+        if warmSession != nil, instructions == self.instructions { return }
+        self.instructions = instructions
         startWarmSession()
     }
 
-    func clean(_ text: String, vocabulary: [String], wordCount: Int, timeout: Duration) async throws -> String {
+    func clean(_ text: String, instructions: String, wordCount: Int, timeout: Duration) async throws -> String {
         if let reason = availabilityDescription { throw CleanupError.modelUnavailable(reason) }
-        if vocabulary != self.vocabulary {
-            self.vocabulary = vocabulary
+        if instructions != self.instructions {
+            self.instructions = instructions
             warmSession = nil
         }
         let session = warmSession ?? makeSession()
@@ -60,7 +60,7 @@ final class LanguageModelCleaner {
 
     private func makeTranscript() -> Transcript {
         var entries: [Transcript.Entry] = [
-            .instructions(.init(segments: [.text(.init(content: CleanupInstructions.text(vocabulary: vocabulary)))], toolDefinitions: [])),
+            .instructions(.init(segments: [.text(.init(content: instructions))], toolDefinitions: [])),
         ]
         for example in examples {
             entries.append(.prompt(.init(segments: [.text(.init(content: CleanupInstructions.transcriptPrompt(for: example.input)))])))

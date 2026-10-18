@@ -15,7 +15,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     private lazy var output = TextOutput(settings: settings)
     private let cleaner = TextCleaner()
-    private lazy var extensions = ExtensionService(output: output)
+    private let toast = ToastController()
+    private lazy var extensions = ExtensionService(output: output, toast: toast)
+    private var vocabularyWords: [String] = []
     private lazy var dictation = Dictation(
         pipeline: DictationPipeline(
             engine: SpeechEngine(parakeet: transcriber),
@@ -53,7 +55,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 history: historyModel,
                 stats: statsModel,
                 vocabulary: vocabularyModel,
-                setup: setupModel
+                setup: setupModel,
+                extensions: ExtensionsModel()
             ),
             analytics: analytics,
             checkForUpdates: { [weak self] in self?.updater.checkForUpdates() },
@@ -159,6 +162,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.warmUpModel(model)
             }
             .store(in: &cancellables)
+        settings.$cleanupPrompt
+            .dropFirst()
+            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
+            .sink { [weak self] prompt in
+                guard let self else { return }
+                self.cleaner.prewarm(prompt: prompt, vocabulary: self.vocabularyWords)
+            }
+            .store(in: &cancellables)
     }
 
     private func observeVocabulary() {
@@ -185,7 +196,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Log.app.error("Vocabulary read failed: \(error.localizedDescription, privacy: .private)")
             return
         }
-        cleaner.prewarm(vocabulary: words)
+        vocabularyWords = words
+        cleaner.prewarm(prompt: settings.cleanupPrompt, vocabulary: words)
         Task {
             do {
                 try await transcriber.prepareVocabulary(words)

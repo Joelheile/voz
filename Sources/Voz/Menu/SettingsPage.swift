@@ -68,6 +68,9 @@ struct SettingsPage: View {
             PanelRow(title: "Clean up text", detail: "Removes filler words, fixes punctuation") {
                 Toggle("Clean up text", isOn: $settings.cleanupEnabled).labelsHidden()
             }
+            if settings.cleanupEnabled {
+                LinkRow(title: "Cleanup prompt", value: settings.cleanupPrompt == CleanupPrompt.standard ? "Default" : "Edited") { model.page = .cleanupPrompt }
+            }
             LinkRow(title: "Dictionary", value: vocabulary.snapshot.words.count.formatted()) { model.page = .dictionary }
         }
     }
@@ -115,7 +118,6 @@ struct SettingsPage: View {
 
     private var general: some View {
         PanelGroup(title: "General") {
-            LinkRow(title: "Extensions", value: "") { model.page = .extensions }
             PanelRow(title: "Launch at login") {
                 Toggle("Launch at login", isOn: $settings.launchAtLogin).labelsHidden()
             }

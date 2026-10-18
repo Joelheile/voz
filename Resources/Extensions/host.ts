@@ -1,17 +1,17 @@
 import {
-  copyFileSync,
   existsSync,
   mkdirSync,
   readdirSync,
   readFileSync,
   statSync,
-  writeFileSync,
 } from "node:fs";
 import { EventEmitter } from "node:events";
 import { basename, extname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import type {
   App,
+  BeforeCleanupEvent,
+  BeforeCleanupResult,
   BeforeInsertEvent,
   BeforeInsertResult,
   CommandEvent,
@@ -26,19 +26,18 @@ type Launch = {
   extensionsDirectory: string;
   packages: string[];
 };
-type EventName = "beforeInsert" | "recording" | "afterInsert";
+type EventName = "beforeCleanup" | "beforeInsert" | "recording" | "afterInsert";
+type HandlerResult = BeforeInsertResult | BeforeCleanupResult;
 type Handler = {
   extension: string;
-  run: (
-    event: object,
-    ctx: Context,
-  ) => BeforeInsertResult | Promise<BeforeInsertResult>;
+  run: (event: object, ctx: Context) => HandlerResult | Promise<HandlerResult>;
 };
 type Command = {
   extension: string;
   phrase: string;
   run: (event: CommandEvent, ctx: Context) => void | Promise<void>;
 };
+type CleanupRequest = BeforeCleanupEvent & { app: App };
 type InsertRequest = BeforeInsertEvent & { app: App };
 type EmitRequest = { event: EventName; payload: object; app: App };
 type CommandRequest = CommandEvent & { phrase: string; app: App };
@@ -55,7 +54,12 @@ console.log =
     (...parts: unknown[]) => log(parts.map(String).join(" "));
 
 const launch: Launch = JSON.parse(process.argv[2]);
-const eventNames: EventName[] = ["beforeInsert", "recording", "afterInsert"];
+const eventNames: EventName[] = [
+  "beforeCleanup",
+  "beforeInsert",
+  "recording",
+  "afterInsert",
+];
 const handlers = new Map<EventName, Handler[]>();
 const commands = new Map<string, Command>();
 const loaded: string[] = [];
@@ -72,21 +76,12 @@ Bun.plugin({
   },
 });
 
-function installTypes() {
-  const directory = join(launch.home, "node_modules", "voz");
-  mkdirSync(directory, { recursive: true });
-  copyFileSync(join(import.meta.dir, "voz.d.ts"), join(directory, "index.d.ts"));
-  writeFileSync(
-    join(directory, "package.json"),
-    JSON.stringify({ name: "voz", private: true, types: "index.d.ts" }),
-  );
-}
-
 function context(app: App): Context {
   return {
     app,
     insert: (text) => send({ method: "insert", params: { text } }),
     press: (key) => send({ method: "press", params: { key } }),
+    notify: (text) => send({ method: "notify", params: { text } }),
   };
 }
 
@@ -187,11 +182,24 @@ async function load() {
   }
 }
 
+async function beforeCleanup({ prompt, app }: CleanupRequest) {
+  const ctx = context(app);
+  for (const handler of handlers.get("beforeCleanup") ?? []) {
+    try {
+      const result = (await handler.run({ prompt }, ctx)) as BeforeCleanupResult;
+      if (result && typeof result.prompt === "string") prompt = result.prompt;
+    } catch (error) {
+      log(`${handler.extension} beforeCleanup failed: ${describe(error)}`);
+    }
+  }
+  return { prompt };
+}
+
 async function beforeInsert({ text, raw, app }: InsertRequest) {
   const ctx = context(app);
   for (const handler of handlers.get("beforeInsert") ?? []) {
     try {
-      const result = await handler.run({ text, raw }, ctx);
+      const result = (await handler.run({ text, raw }, ctx)) as BeforeInsertResult;
       if (result && "handled" in result) return { text: "" };
       if (result && typeof result.text === "string") text = result.text;
     } catch (error) {
@@ -223,13 +231,13 @@ async function command({ phrase, text, app }: CommandRequest) {
 }
 
 const methods: Record<string, (params: any) => Promise<object>> = {
+  beforeCleanup,
   beforeInsert,
   command,
   emit,
   ping: async () => ({}),
 };
 
-installTypes();
 await load();
 send({
   method: "ready",

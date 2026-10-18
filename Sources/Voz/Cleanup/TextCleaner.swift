@@ -28,12 +28,12 @@ final class TextCleaner {
         self.budget = budget
     }
 
-    func prewarm(vocabulary: [String]) {
+    func prewarm(prompt: String, vocabulary: [String]) {
         if let reason = model.availabilityDescription {
             Log.app.notice("Cleanup model unavailable, rule pass only: \(reason)")
             return
         }
-        model.prewarm(vocabulary: vocabulary)
+        model.prewarm(instructions: CleanupInstructions.text(prompt: prompt, vocabulary: vocabulary))
     }
 
     func ruleText(_ raw: String, vocabulary: [String]) -> (text: String, fillersRemoved: Int) {
@@ -41,7 +41,7 @@ final class TextCleaner {
         return (VocabularyCasing.apply(vocabulary, to: SpokenPunctuation.apply(to: fillers.text)), fillers.removed)
     }
 
-    func clean(_ raw: String, vocabulary: [String], deadline: ContinuousClock.Instant? = nil) async -> CleanedText {
+    func clean(_ raw: String, prompt: String, vocabulary: [String], deadline: ContinuousClock.Instant? = nil) async -> CleanedText {
         let started = ContinuousClock.now
         let deadline = deadline ?? started + budget
         let rules = ruleText(raw, vocabulary: vocabulary)
@@ -53,11 +53,11 @@ final class TextCleaner {
             finished = chunks.map { ChunkResult(text: $0, removed: 0, timedOut: false, rejection: nil) }
         } else {
             for chunk in chunks {
-                finished.append(await cleanChunk(chunk, vocabulary: vocabulary, deadline: deadline))
+                finished.append(await cleanChunk(chunk, prompt: prompt, vocabulary: vocabulary, deadline: deadline))
             }
         }
         let elapsed = ContinuousClock.now - started
-        prewarm(vocabulary: vocabulary)
+        prewarm(prompt: prompt, vocabulary: vocabulary)
         return CleanedText(
             text: finished.map(\.text).joined(),
             fillerWordsRemoved: rules.fillersRemoved + finished.reduce(0) { $0 + $1.removed },
@@ -67,7 +67,7 @@ final class TextCleaner {
         )
     }
 
-    private func cleanChunk(_ chunk: String, vocabulary: [String], deadline: ContinuousClock.Instant) async -> ChunkResult {
+    private func cleanChunk(_ chunk: String, prompt: String, vocabulary: [String], deadline: ContinuousClock.Instant) async -> ChunkResult {
         let wordCount = chunk.split(whereSeparator: \.isWhitespace).count
         let unchanged = ChunkResult(text: chunk, removed: 0, timedOut: false, rejection: nil)
         guard wordCount >= Self.minimumWordsForModel else { return unchanged }
@@ -78,7 +78,8 @@ final class TextCleaner {
         }
         let trailing = String(chunk.reversed().prefix(while: \.isWhitespace).reversed())
         do {
-            let modelOutput = try await model.clean(chunk, vocabulary: vocabulary, wordCount: wordCount, timeout: remaining)
+            let instructions = CleanupInstructions.text(prompt: prompt, vocabulary: vocabulary)
+            let modelOutput = try await model.clean(chunk, instructions: instructions, wordCount: wordCount, timeout: remaining)
             let output = CleanupOutput.sanitized(modelOutput, raw: chunk)
             if let rejection = CleanupGuard.rejection(raw: chunk, cleaned: output) {
                 Log.app.notice("Cleanup output rejected (\(rejection.rawValue)), using rule-pass text")

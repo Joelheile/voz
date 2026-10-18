@@ -21,6 +21,16 @@ import Testing
         #expect(settings.versionPingEnabled)
     }
 
+    @Test func editedCleanupPromptPersistsAndResettingFollowsTheBuiltInPrompt() {
+        let fixture = SettingsFixture()
+        let settings = fixture.makeSettings()
+        #expect(settings.cleanupPrompt == CleanupPrompt.standard)
+        settings.cleanupPrompt = "Only fix punctuation."
+        #expect(fixture.makeSettings().cleanupPrompt == "Only fix punctuation.")
+        settings.cleanupPrompt = CleanupPrompt.standard
+        #expect(fixture.storedString(forKey: SettingsKey.cleanupPrompt) == nil)
+    }
+
     @Test func persistsEveryKey() {
         let fixture = SettingsFixture()
         let settings = fixture.makeSettings()

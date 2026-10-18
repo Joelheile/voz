@@ -36,18 +36,20 @@ final class DictationPipeline {
         editObserver.collect()
     }
 
-    func makeStreaming() -> StreamingDictation {
-        StreamingDictation(
+    func makeStreaming(app: FrontApp) -> StreamingDictation {
+        let prompt = settings.cleanupPrompt
+        return StreamingDictation(
             engine: engine,
             cleaner: cleaner,
             model: settings.speechModel,
             vocabulary: vocabularyWords(),
+            prompt: Task { [extensions] in await extensions.cleanupPrompt(prompt, app: app) },
             cleanupEnabled: settings.cleanupEnabled
         )
     }
 
     func run(_ recording: LastRecording, streaming: StreamingDictation?, released: ContinuousClock.Instant) async -> Dictation.Outcome {
-        let session = streaming ?? makeStreaming()
+        let session = streaming ?? makeStreaming(app: recording.app)
         extensions.recorded(recording.samples, app: recording.app)
         do {
             guard let transcript = try await session.finish(samples: recording.samples, released: released) else {

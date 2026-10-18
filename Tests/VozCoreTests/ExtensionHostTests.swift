@@ -31,6 +31,26 @@ struct ExtensionHostTests {
         await host.stop()
     }
 
+    @Test func beforeCleanupHandlersChainThePromptPerApp() async throws {
+        try extensionFile("a-slack.ts", #"export default (voz) => voz.on("beforeCleanup", (e, ctx) => ctx.app.name === "Slack" ? { prompt: e.prompt + " Casual." } : undefined)"#)
+        try extensionFile("b-short.ts", #"export default (voz) => voz.on("beforeCleanup", (e) => ({ prompt: e.prompt + " Short." }))"#)
+        let host = makeHost()
+        let manifest = try await host.start()
+        #expect(manifest.events == ["beforeCleanup"])
+        #expect(await host.beforeCleanup(prompt: "Clean.", app: app, timeout: .seconds(2)) == "Clean. Casual. Short.")
+        await host.stop()
+    }
+
+    @Test func notifySendsAToastAction() async throws {
+        try extensionFile("toast.ts", #"export default (voz) => voz.registerCommand("ping", (e, ctx) => ctx.notify("pong"))"#)
+        let actions = RecordedActions()
+        let host = makeHost(actions: actions)
+        _ = try await host.start()
+        #expect(await host.runCommand(phrase: "ping", text: "", app: app, timeout: .seconds(2)))
+        #expect(actions.all == [.notify("pong")])
+        await host.stop()
+    }
+
     @Test func handlersSeeAppAndConfig() async throws {
         try writeFile(#"{"config":{"tag":{"suffix":" #voz"}}}"#, named: "settings.json", in: home.root)
         try extensionFile("tag.ts", #"export default (voz) => voz.on("beforeInsert", (e, ctx) => ({ text: `${e.text} [${ctx.app.name}]${voz.config.suffix}` }))"#)
@@ -91,7 +111,6 @@ struct ExtensionHostTests {
         #expect(manifest.errors.isEmpty)
         #expect(await host.beforeInsert(text: "bus", raw: "bus", app: app, timeout: .seconds(2)) == "BUS")
         #expect(fileContents(home.root.appendingPathComponent("data/b-listen/seen")) == "bus")
-        #expect(fileContents(home.root.appendingPathComponent("node_modules/voz/index.d.ts"))?.contains("defineExtension") == true)
         await host.stop()
     }
 

@@ -9,14 +9,17 @@ struct ExtensionDelivery {
 @MainActor
 final class ExtensionService {
     private static let insertTimeout: Duration = .milliseconds(300)
+    private static let cleanupPromptTimeout: Duration = .milliseconds(300)
     private static let commandTimeout: Duration = .seconds(10)
     private static let maxRestarts = 3
     private static let watchdogInterval: Duration = .seconds(5)
     private static let pingTimeout: Duration = .seconds(2)
     private static let eventTimeout: Duration = .seconds(30)
+    static let resources = Bundle.main.resourceURL!.appendingPathComponent("Extensions", isDirectory: true)
 
     private let home = VozHome()
     private let output: TextOutput
+    private let toast: ToastController
     private var host: ExtensionHost?
     private var commands: [String] = []
     private var events: Set<String> = []
@@ -26,8 +29,9 @@ final class ExtensionService {
     private var watchdog: Task<Void, Never>?
     private var watcher: FileWatcher?
 
-    init(output: TextOutput) {
+    init(output: TextOutput, toast: ToastController) {
         self.output = output
+        self.toast = toast
     }
 
     func start() {
@@ -51,11 +55,17 @@ final class ExtensionService {
             watch()
             guard home.hasExtensions else { return }
             do {
+                try home.writeAuthoringFiles(from: Self.resources)
                 try await launch()
             } catch {
                 Log.extensions.error("Extensions failed to start: \(String(describing: error), privacy: .public)")
             }
         }
+    }
+
+    func cleanupPrompt(_ prompt: String, app: FrontApp) async -> String {
+        guard let host, events.contains(HostManifest.beforeCleanup) else { return prompt }
+        return await host.beforeCleanup(prompt: prompt, app: app.hostApp, timeout: Self.cleanupPromptTimeout)
     }
 
     func prepare(_ text: String, raw: String, app: FrontApp) async -> ExtensionDelivery {
@@ -97,10 +107,7 @@ final class ExtensionService {
     }
 
     private func launch() async throws {
-        guard let script = Bundle.main.url(forResource: "host", withExtension: "ts", subdirectory: "Extensions") else {
-            Log.extensions.error("Extension host script missing from app bundle")
-            return
-        }
+        let script = Self.resources.appendingPathComponent("host.ts")
         let host = ExtensionHost(
             launch: .init(bun: try await BunRuntime.ensure(), script: script, home: home, packageDirectories: try home.packageDirectories()),
             onAction: { [weak self] action in
@@ -151,6 +158,8 @@ final class ExtensionService {
             } catch {
                 Log.extensions.error("Extension pressed an unknown key: \(key, privacy: .public)")
             }
+        case .notify(let text):
+            toast.show(text)
         }
     }
 

@@ -17,6 +17,7 @@ public struct HostManifest: Decodable, Equatable, Sendable {
     public let errors: [String]
 
     public static let beforeInsert = "beforeInsert"
+    public static let beforeCleanup = "beforeCleanup"
 }
 
 public enum HostEvent: Encodable, Sendable {
@@ -48,6 +49,7 @@ public enum HostEvent: Encodable, Sendable {
 public enum HostAction: Equatable, Sendable {
     case insert(String)
     case press(String)
+    case notify(String)
 }
 
 struct HostLaunchArguments: Encodable {
@@ -66,6 +68,15 @@ struct HostRequest<Params: Encodable>: Encodable {
 struct InsertParams: Encodable {
     let text: String
     let raw: String
+    let app: HostApp
+}
+
+struct PromptParams: Codable {
+    let prompt: String
+}
+
+struct CleanupParams: Encodable {
+    let prompt: String
     let app: HostApp
 }
 

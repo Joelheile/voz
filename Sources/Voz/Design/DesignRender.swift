@@ -11,6 +11,7 @@ enum DesignRender {
         _ = NSApplication.shared
         try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
         let fixture = try Fixture()
+        await fixture.sources.extensions.load()
         try await Task.sleep(for: .milliseconds(500))
         for (suffix, name) in appearances {
             let appearance = NSAppearance(named: name)!
@@ -36,6 +37,8 @@ enum DesignRender {
         ("settings", .settings),
         ("dictionary", .dictionary),
         ("insights", .insights),
+        ("extensions", .extensions),
+        ("cleanup-prompt", .cleanupPrompt),
     ]
 
     private static func write(_ view: some View, to directory: URL, name: String, appearance: NSAppearance) throws {
@@ -93,7 +96,8 @@ private final class Fixture {
             history: HistoryModel(store: history),
             stats: StatsModel(store: history),
             vocabulary: VocabularyModel(store: history.vocabulary, analytics: analytics),
-            setup: SetupModel(analytics: analytics)
+            setup: SetupModel(analytics: analytics),
+            extensions: ExtensionsModel(home: VozHome(root: FileManager.default.temporaryDirectory.appendingPathComponent("voz-render-home")), fetch: { Self.listings })
         )
         status.update(.parakeetUltra, .ready(bytes: 632_000_000))
     }
@@ -114,6 +118,15 @@ private final class Fixture {
         default: DictationHint.idle(hotkey: settings.hotkey, holdToTalk: settings.holdToTalk)
         }
     }
+
+    nonisolated private static let listings = Data("""
+    {"objects": [
+      {"downloads": {"monthly": 5310}, "package": {"name": "voz-tone", "description": "Rewrites your dictation in the tone of each app", "version": "1.4.0", "publisher": {"username": "mara"}}},
+      {"downloads": {"monthly": 3720}, "package": {"name": "voz-snippets", "description": "Say a shortcut, get your address, signature or links", "version": "2.0.1", "publisher": {"username": "jonas"}}},
+      {"downloads": {"monthly": 1840}, "package": {"name": "voz-obsidian", "description": "Appends each dictation to today's daily note", "version": "0.9.2", "publisher": {"username": "lee"}}},
+      {"downloads": {"monthly": 410}, "package": {"name": "voz-linear", "description": "Say new ticket to file a Linear issue", "version": "0.3.0", "publisher": {"username": "sam"}}}
+    ]}
+    """.utf8)
 
     private static func makeRecords() -> [TranscriptRecord] {
         let texts = [

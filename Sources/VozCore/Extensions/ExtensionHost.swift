@@ -82,6 +82,12 @@ public actor ExtensionHost {
         return decodeResult(InsertResult.self, from: data)?.text ?? text
     }
 
+    public func beforeCleanup(prompt: String, app: HostApp, timeout: Duration) async -> String {
+        guard manifest?.events.contains(HostManifest.beforeCleanup) == true else { return prompt }
+        let data = await request("beforeCleanup", CleanupParams(prompt: prompt, app: app), timeout: timeout)
+        return decodeResult(PromptParams.self, from: data)?.prompt ?? prompt
+    }
+
     public func runCommand(phrase: String, text: String, app: HostApp, timeout: Duration) async -> Bool {
         let data = await request("command", CommandParams(phrase: phrase, text: text, app: app), timeout: timeout)
         return decodeResult(CommandResult.self, from: data)?.handled ?? false
@@ -168,6 +174,7 @@ public actor ExtensionHost {
         case "ready": ready(line)
         case "insert": decodeNotification(TextParams.self, line).map { onAction(.insert($0.text)) }
         case "press": decodeNotification(PressParams.self, line).map { onAction(.press($0.key)) }
+        case "notify": decodeNotification(TextParams.self, line).map { onAction(.notify($0.text)) }
         case "log": decodeNotification(TextParams.self, line).map { onLog($0.text) }
         default: onLog("Extension host sent unknown method \(envelope.method ?? "nil")")
         }

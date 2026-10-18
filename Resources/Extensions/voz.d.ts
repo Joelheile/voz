@@ -6,8 +6,11 @@ export type Context = {
   app: App;
   insert(text: string): void;
   press(key: string): void;
+  notify(text: string): void;
 };
 
+export type BeforeCleanupEvent = { prompt: string };
+export type BeforeCleanupResult = { prompt: string } | void;
 export type BeforeInsertEvent = { text: string; raw: string };
 export type BeforeInsertResult = { text: string } | { handled: true } | void;
 export type CommandEvent = { text: string };
@@ -26,6 +29,13 @@ export type ExtensionAPI = {
   config: Record<string, string | number | boolean>;
   paths: Paths;
   events: EventBus;
+  on(
+    event: "beforeCleanup",
+    handler: (
+      event: BeforeCleanupEvent,
+      ctx: Context,
+    ) => Awaitable<BeforeCleanupResult>,
+  ): void;
   on(
     event: "beforeInsert",
     handler: (

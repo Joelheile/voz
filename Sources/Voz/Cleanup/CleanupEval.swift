@@ -1,4 +1,5 @@
 import Foundation
+import VozCore
 
 struct CleanupEvalCase: Decodable {
     let id: Int
@@ -19,9 +20,9 @@ enum CleanupEval {
             return 66
         }
         let cleaner = TextCleaner(budget: budget)
-        cleaner.prewarm(vocabulary: [])
+        cleaner.prewarm(prompt: CleanupPrompt.standard, vocabulary: [])
         try? await Task.sleep(for: .seconds(1))
-        _ = await cleaner.clean("um so can you uh send me the report by friday", vocabulary: [])
+        _ = await cleaner.clean("um so can you uh send me the report by friday", prompt: CleanupPrompt.standard, vocabulary: [])
 
         var allLatencies: [Int] = []
         var scored = 0
@@ -32,7 +33,7 @@ enum CleanupEval {
             var latencies: [Int] = []
             var last: CleanedText?
             for _ in 0..<max(repeats, 1) {
-                let result = await cleaner.clean(evalCase.input, vocabulary: evalCase.vocabulary ?? [])
+                let result = await cleaner.clean(evalCase.input, prompt: CleanupPrompt.standard, vocabulary: evalCase.vocabulary ?? [])
                 latencies.append(result.milliseconds)
                 last = result
                 try? await Task.sleep(for: .seconds(1.5))

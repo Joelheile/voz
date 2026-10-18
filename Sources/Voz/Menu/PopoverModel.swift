@@ -49,6 +49,7 @@ enum PopoverPage {
     case dictionary
     case insights
     case extensions
+    case cleanupPrompt
 
     var title: String {
         switch self {
@@ -57,11 +58,12 @@ enum PopoverPage {
         case .dictionary: "Dictionary"
         case .insights: "Insights"
         case .extensions: "Extensions"
+        case .cleanupPrompt: "Cleanup prompt"
         }
     }
 
     var parent: PopoverPage {
-        [.dictionary, .extensions].contains(self) ? .settings : .home
+        [.dictionary, .cleanupPrompt].contains(self) ? .settings : .home
     }
 }
 

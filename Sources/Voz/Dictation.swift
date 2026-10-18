@@ -105,7 +105,8 @@ final class Dictation {
             Task { await Permissions.requestMicrophone() }
             return
         }
-        let session = pipeline.makeStreaming()
+        let app = FrontApp.current
+        let session = pipeline.makeStreaming(app: app)
         recorder.onSamples = { chunk in
             DispatchQueue.main.async { MainActor.assumeIsolated { session.feed(chunk) } }
         }
@@ -121,7 +122,7 @@ final class Dictation {
         }
         streaming = session
         let cuePlayed = SoundCues.play(.start)
-        recordingApp = FrontApp.current
+        recordingApp = app
         recordingTrigger = trigger
         phase = .recording
         if settings.muteWhileRecording { mute(after: cuePlayed ? .milliseconds(150) : .zero) }

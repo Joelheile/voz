@@ -18,6 +18,16 @@ public struct VozHome: Sendable {
         return loose || !((try? packageSources()) ?? []).isEmpty
     }
 
+    public func writeAuthoringFiles(from resources: URL) throws {
+        let files = FileManager.default
+        let types = root.appendingPathComponent("node_modules/voz", isDirectory: true)
+        try files.createDirectory(at: types, withIntermediateDirectories: true)
+        try files.createDirectory(at: extensions, withIntermediateDirectories: true)
+        try replace(types.appendingPathComponent("index.d.ts"), with: resources.appendingPathComponent("voz.d.ts"))
+        try replace(root.appendingPathComponent("AGENTS.md"), with: resources.appendingPathComponent("AGENTS.md"))
+        try Data(#"{"name":"voz","private":true,"types":"index.d.ts"}"#.utf8).write(to: types.appendingPathComponent("package.json"))
+    }
+
     public func packageSources() throws -> [String] {
         try readSettings()["packages"] as? [String] ?? []
     }
@@ -39,6 +49,11 @@ public struct VozHome: Sendable {
             guard case .local(let url) = try PackageSource(parsing: $0, relativeTo: root) else { return nil }
             return url
         }
+    }
+
+    private func replace(_ destination: URL, with source: URL) throws {
+        try? FileManager.default.removeItem(at: destination)
+        try FileManager.default.copyItem(at: source, to: destination)
     }
 
     private func readSettings() throws -> [String: Any] {

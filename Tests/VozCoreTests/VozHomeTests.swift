@@ -18,6 +18,15 @@ struct VozHomeTests {
         #expect(home.hasExtensions)
     }
 
+    @Test func authoringFilesGiveEditorsTypesAndAgentsAGuide() throws {
+        let resources = hostScript.deletingLastPathComponent()
+        try home.writeAuthoringFiles(from: resources)
+        try home.writeAuthoringFiles(from: resources)
+        #expect(fileContents(home.root.appendingPathComponent("node_modules/voz/index.d.ts"))?.contains("defineExtension") == true)
+        #expect(fileContents(home.root.appendingPathComponent("AGENTS.md"))?.contains("beforeCleanup") == true)
+        #expect(!home.hasExtensions)
+    }
+
     @Test func looseExtensionFileCounts() throws {
         try writeFile("export default () => {}", named: "hello.ts", in: home.extensions)
         #expect(home.hasExtensions)

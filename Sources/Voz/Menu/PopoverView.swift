@@ -8,6 +8,7 @@ struct PopoverSources {
     let stats: StatsModel
     let vocabulary: VocabularyModel
     let setup: SetupModel
+    let extensions: ExtensionsModel
 }
 
 struct PopoverView: View {
@@ -43,7 +44,9 @@ struct PopoverView: View {
             case .insights:
                 InsightsPage(model: sources.stats, back: model.goBack)
             case .extensions:
-                ExtensionsPage(back: model.goBack)
+                ExtensionsPage(model: sources.extensions, back: model.goBack)
+            case .cleanupPrompt:
+                CleanupPromptPage(settings: sources.settings, back: model.goBack)
             }
         }
     }
@@ -143,6 +146,7 @@ private struct HomePage: View {
             IconButton(symbol: "arrow.counterclockwise", help: "Retry last recording", action: model.actions.retry)
                 .disabled(!model.canRetry)
                 .opacity(model.canRetry ? 1 : 0.35)
+            IconButton(symbol: "puzzlepiece.extension", help: "Extensions") { model.page = .extensions }
             IconButton(symbol: "gearshape", help: "Settings") { model.page = .settings }
                 .keyboardShortcut(",", modifiers: .command)
             IconButton(symbol: "power", help: "Quit voz", action: model.actions.quit)

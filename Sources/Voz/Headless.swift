@@ -75,14 +75,15 @@ enum Headless {
             try await transcriber.prepare(model)
             try await transcriber.prepareVocabulary([])
             let samples = try AudioConverter().resampleAudioFile(url)
-            cleaner.prewarm(vocabulary: [])
+            cleaner.prewarm(prompt: CleanupPrompt.standard, vocabulary: [])
             try? await Task.sleep(for: .seconds(1))
-            _ = await cleaner.clean("Warm up the cleanup model before we start timing anything.", vocabulary: [])
+            _ = await cleaner.clean("Warm up the cleanup model before we start timing anything.", prompt: CleanupPrompt.standard, vocabulary: [])
             let session = StreamingDictation(
                 engine: SpeechEngine(parakeet: transcriber),
                 cleaner: cleaner,
                 model: model,
                 vocabulary: [],
+                prompt: Task { CleanupPrompt.standard },
                 cleanupEnabled: cleanupEnabled
             )
             let clock = ContinuousClock()
@@ -141,9 +142,9 @@ enum Headless {
 
     private static func clean(_ text: String, vocabulary: [String]) async -> Int32 {
         let cleaner = TextCleaner()
-        cleaner.prewarm(vocabulary: vocabulary)
+        cleaner.prewarm(prompt: CleanupPrompt.standard, vocabulary: vocabulary)
         try? await Task.sleep(for: .seconds(1))
-        let result = await cleaner.clean(text, vocabulary: vocabulary)
+        let result = await cleaner.clean(text, prompt: CleanupPrompt.standard, vocabulary: vocabulary)
         print(result.text)
         print("cleanup \(result.milliseconds) ms, fillers removed \(result.fillerWordsRemoved), timed out \(result.timedOut)")
         return 0

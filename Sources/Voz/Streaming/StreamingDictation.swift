@@ -32,6 +32,7 @@ final class StreamingDictation {
     private let cleaner: TextCleaner
     private let model: SpeechModel
     private let vocabulary: [String]
+    private let prompt: Task<String, Never>
     private let cleanupEnabled: Bool
     private var detector = PauseDetector()
     private var pendingAudio: [Float] = []
@@ -40,11 +41,12 @@ final class StreamingDictation {
     private var releaseDeadline: ContinuousClock.Instant?
     private var closed = false
 
-    init(engine: SpeechEngine, cleaner: TextCleaner, model: SpeechModel, vocabulary: [String], cleanupEnabled: Bool) {
+    init(engine: SpeechEngine, cleaner: TextCleaner, model: SpeechModel, vocabulary: [String], prompt: Task<String, Never>, cleanupEnabled: Bool) {
         self.engine = engine
         self.cleaner = cleaner
         self.model = model
         self.vocabulary = vocabulary
+        self.prompt = prompt
         self.cleanupEnabled = cleanupEnabled
     }
 
@@ -165,7 +167,7 @@ final class StreamingDictation {
             return CleanedText(text: raw, fillerWordsRemoved: 0, milliseconds: 0, timedOut: false, rejection: nil)
         }
         let deadline = releaseDeadline ?? ContinuousClock.now + CleanupBudget.segmentTimeout
-        return await cleaner.clean(raw, vocabulary: vocabulary, deadline: deadline)
+        return await cleaner.clean(raw, prompt: await prompt.value, vocabulary: vocabulary, deadline: deadline)
     }
 
     private func wait(for task: Task<Void, Never>, until deadline: ContinuousClock.Instant) async {
