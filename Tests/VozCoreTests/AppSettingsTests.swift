@@ -16,7 +16,7 @@ import Testing
         #expect(settings.launchAtLogin)
         #expect(!settings.onboardingCompleted)
         #expect(settings.cleanupEnabled)
-        #expect(settings.analyticsEnabled)
+        #expect(!settings.analyticsEnabled)
         #expect(!settings.receiveBetaUpdates)
     }
 
@@ -34,7 +34,7 @@ import Testing
         settings.launchAtLogin = false
         settings.onboardingCompleted = true
         settings.cleanupEnabled = false
-        settings.analyticsEnabled = false
+        settings.analyticsEnabled = true
         settings.receiveBetaUpdates = true
 
         let reloaded = fixture.makeSettings()
@@ -49,7 +49,7 @@ import Testing
         #expect(!reloaded.launchAtLogin)
         #expect(reloaded.onboardingCompleted)
         #expect(!reloaded.cleanupEnabled)
-        #expect(!reloaded.analyticsEnabled)
+        #expect(reloaded.analyticsEnabled)
         #expect(reloaded.receiveBetaUpdates)
         #expect(fixture.storedString(forKey: "speechModel") == "parakeet-tdt-v2")
         #expect(fixture.storedString(forKey: "indicatorStyle") == "pill")

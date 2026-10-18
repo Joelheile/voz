@@ -82,7 +82,7 @@ public final class AppSettings: ObservableObject {
             SettingsKey.launchAtLogin: true,
             SettingsKey.onboardingCompleted: false,
             SettingsKey.cleanupEnabled: true,
-            SettingsKey.analyticsEnabled: true,
+            SettingsKey.analyticsEnabled: false,
             SettingsKey.receiveBetaUpdates: false,
         ])
         hotkey = defaults.data(forKey: SettingsKey.hotkey)
