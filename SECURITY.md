@@ -1,39 +1,46 @@
-# Security
+# Security and privacy
 
 ## Report a vulnerability
 
 Open a private security advisory at https://github.com/Joelheile/voz/security/advisories/new. Do not open a public issue.
 
-Include the voz version, macOS version and steps to reproduce. You receive a first response within 7 days.
+Include the voz version, macOS version and steps to reproduce. You get a first response within 7 days.
 
 ## Supported versions
 
-Only the latest stable release and the latest beta receive fixes.
+Only the latest stable release and the latest beta get fixes.
 
-## Data handling
+## What stays on your Mac
 
-- Audio stays in memory. voz does not write it to disk. voz releases it after each dictation, except the last recording that "Retry last" needs.
-- Transcripts, dictionary words, and stats are stored in `~/Library/Application Support/voz`. The directory has mode 0700 and the database has mode 0600.
-- Log messages that can contain user text or error details are marked private.
-- When voz inserts text without keeping a copy, it marks the text as transient and concealed on the pasteboard, so clipboard managers skip it. voz then restores your previous clipboard.
-- Edit learning does not read secure text fields.
-- Analytics do not include transcript text, dictionary words, or app names.
+- Audio stays in memory and voz never writes it to disk on its own. If an extension listens for recordings, voz writes each one to a temporary file and deletes it once the extension finishes
+- Transcripts, dictionary words and stats live in `~/Library/Application Support/voz`. The directory has mode 0700 and the database 0600
+- Speech recognition and cleanup run on your Mac
+- Logs mark user text and error details as private
+- Text that voz inserts without keeping a copy is marked transient and concealed on the pasteboard, so clipboard managers skip it. voz then restores your clipboard
+- Edit learning never reads secure text fields
 
-## Network
+## What leaves your Mac
 
-voz connects only to PostHog (EU) for the version ping and opt-in analytics, GitHub for Sparkle updates and the Bun runtime, Hugging Face for model downloads, and the npm registry or git hosts for extensions you browse or install.
+- A version ping to PostHog (EU), once on install and once after each update. It holds the version number and whether it's an install or an update, with a new random ID each time. Turn it off in Settings
+- Anonymous usage events to PostHog (EU), only if you opt in. They hold timings, counts, the app and macOS version, the chip and a random install ID. They never hold transcript text, dictionary words or app names
+- Update checks and downloads from GitHub through Sparkle
+- Speech model downloads from Hugging Face
+- The extension list from the npm registry, when you open Extensions
+- Bun from GitHub the first time you use an extension, and packages you install from npm or git
+
+voz makes no other network requests. Extensions you install can make their own.
 
 ## Extensions
 
-- Installs never run package scripts and pin exact npm versions.
-- voz rejects package names, git paths and refs that could pass a command-line flag or leave the packages directory.
-- voz checks the Bun download against a pinned SHA-256 checksum.
-- The Extensions page asks you to confirm each install and links to the package source.
+- Installs never run package scripts and pin exact npm versions
+- voz rejects package names, git paths and refs that could pass a command-line flag or leave the packages directory
+- voz checks the Bun download against a pinned SHA-256 checksum
+- The Extensions page asks you to confirm each install and links to the package source
 
 ## Updates
 
-Updates are signed with an EdDSA key. Sparkle verifies the signature before it installs an update.
+Updates are signed with an EdDSA key. Sparkle checks the signature before it installs an update.
 
 ## Entitlements
 
-voz requests microphone access and `com.apple.security.cs.disable-library-validation`. `docs/releasing.md` explains why voz needs the second entitlement.
+voz requests microphone access and `com.apple.security.cs.disable-library-validation`. The second one lets voz load `Sparkle.framework`, because the app is signed with a self-signed identity that has no team ID. It goes away once voz is notarized.
