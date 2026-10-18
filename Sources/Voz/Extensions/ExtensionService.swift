@@ -62,7 +62,8 @@ final class ExtensionService {
         guard let host else { return ExtensionDelivery(text: text, command: nil) }
         let match = VoiceCommands.match(text, phrases: commands)
         let dictated = match?.leadingText ?? text
-        let transformed = dictated.isEmpty ? "" : await host.beforeInsert(text: dictated, raw: raw, app: app.hostApp, timeout: Self.insertTimeout)
+        guard events.contains("beforeInsert"), !dictated.isEmpty else { return ExtensionDelivery(text: dictated, command: match?.phrase) }
+        let transformed = await host.beforeInsert(text: dictated, raw: raw, app: app.hostApp, timeout: Self.insertTimeout)
         return ExtensionDelivery(text: transformed, command: match?.phrase)
     }
 
