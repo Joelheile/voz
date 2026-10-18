@@ -57,7 +57,7 @@ voz dev ./my-extension
 
 voz reloads extensions when you save. With no extensions, voz does not start Bun and costs nothing. Full API: [docs/extensions.md](docs/extensions.md).
 
-The `voz` command is `/Applications/voz.app/Contents/MacOS/voz`.
+To get the `voz` command, open Extensions in the menu bar and choose Install next to "voz command". It links `/usr/local/bin/voz` to the app.
 
 ## Security
 

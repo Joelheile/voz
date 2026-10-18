@@ -10,6 +10,7 @@ final class ExtensionsModel: ObservableObject {
     @Published private(set) var installed: Set<String> = []
     @Published private(set) var working: String?
     @Published private(set) var message: String?
+    @Published private(set) var commandInstalled = CommandLineTool.isInstalled
 
     func load() async {
         refreshInstalled()
@@ -38,6 +39,16 @@ final class ExtensionsModel: ObservableObject {
         refreshInstalled()
     }
 
+    func installCommand() {
+        do {
+            try CommandLineTool.install()
+            message = nil
+        } catch {
+            message = "\(error)"
+        }
+        commandInstalled = CommandLineTool.isInstalled
+    }
+
     private func refreshInstalled() {
         let sources = (try? home.packageSources()) ?? []
         installed = Set(sources.compactMap { try? PackageSource(parsing: $0, relativeTo: home.root).name })
@@ -61,6 +72,7 @@ struct ExtensionsPage: View {
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.inkTertiary)
                     .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
             }
             if !model.packages.isEmpty {
                 CappedScrollView(maxHeight: 380) {
@@ -71,6 +83,13 @@ struct ExtensionsPage: View {
                                 if confirming == package.name { confirmation(for: package) }
                             }
                         }
+                    }
+                }
+            }
+            PanelGroup {
+                PanelRow(title: "voz command", detail: model.commandInstalled ? "Run voz install <package> in Terminal" : "Install packages from Terminal") {
+                    if !model.commandInstalled {
+                        Button("Install", action: model.installCommand).buttonStyle(.pill(.quiet, height: 26))
                     }
                 }
             }
