@@ -138,7 +138,6 @@ extension SpeechModel {
     var modelVersion: AsrModelVersion? {
         switch self {
         case .parakeetUltra: .ultra
-        case .parakeetRedux: .redux
         case .parakeetV2: .v2
         case .appleSpeech: nil
         }

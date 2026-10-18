@@ -34,7 +34,7 @@ enum Headless {
             return await simulateDictation(URL(fileURLWithPath: path), arguments: arguments)
         }
         if ["--transcribe", "--clean", "--eval", "--simulate-dictation", "--render-design", "--measure-recorder"].contains(where: arguments.contains) {
-            printError("usage: voz --transcribe <audio file> [--model parakeet-ultra|parakeet-redux|parakeet-tdt-v2|apple-speech] [--vocab a,b]\n       voz --clean <text> [--vocab a,b]\n       voz --eval <cases.json> [--repeat n] [--budget-ms n]\n       voz --simulate-dictation <audio file> [--model parakeet-ultra|parakeet-redux|parakeet-tdt-v2|apple-speech] [--speed n] [--no-cleanup]")
+            printError("usage: voz --transcribe <audio file> [--model parakeet-ultra|parakeet-tdt-v2|apple-speech] [--vocab a,b]\n       voz --clean <text> [--vocab a,b]\n       voz --eval <cases.json> [--repeat n] [--budget-ms n]\n       voz --simulate-dictation <audio file> [--model parakeet-ultra|parakeet-tdt-v2|apple-speech] [--speed n] [--no-cleanup]")
             return 64
         }
         return nil

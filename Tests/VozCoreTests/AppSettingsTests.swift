@@ -55,6 +55,12 @@ import Testing
         #expect(fixture.storedString(forKey: "indicatorStyle") == "pill")
     }
 
+    @Test func removedSpeechModelFallsBackToUltra() {
+        let fixture = SettingsFixture()
+        fixture.store("parakeet-redux", forKey: "speechModel")
+        #expect(fixture.makeSettings().speechModel == .parakeetUltra)
+    }
+
     @Test func outputFollowsToggles() {
         let settings = SettingsFixture().makeSettings()
         settings.copyToClipboard = false

@@ -18,6 +18,10 @@ final class SettingsFixture {
     func storedString(forKey key: String) -> String? {
         defaults.string(forKey: key)
     }
+
+    func store(_ value: String, forKey key: String) {
+        defaults.set(value, forKey: key)
+    }
 }
 
 func makeRecord(_ text: String, at seconds: Double = 0) -> TranscriptRecord {

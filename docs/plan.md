@@ -26,9 +26,8 @@ Local-first macOS dictation app. Menu bar only. Research: `docs/research/stack.m
 
 ## Transcription
 
-- FluidAudio. Four speech models, chosen in onboarding and Settings. Only the chosen model downloads:
+- FluidAudio. Three speech models, chosen in onboarding and Settings. Only the chosen model downloads:
   - Parakeet Ultra, the default: most accurate, 25 languages, 630 MB.
-  - Parakeet Redux: 25 languages, 220 MB, a bit less accurate in English.
   - Parakeet English (TDT v2): English only, 500 MB.
   - Apple Speech: built into macOS, no download.
 - Apple SpeechAnalyzer used while Parakeet downloads or compiles.
