@@ -43,6 +43,22 @@ struct PackageSourceTests {
         #expect(throws: PackageSourceError.unrecognized("npm:")) { try PackageSource(parsing: "npm:", relativeTo: base) }
     }
 
+    @Test(arguments: [
+        "npm:--registry=http://evil.test",
+        "npm:../../outside",
+        "npm:voz-jira@--tag",
+        "npm:Voz Jira",
+        "git:github.com/../../outside",
+        "git:github.com/acme/..",
+        "git:-oProxyCommand=x/acme/voz",
+        "git:github.com/acme/voz@--upload-pack=x",
+        "git:github.com/acme/voz@v1/../../x",
+        "https://github.com/acme/voz jira",
+    ])
+    func rejectsSourcesThatCouldEscapeOrInjectFlags(_ raw: String) {
+        #expect(throws: PackageSourceError.unrecognized(raw)) { try PackageSource(parsing: raw, relativeTo: base) }
+    }
+
     @Test func namesMatchTheLastPathComponentOrPackageName() throws {
         #expect(try PackageSource(parsing: "git:github.com/acme/voz-jira@v1", relativeTo: base).name == "voz-jira")
         #expect(try PackageSource(parsing: "npm:@acme/voz-slack@1", relativeTo: base).name == "@acme/voz-slack")

@@ -19,7 +19,8 @@ public enum PackageSource: Equatable, Sendable, CustomStringConvertible {
         if raw.hasPrefix("npm:") {
             let spec = String(raw.dropFirst(4))
             let name = Self.npmName(spec)
-            guard !name.isEmpty else { throw .unrecognized(raw) }
+            let version = spec.dropFirst(name.count + 1)
+            guard Self.isNpmName(name), spec == name || Self.isSafeToken(version) else { throw .unrecognized(raw) }
             self = .npm(name: name, spec: spec)
         } else if raw.hasPrefix("git:") {
             self = try Self.git(String(raw.dropFirst(4)), raw: raw)
@@ -86,7 +87,20 @@ public enum PackageSource: Equatable, Sendable, CustomStringConvertible {
         }
         if location.hasSuffix(".git") { location = String(location.dropLast(4)) }
         let parts = location.split(separator: "/", maxSplits: 1).map(String.init)
-        guard parts.count == 2, !parts[1].isEmpty, ref?.isEmpty != true else { throw .unrecognized(raw) }
+        guard parts.count == 2, isSafeToken(parts[0][...]), isSafePath(parts[1]), ref.map(isSafePath) != false else { throw .unrecognized(raw) }
         return .git(host: parts[0], path: parts[1], ref: ref)
+    }
+
+    private static func isNpmName(_ name: String) -> Bool {
+        name.wholeMatch(of: /(@[a-z0-9~][a-z0-9._~-]*\/)?[a-z0-9~][a-z0-9._~-]*/) != nil
+    }
+
+    private static func isSafePath(_ path: String) -> Bool {
+        let segments = path.split(separator: "/", omittingEmptySubsequences: false)
+        return segments.allSatisfy { isSafeToken($0) && $0 != "." && $0 != ".." }
+    }
+
+    private static func isSafeToken(_ token: Substring) -> Bool {
+        token.wholeMatch(of: /[A-Za-z0-9_.~^<>=*+][A-Za-z0-9_.~^<>=*+-]*/) != nil
     }
 }
