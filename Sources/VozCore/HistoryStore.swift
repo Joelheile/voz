@@ -4,6 +4,7 @@ import GRDB
 
 public final class HistoryStore: Sendable {
     public static let menuLimit = 10
+    public static let searchLimit = 100
 
     private static let containsIgnoringCase = DatabaseFunction("contains_ignoring_case", argumentCount: 2, pure: true) { values in
         guard let haystack = String.fromDatabaseValue(values[0]), let needle = String.fromDatabaseValue(values[1]) else {
@@ -73,17 +74,13 @@ public final class HistoryStore: Sendable {
         _ = try queue.write { try TranscriptRecord.deleteOne($0, key: id) }
     }
 
-    public func recent(limit: Int = HistoryStore.menuLimit) throws -> [TranscriptRecord] {
-        try queue.read { try Self.request(matching: "", limit: limit).fetchAll($0) }
-    }
-
-    public func search(_ query: String, limit: Int? = nil) throws -> [TranscriptRecord] {
-        try queue.read { try Self.request(matching: query, limit: limit).fetchAll($0) }
+    public func search(_ query: String) throws -> [TranscriptRecord] {
+        try queue.read { try Self.request(matching: query).fetchAll($0) }
     }
 
     public func observeSearch(_ query: String) -> AnyPublisher<[TranscriptRecord], Error> {
         ValueObservation
-            .tracking { try Self.request(matching: query, limit: nil).fetchAll($0) }
+            .tracking { try Self.request(matching: query).fetchAll($0) }
             .publisher(in: queue)
             .eraseToAnyPublisher()
     }
@@ -109,13 +106,10 @@ public final class HistoryStore: Sendable {
         return accumulator.finish()
     }
 
-    private static func request(matching query: String, limit: Int?) -> QueryInterfaceRequest<TranscriptRecord> {
-        var request = TranscriptRecord.order(Column("createdAt").desc)
+    private static func request(matching query: String) -> QueryInterfaceRequest<TranscriptRecord> {
+        let newest = TranscriptRecord.order(Column("createdAt").desc)
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty {
-            request = request.filter(containsIgnoringCase(Column("finalText"), trimmed))
-        }
-        if let limit { request = request.limit(limit) }
-        return request
+        guard !trimmed.isEmpty else { return newest.limit(menuLimit) }
+        return newest.filter(containsIgnoringCase(Column("finalText"), trimmed)).limit(searchLimit)
     }
 }

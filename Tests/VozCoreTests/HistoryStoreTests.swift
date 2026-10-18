@@ -5,10 +5,18 @@ import Testing
     @Test func newestFirstAndLimited() throws {
         let store = try HistoryStore()
         for index in 1...12 { try store.insert(makeRecord("t\(index)", at: Double(index))) }
-        let recent = try store.recent(limit: 10)
-        #expect(recent.count == 10)
+        let recent = try store.search("")
+        #expect(recent.count == HistoryStore.menuLimit)
         #expect(recent.first?.finalText == "t12")
         #expect(recent.last?.finalText == "t3")
+    }
+
+    @Test func searchReturnsTheNewestMatchesUpToTheLimit() throws {
+        let store = try HistoryStore()
+        for index in 0...HistoryStore.searchLimit { try store.insert(makeRecord("match \(index)", at: Double(index))) }
+        let results = try store.search("match")
+        #expect(results.count == HistoryStore.searchLimit)
+        #expect(results.first?.finalText == "match \(HistoryStore.searchLimit)")
     }
 
     @Test func searchIsCaseInsensitiveOverFinalText() throws {
@@ -47,13 +55,13 @@ import Testing
         try store.insert(first)
         try store.insert(makeRecord("two", at: 2))
         try store.delete(id: first.id)
-        #expect(try store.recent().map(\.finalText) == ["two"])
+        #expect(try store.search("").map(\.finalText) == ["two"])
     }
 
     @Test func recordKeepsSchemaFields() throws {
         let store = try HistoryStore()
         try store.insert(makeRecord("one two three"))
-        let saved = try #require(try store.recent().first)
+        let saved = try #require(try store.search("").first)
         #expect(saved.rawText == saved.finalText)
         #expect(saved.wordCount == 3)
         #expect(saved.appBundleID == "com.apple.Notes")
@@ -64,6 +72,6 @@ import Testing
         let path = makeTemporaryStorePath()
         defer { removeFile(atPath: path) }
         try HistoryStore(path: path).insert(makeRecord("kept"))
-        #expect(try HistoryStore(path: path).recent().count == 1)
+        #expect(try HistoryStore(path: path).search("").count == 1)
     }
 }
