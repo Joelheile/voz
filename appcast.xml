@@ -1,6 +1,16 @@
-<?xml version="1.0" encoding="utf-8"?>
-<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+<?xml version='1.0' encoding='utf-8'?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
   <channel>
     <title>voz</title>
+    <item>
+      <title>voz 0.0.1-beta.27</title>
+      <link>https://github.com/Joelheile/voz/releases/tag/beta-27</link>
+      <pubDate>Mon, 19 Oct 2026 13:04:02 GMT</pubDate>
+      <sparkle:version>27</sparkle:version>
+      <sparkle:shortVersionString>0.0.1-beta.27</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-27/voz-0.0.1-beta.27.zip" length="6696614" sparkle:edSignature="12lqXMOQhiyL9vP81pXiUC6rLm0cHdNNlkYKLmFA43U7HNtUOq6pBkk1e8L/Pk+ihgO9Bh/XcE4txwUioBA8CQ==" type="application/octet-stream" />
+    </item>
   </channel>
 </rss>
