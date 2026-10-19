@@ -2,7 +2,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-FRAMEWORKS=/Library/Developer/CommandLineTools/Library/Developer/Frameworks
+export DEVELOPER_DIR=${DEVELOPER_DIR:-$(xcode-select -p)}
+if [[ "$DEVELOPER_DIR" == */CommandLineTools ]]; then
+    FRAMEWORKS=$DEVELOPER_DIR/Library/Developer/Frameworks
+else
+    FRAMEWORKS=$DEVELOPER_DIR/Platforms/MacOSX.platform/Developer/Library/Frameworks
+fi
 
 swift build --build-tests
 mkdir -p build

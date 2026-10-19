@@ -1,7 +1,10 @@
 // swift-tools-version:6.2
 import PackageDescription
 
-let testingFrameworkPath = "/Library/Developer/CommandLineTools/Library/Developer/Frameworks"
+let developerDir = Context.environment["DEVELOPER_DIR"] ?? "/Library/Developer/CommandLineTools"
+let testingFrameworkPath = developerDir.hasSuffix("/CommandLineTools")
+    ? "\(developerDir)/Library/Developer/Frameworks"
+    : "\(developerDir)/Platforms/MacOSX.platform/Developer/Library/Frameworks"
 
 let package = Package(
     name: "voz",
