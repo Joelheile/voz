@@ -21,7 +21,7 @@ main() {
 
     local work
     work=$(mktemp -d)
-    trap 'rm -rf "$work"' EXIT
+    trap "rm -rf '$work'" EXIT
 
     echo "Downloading $url"
     curl -fL --progress-bar "$url" -o "$work/voz.zip"
