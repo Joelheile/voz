@@ -117,7 +117,7 @@ enum PackageCLI {
         let added = !sources.contains(source.description)
         if added { try home.setPackageSources(sources + [source.description]) }
         notifyApp()
-        print("Loaded \(url.path). voz reloads it when you save. Press Ctrl-C to stop.")
+        print("Loaded \(url.path). Voz reloads it when you save. Press Ctrl-C to stop.")
         signal(SIGINT) { _ in }
         _ = try BunRuntime.run("/usr/bin/log", ["stream", "--style", "compact", "--predicate", "subsystem == \"\(Log.subsystem)\" AND category == \"extensions\""])
         if added { try home.setPackageSources(try home.packageSources().filter { $0 != source.description }) }

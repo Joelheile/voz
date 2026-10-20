@@ -8,7 +8,7 @@ struct CleanupPromptPage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             PageBar(title: "Cleanup prompt", back: back)
-            Text("The on-device model follows this prompt to clean up each dictation. voz adds your dictionary words at the end.")
+            Text("The on-device model follows this prompt to clean up each dictation. Voz adds your dictionary words at the end.")
                 .font(.meta)
                 .foregroundStyle(Theme.inkSecondary)
                 .fixedSize(horizontal: false, vertical: true)

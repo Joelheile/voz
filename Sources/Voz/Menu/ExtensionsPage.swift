@@ -175,7 +175,7 @@ struct ExtensionsPage: View {
 
     private var yourOwn: some View {
         PanelGroup(title: "Your own") {
-            PanelRow(title: "Extensions folder", detail: "Drop a .ts file here and voz loads it") {
+            PanelRow(title: "Extensions folder", detail: "Drop a .ts file here and Voz loads it") {
                 Button("Open", action: model.openExtensionsFolder).buttonStyle(.pill(.quiet, height: 26))
             }
             PanelRow(title: "voz command", detail: model.commandInstalled ? "Run voz install <package> in Terminal" : "Install packages from Terminal") {

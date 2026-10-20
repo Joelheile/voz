@@ -53,7 +53,7 @@ enum PopoverPage {
 
     var title: String {
         switch self {
-        case .home: "voz"
+        case .home: "Voz"
         case .settings: "Settings"
         case .dictionary: "Dictionary"
         case .insights: "Insights"

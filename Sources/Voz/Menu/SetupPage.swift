@@ -9,7 +9,7 @@ struct SetupPage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Set up voz")
+                Text("Set up Voz")
                     .font(.display(22, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                 Text("Three permissions, then you can dictate in any app.")

@@ -1,10 +1,18 @@
-# voz
+# Voz
+
+## Problem
+
+- Dictation apps charge monthly to talk
+- They grow a hundred settings, and each one slows and complicates the core
+- Want a change? Open an issue or PR and wait for the maintainer, often forever
 
 ## Vision
 
-voz is the fastest, most reliable, simplest and most extensible voice transcriber. It is pi.dev for local-first dictation: a tiny core that everyone extends with packages.
+Voz is the fastest, most reliable, simplest and most extensible voice transcriber. It is pi.dev for local-first dictation: a tiny core that everyone extends with packages.
 
-- Speed, reliability and simplicity beat features. voz is always on. Nothing may slow down or break dictation
+Voz answers each problem: free and open source, a tiny core with no settings maze, and no PR needed because your coding agent writes the extension from `~/.voz/AGENTS.md`. It is for people who want their tools their way.
+
+- Speed, reliability and simplicity beat features. Voz is always on. Nothing may slow down or break dictation
 - The core records, transcribes, cleans up, inserts and saves history. Everything else is an extension
 - Primitives, not features. Add an extension point before you add a feature
 
@@ -25,7 +33,7 @@ voz is the fastest, most reliable, simplest and most extensible voice transcribe
 - `voz --render-design <dir>` renders every popover page in light and dark to PNG. README screenshots live in `.github/images`
 - Signing identity "voz Dev" (self-signed) must never change: macOS keeps mic and Accessibility grants only while it stays the same
 - Push to `main` publishes a beta, tag `vX.Y.Z` publishes stable. Sparkle reads `appcast.xml` in the repo root
-- `disable-library-validation` stays until voz is notarized with a Developer ID
+- `disable-library-validation` stays until Voz is notarized with a Developer ID
 
 ## Design
 
@@ -34,6 +42,7 @@ voz is the fastest, most reliable, simplest and most extensible voice transcribe
 - Indigo accent (#5163F9 light, #6475FA dark) only for the status dot and Insights bars. Controls use the system accent color
 - Everything lives in the menu bar panel, no main window
 - Copy: short, active, sentence case. Inline lists join with commas, no middle dots
+- The name is Voz. Lowercase `voz` only for the CLI command, module name, paths and bundle files
 
 ## Docs
 

@@ -27,8 +27,8 @@ enum AppMover {
 
     private static func confirm() -> Bool {
         let alert = NSAlert()
-        alert.messageText = "Move voz to Applications?"
-        alert.informativeText = "voz starts at login and updates itself only from the Applications folder."
+        alert.messageText = "Move Voz to Applications?"
+        alert.informativeText = "Voz starts at login and updates itself only from the Applications folder."
         alert.addButton(withTitle: "Move to Applications")
         alert.addButton(withTitle: "Not now")
         NSApp.activate()
@@ -63,7 +63,7 @@ enum AppMover {
 
     private static func showFailure(_ error: Error) {
         let alert = NSAlert()
-        alert.messageText = "voz couldn't move itself"
+        alert.messageText = "Voz couldn't move itself"
         alert.informativeText = "Drag voz.app to the Applications folder in Finder. \(error.localizedDescription)"
         alert.runModal()
     }

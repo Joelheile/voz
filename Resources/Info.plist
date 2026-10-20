@@ -5,9 +5,9 @@
     <key>CFBundleIdentifier</key>
     <string>com.joelheile.voz</string>
     <key>CFBundleName</key>
-    <string>voz</string>
+    <string>Voz</string>
     <key>CFBundleDisplayName</key>
-    <string>voz</string>
+    <string>Voz</string>
     <key>CFBundleExecutable</key>
     <string>voz</string>
     <key>CFBundleIconFile</key>
@@ -33,6 +33,6 @@
     <key>SUScheduledCheckInterval</key>
     <integer>86400</integer>
     <key>NSMicrophoneUsageDescription</key>
-    <string>voz records your voice while you dictate and transcribes it on this Mac.</string>
+    <string>Voz records your voice while you dictate and transcribes it on this Mac.</string>
 </dict>
 </plist>

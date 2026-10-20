@@ -9,7 +9,7 @@ struct DictionaryPage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             PageBar(title: "Dictionary", back: back)
-            Text("Names and terms voz spells the way you enter them.")
+            Text("Names and terms Voz spells the way you enter them.")
                 .font(.meta)
                 .foregroundStyle(Theme.inkSecondary)
             addRow

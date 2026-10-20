@@ -269,7 +269,7 @@ final class StatusItemController: NSObject {
         menu.addItem(menuItem("Settings…", #selector(openSettingsClicked), key: ","))
         menu.addItem(menuItem("Check for Updates…", #selector(checkForUpdatesClicked)))
         menu.addItem(.separator())
-        menu.addItem(menuItem("Quit voz", #selector(quit), key: "q"))
+        menu.addItem(menuItem("Quit Voz", #selector(quit), key: "q"))
         statusItem.menu = menu
         statusItem.button?.performClick(nil)
         statusItem.menu = nil

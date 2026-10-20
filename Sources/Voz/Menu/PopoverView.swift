@@ -149,7 +149,7 @@ private struct HomePage: View {
             IconButton(symbol: "puzzlepiece.extension", help: "Extensions") { model.page = .extensions }
             IconButton(symbol: "gearshape", help: "Settings") { model.page = .settings }
                 .keyboardShortcut(",", modifiers: .command)
-            IconButton(symbol: "power", help: "Quit voz", action: model.actions.quit)
+            IconButton(symbol: "power", help: "Quit Voz", action: model.actions.quit)
         }
     }
 

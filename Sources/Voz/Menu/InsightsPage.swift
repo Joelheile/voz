@@ -48,7 +48,7 @@ struct InsightsPage: View {
             sentences.append("You are on a \(stats.currentStreak)-day streak. Your longest is \(StatsFormat.days(stats.longestStreak)).")
         }
         if stats.fillerWordsRemoved > 0 {
-            sentences.append("voz removed \(stats.fillerWordsRemoved.formatted()) filler words.")
+            sentences.append("Voz removed \(stats.fillerWordsRemoved.formatted()) filler words.")
         }
         return sentences
     }
