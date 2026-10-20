@@ -39,12 +39,7 @@ final class PopoverPanel: NSPanel {
 }
 
 final class PopoverHostingView: NSHostingView<PopoverView> {
-    var onResize: () -> Void = {}
-
-    override func invalidateIntrinsicContentSize() {
-        super.invalidateIntrinsicContentSize()
-        DispatchQueue.main.async { [weak self] in self?.onResize() }
-    }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
 @MainActor
@@ -53,6 +48,7 @@ final class StatusItemController: NSObject {
     private static let screenMargin: CGFloat = 8
     private static let reopenGuard: TimeInterval = 0.2
     private static let fade: TimeInterval = 0.12
+    private static let anchorRetry: TimeInterval = 0.1
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private let model = PopoverModel()
@@ -62,6 +58,7 @@ final class StatusItemController: NSObject {
     private let settings: AppSettings
     private let modelStatus: ModelStatus
     private let history: HistoryModel
+    private let setup: SetupModel
     private let analytics: Analytics
     private let checkForUpdates: () -> Void
     private let quitApp: () -> Void
@@ -82,16 +79,13 @@ final class StatusItemController: NSObject {
         settings = sources.settings
         modelStatus = sources.modelStatus
         history = sources.history
+        setup = sources.setup
         self.analytics = analytics
         self.checkForUpdates = checkForUpdates
         quitApp = quit
         hosting = PopoverHostingView(rootView: PopoverView(model: model, sources: sources))
         super.init()
         hosting.sizingOptions = [.intrinsicContentSize]
-        hosting.onResize = { [weak self] in
-            guard let self, self.panel.isVisible else { return }
-            self.layoutPanel()
-        }
         panel.contentView = hosting
         panel.onCancel = { [weak self] in self?.cancel() }
         panel.onResignKey = { [weak self] in self?.dismissUnlessPinned() }
@@ -106,6 +100,10 @@ final class StatusItemController: NSObject {
             finishSetup: { [weak self] in
                 self?.closePanel()
                 finishSetup()
+            },
+            resize: { [weak self] size in
+                guard let self, self.panel.isVisible else { return }
+                self.layoutPanel(size: size)
             },
             quit: quit
         )
@@ -126,6 +124,7 @@ final class StatusItemController: NSObject {
         model.hint = hint(for: status)
         model.canRetry = dictation.hasLastRecording && dictation.phase == .idle
         model.needsSetup = !settings.onboardingCompleted
+        if model.needsSetup { setup.refreshPermissions() }
     }
 
     func dictationChanged() {
@@ -220,7 +219,8 @@ final class StatusItemController: NSObject {
     private func showPanel() {
         refresh()
         if !model.needsSetup { analytics.capture(.historyOpened) }
-        layoutPanel()
+        hosting.layoutSubtreeIfNeeded()
+        layoutPanel(size: hosting.fittingSize)
         panel.alphaValue = 0
         panel.makeKeyAndOrderFront(nil)
         NSAnimationContext.runAnimationGroup { context in
@@ -253,11 +253,17 @@ final class StatusItemController: NSObject {
         action()
     }
 
-    private func layoutPanel() {
+    private func layoutPanel(size: CGSize) {
         guard let buttonWindow = statusItem.button?.window, let button = statusItem.button else { return }
-        hosting.layoutSubtreeIfNeeded()
-        let size = hosting.fittingSize
         let anchor = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
+        let anchorIsOnScreen = NSScreen.screens.contains { $0.frame.contains(anchor) }
+        guard anchorIsOnScreen else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.anchorRetry) { [weak self] in
+                guard let self, self.panel.isVisible else { return }
+                self.layoutPanel(size: size)
+            }
+            return
+        }
         let visible = (buttonWindow.screen ?? NSScreen.main)?.visibleFrame ?? anchor
         let x = min(max(anchor.midX - size.width / 2, visible.minX + Self.screenMargin), visible.maxX - size.width - Self.screenMargin)
         panel.setFrame(NSRect(x: x, y: anchor.minY - Self.panelGap - size.height, width: size.width, height: size.height), display: true)

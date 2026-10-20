@@ -27,6 +27,8 @@ struct PopoverView: View {
             .overlay(RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous).strokeBorder(Theme.hairline))
             .toggleStyle(.switch)
             .animation(Theme.Motion.section, value: model.page)
+            .fixedSize(horizontal: false, vertical: true)
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { model.actions.resize($0) }
     }
 
     @ViewBuilder

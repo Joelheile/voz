@@ -28,10 +28,9 @@ struct PanelGroup<Content: View>: View {
                 VStack(spacing: 0) {
                     ForEach(rows.indices, id: \.self) { index in
                         if index > 0 { RowDivider() }
-                        rows[index]
+                        rows[index].padding(.horizontal, 12)
                     }
                 }
-                .padding(.horizontal, 12)
                 .overlay(RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous).strokeBorder(Theme.hairline))
             }
         }

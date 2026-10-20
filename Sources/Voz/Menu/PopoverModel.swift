@@ -73,6 +73,7 @@ struct PopoverActions {
     var fixPermission: (PermissionFix) -> Void = { _ in }
     var checkForUpdates: () -> Void = {}
     var finishSetup: () -> Void = {}
+    var resize: (CGSize) -> Void = { _ in }
     var quit: () -> Void = {}
 }
 

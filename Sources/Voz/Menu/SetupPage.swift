@@ -47,12 +47,6 @@ struct SetupPage: View {
             .entrance(3, appeared: appeared, reduceMotion: reduceMotion)
         }
         .onAppear { appeared = true }
-        .task {
-            while !Task.isCancelled {
-                model.refreshPermissions()
-                try? await Task.sleep(for: .milliseconds(500))
-            }
-        }
     }
 }
 
