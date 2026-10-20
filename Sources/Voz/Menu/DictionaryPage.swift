@@ -27,7 +27,7 @@ struct DictionaryPage: View {
         HStack(spacing: 8) {
             TextField("Add a word or name", text: $model.draft)
                 .textFieldStyle(.plain)
-                .font(.system(size: 13))
+                .font(.ui(13))
                 .foregroundStyle(Theme.ink)
                 .focused($draftFocused)
                 .padding(.horizontal, 12)
@@ -59,7 +59,7 @@ struct DictionaryPage: View {
     private var words: some View {
         if model.snapshot.words.isEmpty {
             Text("No words yet")
-                .font(.system(size: 13))
+                .font(.ui(13))
                 .foregroundStyle(Theme.inkTertiary)
                 .frame(maxWidth: .infinity, minHeight: 56)
         } else {
@@ -80,7 +80,7 @@ private struct WordChip: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Text(word).font(.system(size: 13)).foregroundStyle(Theme.ink)
+            Text(word).font(.ui(13)).foregroundStyle(Theme.ink)
             Button(action: remove) {
                 Image(systemName: "xmark")
                     .font(.system(size: 9, weight: .bold))

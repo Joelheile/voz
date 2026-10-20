@@ -58,9 +58,18 @@ extension Color {
 }
 
 extension Font {
-    static func display(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        .system(size: size, weight: weight, design: .serif)
+    static func display(_ size: CGFloat) -> Font {
+        .custom("GeistPixel-Square", size: size)
     }
 
-    static let meta = Font.system(size: 12.5)
+    static func ui(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        switch weight {
+        case .medium: .custom("Geist-Medium", size: size)
+        case .semibold: .custom("Geist-SemiBold", size: size)
+        case .bold, .heavy, .black: .custom("Geist-Bold", size: size)
+        default: .custom("Geist-Regular", size: size)
+        }
+    }
+
+    static let meta = Font.ui(12.5)
 }

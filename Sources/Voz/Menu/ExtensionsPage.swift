@@ -114,7 +114,7 @@ struct ExtensionsPage: View {
             .labelsHidden()
             if let message = model.message {
                 Text(message)
-                    .font(.system(size: 12))
+                    .font(.ui(12))
                     .foregroundStyle(Theme.inkTertiary)
                     .fixedSize(horizontal: false, vertical: true)
                     .textSelection(.enabled)
@@ -200,11 +200,11 @@ struct ExtensionsPage: View {
     private func confirmation(for listing: PackageListing) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("\(listing.name) by \(listing.publisher) can read your transcripts, your files and the network. Read its source before you install it.")
-                .font(.system(size: 11.5))
+                .font(.ui(11.5))
                 .foregroundStyle(Theme.inkSecondary)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 8) {
-                if let page = listing.page { Link("Read source", destination: page).font(.system(size: 12)) }
+                if let page = listing.page { Link("Read source", destination: page).font(.ui(12)) }
                 Spacer(minLength: 0)
                 Button("Cancel") { confirming = nil }
                     .buttonStyle(.pill(.quiet, height: 26))
@@ -226,15 +226,15 @@ private struct ListingRow<Control: View>: View {
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(listing.name).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.ink)
+                Text(listing.name).font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
                 if let summary = listing.summary {
                     Text(summary)
-                        .font(.system(size: 11.5))
+                        .font(.ui(11.5))
                         .foregroundStyle(Theme.inkSecondary)
                         .lineLimit(1)
                 }
                 Text("by \(listing.publisher), \(listing.monthlyDownloads.formatted(.number.notation(.compactName))) a month")
-                    .font(.system(size: 11))
+                    .font(.ui(11))
                     .foregroundStyle(Theme.inkTertiary)
             }
             Spacer(minLength: 0)

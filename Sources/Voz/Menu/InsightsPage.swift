@@ -17,7 +17,7 @@ struct InsightsPage: View {
                     DailyChart(days: stats.dailyWords)
                     TopApps(apps: Array(stats.topApps.prefix(5)))
                     Text("Time saved assumes you type 40 words per minute.")
-                        .font(.system(size: 11.5))
+                        .font(.ui(11.5))
                         .foregroundStyle(Theme.inkTertiary)
                 }
             }
@@ -27,12 +27,12 @@ struct InsightsPage: View {
     private var summary: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("\(stats.wordsThisWeek.formatted()) words this week")
-                .font(.display(24, weight: .semibold))
+                .font(.ui(24, weight: .semibold))
                 .monospacedDigit()
                 .foregroundStyle(Theme.ink)
                 .contentTransition(.numericText())
             Text(details.joined(separator: " "))
-                .font(.system(size: 13))
+                .font(.ui(13))
                 .lineSpacing(3)
                 .foregroundStyle(Theme.inkSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -68,7 +68,7 @@ private struct DailyChart: View {
             .chartXAxis {
                 AxisMarks(values: .stride(by: .day, count: 7)) { _ in
                     AxisValueLabel(format: .dateTime.month(.abbreviated).day())
-                        .font(.system(size: 10))
+                        .font(.ui(10))
                         .foregroundStyle(Theme.inkTertiary)
                 }
             }
@@ -92,13 +92,13 @@ private struct TopApps: View {
             ForEach(apps, id: \.appName) { app in
                 HStack(spacing: 10) {
                     Text(app.appName)
-                        .font(.system(size: 12.5, weight: .medium))
+                        .font(.ui(12.5, weight: .medium))
                         .foregroundStyle(Theme.ink)
                         .frame(width: 90, alignment: .leading)
                         .lineLimit(1)
                     UsageBar(fraction: Double(app.words) / Double(max(apps.first?.words ?? 1, 1)))
                     Text(app.words.formatted())
-                        .font(.system(size: 12))
+                        .font(.ui(12))
                         .monospacedDigit()
                         .foregroundStyle(Theme.inkSecondary)
                         .frame(width: 44, alignment: .trailing)

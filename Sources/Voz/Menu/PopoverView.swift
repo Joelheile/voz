@@ -90,7 +90,7 @@ private struct HomePage: View {
                 .padding(.top, 7)
             VStack(alignment: .leading, spacing: 2) {
                 Text(model.status.title)
-                    .font(.display(20, weight: .semibold))
+                    .font(.display(20))
                     .foregroundStyle(Theme.ink)
                 Text(model.hint)
                     .font(.meta)
@@ -119,7 +119,7 @@ private struct HomePage: View {
     private var transcripts: some View {
         if records.isEmpty {
             Text(isSearching ? "No matching transcripts" : "Your transcripts appear here.")
-                .font(.system(size: 13))
+                .font(.ui(13))
                 .foregroundStyle(Theme.inkTertiary)
                 .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
         } else {
@@ -168,7 +168,7 @@ private struct StatsLine: View {
         Button(action: open) {
             HStack(spacing: 6) {
                 Text(summary)
-                    .font(.system(size: 12.5))
+                    .font(.ui(12.5))
                     .monospacedDigit()
                     .foregroundStyle(Theme.inkSecondary)
                     .contentTransition(.numericText())
@@ -205,7 +205,7 @@ private struct TranscriptRow: View {
         Button(action: copy) {
             HStack(spacing: 10) {
                 Text(record.finalText.replacingOccurrences(of: "\n", with: " "))
-                    .font(.system(size: 13))
+                    .font(.ui(13))
                     .foregroundStyle(Theme.ink)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -232,7 +232,7 @@ private struct TranscriptRow: View {
     private var trailing: some View {
         if copied {
             Label("Copied", systemImage: "checkmark")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.ui(12, weight: .semibold))
                 .foregroundStyle(Color.accentColor)
                 .transition(.opacity)
         } else if hovering {

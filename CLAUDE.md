@@ -38,7 +38,7 @@ Voz answers each problem: free and open source, a tiny core with no settings maz
 ## Design
 
 - Dark and light mode, following the system. No other themes
-- Quiet, editorial look: warm canvas, white panel, serif titles and numbers (New York), SF Pro for UI
+- Quiet look: warm canvas, white panel, Geist Pixel Square for titles, Geist for everything else. SF Pro only inside SF Symbols
 - Indigo accent (#5163F9 light, #6475FA dark) only for the status dot and Insights bars. Controls use the system accent color
 - Everything lives in the menu bar panel, no main window
 - Copy: short, active, sentence case. Inline lists join with commas, no middle dots

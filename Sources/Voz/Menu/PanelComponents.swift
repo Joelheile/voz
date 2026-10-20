@@ -9,7 +9,7 @@ struct PageBar: View {
             IconButton(symbol: "chevron.left", help: "Back", action: back)
                 .keyboardShortcut("[", modifiers: .command)
             Text(title)
-                .font(.display(20, weight: .semibold))
+                .font(.display(20))
                 .foregroundStyle(Theme.ink)
             Spacer(minLength: 0)
         }
@@ -46,10 +46,10 @@ struct PanelRow<Control: View>: View {
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.ink)
+                Text(title).font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
                 if let detail {
                     Text(detail)
-                        .font(.system(size: 11.5))
+                        .font(.ui(11.5))
                         .foregroundStyle(Theme.inkSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -71,9 +71,9 @@ struct LinkRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                Text(title).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.ink)
+                Text(title).font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
                 Spacer(minLength: 0)
-                Text(value).font(.system(size: 12.5)).foregroundStyle(Theme.inkSecondary)
+                Text(value).font(.ui(12.5)).foregroundStyle(Theme.inkSecondary)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(hovering ? Theme.ink : Theme.inkTertiary)

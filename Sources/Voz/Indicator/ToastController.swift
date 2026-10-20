@@ -59,7 +59,7 @@ private struct ToastView: View {
 
     var body: some View {
         Text(model.text)
-            .font(.system(size: 13, weight: .medium))
+            .font(.ui(13, weight: .medium))
             .foregroundStyle(.white)
             .multilineTextAlignment(.center)
             .lineLimit(3)

@@ -30,7 +30,7 @@ private struct IndicatorTile: View {
                             .strokeBorder(selected ? Color.accentColor : Theme.hairline, lineWidth: selected ? 2 : 1)
                     )
                 Text(style.title)
-                    .font(.system(size: 12, weight: selected ? .semibold : .regular))
+                    .font(.ui(12, weight: selected ? .semibold : .regular))
                     .foregroundStyle(selected ? Theme.ink : Theme.inkSecondary)
             }
             .contentShape(Rectangle())

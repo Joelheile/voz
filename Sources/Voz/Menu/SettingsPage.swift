@@ -90,7 +90,7 @@ struct SettingsPage: View {
                 Toggle("Sound cues", isOn: $settings.soundCues).labelsHidden()
             }
             VStack(alignment: .leading, spacing: 8) {
-                Text("Indicator").font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.ink)
+                Text("Indicator").font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
                 IndicatorPicker(selection: $settings.indicatorStyle)
             }
             .padding(.vertical, 10)

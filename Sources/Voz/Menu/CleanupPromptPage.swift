@@ -13,7 +13,7 @@ struct CleanupPromptPage: View {
                 .foregroundStyle(Theme.inkSecondary)
                 .fixedSize(horizontal: false, vertical: true)
             TextEditor(text: $settings.cleanupPrompt)
-                .font(.system(size: 12))
+                .font(.ui(12))
                 .foregroundStyle(Theme.ink)
                 .scrollContentBackground(.hidden)
                 .padding(8)

@@ -35,13 +35,13 @@ struct SpeechModelPicker: View {
     private var header: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Speech model").font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.ink)
-                Text(selection.label).font(.system(size: 11.5)).foregroundStyle(Theme.inkSecondary).lineLimit(1)
+                Text("Speech model").font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
+                Text(selection.label).font(.ui(11.5)).foregroundStyle(Theme.inkSecondary).lineLimit(1)
             }
             Spacer(minLength: 0)
             if showsStatus, let status {
                 ModelStatusLabel(status: status, model: selection)
-                    .font(.system(size: 12.5))
+                    .font(.ui(12.5))
                     .foregroundStyle(Theme.inkSecondary)
                     .lineLimit(1)
             }
@@ -70,7 +70,7 @@ private struct SpeechModelOption: View {
                     .foregroundStyle(Color.accentColor)
                     .opacity(selected ? 1 : 0)
                 Text(model.label)
-                    .font(.system(size: 13))
+                    .font(.ui(13))
                     .foregroundStyle(Theme.ink)
                 Spacer(minLength: 0)
             }

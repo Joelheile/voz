@@ -10,7 +10,7 @@ struct SetupPage: View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Set up Voz")
-                    .font(.display(22, weight: .semibold))
+                    .font(.display(22))
                     .foregroundStyle(Theme.ink)
                 Text("Three permissions, then you can dictate in any app.")
                     .font(.meta)

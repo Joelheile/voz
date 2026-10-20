@@ -5,7 +5,7 @@ struct SectionLabel: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 12.5))
+            .font(.ui(12.5))
             .foregroundStyle(Theme.inkSecondary)
     }
 }
@@ -39,7 +39,7 @@ struct PillButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 14, weight: .semibold))
+            .font(.ui(14, weight: .semibold))
             .foregroundStyle(kind.text)
             .padding(.horizontal, height * 0.55)
             .frame(height: height)
@@ -90,7 +90,7 @@ struct SearchField: View {
                 .foregroundStyle(Theme.inkTertiary)
             TextField(prompt, text: $text)
                 .textFieldStyle(.plain)
-                .font(.system(size: 13))
+                .font(.ui(13))
                 .foregroundStyle(Theme.ink)
                 .focused(focused)
         }
