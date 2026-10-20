@@ -3,6 +3,16 @@
   <channel>
     <title>voz</title>
     <item>
+      <title>voz 0.0.2-beta.38</title>
+      <link>https://github.com/Joelheile/voz/releases/tag/beta-38</link>
+      <pubDate>Tue, 20 Oct 2026 10:57:40 GMT</pubDate>
+      <sparkle:version>38</sparkle:version>
+      <sparkle:shortVersionString>0.0.2-beta.38</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-38/voz-0.0.2-beta.38.zip" length="6598664" sparkle:edSignature="cAszTc24KpiqNpVnij3Y65XCkhBl5nOyBvw40E3vTnAThMDn1mDwA0bAfZbl2m9rY0/Vq7WKOgC6CX2Lr5f8Cg==" type="application/octet-stream" />
+    </item>
+    <item>
       <title>voz 0.0.1-beta.35</title>
       <link>https://github.com/Joelheile/voz/releases/tag/beta-35</link>
       <pubDate>Tue, 20 Oct 2026 10:28:02 GMT</pubDate>
