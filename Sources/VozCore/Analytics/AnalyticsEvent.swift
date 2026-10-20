@@ -5,7 +5,6 @@ public enum AnalyticsEvent: Equatable, Sendable {
     case dictationCompleted(DictationMetrics)
     case dictationFailed(stage: DictationStage, errorCode: DictationErrorCode)
     case dictationDiscarded(reason: DiscardReason)
-    case retryUsed
     case modelDownload(model: SpeechModel, seconds: Int, success: Bool, bytes: Int)
     case modelLoad(model: SpeechModel, coldMs: Int)
     case vocabularySuggestion(accepted: Bool)
@@ -22,7 +21,6 @@ public enum AnalyticsEvent: Equatable, Sendable {
         case .dictationCompleted: "dictation_completed"
         case .dictationFailed: "dictation_failed"
         case .dictationDiscarded: "dictation_discarded"
-        case .retryUsed: "retry_used"
         case .modelDownload: "model_download"
         case .modelLoad: "model_load"
         case .vocabularySuggestion: "vocabulary_suggestion"
@@ -45,7 +43,7 @@ public enum AnalyticsEvent: Equatable, Sendable {
             ["stage": .label(stage.rawValue), "error_code": .label(errorCode.rawValue)]
         case let .dictationDiscarded(reason):
             ["reason": .label(reason.rawValue)]
-        case .retryUsed, .historyOpened, .statsOpened:
+        case .historyOpened, .statsOpened:
             [:]
         case let .modelDownload(model, seconds, success, bytes):
             ["model": .label(model.rawValue), "seconds": .integer(seconds), "success": .flag(success), "bytes": .integer(bytes)]

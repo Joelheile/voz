@@ -15,8 +15,8 @@ enum Theme {
 
     enum Radius {
         static let control: CGFloat = 8
-        static let row: CGFloat = 12
-        static let panel: CGFloat = 22
+        static let row: CGFloat = 10
+        static let panel: CGFloat = 16
     }
 
     enum Spacing {

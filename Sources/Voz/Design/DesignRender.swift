@@ -107,7 +107,6 @@ private final class Fixture {
         let model = PopoverModel()
         model.status = status
         model.hint = hint.isEmpty ? Self.hint(for: status, settings: settings) : hint
-        model.canRetry = true
         model.page = page
         model.needsSetup = needsSetup
         return PopoverView(model: model, sources: sources)

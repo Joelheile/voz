@@ -48,7 +48,7 @@ final class DictationPipeline {
         )
     }
 
-    func run(_ recording: LastRecording, streaming: StreamingDictation?, released: ContinuousClock.Instant) async -> Dictation.Outcome {
+    func run(_ recording: Recording, streaming: StreamingDictation?, released: ContinuousClock.Instant) async -> Dictation.Outcome {
         let session = streaming ?? makeStreaming(app: recording.app)
         extensions.recorded(recording.samples, app: recording.app)
         do {

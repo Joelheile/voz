@@ -27,7 +27,6 @@ import Testing
             .dictationCompleted(metrics),
             .dictationFailed(stage: .transcription, errorCode: .transcriptionFailed),
             .dictationDiscarded(reason: .silent),
-            .retryUsed,
             .modelDownload(model: .parakeetV2, seconds: 30, success: true, bytes: 1_000_000),
             .modelLoad(model: .parakeetUltra, coldMs: 900),
             .vocabularySuggestion(accepted: false),
@@ -58,7 +57,7 @@ import Testing
         let names = Set(Self.events.map(\.name))
         #expect(names.isSuperset(of: [
             "app_installed", "app_launched", "permission_result",
-            "dictation_completed", "dictation_failed", "dictation_discarded", "retry_used",
+            "dictation_completed", "dictation_failed", "dictation_discarded",
             "model_download", "model_load", "vocabulary_suggestion", "setting_changed",
             "history_opened", "stats_opened", "update_installed",
         ]))

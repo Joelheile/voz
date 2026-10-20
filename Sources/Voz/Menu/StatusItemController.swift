@@ -16,7 +16,7 @@ final class PopoverPanel: NSPanel {
         )
         isOpaque = false
         backgroundColor = .clear
-        hasShadow = true
+        hasShadow = false
         isFloatingPanel = true
         hidesOnDeactivate = false
         isReleasedWhenClosed = false
@@ -49,6 +49,7 @@ final class StatusItemController: NSObject {
     private static let reopenGuard: TimeInterval = 0.2
     private static let fade: TimeInterval = 0.12
     private static let anchorRetry: TimeInterval = 0.1
+    private static let shrinkDelay: TimeInterval = 0.35
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private let model = PopoverModel()
@@ -66,6 +67,7 @@ final class StatusItemController: NSObject {
     private var outsideClickMonitor: Any?
     private var permissionPoll: Timer?
     private var closedAt = Date.distantPast
+    private var pendingSize: CGSize?
 
     init(
         dictation: Dictation,
@@ -85,16 +87,12 @@ final class StatusItemController: NSObject {
         quitApp = quit
         hosting = PopoverHostingView(rootView: PopoverView(model: model, sources: sources))
         super.init()
-        hosting.sizingOptions = [.intrinsicContentSize]
+        hosting.sizingOptions = []
         panel.contentView = hosting
         panel.onCancel = { [weak self] in self?.cancel() }
         panel.onResignKey = { [weak self] in self?.dismissUnlessPinned() }
         model.actions = PopoverActions(
             copy: { [dictation] in dictation.copy($0.finalText) },
-            retry: { [weak self] in
-                self?.closePanel()
-                self?.dictation.retryLast()
-            },
             fixPermission: { [weak self] in self?.fix($0) },
             checkForUpdates: { [weak self] in self?.dismissThen(checkForUpdates) },
             finishSetup: { [weak self] in
@@ -103,7 +101,7 @@ final class StatusItemController: NSObject {
             },
             resize: { [weak self] size in
                 guard let self, self.panel.isVisible else { return }
-                self.layoutPanel(size: size)
+                self.resize(to: size)
             },
             quit: quit
         )
@@ -122,7 +120,6 @@ final class StatusItemController: NSObject {
         let status = currentStatus()
         model.status = status
         model.hint = hint(for: status)
-        model.canRetry = dictation.hasLastRecording && dictation.phase == .idle
         model.needsSetup = !settings.onboardingCompleted
         if model.needsSetup { setup.refreshPermissions() }
     }
@@ -253,6 +250,15 @@ final class StatusItemController: NSObject {
         action()
     }
 
+    private func resize(to size: CGSize) {
+        pendingSize = size
+        guard size.height < panel.frame.height else { return layoutPanel(size: size) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.shrinkDelay) { [weak self] in
+            guard let self, self.panel.isVisible, self.pendingSize == size else { return }
+            self.layoutPanel(size: size)
+        }
+    }
+
     private func layoutPanel(size: CGSize) {
         guard let buttonWindow = statusItem.button?.window, let button = statusItem.button else { return }
         let anchor = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
@@ -265,9 +271,9 @@ final class StatusItemController: NSObject {
             return
         }
         let visible = (buttonWindow.screen ?? NSScreen.main)?.visibleFrame ?? anchor
-        let x = min(max(anchor.midX - size.width / 2, visible.minX + Self.screenMargin), visible.maxX - size.width - Self.screenMargin)
-        panel.setFrame(NSRect(x: x, y: anchor.minY - Self.panelGap - size.height, width: size.width, height: size.height), display: true)
-        panel.invalidateShadow()
+        let inset = PopoverView.shadowInset
+        let x = min(max(anchor.midX - size.width / 2, visible.minX + Self.screenMargin - inset), visible.maxX - size.width - Self.screenMargin + inset)
+        panel.setFrame(NSRect(x: x, y: anchor.minY - Self.panelGap + inset - size.height, width: size.width, height: size.height), display: true)
     }
 
     private func showFallbackMenu() {

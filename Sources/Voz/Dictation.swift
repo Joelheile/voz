@@ -12,7 +12,7 @@ struct FrontApp {
     }
 }
 
-struct LastRecording {
+struct Recording {
     let samples: [Float]
     let app: FrontApp
     let trigger: DictationTrigger
@@ -36,7 +36,6 @@ final class Dictation {
     private let analytics: Analytics
     private var recordingApp = FrontApp(bundleID: nil, name: nil)
     private var recordingTrigger = DictationTrigger.tap
-    private var lastRecording: LastRecording?
     private var streaming: StreamingDictation?
     private let activity = ActivityHold()
 
@@ -46,7 +45,6 @@ final class Dictation {
             onChange()
         }
     }
-    var hasLastRecording: Bool { lastRecording != nil }
     var isRecording: Bool { phase == .recording }
 
     var onChange: () -> Void = {}
@@ -85,12 +83,6 @@ final class Dictation {
         guard phase == .recording else { return }
         Log.app.notice("Recording interrupted, transcribing what was captured")
         stopAndTranscribe()
-    }
-
-    func retryLast() {
-        guard phase == .idle, let lastRecording else { return }
-        analytics.capture(.retryUsed)
-        transcribe(lastRecording, streaming: nil)
     }
 
     func copy(_ text: String) {
@@ -158,13 +150,12 @@ final class Dictation {
             onOutcome(.discarded)
             phase = .idle
         case .keep:
-            let recording = LastRecording(samples: samples, app: recordingApp, trigger: recordingTrigger)
-            lastRecording = recording
+            let recording = Recording(samples: samples, app: recordingApp, trigger: recordingTrigger)
             transcribe(recording, streaming: session, released: released)
         }
     }
 
-    private func transcribe(_ recording: LastRecording, streaming: StreamingDictation?, released: ContinuousClock.Instant = .now) {
+    private func transcribe(_ recording: Recording, streaming: StreamingDictation?, released: ContinuousClock.Instant = .now) {
         phase = .transcribing
         Task {
             defer { phase = .idle }

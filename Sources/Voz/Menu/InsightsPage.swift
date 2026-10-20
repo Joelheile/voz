@@ -11,15 +11,25 @@ struct InsightsPage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             PageBar(title: "Insights", back: back)
-            CappedScrollView(maxHeight: 540) {
-                VStack(alignment: .leading, spacing: 20) {
-                    summary
-                    DailyChart(days: stats.dailyWords)
-                    TopApps(apps: Array(stats.topApps.prefix(5)))
-                    Text("Time saved assumes you type 40 words per minute.")
-                        .font(.ui(11.5))
-                        .foregroundStyle(Theme.inkTertiary)
-                }
+            if stats.wordsTotal == 0 {
+                Text("Dictate something to see your stats.")
+                    .font(.ui(13))
+                    .foregroundStyle(Theme.inkSecondary)
+            } else {
+                content
+            }
+        }
+    }
+
+    private var content: some View {
+        CappedScrollView(maxHeight: 540) {
+            VStack(alignment: .leading, spacing: 20) {
+                summary
+                DailyChart(days: stats.dailyWords)
+                TopApps(apps: Array(stats.topApps.prefix(5)))
+                Text("Time saved assumes you type 40 words per minute.")
+                    .font(.ui(11.5))
+                    .foregroundStyle(Theme.inkTertiary)
             }
         }
     }
@@ -27,7 +37,7 @@ struct InsightsPage: View {
     private var summary: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("\(stats.wordsThisWeek.formatted()) words this week")
-                .font(.ui(24, weight: .semibold))
+                .font(.ui(17, weight: .semibold))
                 .monospacedDigit()
                 .foregroundStyle(Theme.ink)
                 .contentTransition(.numericText())

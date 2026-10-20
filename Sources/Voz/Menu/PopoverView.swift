@@ -13,6 +13,7 @@ struct PopoverSources {
 
 struct PopoverView: View {
     static let width: CGFloat = 360
+    static let shadowInset: CGFloat = 28
 
     @ObservedObject var model: PopoverModel
     let sources: PopoverSources
@@ -28,7 +29,11 @@ struct PopoverView: View {
             .toggleStyle(.switch)
             .animation(Theme.Motion.section, value: model.page)
             .fixedSize(horizontal: false, vertical: true)
+            .compositingGroup()
+            .shadow(color: .black.opacity(0.16), radius: 18, y: 8)
+            .padding(Self.shadowInset)
             .onGeometryChange(for: CGSize.self) { $0.size } action: { model.actions.resize($0) }
+            .frame(maxHeight: .infinity, alignment: .top)
     }
 
     @ViewBuilder
@@ -38,7 +43,7 @@ struct PopoverView: View {
         } else {
             switch model.page {
             case .home:
-                HomePage(model: model, history: sources.history, stats: sources.stats, settings: sources.settings)
+                HomePage(model: model, history: sources.history, settings: sources.settings)
             case .settings:
                 SettingsPage(model: model, settings: sources.settings, status: sources.modelStatus, vocabulary: sources.vocabulary)
             case .dictionary:
@@ -60,7 +65,6 @@ private struct HomePage: View {
 
     @ObservedObject var model: PopoverModel
     @ObservedObject var history: HistoryModel
-    @ObservedObject var stats: StatsModel
     @ObservedObject var settings: AppSettings
     @FocusState private var searchFocused: Bool
 
@@ -81,8 +85,6 @@ private struct HomePage: View {
                     .onSubmit(copyFirstResult)
             }
             transcripts
-            StatsLine(stats: stats.stats) { model.page = .insights }
-            RowDivider()
             footer
         }
         .onAppear { searchFocused = showsSearch }
@@ -90,10 +92,10 @@ private struct HomePage: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 10) {
-                StatusMark(status: model.status)
+            HStack(spacing: 8) {
+                if model.status == .recording { RecordingMark() }
                 Text(model.status.title)
-                    .font(.display(20))
+                    .font(.display(18))
                     .foregroundStyle(Theme.ink)
             }
             Text(model.hint)
@@ -123,7 +125,7 @@ private struct HomePage: View {
             Text(isSearching ? "No matching transcripts" : "Your transcripts appear here.")
                 .font(.ui(13))
                 .foregroundStyle(Theme.inkTertiary)
-                .frame(maxWidth: .infinity, minHeight: Self.rowHeight, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
         } else {
             CappedScrollView(maxHeight: CGFloat(Self.visibleRows) * Self.rowHeight) {
                 VStack(spacing: 0) {
@@ -145,9 +147,7 @@ private struct HomePage: View {
     private var footer: some View {
         HStack(spacing: 2) {
             Spacer(minLength: 0)
-            IconButton(symbol: "arrow.counterclockwise", help: "Retry last recording", action: model.actions.retry)
-                .disabled(!model.canRetry)
-                .opacity(model.canRetry ? 1 : 0.35)
+            IconButton(symbol: "chart.bar", help: "Insights") { model.page = .insights }
             IconButton(symbol: "puzzlepiece.extension", help: "Extensions") { model.page = .extensions }
             IconButton(symbol: "gearshape", help: "Settings") { model.page = .settings }
                 .keyboardShortcut(",", modifiers: .command)
@@ -159,40 +159,6 @@ private struct HomePage: View {
     private func copyFirstResult() {
         guard let first = records.first else { return }
         model.copy(first)
-    }
-}
-
-private struct StatsLine: View {
-    let stats: UsageStats
-    let open: () -> Void
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: open) {
-            HStack(spacing: 6) {
-                Text(summary)
-                    .font(.ui(12.5))
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.inkSecondary)
-                    .contentTransition(.numericText())
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(hovering ? Theme.ink : Theme.inkTertiary)
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .help("Insights")
-        .onHover { hovering = $0 }
-        .animation(Theme.Motion.hover, value: hovering)
-    }
-
-    private var summary: String {
-        var parts = ["\(stats.wordsThisWeek.formatted()) words this week"]
-        if let pace = stats.averageWordsPerMinute { parts.append("\(Int(pace.rounded())) wpm") }
-        if stats.currentStreak > 1 { parts.append("\(stats.currentStreak)-day streak") }
-        return parts.joined(separator: ", ")
     }
 }
 
@@ -252,27 +218,16 @@ private struct TranscriptRow: View {
     }
 }
 
-private struct StatusMark: View {
-    let status: PopoverStatus
+private struct RecordingMark: View {
     @State private var pulsing = false
 
     var body: some View {
         Circle()
-            .fill(color)
-            .frame(width: 9, height: 9)
-            .scaleEffect(isRecording && pulsing ? 1.35 : 1)
-            .opacity(isRecording && pulsing ? 0.6 : 1)
-            .animation(isRecording ? .easeInOut(duration: 0.7).repeatForever() : .default, value: pulsing)
-            .onChange(of: isRecording, initial: true) { pulsing = isRecording }
-    }
-
-    private var isRecording: Bool { status == .recording }
-
-    private var color: Color {
-        switch status {
-        case .ready, .recording: Theme.accent
-        case .transcribing, .loadingModel: Theme.inkTertiary
-        case .permissionNeeded, .modelFailed: Color(nsColor: .systemOrange)
-        }
+            .fill(Theme.accent)
+            .frame(width: 8, height: 8)
+            .scaleEffect(pulsing ? 1.35 : 1)
+            .opacity(pulsing ? 0.6 : 1)
+            .animation(.easeInOut(duration: 0.7).repeatForever(), value: pulsing)
+            .onAppear { pulsing = true }
     }
 }

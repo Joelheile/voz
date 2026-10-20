@@ -69,7 +69,6 @@ enum PopoverPage {
 
 struct PopoverActions {
     var copy: (TranscriptRecord) -> Void = { _ in }
-    var retry: () -> Void = {}
     var fixPermission: (PermissionFix) -> Void = { _ in }
     var checkForUpdates: () -> Void = {}
     var finishSetup: () -> Void = {}
@@ -83,7 +82,6 @@ final class PopoverModel: ObservableObject {
 
     @Published var status = PopoverStatus.ready
     @Published var hint = ""
-    @Published var canRetry = false
     @Published var page = PopoverPage.home
     @Published var needsSetup = false
     @Published private(set) var copiedID: UUID?
