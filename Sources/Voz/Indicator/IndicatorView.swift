@@ -2,14 +2,14 @@ import SwiftUI
 import VozCore
 
 enum IndicatorMotion {
-    static let open = Animation.spring(duration: 0.34, bounce: 0.15)
-    static let close = Animation.spring(duration: 0.32, bounce: 0)
+    static let open = Animation.spring(duration: 0.22, bounce: 0.15)
+    static let close = Animation.spring(duration: 0.2, bounce: 0)
     static let reducedMotion = Animation.easeInOut(duration: 0.2)
-    static let stateSwap = Animation.snappy(duration: 0.3)
-    static let contentEnter = Animation.spring(duration: 0.34, bounce: 0.1)
-    static let contentExit = Animation.easeOut(duration: 0.12)
-    static let leadingDelay = 0.08
-    static let trailingDelay = 0.12
+    static let stateSwap = Animation.snappy(duration: 0.25)
+    static let contentEnter = Animation.spring(duration: 0.22, bounce: 0.1)
+    static let contentExit = Animation.easeOut(duration: 0.1)
+    static let leadingDelay = 0.06
+    static let trailingDelay = 0.0
     static let enterBlur: CGFloat = 8
     static let exitBlur: CGFloat = 4
     static let hiddenScaleX: CGFloat = 0.4

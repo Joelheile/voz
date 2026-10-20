@@ -31,7 +31,7 @@ import Testing
     @Test func notchPanelIsFlushWithTopAndCenteredOnNotch() {
         let layout = IndicatorLayout.make(style: .notch, screen: notchScreen)
         #expect(layout.style == .notch)
-        #expect(layout.panelFrame == CGRect(x: 744, y: 1131, width: 312, height: 38))
+        #expect(layout.panelFrame == CGRect(x: 734, y: 1131, width: 332, height: 38))
         #expect(layout.panelFrame.midX == 900)
         #expect(layout.panelFrame.maxY == 1169)
         #expect(layout.collapsedWidth == 222)

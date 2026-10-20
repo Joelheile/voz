@@ -10,7 +10,6 @@ enum Theme {
     static let hairline = Color(light: 0x141414, dark: 0xFFFFFF, lightAlpha: 0.08, darkAlpha: 0.09)
     static let selected = Color(light: 0xE9E6DF, dark: 0xFFFFFF, lightAlpha: 1, darkAlpha: 0.09)
     static let accent = Color(light: 0x5163F9, dark: 0x6475FA)
-    static let accentOnBlack = Color(hex: 0x7A8CFF)
     static let onInk = Color(light: 0xFFFFFF, dark: 0x141414)
 
     enum Radius {
@@ -46,10 +45,6 @@ extension NSColor {
 }
 
 extension Color {
-    init(hex: UInt32) {
-        self.init(nsColor: NSColor(hex: hex))
-    }
-
     init(light: UInt32, dark: UInt32, lightAlpha: CGFloat = 1, darkAlpha: CGFloat = 1) {
         self.init(nsColor: NSColor(name: nil) { appearance in
             Theme.isDark(appearance) ? NSColor(hex: dark, alpha: darkAlpha) : NSColor(hex: light, alpha: lightAlpha)

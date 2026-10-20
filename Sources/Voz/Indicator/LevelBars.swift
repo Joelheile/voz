@@ -49,24 +49,6 @@ struct ProgressDots: View {
     }
 }
 
-struct RecordingDot: View {
-    let isPulsing: Bool
-    let color: Color
-    @State private var pulse = false
-
-    var body: some View {
-        Circle()
-            .fill(color)
-            .frame(width: 8, height: 8)
-            .shadow(color: color.opacity(0.5), radius: 3)
-            .scaleEffect(isPulsing && pulse ? 1.18 : 1)
-            .opacity(isPulsing && pulse ? 0.65 : 1)
-            .animation(isPulsing ? .easeInOut(duration: 0.8).repeatForever(autoreverses: true) : .easeOut(duration: 0.2), value: pulse)
-            .animation(.easeOut(duration: 0.2), value: color)
-            .onAppear { pulse = true }
-    }
-}
-
 struct ResultSymbol: View {
     let name: String
     let color: Color

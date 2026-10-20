@@ -7,7 +7,7 @@ final class IndicatorController {
     private static let doneHold = Duration.milliseconds(600)
     private static let discardHold = Duration.milliseconds(250)
     private static let failureHold = Duration.milliseconds(700)
-    private static let closeDuration = Duration.milliseconds(500)
+    private static let closeDuration = Duration.milliseconds(300)
 
     private let model = IndicatorModel()
     private let panel = IndicatorPanel()
@@ -33,6 +33,8 @@ final class IndicatorController {
         lifecycle?.cancel()
         if !panel.isVisible { present() }
         model.level = 0
+        model.recordingStart = .now
+        model.recordingEnd = nil
         model.state = .recording
         lifecycle = Task { [model] in
             try? await Task.sleep(for: .milliseconds(16))
@@ -44,6 +46,7 @@ final class IndicatorController {
     func showTranscribing() {
         guard panel.isVisible else { return }
         lifecycle?.cancel()
+        stopTimer()
         model.state = .transcribing
         model.isExpanded = true
     }
@@ -51,6 +54,7 @@ final class IndicatorController {
     func showOutcome(_ state: IndicatorState) {
         guard panel.isVisible else { return }
         lifecycle?.cancel()
+        stopTimer()
         model.state = state
         if state == .failed { model.shakeCount += 1 }
         let hold = holdDuration(for: state)
@@ -103,6 +107,10 @@ final class IndicatorController {
     func pushLevel(_ level: Float) {
         guard model.state == .recording else { return }
         model.level = level
+    }
+
+    private func stopTimer() {
+        if model.recordingEnd == nil { model.recordingEnd = .now }
     }
 
     private func holdDuration(for state: IndicatorState) -> Duration {

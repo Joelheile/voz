@@ -1,3 +1,4 @@
+import Foundation
 import Observation
 
 enum IndicatorState: Equatable {
@@ -14,5 +15,7 @@ final class IndicatorModel {
     var state = IndicatorState.recording
     var isExpanded = false
     var shakeCount = 0
+    var recordingStart = Date.now
+    var recordingEnd: Date?
     @ObservationIgnored var level: Float = 0
 }

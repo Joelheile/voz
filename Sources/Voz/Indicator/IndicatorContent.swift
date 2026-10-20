@@ -4,16 +4,16 @@ struct IndicatorLeading: View {
     let model: IndicatorModel
 
     var body: some View {
-        RecordingDot(isPulsing: model.state == .recording, color: color)
-    }
-
-    private var color: Color {
-        switch model.state {
-        case .recording: Theme.accentOnBlack
-        case .transcribing, .discarded: .white.opacity(0.35)
-        case .done: .green
-        case .failed: .orange
-        }
+        Text(
+            timerInterval: model.recordingStart...model.recordingStart.addingTimeInterval(3600),
+            pauseTime: model.recordingEnd,
+            countsDown: false,
+            showsHours: false
+        )
+        .font(.ui(12, weight: .medium))
+        .monospacedDigit()
+        .foregroundStyle(.white.opacity(model.state == .recording ? 0.9 : 0.4))
+        .animation(.easeOut(duration: 0.2), value: model.state)
     }
 }
 
