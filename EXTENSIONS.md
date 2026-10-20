@@ -113,6 +113,7 @@ voz remove voz-jira
 - npm installs use the exact version. `voz install npm:voz-jira@1.2.0` and `git:...@v1.0.0` are pinned. A git ref is a tag or a branch. `voz update` skips pinned packages and moves the others to the latest version
 - Packages only change when you run `voz update`. Voz never updates them on its own
 - Voz never runs install scripts
+- Voz installs only npm versions published at least a day ago. A package you published today installs tomorrow. Use `voz dev` to try it before then
 - Installed packages are listed in `~/.voz/settings.json`
 
 ## Settings file
@@ -137,5 +138,6 @@ Extensions run with your user's permissions. They can read your transcripts, you
 To limit risk, Voz:
 
 - Never runs install scripts, so installing a package does not run its code
+- Skips npm versions less than a day old, so a hijacked release has time to be caught and removed
 - Installs exact versions and updates only when you run `voz update`
 - Pins packages to a version or git ref when you ask

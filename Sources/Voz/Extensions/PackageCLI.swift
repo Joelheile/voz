@@ -24,6 +24,7 @@ enum PackageCLIError: Error, CustomStringConvertible {
 enum PackageCLI {
     private static let home = VozHome()
     private static let git = "/usr/bin/git"
+    private static let safeInstall = ["--ignore-scripts", "--minimum-release-age=86400"]
 
     static func handles(_ arguments: [String]) -> Bool {
         arguments.count > 1 && ["install", "remove", "list", "update", "dev"].contains(arguments[1])
@@ -54,7 +55,7 @@ enum PackageCLI {
         case .npm(_, let spec):
             let bun = try await BunRuntime.ensure()
             try preparePackagesManifest()
-            try execute(bun.path, ["add", "--ignore-scripts", "--exact", spec], in: home.packages)
+            try execute(bun.path, ["add", "--exact", spec] + safeInstall, in: home.packages)
         case .git(_, _, let ref):
             guard !FileManager.default.fileExists(atPath: directory.path) else { throw PackageCLIError.alreadyInstalled(directory.path) }
             let bun = try await BunRuntime.ensure()
@@ -101,7 +102,7 @@ enum PackageCLI {
         for package in packages where !package.source.isPinned {
             switch package.source {
             case .npm(let name, _):
-                try execute(bun.path, ["add", "--ignore-scripts", "--exact", "\(name)@latest"], in: home.packages)
+                try execute(bun.path, ["add", "--exact", "\(name)@latest"] + safeInstall, in: home.packages)
             case .git:
                 let directory = package.source.directory(in: home)
                 try execute(git, ["-C", directory.path, "pull", "--ff-only"])
@@ -150,7 +151,7 @@ enum PackageCLI {
 
     private static func installDependencies(in directory: URL, bun: URL) throws {
         guard FileManager.default.fileExists(atPath: directory.appendingPathComponent("package.json").path) else { return }
-        try execute(bun.path, ["install", "--ignore-scripts", "--production"], in: directory)
+        try execute(bun.path, ["install", "--production"] + safeInstall, in: directory)
     }
 
     private static func execute(_ executable: String, _ arguments: [String], in directory: URL? = nil) throws {

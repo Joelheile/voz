@@ -4,7 +4,7 @@
 
 **Talk instead of type, in every app on your Mac.**
 
-[Website](https://voz.joels.tech), [Extensions](https://voz.joels.tech/extensions/), [Privacy](SECURITY.md)
+[Website](https://voz.joels.tech), [Extensions](https://voz.joels.tech/extensions/)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/images/ready-dark.png">
@@ -66,9 +66,11 @@ To have a coding agent write one, open it in `~/.voz`. Voz keeps a guide for age
 
 The full API is in [EXTENSIONS.md](EXTENSIONS.md). Extensions run with your permissions, so install only ones you trust.
 
+Packages on npm come from their authors. I do not review them and I am not responsible for them or for npm. Voz never runs install scripts and skips npm versions less than a day old.
+
 ## Privacy
 
-Your audio and text stay on your Mac. Voz sends its version number on install and update, and you can turn that off. Usage analytics stay off unless you opt in. Details in [SECURITY.md](SECURITY.md).
+Your audio and text stay on your Mac. Voz sends its version number on install and update, and you can turn that off. Usage analytics stay off unless you opt in.
 
 ## Contributing
 
