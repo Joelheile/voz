@@ -63,7 +63,7 @@ struct DictionaryPage: View {
                 .foregroundStyle(Theme.inkTertiary)
                 .frame(maxWidth: .infinity, minHeight: 56)
         } else {
-            FlowLayout(spacing: 6) {
+            FlowLayout(spacing: 8) {
                 ForEach(model.snapshot.words) { word in
                     WordChip(word: word.word) { model.remove(word) }
                 }

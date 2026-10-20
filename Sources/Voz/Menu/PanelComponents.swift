@@ -48,7 +48,8 @@ struct PanelRow<Control: View>: View {
                 Text(title).font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
                 if let detail {
                     Text(detail)
-                        .font(.ui(11.5))
+                        .font(.meta)
+                        .lineSpacing(2)
                         .foregroundStyle(Theme.inkSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }

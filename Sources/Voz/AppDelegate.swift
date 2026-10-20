@@ -80,6 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         indicator.attach(to: dictation)
         observeWake()
+        OpenRequest.observe { [weak self] in self?.statusItemController?.open() }
         observeSettings()
         observeVocabulary()
         if settings.onboardingCompleted {
@@ -109,11 +110,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func manageLaunchAgent() {
-        guard settings.launchAtLogin else { return LaunchAgent.unregisterIfRegistered() }
+        guard settings.launchAtLogin else {
+            LaunchAgent.unregisterIfRegistered()
+            return openIfUserLaunched()
+        }
         Task {
-            guard await LaunchAgent.handOver() else { return }
+            guard await LaunchAgent.handOver() else { return openIfUserLaunched() }
+            OpenRequest.deferToNextLaunch()
             NSApp.perform(#selector(NSApplication.terminate(_:)), with: nil, afterDelay: 0)
         }
+    }
+
+    private func openIfUserLaunched() {
+        if OpenRequest.takePending() || !LaunchAgent.launchedByLaunchd {
+            statusItemController?.open()
+        }
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        statusItemController?.open()
+        return false
     }
 
     private func quitFromMenu() {

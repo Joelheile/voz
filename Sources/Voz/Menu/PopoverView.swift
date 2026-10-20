@@ -75,7 +75,7 @@ private struct HomePage: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 12) {
                 header
                 statusDetail
@@ -95,11 +95,12 @@ private struct HomePage: View {
             HStack(spacing: 8) {
                 if model.status == .recording { RecordingMark() }
                 Text(model.status.title)
-                    .font(.display(18))
+                    .font(.display(20))
                     .foregroundStyle(Theme.ink)
             }
             Text(model.hint)
                 .font(.meta)
+                .lineSpacing(2)
                 .foregroundStyle(Theme.inkSecondary)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -186,7 +187,7 @@ private struct TranscriptRow: View {
             .background(hovering ? Theme.selected.opacity(0.7) : .clear, in: RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous))
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.pressable(0.98))
         .help(record.finalText)
         .contextMenu {
             Button("Copy", action: copy)

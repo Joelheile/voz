@@ -216,7 +216,8 @@ struct ExtensionsPage: View {
     private func confirmation(for listing: PackageListing) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("\(listing.name) by \(listing.publisher) can read your transcripts, your files and the network. Read its source before you install it.")
-                .font(.ui(11.5))
+                .font(.meta)
+                .lineSpacing(2)
                 .foregroundStyle(Theme.inkSecondary)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 8) {
@@ -245,7 +246,7 @@ private struct ListingRow<Control: View>: View {
                 Text(listing.name).font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
                 if let summary = listing.summary {
                     Text(summary)
-                        .font(.ui(11.5))
+                        .font(.meta)
                         .foregroundStyle(Theme.inkSecondary)
                         .lineLimit(1)
                 }

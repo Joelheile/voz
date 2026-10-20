@@ -28,7 +28,7 @@ struct InsightsPage: View {
                 DailyChart(days: stats.dailyWords)
                 TopApps(apps: Array(stats.topApps.prefix(5)))
                 Text("Time saved assumes you type 40 words per minute.")
-                    .font(.ui(11.5))
+                    .font(.meta)
                     .foregroundStyle(Theme.inkTertiary)
             }
         }
@@ -78,7 +78,7 @@ private struct DailyChart: View {
             .chartXAxis {
                 AxisMarks(values: .stride(by: .day, count: 7)) { _ in
                     AxisValueLabel(format: .dateTime.month(.abbreviated).day())
-                        .font(.ui(10))
+                        .font(.ui(11))
                         .foregroundStyle(Theme.inkTertiary)
                 }
             }
@@ -102,7 +102,7 @@ private struct TopApps: View {
             ForEach(apps, id: \.appName) { app in
                 HStack(spacing: 10) {
                     Text(app.appName)
-                        .font(.ui(12.5, weight: .medium))
+                        .font(.ui(13, weight: .medium))
                         .foregroundStyle(Theme.ink)
                         .frame(width: 90, alignment: .leading)
                         .lineLimit(1)

@@ -9,9 +9,9 @@ struct SetupPage: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             Text("Set up Voz")
-                .font(.display(22))
+                .font(.display(20))
                 .foregroundStyle(Theme.ink)
                 .entrance(0, appeared: appeared, reduceMotion: reduceMotion)
             PanelGroup {

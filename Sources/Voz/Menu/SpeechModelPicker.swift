@@ -51,7 +51,7 @@ struct SpeechModelPicker: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Speech model").font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
                 Text("\(selection.name), \(selection.size)")
-                    .font(.ui(11.5))
+                    .font(.meta)
                     .foregroundStyle(Theme.inkSecondary)
                     .lineLimit(1)
                     .contentTransition(.interpolate)
@@ -99,7 +99,7 @@ private struct SpeechModelOption: View {
                     .foregroundStyle(Theme.ink)
                 Spacer(minLength: 0)
                 Text(model.size)
-                    .font(.ui(11.5))
+                    .font(.meta)
                     .monospacedDigit()
                     .foregroundStyle(selected ? Theme.inkSecondary : Theme.inkTertiary)
             }

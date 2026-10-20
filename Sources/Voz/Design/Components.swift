@@ -56,6 +56,22 @@ extension ButtonStyle where Self == PillButtonStyle {
     }
 }
 
+struct PressableButtonStyle: ButtonStyle {
+    let scale: CGFloat
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? scale : 1)
+            .animation(Theme.Motion.press, value: configuration.isPressed)
+    }
+}
+
+extension ButtonStyle where Self == PressableButtonStyle {
+    static func pressable(_ scale: CGFloat) -> PressableButtonStyle {
+        PressableButtonStyle(scale: scale)
+    }
+}
+
 struct IconButton: View {
     let symbol: String
     let help: String
@@ -71,7 +87,7 @@ struct IconButton: View {
                 .background(hovering ? Theme.selected : .clear, in: RoundedRectangle(cornerRadius: Theme.Radius.control))
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.pressable(0.92))
         .help(help)
         .onHover { hovering = $0 }
         .animation(Theme.Motion.hover, value: hovering)

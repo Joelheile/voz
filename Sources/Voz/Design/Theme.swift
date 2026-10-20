@@ -65,5 +65,5 @@ extension Font {
         }
     }
 
-    static let meta = Font.ui(12.5)
+    static let meta = Font.ui(12)
 }

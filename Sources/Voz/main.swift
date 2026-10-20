@@ -25,6 +25,7 @@ if arguments.contains(IndicatorDemo.launchArgument) {
 let instance = SingleInstance()
 guard instance.claim(waiting: LaunchAgent.launchedByLaunchd ? .seconds(5) : .zero) else {
     Log.app.notice("Another voz is running, exiting")
+    if !LaunchAgent.launchedByLaunchd { OpenRequest.send() }
     exit(0)
 }
 application.setActivationPolicy(.accessory)

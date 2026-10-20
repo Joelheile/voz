@@ -10,6 +10,7 @@ struct CleanupPromptPage: View {
             PageBar(title: "Cleanup prompt", back: back)
             Text("The on-device model follows this prompt to clean up each dictation. Voz adds your dictionary words at the end.")
                 .font(.meta)
+                .lineSpacing(2)
                 .foregroundStyle(Theme.inkSecondary)
                 .fixedSize(horizontal: false, vertical: true)
             TextEditor(text: $settings.cleanupPrompt)
