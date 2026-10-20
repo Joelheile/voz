@@ -18,10 +18,19 @@ public enum SegmentJoiner {
     }
 
     public static func join(cleaned: [String?], fallback: [String], lowercaseContinuations: Bool) -> String {
-        let chosen = fallback.indices.map { index in
+        var chosen = fallback.indices.map { index in
             index < cleaned.count ? (cleaned[index] ?? fallback[index]) : fallback[index]
         }
+        for index in chosen.indices.dropLast() where !endsSentence(fallback[index]) {
+            chosen[index] = droppingFinalPeriod(chosen[index])
+        }
         return join(chosen, lowercaseContinuations: lowercaseContinuations)
+    }
+
+    private static func droppingFinalPeriod(_ text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasSuffix("."), !trimmed.hasSuffix("..") else { return text }
+        return String(trimmed.dropLast())
     }
 
     private static func endsSentence(_ text: String) -> Bool {

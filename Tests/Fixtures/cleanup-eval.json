@@ -182,5 +182,17 @@
       "Kubernetes",
       "Helm"
     ]
+  },
+  {
+    "id": 31,
+    "category": "filler-like",
+    "input": "does it already do like cutting or like um redoing the prompt",
+    "expected": "Does it already do cutting or redoing the prompt?"
+  },
+  {
+    "id": 32,
+    "category": "filler-mid",
+    "input": "so when I hit command um also minimize the prompt",
+    "expected": "So when I hit command, also minimize the prompt."
   }
 ]

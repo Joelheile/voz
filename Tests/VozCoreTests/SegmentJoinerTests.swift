@@ -26,7 +26,22 @@ import Testing
     }
 
     @Test func fallsBackPerSegment() {
-        let text = SegmentJoiner.join(cleaned: ["Clean one.", nil, "Clean three."], fallback: ["raw one", "rule two.", "raw three"], lowercaseContinuations: false)
+        let text = SegmentJoiner.join(cleaned: ["Clean one.", nil, "Clean three."], fallback: ["raw one.", "rule two.", "raw three"], lowercaseContinuations: false)
         #expect(text == "Clean one. rule two. Clean three.")
+    }
+
+    @Test func dropsPeriodTheModelAddedAtAPause() {
+        let text = SegmentJoiner.join(cleaned: ["Read how to build.", "Outreach and how to write it."], fallback: ["read how to build", "outreach and how to write it."], lowercaseContinuations: true)
+        #expect(text == "Read how to build outreach and how to write it.")
+    }
+
+    @Test func keepsPeriodTheSpeakerEnded() {
+        let text = SegmentJoiner.join(cleaned: ["We left.", "Then it rained."], fallback: ["we left.", "then it rained."], lowercaseContinuations: true)
+        #expect(text == "We left. Then it rained.")
+    }
+
+    @Test func keepsPeriodOnTheLastSegment() {
+        let text = SegmentJoiner.join(cleaned: ["We left."], fallback: ["we left"], lowercaseContinuations: true)
+        #expect(text == "We left.")
     }
 }
