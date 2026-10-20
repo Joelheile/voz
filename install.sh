@@ -11,13 +11,13 @@ fail() {
 }
 
 main() {
-    [[ "$(uname -m)" == arm64 ]] || fail "voz needs a Mac with Apple Silicon."
-    (( $(sw_vers -productVersion | cut -d. -f1) >= 26 )) || fail "voz needs macOS 26 or later."
+    [[ "$(uname -m)" == arm64 ]] || fail "Voz needs a Mac with Apple Silicon."
+    (( $(sw_vers -productVersion | cut -d. -f1) >= 26 )) || fail "Voz needs macOS 26 or later."
 
     local url
     url=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" |
         grep -o '"browser_download_url": *"[^"]*\.zip"' | head -1 | cut -d'"' -f4)
-    [[ -n "$url" ]] || fail "No voz release found at github.com/$REPO/releases."
+    [[ -n "$url" ]] || fail "No Voz release found at github.com/$REPO/releases."
 
     local work
     work=$(mktemp -d)
@@ -38,7 +38,7 @@ main() {
     rm -rf "$APP"
     ditto "$work/voz.app" "$APP"
     open "$APP"
-    echo "Installed voz. Finish setup from the menu bar."
+    echo "Installed Voz. Finish setup from the menu bar."
 }
 
 main
