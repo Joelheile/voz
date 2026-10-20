@@ -1,0 +1,13 @@
+{
+  "name": "voz-launcher",
+  "version": "0.1.0",
+  "description": "Open apps, search the web and run your own commands by voice",
+  "keywords": ["voz-package"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Joelheile/voz.git",
+    "directory": "examples/launcher"
+  },
+  "files": ["index.ts"]
+}

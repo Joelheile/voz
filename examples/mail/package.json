@@ -1,0 +1,13 @@
+{
+  "name": "voz-mail",
+  "version": "0.1.0",
+  "description": "Format dictations in Mail and Outlook as emails, in your own style",
+  "keywords": ["voz-package"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Joelheile/voz.git",
+    "directory": "examples/mail"
+  },
+  "files": ["index.ts"]
+}
