@@ -9,12 +9,6 @@ public enum DictationHint {
             : "\(verb(hotkey: hotkey, holdToTalk: false)) \(keyPhrase(hotkey)) again to stop"
     }
 
-    public static func instruction(hotkey: Hotkey, holdToTalk: Bool) -> String {
-        holdToTalk
-            ? "Hold \(keyPhrase(hotkey)), speak, then release."
-            : "\(verb(hotkey: hotkey, holdToTalk: false)) \(keyPhrase(hotkey)), speak, then \(verb(hotkey: hotkey, holdToTalk: false).lowercased()) it again."
-    }
-
     private static func verb(hotkey: Hotkey, holdToTalk: Bool) -> String {
         if holdToTalk { return "Hold" }
         return hotkey.isModifierOnly ? "Tap" : "Press"

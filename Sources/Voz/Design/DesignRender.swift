@@ -42,7 +42,7 @@ enum DesignRender {
     ]
 
     private static func write(_ view: some View, to directory: URL, name: String, appearance: NSAppearance) throws {
-        let host = NSHostingView(rootView: view.padding(28).background(Theme.canvas))
+        let host = NSHostingView(rootView: view.padding(28).background(Theme.canvas).transaction { $0.disablesAnimations = true })
         host.appearance = appearance
         host.layoutSubtreeIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.1))
@@ -51,6 +51,7 @@ enum DesignRender {
         let window = NSWindow(contentRect: host.frame, styleMask: .borderless, backing: .buffered, defer: false)
         window.appearance = appearance
         window.contentView = host
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
         host.layoutSubtreeIfNeeded()
         guard let rep = NSBitmapImageRep(
             bitmapDataPlanes: nil,

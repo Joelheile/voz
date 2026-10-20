@@ -16,6 +16,7 @@ final class SetupModel: ObservableObject {
     }
 
     var microphoneGranted: Bool { microphoneStatus == .authorized }
+    var allGranted: Bool { microphoneGranted && accessibilityGranted && inputMonitoringGranted }
 
     func refreshPermissions() {
         microphoneStatus = Permissions.microphoneStatus

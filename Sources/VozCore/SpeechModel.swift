@@ -5,9 +5,9 @@ public enum SpeechModel: String, CaseIterable, Sendable {
 
     public var label: String {
         switch self {
-        case .parakeetUltra: "Ultra, most accurate, 630 MB"
+        case .parakeetUltra: "Ultra, 630 MB"
         case .parakeetV2: "English only, 500 MB"
-        case .appleSpeech: "Apple, built in, no download"
+        case .appleSpeech: "Apple, no download"
         }
     }
 }

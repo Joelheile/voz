@@ -155,10 +155,13 @@ struct PermissionRow: View {
                     .font(.system(size: 15))
                     .foregroundStyle(Color.accentColor)
                     .help("Allowed")
+                    .transition(.symbolEffect(.drawOn))
             } else {
-                Button("Allow", action: fix).buttonStyle(.pill(.accent, height: 26))
+                Button("Allow", action: fix)
+                    .buttonStyle(.pill(.accent, height: 26))
+                    .transition(.scale(scale: 0.9).combined(with: .opacity))
             }
         }
-        .animation(Theme.Motion.section, value: granted)
+        .animation(.spring(duration: 0.3, bounce: 0.15), value: granted)
     }
 }
