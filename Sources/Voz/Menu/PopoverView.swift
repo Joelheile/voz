@@ -70,8 +70,10 @@ private struct HomePage: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            header
-            statusDetail
+            VStack(alignment: .leading, spacing: 12) {
+                header
+                statusDetail
+            }
             if showsSearch {
                 SearchField(text: $history.query, prompt: "Search transcripts", focused: $searchFocused)
                     .onSubmit(copyFirstResult)
@@ -85,20 +87,18 @@ private struct HomePage: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: 10) {
-            StatusMark(status: model.status)
-                .padding(.top, 7)
-            VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 10) {
+                StatusMark(status: model.status)
                 Text(model.status.title)
                     .font(.display(20))
                     .foregroundStyle(Theme.ink)
-                Text(model.hint)
-                    .font(.meta)
-                    .foregroundStyle(Theme.inkSecondary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer(minLength: 0)
+            Text(model.hint)
+                .font(.meta)
+                .foregroundStyle(Theme.inkSecondary)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -121,7 +121,7 @@ private struct HomePage: View {
             Text(isSearching ? "No matching transcripts" : "Your transcripts appear here.")
                 .font(.ui(13))
                 .foregroundStyle(Theme.inkTertiary)
-                .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: Self.rowHeight, alignment: .leading)
         } else {
             CappedScrollView(maxHeight: CGFloat(Self.visibleRows) * Self.rowHeight) {
                 VStack(spacing: 0) {
@@ -151,6 +151,7 @@ private struct HomePage: View {
                 .keyboardShortcut(",", modifiers: .command)
             IconButton(symbol: "power", help: "Quit Voz", action: model.actions.quit)
         }
+        .padding(.trailing, -8)
     }
 
     private func copyFirstResult() {
