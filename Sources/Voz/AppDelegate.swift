@@ -8,7 +8,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let modelStatus = ModelStatus()
     private let installID = InstallID()
     private lazy var analytics = Analytics(enabled: settings.analyticsEnabled, installID: installID.value)
-    private var settingChangeReporter: SettingChangeReporter?
     private let history = AppDelegate.openHistory()
     private lazy var transcriber = Transcriber { [modelStatus] mode, state in
         DispatchQueue.main.async { MainActor.assumeIsolated { modelStatus.update(mode, state) } }
@@ -64,7 +63,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             quit: { [weak self] in self?.quitFromMenu() }
         )
         self.statusItemController = statusItemController
-        dictation.onChange = { [weak statusItemController] in statusItemController?.dictationChanged() }
+        dictation.onChange = { [weak self] in
+            guard let self else { return }
+            self.statusItemController?.dictationChanged()
+            self.indicator.sync(phase: self.dictation.phase)
+        }
         hotkeyMonitor = HotkeyMonitor(
             hotkey: settings.hotkey,
             holdToTalk: settings.holdToTalk,
@@ -92,18 +95,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             statusItemController.open()
         }
         hotkeyMonitor?.startHealthChecks()
-        settingChangeReporter = SettingChangeReporter(settings: settings, analytics: analytics)
-        let launchMs = LaunchTimer.millisecondsSinceProcessStart()
-        let version = SystemContext.properties["app_version"] ?? "unknown"
-        let previousVersion = InstalledUpdateReporter(defaults: .standard).recordLaunch(of: version)
-        if let updateEvent = UpdateDetector.installedUpdate(previousVersion: previousVersion, currentVersion: version) {
-            analytics.capture(updateEvent)
+        let launch = LaunchVersion.record(SystemContext.appVersion, in: .standard)
+        if let previous = launch.updatedFrom {
+            analytics.capture(.updateInstalled(from: previous, to: launch.current, channel: UpdateChannel(version: launch.current)))
         }
-        if settings.versionPingEnabled, let ping = VersionPing.kind(isNewInstall: installID.isNew, previousVersion: previousVersion, currentVersion: version) {
-            VersionPinger.send(ping, version: version)
+        let ping: VersionPing? = installID.isNew ? .install : launch.updatedFrom.map { _ in .update }
+        if settings.versionPingEnabled, let ping {
+            VersionPinger.send(ping, version: launch.current)
         }
         updater.start()
-        analytics.capture(installID.isNew ? .appInstalled(launchMs: launchMs) : .appLaunched(launchMs: launchMs))
+        analytics.capture(installID.isNew ? .appInstalled : .appLaunched)
         manageLaunchAgent()
     }
 
@@ -154,6 +155,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings.$launchAtLogin
             .dropFirst()
             .sink { [weak self] _ in self?.manageLaunchAgent() }
+            .store(in: &cancellables)
+        settings.$analyticsEnabled
+            .dropFirst()
+            .sink { [weak self] enabled in self?.analytics.setEnabled(enabled) }
             .store(in: &cancellables)
         settings.$speechModel
             .dropFirst()
@@ -244,19 +249,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func observeWake() {
-        NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didWakeNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.hotkeyMonitor?.recreate() }
-        }
-        NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.sessionDidBecomeActiveNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.hotkeyMonitor?.recreate() }
+        for name in [NSWorkspace.didWakeNotification, NSWorkspace.sessionDidBecomeActiveNotification] {
+            NSWorkspace.shared.notificationCenter.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.hotkeyMonitor?.recreate() }
+            }
         }
         DistributedNotificationCenter.default().addObserver(
             forName: Notification.Name("com.apple.accessibility.api"),

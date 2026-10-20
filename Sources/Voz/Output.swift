@@ -4,6 +4,8 @@ import VozCore
 @MainActor
 final class TextOutput {
     private static let pasteDelay: TimeInterval = 0.05
+    private static let restoreDelay: TimeInterval = 0.25
+    private static let privateMarkers = [NSPasteboard.PasteboardType("org.nspasteboard.TransientType"), NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType")]
 
     private let settings: AppSettings
     private var pendingRestore: (snapshot: [[NSPasteboard.PasteboardType: Data]], task: Task<Void, Never>)?
@@ -13,14 +15,15 @@ final class TextOutput {
     }
 
     func deliver(_ text: String) async {
-        let output = settings.output
-        guard output.copyToClipboard || output.pasteIntoActiveApp else { return }
+        let copies = settings.copyToClipboard
+        let pastes = settings.insertIntoApp
+        guard copies || pastes else { return }
         let pasteboard = NSPasteboard.general
         pendingRestore?.task.cancel()
-        let snapshot = output.needsClipboardRestore ? pendingRestore?.snapshot ?? Self.snapshot(of: pasteboard) : nil
+        let snapshot = pastes && !copies ? pendingRestore?.snapshot ?? Self.snapshot(of: pasteboard) : nil
         pendingRestore = nil
-        let changeCountAtWrite = write(text, to: pasteboard, markers: PasteboardMarkers.types(copyToClipboard: output.copyToClipboard))
-        guard output.pasteIntoActiveApp else { return }
+        let changeCountAtWrite = write(text, to: pasteboard, markers: copies ? [] : Self.privateMarkers)
+        guard pastes else { return }
         guard AXIsProcessTrusted() else {
             Log.app.error("Accessibility not granted, text copied but not pasted")
             return
@@ -33,11 +36,10 @@ final class TextOutput {
         Self.post(keyCode: CGKeyCode(keyCode), flags: .maskCommand)
         guard let snapshot else { return }
         let task = Task { [weak self] in
-            guard (try? await Task.sleep(for: .seconds(ClipboardRestoreGuard.delay))) != nil else { return }
+            guard (try? await Task.sleep(for: .seconds(Self.restoreDelay))) != nil else { return }
             self?.pendingRestore = nil
-            if ClipboardRestoreGuard.shouldRestore(changeCountAtWrite: changeCountAtWrite, currentChangeCount: pasteboard.changeCount) {
-                Self.restore(snapshot, to: pasteboard)
-            }
+            let untouchedSinceWrite = pasteboard.changeCount == changeCountAtWrite
+            if untouchedSinceWrite { Self.restore(snapshot, to: pasteboard) }
         }
         pendingRestore = (snapshot, task)
     }
@@ -65,11 +67,11 @@ final class TextOutput {
         pasteboard.setString(text, forType: .string)
     }
 
-    private func write(_ text: String, to pasteboard: NSPasteboard, markers: [String]) -> Int {
+    private func write(_ text: String, to pasteboard: NSPasteboard, markers: [NSPasteboard.PasteboardType]) -> Int {
         pasteboard.clearContents()
         let item = NSPasteboardItem()
         item.setString(text, forType: .string)
-        for marker in markers { item.setData(Data(), forType: NSPasteboard.PasteboardType(marker)) }
+        for marker in markers { item.setData(Data(), forType: marker) }
         pasteboard.writeObjects([item])
         return pasteboard.changeCount
     }

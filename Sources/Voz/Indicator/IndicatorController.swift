@@ -12,7 +12,6 @@ final class IndicatorController {
     private let model = IndicatorModel()
     private let panel = IndicatorPanel()
     private var layout: IndicatorLayout?
-    private var requestedStyle = IndicatorStyle.notch
     private var lifecycle: Task<Void, Never>?
     private var observers: [NSObjectProtocol] = []
     private var lastPhase = Dictation.Phase.idle
@@ -26,8 +25,6 @@ final class IndicatorController {
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main, using: reposition))
     }
-
-    var isVisible: Bool { panel.isVisible }
 
     func showRecording() {
         lifecycle?.cancel()
@@ -71,12 +68,6 @@ final class IndicatorController {
     }
 
     func attach(to dictation: Dictation) {
-        let previousOnChange = dictation.onChange
-        dictation.onChange = { [weak self, weak dictation] in
-            previousOnChange()
-            guard let self, let dictation else { return }
-            self.sync(phase: dictation.phase)
-        }
         dictation.onOutcome = { [weak self] outcome in
             switch outcome {
             case .done: self?.showOutcome(.done)
@@ -88,7 +79,7 @@ final class IndicatorController {
         dictation.onBusy = { [weak self] in self?.shake() }
     }
 
-    private func sync(phase: Dictation.Phase) {
+    func sync(phase: Dictation.Phase) {
         guard phase != lastPhase else { return }
         lastPhase = phase
         switch phase {
@@ -137,25 +128,23 @@ final class IndicatorController {
             Log.app.error("Indicator has no screen to show on")
             return
         }
-        let style = UserDefaults.standard.string(forKey: SettingsKey.indicatorStyle).flatMap(IndicatorStyle.init) ?? .notch
-        let layout = IndicatorLayout.make(style: style, screen: ScreenResolver.metrics(for: screen))
-        self.layout = layout
-        requestedStyle = style
         model.isExpanded = false
-        let hosting = NSHostingView(rootView: IndicatorView(model: model, layout: layout))
-        hosting.sizingOptions = []
-        panel.contentView = hosting
-        panel.setFrame(layout.panelFrame, display: true)
+        install(IndicatorLayout.make(screen: ScreenResolver.metrics(for: screen)))
         panel.orderFrontRegardless()
     }
 
     private func repositionIfVisible() {
         guard panel.isVisible, let screen = ScreenResolver.targetScreen() else { return }
-        let updated = IndicatorLayout.make(style: requestedStyle, screen: ScreenResolver.metrics(for: screen))
+        let updated = IndicatorLayout.make(screen: ScreenResolver.metrics(for: screen))
         guard updated != layout else { return }
-        layout = updated
-        panel.contentView = NSHostingView(rootView: IndicatorView(model: model, layout: updated))
-        (panel.contentView as? NSHostingView<IndicatorView>)?.sizingOptions = []
-        panel.setFrame(updated.panelFrame, display: true)
+        install(updated)
+    }
+
+    private func install(_ layout: IndicatorLayout) {
+        self.layout = layout
+        let hosting = NSHostingView(rootView: IndicatorView(model: model, layout: layout))
+        hosting.sizingOptions = []
+        panel.contentView = hosting
+        panel.setFrame(layout.panelFrame, display: true)
     }
 }

@@ -29,7 +29,7 @@ public struct PauseDetector: Sendable {
             let frame = Array(pending[offset..<offset + Self.frameSamples])
             offset += Self.frameSamples
             processedSamples += Self.frameSamples
-            if consume(rms: RecordingFilter.rms(of: frame)) {
+            if consume(rms: AudioLevel.rms(of: frame)) {
                 cuts.append(processedSamples)
                 segmentStart = processedSamples
                 speechFrames = 0

@@ -36,7 +36,7 @@ final class DictationPipeline {
         editObserver.collect()
     }
 
-    func makeStreaming(app: FrontApp) -> StreamingDictation {
+    func makeStreaming(app: HostApp) -> StreamingDictation {
         let prompt = settings.cleanupPrompt
         return StreamingDictation(
             engine: engine,
@@ -48,8 +48,7 @@ final class DictationPipeline {
         )
     }
 
-    func run(_ recording: Recording, streaming: StreamingDictation?, released: ContinuousClock.Instant) async -> Dictation.Outcome {
-        let session = streaming ?? makeStreaming(app: recording.app)
+    func run(_ recording: Recording, streaming session: StreamingDictation, released: ContinuousClock.Instant) async -> Dictation.Outcome {
         extensions.recorded(recording.samples, app: recording.app)
         do {
             guard let transcript = try await session.finish(samples: recording.samples, released: released) else {
@@ -57,7 +56,7 @@ final class DictationPipeline {
                 analytics.capture(.dictationDiscarded(reason: .emptyTranscript))
                 return .discarded
             }
-            Log.app.notice("Transcribed \(transcript.audioSeconds, format: .fixed(precision: 1))s with \(transcript.model): \(transcript.segmentCount) segments, \(transcript.cleanedInTime) cleaned in time, tail STT \(transcript.sttMs) ms, cleanup wait \(transcript.cleaned.milliseconds) ms")
+            Log.app.notice("Transcribed \(transcript.audioSeconds, format: .fixed(precision: 1))s with \(transcript.model.rawValue): \(transcript.segmentCount) segments, \(transcript.cleanedInTime) cleaned in time, tail STT \(transcript.sttMs) ms, cleanup wait \(transcript.cleaned.milliseconds) ms")
             let delivery = await extensions.prepare(transcript.cleaned.text, raw: transcript.raw, app: recording.app)
             let insertStarted = ContinuousClock.now
             if !delivery.text.isEmpty {
@@ -86,11 +85,7 @@ final class DictationPipeline {
         }
     }
 
-    private func report(_ record: TranscriptRecord, model modelName: String, insertMs: Int, trigger: DictationTrigger) {
-        guard let model = SpeechModel(rawValue: modelName) else {
-            Log.app.error("Unknown speech model, dictation event skipped: \(modelName)")
-            return
-        }
+    private func report(_ record: TranscriptRecord, model: SpeechModel, insertMs: Int, trigger: DictationTrigger) {
         analytics.capture(.dictationCompleted(DictationMetrics(
             audioSeconds: record.audioSeconds,
             wordCount: record.wordCount,
@@ -107,14 +102,14 @@ final class DictationPipeline {
         )))
     }
 
-    private func save(_ transcript: StreamedTranscript, finalText: String, app: FrontApp, released: ContinuousClock.Instant) -> TranscriptRecord {
+    private func save(_ transcript: StreamedTranscript, finalText: String, app: HostApp, released: ContinuousClock.Instant) -> TranscriptRecord {
         let record = TranscriptRecord(
             rawText: transcript.raw,
             finalText: finalText,
             audioSeconds: transcript.audioSeconds,
             sttMs: transcript.sttMs,
             totalMs: (ContinuousClock.now - released).wholeMilliseconds,
-            model: transcript.model,
+            model: transcript.model.rawValue,
             appBundleID: app.bundleID,
             appName: app.name,
             fillerWordsRemoved: transcript.cleaned.fillerWordsRemoved,

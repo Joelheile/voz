@@ -31,7 +31,7 @@ final class SetupModel: ObservableObject {
                 refreshPermissions()
             }
         } else {
-            Permissions.openSettings(pane: "Privacy_Microphone")
+            Permissions.openSettings(.microphone)
         }
     }
 
@@ -41,7 +41,7 @@ final class SetupModel: ObservableObject {
 
     func requestInputMonitoring() {
         Permissions.requestInputMonitoring()
-        Permissions.openSettings(pane: "Privacy_ListenEvent")
+        Permissions.openSettings(.inputMonitoring)
     }
 
     func reportPermissions() {

@@ -1,8 +1,10 @@
 import Foundation
 
 enum SystemContext {
+    static let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+
     static let properties: [String: String] = [
-        "app_version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown",
+        "app_version": appVersion,
         "os_version": ProcessInfo.processInfo.operatingSystemVersionString,
         "chip": chip,
     ]

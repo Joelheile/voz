@@ -5,7 +5,7 @@ struct StreamedTranscript {
     let raw: String
     let cleaned: CleanedText
     let sttMs: Int
-    let model: String
+    let model: SpeechModel
     let audioSeconds: Double
     let segmentCount: Int
     let cleanedInTime: Int
@@ -84,7 +84,6 @@ final class StreamingDictation {
         if let tail { segments.append(tail) }
 
         let tailResult = await tail?.transcription.value
-        if keepsTail, tailResult == nil { throw StreamingError.segmentTranscriptionFailed }
         let transcribedAt = ContinuousClock.now
         var results: [TranscriptionResult] = []
         for segment in segments {
@@ -100,14 +99,13 @@ final class StreamingDictation {
     }
 
     private func assemble(raws: [String], results: [TranscriptionResult], tailResult: TranscriptionResult?, samples: [Float], cleanupWait: Duration) -> StreamedTranscript {
-        let lowercase = model == .parakeetV2
         var cleanedTexts: [String?] = []
         var fallbacks: [String] = []
         var fillersRemoved = 0
         var timedOut = false
         var cleanedInTime = 0
         for (segment, raw) in zip(segments, raws) {
-            let rules = cleanupEnabled ? cleaner.ruleText(raw, vocabulary: vocabulary) : (text: raw, fillersRemoved: 0)
+            let rules = cleanupEnabled ? cleaner.ruleText(raw, vocabulary: vocabulary) : FillerPassResult(text: raw, removed: 0)
             fallbacks.append(rules.text)
             cleanedTexts.append(segment.cleaned?.text)
             guard !raw.isEmpty else { continue }
@@ -116,22 +114,22 @@ final class StreamingDictation {
                 fillersRemoved += cleaned.fillerWordsRemoved
                 timedOut = timedOut || cleaned.timedOut
             } else {
-                fillersRemoved += rules.fillersRemoved
+                fillersRemoved += rules.removed
                 timedOut = true
             }
         }
         let cleaned = CleanedText(
-            text: SegmentJoiner.join(cleaned: cleanedTexts, fallback: fallbacks, lowercaseContinuations: lowercase),
+            text: SegmentJoiner.join(cleaned: cleanedTexts, fallback: fallbacks),
             fillerWordsRemoved: fillersRemoved,
             milliseconds: cleanupWait.wholeMilliseconds,
             timedOut: timedOut,
             rejection: segments.compactMap { $0.cleaned?.rejection }.first
         )
         return StreamedTranscript(
-            raw: SegmentJoiner.join(raws, lowercaseContinuations: lowercase),
+            raw: SegmentJoiner.join(raws),
             cleaned: cleaned,
             sttMs: Int((tailResult?.processingSeconds ?? 0) * 1000),
-            model: results.last?.model ?? model.rawValue,
+            model: results[results.count - 1].model,
             audioSeconds: Double(samples.count) / RecordingFilter.sampleRate,
             segmentCount: raws.filter { !$0.isEmpty }.count,
             cleanedInTime: cleanedInTime

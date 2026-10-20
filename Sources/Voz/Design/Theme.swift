@@ -61,7 +61,6 @@ extension Font {
         switch weight {
         case .medium: .custom("Geist-Medium", size: size)
         case .semibold: .custom("Geist-SemiBold", size: size)
-        case .bold, .heavy, .black: .custom("Geist-Bold", size: size)
         default: .custom("Geist-Regular", size: size)
         }
     }

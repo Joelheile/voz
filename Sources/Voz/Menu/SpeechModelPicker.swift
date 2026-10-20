@@ -59,7 +59,7 @@ struct SpeechModelPicker: View {
             Spacer(minLength: 0)
             if showsStatus, let status {
                 ModelStatusLabel(status: status, model: selection)
-                    .font(.ui(12.5))
+                    .font(.meta)
                     .foregroundStyle(Theme.inkSecondary)
                     .lineLimit(1)
             }

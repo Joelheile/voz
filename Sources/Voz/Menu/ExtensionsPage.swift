@@ -23,26 +23,33 @@ final class ExtensionsModel: ObservableObject {
     @Published private(set) var commandInstalled = CommandLineTool.isInstalled
 
     var installedRows: [PackageSource] {
-        installed.filter { matches($0.name, listing(named: $0.name)?.summary) }
+        installed.filter { matches($0.name, summary(for: $0)) }
     }
 
     var browseRows: [PackageListing] {
-        let names = Set(installed.map(\.name))
-        return listings.filter { !names.contains($0.name) && matches($0.name, $0.summary) }.ordered(by: order)
+        let installedFromNpm = Set(installed.compactMap { Self.npmName(of: $0) })
+        return listings.filter { !installedFromNpm.contains($0.name) && matches($0.name, $0.summary) }.ordered(by: order)
     }
 
-    func listing(named name: String) -> PackageListing? {
-        listings.first { $0.name == name }
+    func summary(for source: PackageSource) -> String? {
+        guard let name = Self.npmName(of: source) else { return nil }
+        return listings.first { $0.name == name }?.summary
     }
 
     func load() async {
         refreshInstalled()
         defer { loading = false }
+        let data: Data
         do {
-            listings = try PackageListing.decodeSearch(try await fetch())
-            message = nil
+            data = try await fetch()
         } catch {
             message = "Could not reach npm. Check your connection."
+            return
+        }
+        do {
+            listings = try PackageListing.decodeSearch(data)
+        } catch {
+            message = "Could not read the npm search results."
         }
     }
 
@@ -92,8 +99,17 @@ final class ExtensionsModel: ObservableObject {
     }
 
     private func refreshInstalled() {
-        let sources = (try? home.packageSources()) ?? []
-        installed = sources.compactMap { try? PackageSource(parsing: $0, relativeTo: home.root) }
+        do {
+            installed = try home.packageSources().map { try PackageSource(parsing: $0, relativeTo: home.root) }
+        } catch {
+            installed = []
+            message = "\(error)"
+        }
+    }
+
+    private static func npmName(of source: PackageSource) -> String? {
+        guard case .npm(let name, _) = source else { return nil }
+        return name
     }
 }
 
@@ -135,7 +151,7 @@ struct ExtensionsPage: View {
     private var installed: some View {
         PanelGroup(title: "Installed") {
             ForEach(model.installedRows, id: \.description) { source in
-                PanelRow(title: source.name, detail: model.listing(named: source.name)?.summary ?? source.description) {
+                PanelRow(title: source.name, detail: model.summary(for: source) ?? source.description) {
                     if model.working == source.name {
                         ProgressView()
                     } else {

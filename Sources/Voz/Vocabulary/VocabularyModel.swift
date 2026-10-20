@@ -34,20 +34,23 @@ final class VocabularyModel: ObservableObject {
     }
 
     func accept(_ suggestion: VocabularySuggestion) {
-        perform("accept") { try store.accept(suggestion) }
+        guard perform("accept", { try store.accept(suggestion) }) else { return }
         analytics.capture(.vocabularySuggestion(accepted: true))
     }
 
     func dismiss(_ suggestion: VocabularySuggestion) {
-        perform("dismiss") { try store.dismiss(suggestion) }
+        guard perform("dismiss", { try store.dismiss(suggestion) }) else { return }
         analytics.capture(.vocabularySuggestion(accepted: false))
     }
 
-    private func perform(_ action: String, _ work: () throws -> Void) {
+    @discardableResult
+    private func perform(_ action: String, _ work: () throws -> Void) -> Bool {
         do {
             try work()
+            return true
         } catch {
             Log.app.error("Vocabulary \(action) failed: \(error.localizedDescription, privacy: .private)")
+            return false
         }
     }
 }

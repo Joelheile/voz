@@ -16,7 +16,7 @@ enum CleanupEval {
         do {
             cases = try JSONDecoder().decode([CleanupEvalCase].self, from: Data(contentsOf: URL(fileURLWithPath: path)))
         } catch {
-            FileHandle.standardError.write(Data("eval fixture unreadable: \(error)\n".utf8))
+            Headless.printError("eval fixture unreadable: \(error)")
             return 66
         }
         let cleaner = TextCleaner(budget: budget)

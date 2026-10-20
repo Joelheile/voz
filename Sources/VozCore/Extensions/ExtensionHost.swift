@@ -77,13 +77,13 @@ public actor ExtensionHost {
     }
 
     public func beforeInsert(text: String, raw: String, app: HostApp, timeout: Duration) async -> String {
-        guard manifest?.events.contains(HostManifest.beforeInsert) == true else { return text }
+        guard manifest?.subscribes(to: .beforeInsert) == true else { return text }
         let data = await request("beforeInsert", InsertParams(text: text, raw: raw, app: app), timeout: timeout)
         return decodeResult(InsertResult.self, from: data)?.text ?? text
     }
 
     public func beforeCleanup(prompt: String, app: HostApp, timeout: Duration) async -> String {
-        guard manifest?.events.contains(HostManifest.beforeCleanup) == true else { return prompt }
+        guard manifest?.subscribes(to: .beforeCleanup) == true else { return prompt }
         let data = await request("beforeCleanup", CleanupParams(prompt: prompt, app: app), timeout: timeout)
         return decodeResult(PromptParams.self, from: data)?.prompt ?? prompt
     }
@@ -94,8 +94,8 @@ public actor ExtensionHost {
     }
 
     public func emit(_ event: HostEvent, app: HostApp, timeout: Duration) async {
-        guard manifest?.events.contains(event.name) == true else { return }
-        _ = decodeResult(EmptyParams.self, from: await request("emit", EmitParams(event: event.name, payload: event, app: app), timeout: timeout))
+        guard manifest?.subscribes(to: event.hook) == true else { return }
+        _ = decodeResult(EmptyParams.self, from: await request("emit", EmitParams(event: event.hook.rawValue, payload: event, app: app), timeout: timeout))
     }
 
     public func ping(timeout: Duration) async -> Bool {

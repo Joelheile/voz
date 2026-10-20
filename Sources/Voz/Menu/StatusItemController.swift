@@ -116,7 +116,7 @@ final class StatusItemController: NSObject {
 
     func refresh() {
         statusItem.button?.image = MenuBarGlyph.image(for: dictation.phase)
-        statusItem.button?.setAccessibilityLabel("voz")
+        statusItem.button?.setAccessibilityLabel("Voz")
         let status = currentStatus()
         model.status = status
         model.hint = hint(for: status)
@@ -168,7 +168,7 @@ final class StatusItemController: NSObject {
         case let .downloading(fraction):
             let percent = fraction.formatted(.percent.precision(.fractionLength(0)))
             return .loadingModel(detail: "Downloading speech model, \(percent)", progress: fraction)
-        case .compiling: return .loadingModel(detail: "Preparing speech model for first use", progress: nil)
+        case .compiling: return .loadingModel(detail: "Preparing the speech model", progress: nil)
         case let .failed(message): return .modelFailed(message)
         }
     }
@@ -187,7 +187,7 @@ final class StatusItemController: NSObject {
     private func fix(_ fix: PermissionFix) {
         switch fix {
         case .microphone: Task { await Permissions.requestMicrophone() }
-        case .microphoneBlocked: Permissions.openSettings(pane: "Privacy_Microphone")
+        case .microphoneBlocked: Permissions.openSettings(.microphone)
         case .accessibility: Permissions.promptForAccessibility()
         }
     }

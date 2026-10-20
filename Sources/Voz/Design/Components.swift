@@ -5,7 +5,7 @@ struct SectionLabel: View {
 
     var body: some View {
         Text(text)
-            .font(.ui(12.5))
+            .font(.meta)
             .foregroundStyle(Theme.inkSecondary)
     }
 }

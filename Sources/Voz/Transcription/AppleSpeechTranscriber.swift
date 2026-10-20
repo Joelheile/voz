@@ -1,6 +1,7 @@
 @preconcurrency import AVFoundation
 import Foundation
 import Speech
+import VozCore
 
 enum AppleSpeechError: Error {
     case localeUnsupported(String)
@@ -9,7 +10,6 @@ enum AppleSpeechError: Error {
 }
 
 actor AppleSpeechTranscriber {
-    static let modelName = "apple-speech"
 
     func transcribe(_ samples: [Float], locale: Locale, vocabulary: [String]) async throws -> TranscriptionResult {
         let started = Date()
@@ -40,13 +40,12 @@ actor AppleSpeechTranscriber {
         let text = try await transcript
         return TranscriptionResult(
             text: text,
-            audioSeconds: Double(samples.count) / Self.sampleRate,
+            audioSeconds: Double(samples.count) / RecordingFilter.sampleRate,
             processingSeconds: Date().timeIntervalSince(started),
-            model: Self.modelName
+            model: .appleSpeech
         )
     }
 
-    private static let sampleRate = 16_000.0
 
     private static func collect(_ results: some AsyncSequence<SpeechTranscriber.Result, any Error>) async throws -> String {
         var text = ""
@@ -58,13 +57,13 @@ actor AppleSpeechTranscriber {
 
     private static func buffer(from samples: [Float], format: AVAudioFormat) throws -> AVAudioPCMBuffer {
         guard
-            let sourceFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: 1, interleaved: false),
+            let sourceFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: RecordingFilter.sampleRate, channels: 1, interleaved: false),
             let source = AVAudioPCMBuffer(pcmFormat: sourceFormat, frameCapacity: AVAudioFrameCount(samples.count)),
             let converter = AVAudioConverter(from: sourceFormat, to: format)
         else { throw AppleSpeechError.conversionFailed }
         source.frameLength = AVAudioFrameCount(samples.count)
         samples.withUnsafeBufferPointer { source.floatChannelData![0].update(from: $0.baseAddress!, count: samples.count) }
-        let ratio = format.sampleRate / sampleRate
+        let ratio = format.sampleRate / RecordingFilter.sampleRate
         let capacity = AVAudioFrameCount(Double(samples.count) * ratio) + 32
         guard let output = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else {
             throw AppleSpeechError.conversionFailed

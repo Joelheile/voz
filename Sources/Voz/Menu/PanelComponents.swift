@@ -72,7 +72,7 @@ struct LinkRow: View {
             HStack(spacing: 6) {
                 Text(title).font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
                 Spacer(minLength: 0)
-                Text(value).font(.ui(12.5)).foregroundStyle(Theme.inkSecondary)
+                Text(value).font(.meta).foregroundStyle(Theme.inkSecondary)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(hovering ? Theme.ink : Theme.inkTertiary)

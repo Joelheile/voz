@@ -6,7 +6,6 @@ import VozCore
 final class Analytics {
     nonisolated static let projectToken = "phc_pprHknWQHntzTK6vR4vzHK9B6hWNv4nKXbAYpkYcoLXS"
     nonisolated static let host = "https://eu.i.posthog.com"
-    private static let debugVariable = "VOZ_ANALYTICS_DEBUG"
 
     private let installID: UUID
     private let context = SystemContext.properties
@@ -54,7 +53,6 @@ final class Analytics {
         config.disableGeoIp = true
         config.personProfiles = .identifiedOnly
         config.getAnonymousId = { _ in installID }
-        config.debug = ProcessInfo.processInfo.environment[Self.debugVariable] != nil
         PostHogSDK.shared.setup(config)
         isSetUp = true
     }
@@ -64,8 +62,7 @@ final class Analytics {
         case let .integer(number): number
         case let .number(number): number
         case let .flag(flag): flag
-        case let .label(label): label
-        case let .version(version): version
+        case let .text(text): text
         }
     }
 }

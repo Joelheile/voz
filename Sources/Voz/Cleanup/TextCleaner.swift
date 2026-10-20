@@ -23,8 +23,8 @@ final class TextCleaner {
     private let model: LanguageModelCleaner
     private let budget: Duration
 
-    init(examples: [CleanupExample] = CleanupExamples.all, budget: Duration = CleanupBudget.total) {
-        model = LanguageModelCleaner(examples: examples)
+    init(budget: Duration = CleanupBudget.total) {
+        model = LanguageModelCleaner(examples: CleanupExamples.all)
         self.budget = budget
     }
 
@@ -36,9 +36,9 @@ final class TextCleaner {
         model.prewarm(instructions: CleanupInstructions.text(prompt: prompt, vocabulary: vocabulary))
     }
 
-    func ruleText(_ raw: String, vocabulary: [String]) -> (text: String, fillersRemoved: Int) {
+    func ruleText(_ raw: String, vocabulary: [String]) -> FillerPassResult {
         let fillers = FillerWords.removeObvious(from: raw)
-        return (VocabularyCasing.apply(vocabulary, to: SpokenPunctuation.apply(to: fillers.text)), fillers.removed)
+        return FillerPassResult(text: VocabularyCasing.apply(vocabulary, to: SpokenPunctuation.apply(to: fillers.text)), removed: fillers.removed)
     }
 
     func clean(_ raw: String, prompt: String, vocabulary: [String], deadline: ContinuousClock.Instant? = nil) async -> CleanedText {
@@ -60,7 +60,7 @@ final class TextCleaner {
         prewarm(prompt: prompt, vocabulary: vocabulary)
         return CleanedText(
             text: finished.map(\.text).joined(),
-            fillerWordsRemoved: rules.fillersRemoved + finished.reduce(0) { $0 + $1.removed },
+            fillerWordsRemoved: rules.removed + finished.reduce(0) { $0 + $1.removed },
             milliseconds: elapsed.wholeMilliseconds,
             timedOut: finished.contains { $0.timedOut },
             rejection: finished.compactMap(\.rejection).first
@@ -97,7 +97,7 @@ final class TextCleaner {
             return ChunkResult(text: chunk, removed: 0, timedOut: true, rejection: nil)
         } catch {
             Log.app.error("Cleanup chunk failed, using rule-pass text: \(error.localizedDescription, privacy: .private)")
-            return ChunkResult(text: chunk, removed: 0, timedOut: true, rejection: nil)
+            return unchanged
         }
     }
 }

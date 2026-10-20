@@ -22,8 +22,7 @@ final class ExtensionService {
     private let output: TextOutput
     private let toast: ToastController
     private var host: ExtensionHost?
-    private var commands: [String] = []
-    private var events: Set<String> = []
+    private var manifest: HostManifest?
     private var restarts = 0
     private var started = ContinuousClock.now
     private var observer: NSObjectProtocol?
@@ -52,8 +51,7 @@ final class ExtensionService {
             watchdog?.cancel()
             await host?.stop()
             host = nil
-            commands = []
-            events = []
+            manifest = nil
             watch()
             guard home.hasExtensions else { return }
             do {
@@ -66,22 +64,22 @@ final class ExtensionService {
         }
     }
 
-    func cleanupPrompt(_ prompt: String, app: FrontApp) async -> String {
-        guard let host, events.contains(HostManifest.beforeCleanup) else { return prompt }
-        return await host.beforeCleanup(prompt: prompt, app: app.hostApp, timeout: Self.cleanupPromptTimeout)
+    func cleanupPrompt(_ prompt: String, app: HostApp) async -> String {
+        guard let host, manifest?.subscribes(to: .beforeCleanup) == true else { return prompt }
+        return await host.beforeCleanup(prompt: prompt, app: app, timeout: Self.cleanupPromptTimeout)
     }
 
-    func prepare(_ text: String, raw: String, app: FrontApp) async -> ExtensionDelivery {
-        guard let host else { return ExtensionDelivery(text: text, command: nil) }
-        let match = VoiceCommands.match(text, phrases: commands)
+    func prepare(_ text: String, raw: String, app: HostApp) async -> ExtensionDelivery {
+        guard let host, let manifest else { return ExtensionDelivery(text: text, command: nil) }
+        let match = VoiceCommands.match(text, phrases: manifest.commands)
         let dictated = match?.leadingText ?? text
-        guard events.contains("beforeInsert"), !dictated.isEmpty else { return ExtensionDelivery(text: dictated, command: match?.phrase) }
-        let transformed = await host.beforeInsert(text: dictated, raw: raw, app: app.hostApp, timeout: Self.insertTimeout)
+        guard manifest.subscribes(to: .beforeInsert), !dictated.isEmpty else { return ExtensionDelivery(text: dictated, command: match?.phrase) }
+        let transformed = await host.beforeInsert(text: dictated, raw: raw, app: app, timeout: Self.insertTimeout)
         return ExtensionDelivery(text: transformed, command: match?.phrase)
     }
 
-    func recorded(_ samples: [Float], app: FrontApp) {
-        guard let host, events.contains("recording") else { return }
+    func recorded(_ samples: [Float], app: HostApp) {
+        guard let host, manifest?.subscribes(to: .recording) == true else { return }
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("voz-recording-\(UUID().uuidString).wav")
         let seconds = Double(samples.count) / RecordingFilter.sampleRate
         Task.detached {
@@ -91,20 +89,20 @@ final class ExtensionService {
                 Log.extensions.error("Recording file write failed: \(error.localizedDescription, privacy: .public)")
                 return
             }
-            await host.emit(.recording(path: file.path, seconds: seconds), app: app.hostApp, timeout: Self.eventTimeout)
+            await host.emit(.recording(path: file.path, seconds: seconds), app: app, timeout: Self.eventTimeout)
             try? FileManager.default.removeItem(at: file)
         }
     }
 
-    func inserted(_ text: String, raw: String, app: FrontApp) {
-        guard let host, events.contains("afterInsert") else { return }
-        Task { await host.emit(.afterInsert(text: text, raw: raw), app: app.hostApp, timeout: Self.eventTimeout) }
+    func inserted(_ text: String, raw: String, app: HostApp) {
+        guard let host, manifest?.subscribes(to: .afterInsert) == true else { return }
+        Task { await host.emit(.afterInsert(text: text, raw: raw), app: app, timeout: Self.eventTimeout) }
     }
 
-    func run(_ command: String, text: String, app: FrontApp) {
+    func run(_ command: String, text: String, app: HostApp) {
         guard let host else { return }
         Task {
-            let handled = await host.runCommand(phrase: command, text: text, app: app.hostApp, timeout: Self.commandTimeout)
+            let handled = await host.runCommand(phrase: command, text: text, app: app, timeout: Self.commandTimeout)
             if !handled { Log.extensions.error("Voice command was not handled: \(command, privacy: .public)") }
         }
     }
@@ -126,9 +124,8 @@ final class ExtensionService {
         if !manifest.errors.isEmpty { toast.show("Could not load \(manifest.errors.map(\.extension).joined(separator: ", "))") }
         Log.extensions.notice("Extensions loaded: \(manifest.extensions.joined(separator: ", "), privacy: .public)")
         self.host = host
+        self.manifest = manifest
         started = .now
-        commands = manifest.commands
-        events = Set(manifest.events)
         watchdog = Task { [weak self] in await self?.watch(host) }
     }
 
@@ -171,8 +168,7 @@ final class ExtensionService {
     private func hostExited(_ status: Int32) {
         watchdog?.cancel()
         host = nil
-        commands = []
-        events = []
+        manifest = nil
         if ContinuousClock.now - started > Self.healthyUptime { restarts = 0 }
         guard restarts < Self.maxRestarts else {
             Log.extensions.error("Extension host keeps exiting, last status \(status), extensions stay off until the next change")
@@ -182,8 +178,4 @@ final class ExtensionService {
         Log.extensions.error("Extension host exited with status \(status), restarting")
         reload()
     }
-}
-
-private extension FrontApp {
-    var hostApp: HostApp { HostApp(bundleID: bundleID, name: name) }
 }

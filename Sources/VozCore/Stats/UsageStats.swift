@@ -47,12 +47,4 @@ public struct StatsRow: Decodable, FetchableRecord, Sendable {
     public let audioSeconds: Double
     public let appName: String?
     public let fillerWordsRemoved: Int
-
-    public init(createdAt: Date, wordCount: Int, audioSeconds: Double, appName: String?, fillerWordsRemoved: Int) {
-        self.createdAt = createdAt
-        self.wordCount = wordCount
-        self.audioSeconds = audioSeconds
-        self.appName = appName
-        self.fillerWordsRemoved = fillerWordsRemoved
-    }
 }

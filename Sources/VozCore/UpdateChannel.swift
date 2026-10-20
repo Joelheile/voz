@@ -1,4 +1,4 @@
-public enum UpdateChannel: String, AnalyticsLabel {
+public enum UpdateChannel: String, Sendable {
     case stable
     case beta
 

@@ -61,23 +61,18 @@ struct IndicatorView: View {
     }
 
     var body: some View {
-        Group {
-            switch layout.style {
-            case .notch: notch
-            case .pill: pill
+        notch
+            .frame(width: layout.panelFrame.width, height: layout.panelFrame.height, alignment: .top)
+            .keyframeAnimator(initialValue: 0.0, trigger: model.shakeCount) { view, offset in
+                view.offset(x: offset)
+            } keyframes: { _ in
+                KeyframeTrack {
+                    CubicKeyframe(-5, duration: 0.07)
+                    CubicKeyframe(5, duration: 0.1)
+                    CubicKeyframe(-3, duration: 0.1)
+                    CubicKeyframe(0, duration: 0.13)
+                }
             }
-        }
-        .frame(width: layout.panelFrame.width, height: layout.panelFrame.height, alignment: .top)
-        .keyframeAnimator(initialValue: 0.0, trigger: model.shakeCount) { view, offset in
-            view.offset(x: offset)
-        } keyframes: { _ in
-            KeyframeTrack {
-                CubicKeyframe(-5, duration: 0.07)
-                CubicKeyframe(5, duration: 0.1)
-                CubicKeyframe(-3, duration: 0.1)
-                CubicKeyframe(0, duration: 0.13)
-            }
-        }
     }
 
     private func transition(anchor: UnitPoint, delay: Double) -> AnyTransition {
@@ -133,42 +128,4 @@ struct IndicatorView: View {
         .frame(width: IndicatorLayout.sideWidth - notchShape.topRadius)
         .frame(width: IndicatorLayout.sideWidth, alignment: alignment)
     }
-
-    private var pill: some View {
-        ZStack {
-            VisualEffectBackground()
-            Color.black.opacity(0.35)
-            HStack(spacing: 12) {
-                ZStack {
-                    if model.isExpanded {
-                        IndicatorLeading(model: model).transition(transition(anchor: .trailing, delay: IndicatorMotion.leadingDelay))
-                    }
-                }
-                ZStack {
-                    if model.isExpanded {
-                        IndicatorTrailing(model: model).transition(transition(anchor: .leading, delay: IndicatorMotion.trailingDelay))
-                    }
-                }
-                .frame(width: LevelBarsGeometry.totalWidth)
-            }
-        }
-        .clipShape(Capsule())
-        .overlay(Capsule().strokeBorder(.white.opacity(0.1), lineWidth: 0.5))
-        .scaleEffect(reduceMotion || model.isExpanded ? 1 : 0.8, anchor: .top)
-        .opacity(model.isExpanded ? 1 : 0)
-        .animation(animation, value: model.isExpanded)
-    }
-}
-
-struct VisualEffectBackground: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView()
-        view.material = .hudWindow
-        view.blendingMode = .behindWindow
-        view.state = .active
-        view.appearance = NSAppearance(named: .darkAqua)
-        return view
-    }
-
-    func updateNSView(_ view: NSVisualEffectView, context: Context) {}
 }

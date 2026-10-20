@@ -4,12 +4,6 @@ public enum VersionPing: String, Sendable, Encodable {
     case install
     case update
 
-    public static func kind(isNewInstall: Bool, previousVersion: String?, currentVersion: String) -> VersionPing? {
-        if isNewInstall { return .install }
-        guard let previousVersion, previousVersion != currentVersion else { return nil }
-        return .update
-    }
-
     public func body(version: String, projectToken: String) throws -> Data {
         let payload = Payload(
             apiKey: projectToken,

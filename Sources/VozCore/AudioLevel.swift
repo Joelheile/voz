@@ -20,17 +20,14 @@ public enum AudioLevel {
 }
 
 public struct LevelSmoother {
-    public let attackSeconds: Double
-    public let releaseSeconds: Double
+    private static let attackSeconds = 0.04
+    private static let releaseSeconds = 0.18
     public private(set) var value: Float = 0
 
-    public init(attackSeconds: Double = 0.04, releaseSeconds: Double = 0.18) {
-        self.attackSeconds = attackSeconds
-        self.releaseSeconds = releaseSeconds
-    }
+    public init() {}
 
     public mutating func update(target: Float, elapsedSeconds: Double) -> Float {
-        let timeConstant = target > value ? attackSeconds : releaseSeconds
+        let timeConstant = target > value ? Self.attackSeconds : Self.releaseSeconds
         let weight = Float(1 - exp(-max(elapsedSeconds, 0) / timeConstant))
         value += (target - value) * weight
         return value

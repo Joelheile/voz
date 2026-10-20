@@ -22,13 +22,13 @@ struct SetupPage: View {
             .entrance(1, appeared: appeared, reduceMotion: reduceMotion)
             PanelGroup {
                 SpeechModelPicker(selection: $settings.speechModel)
-                PanelRow(title: "Help improve Voz") {
+                PanelRow(title: "Share anonymous usage stats") {
                     HStack(spacing: 8) {
                         Image(systemName: "info.circle")
                             .font(.system(size: 12))
                             .foregroundStyle(Theme.inkTertiary)
-                            .help("I'd appreciate anonymous stats on how you use Voz. I never save your text or audio.")
-                        Toggle("Help improve Voz", isOn: $settings.analyticsEnabled).labelsHidden()
+                            .help("Counts and timings, never text or audio")
+                        Toggle("Share anonymous usage stats", isOn: $settings.analyticsEnabled).labelsHidden()
                     }
                 }
             }

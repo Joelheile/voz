@@ -28,10 +28,6 @@ public enum CleanupGuard {
 
     private static let spokenSymbolWords: Set<String> = ["dot", "at", "slash", "underscore", "dash", "colon"]
 
-    public static func accepts(raw: String, cleaned: String) -> Bool {
-        rejection(raw: raw, cleaned: cleaned) == nil
-    }
-
     public static func rejection(raw: String, cleaned: String) -> CleanupRejection? {
         let rawWords = WordTokens.alphanumeric(raw)
         let cleanedWords = WordTokens.alphanumeric(cleaned)

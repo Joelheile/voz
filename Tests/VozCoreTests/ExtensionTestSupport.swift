@@ -27,11 +27,6 @@ func fileContents(_ url: URL) -> String? {
     try? String(contentsOf: url, encoding: .utf8)
 }
 
-func storedConfig(in home: VozHome) throws -> [String: [String: String]]? {
-    let stored = try JSONSerialization.jsonObject(with: Data(contentsOf: home.settings)) as? [String: Any]
-    return stored?["config"] as? [String: [String: String]]
-}
-
 final class RecordedActions: @unchecked Sendable {
     private let lock = NSLock()
     private var actions: [HostAction] = []

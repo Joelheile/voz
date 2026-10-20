@@ -27,8 +27,13 @@ enum Permissions {
         CGRequestListenEventAccess()
     }
 
-    static func openSettings(pane: String) {
-        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") else { return }
+    enum PrivacyPane: String {
+        case microphone = "Privacy_Microphone"
+        case inputMonitoring = "Privacy_ListenEvent"
+    }
+
+    static func openSettings(_ pane: PrivacyPane) {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane.rawValue)") else { return }
         NSWorkspace.shared.open(url)
     }
 

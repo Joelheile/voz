@@ -36,6 +36,9 @@ private final class TapRelay: @unchecked Sendable {
 
 @MainActor
 final class HotkeyMonitor {
+    private static let healthyTapCheckInterval = 30.0
+    private static let missingTapCheckInterval = 2.0
+
     private var machine: HotkeyStateMachine
     private var tap: CFMachPort?
     private var relay: TapRelay?
@@ -122,36 +125,26 @@ final class HotkeyMonitor {
 
     func checkHealth() {
         defer { scheduleNextHealthCheck() }
-        let isEnabled = tap.map { CGEvent.tapIsEnabled(tap: $0) } ?? false
-        var enableSucceeded = false
-        if let tap, !isEnabled {
-            CGEvent.tapEnable(tap: tap, enable: true)
-            enableSucceeded = CGEvent.tapIsEnabled(tap: tap)
-        }
-        let action = TapHealthAction.decide(
-            accessibilityGranted: Permissions.accessibilityGranted,
-            hasTap: tap != nil,
-            isEnabled: isEnabled,
-            enableSucceeded: enableSucceeded
-        )
-        switch action {
-        case .none, .enable:
-            break
-        case .stop:
+        guard Permissions.accessibilityGranted else {
+            guard tap != nil else { return }
             Log.app.warning("Accessibility revoked, event tap stopped")
             stop()
-        case .create:
-            let started = start()
-            if started { Log.app.notice("Hotkey tap started") }
-        case .recreate:
-            Log.app.warning("Event tap could not be re-enabled, recreating")
-            recreate()
+            return
         }
+        guard let tap else {
+            if start() { Log.app.notice("Hotkey tap started") }
+            return
+        }
+        guard !CGEvent.tapIsEnabled(tap: tap) else { return }
+        CGEvent.tapEnable(tap: tap, enable: true)
+        guard !CGEvent.tapIsEnabled(tap: tap) else { return }
+        Log.app.warning("Event tap could not be re-enabled, recreating")
+        recreate()
     }
 
     private func scheduleNextHealthCheck() {
         healthTimer?.invalidate()
-        let interval = TapHealthSchedule.interval(hasTap: tap != nil)
+        let interval = tap == nil ? Self.missingTapCheckInterval : Self.healthyTapCheckInterval
         let timer = Timer(timeInterval: interval, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated { self?.checkHealth() }
         }

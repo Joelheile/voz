@@ -64,7 +64,8 @@ enum DesignRender {
             colorSpaceName: .deviceRGB,
             bytesPerRow: 0,
             bitsPerPixel: 0
-        ), let _ = Optional(rep.size = resolved) else { throw CocoaError(.fileWriteUnknown) }
+        ) else { throw CocoaError(.fileWriteUnknown) }
+        rep.size = resolved
         host.cacheDisplay(in: host.bounds, to: rep)
         guard let data = rep.representation(using: .png, properties: [:]) else { throw CocoaError(.fileWriteUnknown) }
         let url = directory.appendingPathComponent("\(name).png")
@@ -100,7 +101,7 @@ private final class Fixture {
             setup: SetupModel(analytics: analytics),
             extensions: ExtensionsModel(home: VozHome(root: FileManager.default.temporaryDirectory.appendingPathComponent("voz-render-home")), fetch: { Self.listings })
         )
-        status.update(.parakeetUltra, .ready(bytes: 632_000_000))
+        status.update(.parakeetV3, .ready(bytes: 483_000_000))
     }
 
     func popover(status: PopoverStatus = .ready, hint: String = "", page: PopoverPage = .home, needsSetup: Bool = false) -> some View {
@@ -161,7 +162,7 @@ private final class Fixture {
             audioSeconds: Double(text.split(separator: " ").count) / 2.6,
             sttMs: 180,
             totalMs: 420,
-            model: "parakeet-ultra",
+            model: SpeechModel.parakeetV3.rawValue,
             appBundleID: nil,
             appName: app,
             fillerWordsRemoved: text.count % 4

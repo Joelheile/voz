@@ -16,8 +16,16 @@ public struct HostManifest: Decodable, Equatable, Sendable {
     public let commands: [String]
     public let errors: [LoadError]
 
-    public static let beforeInsert = "beforeInsert"
-    public static let beforeCleanup = "beforeCleanup"
+    public func subscribes(to hook: HostHook) -> Bool {
+        events.contains(hook.rawValue)
+    }
+}
+
+public enum HostHook: String, Sendable {
+    case beforeInsert
+    case beforeCleanup
+    case recording
+    case afterInsert
 }
 
 public struct LoadError: Decodable, Equatable, Sendable {
@@ -29,10 +37,10 @@ public enum HostEvent: Encodable, Sendable {
     case recording(path: String, seconds: Double)
     case afterInsert(text: String, raw: String)
 
-    public var name: String {
+    public var hook: HostHook {
         switch self {
-        case .recording: "recording"
-        case .afterInsert: "afterInsert"
+        case .recording: .recording
+        case .afterInsert: .afterInsert
         }
     }
 

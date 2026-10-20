@@ -1,20 +1,17 @@
 import AppKit
 import VozCore
 
-struct FrontApp {
-    let bundleID: String?
-    let name: String?
-
+extension HostApp {
     @MainActor
-    static var current: FrontApp {
+    static var current: HostApp {
         let app = NSWorkspace.shared.frontmostApplication
-        return FrontApp(bundleID: app?.bundleIdentifier, name: app?.localizedName)
+        return HostApp(bundleID: app?.bundleIdentifier, name: app?.localizedName)
     }
 }
 
 struct Recording {
     let samples: [Float]
-    let app: FrontApp
+    let app: HostApp
     let trigger: DictationTrigger
 }
 
@@ -34,7 +31,7 @@ final class Dictation {
     private let settings: AppSettings
     private let output: TextOutput
     private let analytics: Analytics
-    private var recordingApp = FrontApp(bundleID: nil, name: nil)
+    private var recordingApp = HostApp(bundleID: nil, name: nil)
     private var recordingTrigger = DictationTrigger.tap
     private var streaming: StreamingDictation?
     private let activity = ActivityHold()
@@ -71,11 +68,12 @@ final class Dictation {
     }
 
     func handle(_ action: HotkeyAction) {
-        switch DictationCommand.command(for: action, in: phase) {
-        case let .start(trigger): start(trigger: trigger)
-        case .stop: stopAndTranscribe()
-        case .rejectBusy: onBusy()
-        case .ignore: break
+        switch (action, phase) {
+        case (.toggle, .idle): start(trigger: .tap)
+        case (.start, .idle): start(trigger: .hold)
+        case (.toggle, .recording), (.stop, .recording): stopAndTranscribe()
+        case (.toggle, .transcribing), (.start, .transcribing): onBusy()
+        default: break
         }
     }
 
@@ -96,7 +94,7 @@ final class Dictation {
             Task { await Permissions.requestMicrophone() }
             return
         }
-        let app = FrontApp.current
+        let app = HostApp.current
         let session = pipeline.makeStreaming(app: app)
         recorder.onSamples = { chunk in
             DispatchQueue.main.async { MainActor.assumeIsolated { session.feed(chunk) } }
@@ -112,7 +110,7 @@ final class Dictation {
             return
         }
         streaming = session
-        let cuePlayed = SoundCues.play(.start)
+        let cuePlayed = settings.soundCues && SoundCues.play(.start)
         recordingApp = app
         recordingTrigger = trigger
         phase = .recording
@@ -132,19 +130,23 @@ final class Dictation {
     private func stopAndTranscribe() {
         let released = ContinuousClock.now
         let samples = recorder.stop()
-        let session = streaming
-        streaming = nil
         muter.unmuteIfMutedByVoz()
-        SoundCues.play(.stop)
+        if settings.soundCues { SoundCues.play(.stop) }
+        guard let session = streaming else {
+            Log.app.error("Recording stopped without a streaming session")
+            phase = .idle
+            return
+        }
+        streaming = nil
         switch RecordingFilter.verdict(for: samples) {
         case .tooShort:
-            session?.cancel()
+            session.cancel()
             Log.app.notice("Recording discarded: too short")
             analytics.capture(.dictationDiscarded(reason: .tooShort))
             onOutcome(.discarded)
             phase = .idle
         case .silent:
-            session?.cancel()
+            session.cancel()
             Log.app.notice("Recording discarded: silent")
             analytics.capture(.dictationDiscarded(reason: .silent))
             onOutcome(.discarded)
@@ -155,7 +157,7 @@ final class Dictation {
         }
     }
 
-    private func transcribe(_ recording: Recording, streaming: StreamingDictation?, released: ContinuousClock.Instant = .now) {
+    private func transcribe(_ recording: Recording, streaming: StreamingDictation, released: ContinuousClock.Instant) {
         phase = .transcribing
         Task {
             defer { phase = .idle }

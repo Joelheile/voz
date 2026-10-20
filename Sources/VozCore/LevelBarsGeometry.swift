@@ -12,10 +12,6 @@ public enum LevelBarsGeometry {
     public static let loudnessExponent = 0.7
     public static let edgeAttenuation: CGFloat = 0.4
 
-    public static var totalWidth: CGFloat {
-        CGFloat(barCount) * barWidth + CGFloat(barCount - 1) * barSpacing
-    }
-
     public static func height(level: Float, time: Double, index: Int) -> CGFloat {
         let wave = 0.5 + 0.5 * sin(time * waveSpeed + Double(index) * wavePhasePerBar)
         let speech = loudness(level)

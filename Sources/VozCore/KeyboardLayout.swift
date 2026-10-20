@@ -2,6 +2,8 @@ import Carbon.HIToolbox
 import Foundation
 
 public enum KeyboardLayout {
+    private static let keyCount: UInt16 = 128
+
     public static func keyCode(producing character: String) -> UInt16? {
         guard
             let source = TISCopyCurrentASCIICapableKeyboardLayoutInputSource()?.takeRetainedValue(),
@@ -10,7 +12,7 @@ public enum KeyboardLayout {
         let layoutData = Unmanaged<CFData>.fromOpaque(property).takeUnretainedValue() as Data
         return layoutData.withUnsafeBytes { raw -> UInt16? in
             guard let layout = raw.baseAddress?.assumingMemoryBound(to: UCKeyboardLayout.self) else { return nil }
-            return KeyCodeSearch.keyCode(producing: character) { translate(keyCode: $0, layout: layout) }
+            return (0..<Self.keyCount).first { translate(keyCode: $0, layout: layout) == character }
         }
     }
 

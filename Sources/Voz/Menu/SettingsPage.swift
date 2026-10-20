@@ -89,11 +89,6 @@ struct SettingsPage: View {
             PanelRow(title: "Sound cues") {
                 Toggle("Sound cues", isOn: $settings.soundCues).labelsHidden()
             }
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Indicator").font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
-                IndicatorPicker(selection: $settings.indicatorStyle)
-            }
-            .padding(.vertical, 10)
         }
     }
 
@@ -103,7 +98,7 @@ struct SettingsPage: View {
                 if microphone == .notDetermined {
                     Task { await Permissions.requestMicrophone() }
                 } else {
-                    Permissions.openSettings(pane: "Privacy_Microphone")
+                    Permissions.openSettings(.microphone)
                 }
             }
             PermissionRow(title: "Accessibility", granted: accessibility) {
@@ -111,7 +106,7 @@ struct SettingsPage: View {
             }
             PermissionRow(title: "Input Monitoring", granted: inputMonitoring) {
                 Permissions.requestInputMonitoring()
-                Permissions.openSettings(pane: "Privacy_ListenEvent")
+                Permissions.openSettings(.inputMonitoring)
             }
         }
     }

@@ -29,8 +29,12 @@ enum CommandLineTool {
             if replacesOldVoz { try files.removeItem(at: link) }
             try files.createSymbolicLink(atPath: link.path, withDestinationPath: executable)
         } catch {
-            throw CommandLineToolError.notWritable("sudo mkdir -p /usr/local/bin && sudo ln -sf '\(executable)' \(link.path)")
+            throw CommandLineToolError.notWritable("sudo mkdir -p /usr/local/bin && sudo ln -sf \(shellQuoted(executable)) \(link.path)")
         }
+    }
+
+    private static func shellQuoted(_ path: String) -> String {
+        "'" + path.replacingOccurrences(of: "'", with: #"'\''"#) + "'"
     }
 
     private static var executable: String {

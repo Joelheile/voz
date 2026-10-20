@@ -44,11 +44,6 @@ public struct KeyChord: Equatable, Sendable {
     public let key: Key
     public let modifiers: Modifiers
 
-    public init(key: Key, modifiers: Modifiers) {
-        self.key = key
-        self.modifiers = modifiers
-    }
-
     public init(parsing raw: String) throws(KeyChordError) {
         let parts = raw.lowercased().split(separator: "+", omittingEmptySubsequences: false).map(String.init)
         let keyName = parts.last ?? ""

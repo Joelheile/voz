@@ -1,22 +1,21 @@
 import Combine
 import Foundation
 
-public enum SettingsKey {
-    public static let hotkey = "hotkey"
-    public static let holdToTalk = "holdToTalk"
-    public static let muteWhileRecording = "muteWhileRecording"
-    public static let copyToClipboard = "copyToClipboard"
-    public static let insertIntoApp = "insertIntoApp"
-    public static let speechModel = "speechModel"
-    public static let indicatorStyle = "indicatorStyle"
-    public static let soundCues = "soundCues"
-    public static let launchAtLogin = "launchAtLogin"
-    public static let onboardingCompleted = "onboardingCompleted"
-    public static let cleanupEnabled = "cleanupEnabled"
-    public static let analyticsEnabled = "analyticsEnabled"
-    public static let receiveBetaUpdates = "receiveBetaUpdates"
-    public static let versionPingEnabled = "versionPingEnabled"
-    public static let cleanupPrompt = "cleanupPrompt"
+private enum SettingsKey {
+    static let hotkey = "hotkey"
+    static let holdToTalk = "holdToTalk"
+    static let muteWhileRecording = "muteWhileRecording"
+    static let copyToClipboard = "copyToClipboard"
+    static let insertIntoApp = "insertIntoApp"
+    static let speechModel = "speechModel"
+    static let soundCues = "soundCues"
+    static let launchAtLogin = "launchAtLogin"
+    static let onboardingCompleted = "onboardingCompleted"
+    static let cleanupEnabled = "cleanupEnabled"
+    static let analyticsEnabled = "analyticsEnabled"
+    static let receiveBetaUpdates = "receiveBetaUpdates"
+    static let versionPingEnabled = "versionPingEnabled"
+    static let cleanupPrompt = "cleanupPrompt"
 }
 
 @MainActor
@@ -40,9 +39,6 @@ public final class AppSettings: ObservableObject {
     }
     @Published public var speechModel: SpeechModel {
         didSet { defaults.set(speechModel.rawValue, forKey: SettingsKey.speechModel) }
-    }
-    @Published public var indicatorStyle: IndicatorStyle {
-        didSet { defaults.set(indicatorStyle.rawValue, forKey: SettingsKey.indicatorStyle) }
     }
     @Published public var soundCues: Bool {
         didSet { defaults.set(soundCues, forKey: SettingsKey.soundCues) }
@@ -76,13 +72,6 @@ public final class AppSettings: ObservableObject {
     }
     @Published public var isCapturingHotkey = false
 
-    public var output: OutputSettings {
-        var output = OutputSettings()
-        output.copyToClipboard = copyToClipboard
-        output.pasteIntoActiveApp = insertIntoApp
-        return output
-    }
-
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         defaults.register(defaults: [
@@ -90,8 +79,7 @@ public final class AppSettings: ObservableObject {
             SettingsKey.muteWhileRecording: true,
             SettingsKey.copyToClipboard: true,
             SettingsKey.insertIntoApp: true,
-            SettingsKey.speechModel: SpeechModel.parakeetUltra.rawValue,
-            SettingsKey.indicatorStyle: IndicatorStyle.notch.rawValue,
+            SettingsKey.speechModel: SpeechModel.parakeetV3.rawValue,
             SettingsKey.soundCues: false,
             SettingsKey.launchAtLogin: true,
             SettingsKey.onboardingCompleted: false,
@@ -106,8 +94,7 @@ public final class AppSettings: ObservableObject {
         muteWhileRecording = defaults.bool(forKey: SettingsKey.muteWhileRecording)
         copyToClipboard = defaults.bool(forKey: SettingsKey.copyToClipboard)
         insertIntoApp = defaults.bool(forKey: SettingsKey.insertIntoApp)
-        speechModel = defaults.string(forKey: SettingsKey.speechModel).flatMap(SpeechModel.init) ?? .parakeetUltra
-        indicatorStyle = defaults.string(forKey: SettingsKey.indicatorStyle).flatMap(IndicatorStyle.init) ?? .notch
+        speechModel = defaults.string(forKey: SettingsKey.speechModel).flatMap(SpeechModel.init) ?? .parakeetV3
         soundCues = defaults.bool(forKey: SettingsKey.soundCues)
         launchAtLogin = defaults.bool(forKey: SettingsKey.launchAtLogin)
         onboardingCompleted = defaults.bool(forKey: SettingsKey.onboardingCompleted)

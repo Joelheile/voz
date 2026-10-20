@@ -1,5 +1,4 @@
 import AppKit
-import VozCore
 
 enum SoundCue: String {
     case start
@@ -12,7 +11,6 @@ enum SoundCues {
 
     @discardableResult
     static func play(_ cue: SoundCue) -> Bool {
-        guard UserDefaults.standard.bool(forKey: SettingsKey.soundCues) else { return false }
         guard
             let url = Bundle.main.url(forResource: cue.rawValue, withExtension: "wav", subdirectory: "Sounds"),
             let sound = NSSound(contentsOf: url, byReference: true)

@@ -3,6 +3,11 @@ import Foundation
 public struct FillerPassResult: Equatable, Sendable {
     public let text: String
     public let removed: Int
+
+    public init(text: String, removed: Int) {
+        self.text = text
+        self.removed = removed
+    }
 }
 
 public enum FillerWords {

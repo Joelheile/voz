@@ -1,5 +1,15 @@
 import Foundation
 
+public enum VozHomeError: Error, CustomStringConvertible {
+    case malformedSettings(URL)
+
+    public var description: String {
+        switch self {
+        case .malformedSettings(let url): "\(url.path) must be a JSON object with \"packages\" as a list of strings"
+        }
+    }
+}
+
 public struct VozHome: Sendable {
     public static let changedNotification = Notification.Name("com.joelheile.voz.extensions-changed")
 
@@ -15,7 +25,8 @@ public struct VozHome: Sendable {
 
     public var hasExtensions: Bool {
         let loose = (try? FileManager.default.contentsOfDirectory(atPath: extensions.path))?.contains { !$0.hasPrefix(".") } ?? false
-        return loose || !((try? packageSources()) ?? []).isEmpty
+        let unreadableOrListed = (try? packageSources()).map { !$0.isEmpty } ?? true
+        return loose || unreadableOrListed
     }
 
     public func writeAuthoringFiles(from resources: URL) throws {
@@ -32,10 +43,14 @@ public struct VozHome: Sendable {
     }
 
     public func packageSources() throws -> [String] {
-        try readSettings()["packages"] as? [String] ?? []
+        let packages = try readSettings()["packages"]
+        guard let packages else { return [] }
+        guard let list = packages as? [String] else { throw VozHomeError.malformedSettings(settings) }
+        return list
     }
 
     public func setPackageSources(_ sources: [String]) throws {
+        _ = try packageSources()
         var settings = try readSettings()
         settings["packages"] = sources
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -61,6 +76,9 @@ public struct VozHome: Sendable {
 
     private func readSettings() throws -> [String: Any] {
         guard FileManager.default.fileExists(atPath: settings.path) else { return [:] }
-        return try JSONSerialization.jsonObject(with: Data(contentsOf: settings)) as? [String: Any] ?? [:]
+        guard let object = try JSONSerialization.jsonObject(with: Data(contentsOf: settings)) as? [String: Any] else {
+            throw VozHomeError.malformedSettings(settings)
+        }
+        return object
     }
 }

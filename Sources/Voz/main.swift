@@ -1,6 +1,5 @@
 import AppKit
 import Foundation
-import VozCore
 
 let arguments = CommandLine.arguments
 
@@ -8,7 +7,7 @@ if PackageCLI.handles(arguments) || Headless.handles(arguments) {
     Task {
         exit(PackageCLI.handles(arguments) ? await PackageCLI.run(arguments) : await Headless.run(arguments))
     }
-    dispatchMain()
+    RunLoop.main.run()
 }
 
 let application = NSApplication.shared

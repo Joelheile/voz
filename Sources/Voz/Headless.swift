@@ -39,7 +39,8 @@ enum Headless {
         if let path = value(of: "--simulate-dictation", in: arguments) {
             return await simulateDictation(URL(fileURLWithPath: path), arguments: arguments)
         }
-        printError("usage: voz --transcribe <audio file> [--model parakeet-ultra|parakeet-tdt-v2|apple-speech] [--vocab a,b]\n       voz --clean <text> [--vocab a,b]\n       voz --eval <cases.json> [--repeat n] [--budget-ms n]\n       voz --simulate-dictation <audio file> [--model parakeet-ultra|parakeet-tdt-v2|apple-speech] [--speed n] [--no-cleanup]")
+        let models = SpeechModel.allCases.map(\.rawValue).joined(separator: "|")
+        printError("usage: voz --transcribe <audio file> [--model \(models)] [--vocab a,b]\n       voz --clean <text> [--vocab a,b]\n       voz --eval <cases.json> [--repeat n] [--budget-ms n]\n       voz --simulate-dictation <audio file> [--model \(models)] [--speed n] [--no-cleanup]")
         return 64
     }
 
@@ -59,7 +60,7 @@ enum Headless {
             print(result.text)
             print(String(
                 format: "engine %@, load %.2fs, audio %.2fs, transcription %.3fs",
-                result.model, loadSeconds, result.audioSeconds, result.processingSeconds
+                result.model.rawValue, loadSeconds, result.audioSeconds, result.processingSeconds
             ))
             return 0
         } catch {
@@ -159,14 +160,14 @@ enum Headless {
     }
 
     private static func speechModel(in arguments: [String]) -> SpeechModel {
-        value(of: "--model", in: arguments).flatMap(SpeechModel.init) ?? .parakeetUltra
+        value(of: "--model", in: arguments).flatMap(SpeechModel.init) ?? .parakeetV3
     }
 
     private static func vocabulary(in arguments: [String]) -> [String] {
         value(of: "--vocab", in: arguments)?.split(separator: ",").map(String.init) ?? []
     }
 
-    private static func printError(_ message: String) {
+    static func printError(_ message: String) {
         FileHandle.standardError.write(Data((message + "\n").utf8))
     }
 }

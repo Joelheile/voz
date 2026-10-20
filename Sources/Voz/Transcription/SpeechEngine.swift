@@ -15,7 +15,7 @@ final class SpeechEngine: Sendable {
             return try await parakeet.transcribe(samples, model: model, vocabulary: vocabulary)
         }
         if model != .appleSpeech { Log.app.notice("Parakeet not ready, using Apple speech") }
-        return try await apple.transcribe(samples, locale: Self.locale(for: model), vocabulary: vocabulary)
+        return try await apple.transcribe(samples, locale: Self.locale, vocabulary: vocabulary)
     }
 
     func transcribeFile(_ url: URL, model: SpeechModel, vocabulary: [String]) async throws -> TranscriptionResult {
@@ -23,8 +23,7 @@ final class SpeechEngine: Sendable {
         return try await transcribe(samples, model: model, vocabulary: vocabulary)
     }
 
-    static func locale(for model: SpeechModel) -> Locale {
-        if model == .parakeetV2 { return Locale(identifier: "en_US") }
-        return Locale.current.language.languageCode == "de" ? Locale(identifier: "de_DE") : Locale(identifier: "en_US")
+    static var locale: Locale {
+        Locale.current.language.languageCode == "de" ? Locale(identifier: "de_DE") : Locale(identifier: "en_US")
     }
 }
