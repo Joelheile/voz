@@ -4,9 +4,7 @@
 
 **Talk instead of type, in every app on your Mac.**
 
-Voz is what you'd get if [Wispr Flow](https://wisprflow.ai) and [pi](https://pi.dev) merged: dictation as simple as Wispr Flow, built like pi as a small core you extend.
-
-[Download](https://github.com/Joelheile/voz/releases/latest) · [Extensions](EXTENSIONS.md) · [Privacy](SECURITY.md)
+[Website](https://voz.joels.tech), [Extensions](https://voz.joels.tech/extensions/), [Privacy](SECURITY.md)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/images/ready-dark.png">
@@ -15,11 +13,23 @@ Voz is what you'd get if [Wispr Flow](https://wisprflow.ai) and [pi](https://pi.
 
 </div>
 
-## Dictate
+Voz is free, open source dictation for macOS. It transcribes on your Mac, removes filler words and types the text at your cursor. The core stays small. Everything else is a TypeScript extension.
 
-Tap right Command, speak, tap again. The text lands at your cursor, in whatever app you're using.
+## Install
 
-You speak about 150 words a minute and type about 40. Voz drops the "um"s, fixes punctuation and spells names the way your dictionary does. It runs offline on your Mac. Change how it cleans up text by editing the prompt in Settings.
+You need macOS 26 and Apple Silicon. Paste this in Terminal:
+
+```
+curl -fsSL https://voz.joels.tech/install | bash
+```
+
+The script downloads the latest release, puts Voz in `/Applications` and opens it. Voz then asks for Microphone, Accessibility and Input Monitoring access. After that it updates itself.
+
+## Usage
+
+Tap right Command, speak, tap again. The text lands at your cursor in whatever app you're using.
+
+Voz lives in the menu bar. The panel shows your recent transcripts, and a click copies one. Insights counts your words and the time you saved. The dictionary sets how Voz spells names, and you can edit the cleanup prompt in Settings.
 
 <p align="center">
   <picture>
@@ -32,9 +42,13 @@ You speak about 150 words a minute and type about 40. Voz drops the "um"s, fixes
   </picture>
 </p>
 
-## Extend
+## How it works
 
-The core records, transcribes, cleans up and inserts. Everything else is an extension, so you bend Voz to how you work, not the other way around.
+The core records, transcribes, cleans up, inserts and saves history. Speech recognition and cleanup both run on your Mac, so Voz works offline.
+
+Extensions hook in between those steps: after recording, before cleanup, before insert, after insert, and on voice commands. Bun runs them in a separate process. If you install none, Voz skips the Bun download and starts no extra process. A slow or crashing extension never blocks dictation: after 300 ms, Voz inserts the original text.
+
+## Extensions
 
 An extension is a TypeScript file in `~/.voz/extensions`:
 
@@ -48,84 +62,21 @@ export default defineExtension((voz) => {
 
 Say "let's ship it, send it" and Voz types "Let's ship it", then presses Return.
 
-More examples. Handlers go inside `defineExtension((voz) => { ... })`, imports at the top of the file.
+To have a coding agent write one, open it in `~/.voz`. Voz keeps a guide for agents there in `AGENTS.md`. Publish to npm with the `voz-package` keyword to list it on [voz.joels.tech/extensions](https://voz.joels.tech/extensions/). Install one with `voz install npm:<name>`.
 
-Write casually in Slack:
-
-```ts
-voz.on("beforeCleanup", (event, ctx) => {
-  if (ctx.app.bundleID !== "com.tinyspeck.slackmacgap") return;
-  return { prompt: event.prompt + "\n\nWrite casually. Use lowercase." };
-});
-```
-
-Expand snippets. Say "my email" and Voz types the address:
-
-```ts
-const snippets: Record<string, string> = {
-  "my email": "me@example.com",
-  "my calendar": "https://cal.com/me",
-};
-
-voz.on("beforeInsert", (event) => {
-  const snippet = snippets[event.text.toLowerCase().replace(/[.!?]$/, "")];
-  if (snippet) return { text: snippet };
-});
-```
-
-Save notes. Say "note, call the bank tomorrow" and Voz adds it to a file instead of typing it:
-
-```ts
-import { appendFileSync } from "node:fs";
-import { join } from "node:path";
-
-voz.on("beforeInsert", (event, ctx) => {
-  const note = event.text.match(/^note[,:]?\s+(.+)/i)?.[1];
-  if (!note) return;
-  appendFileSync(join(voz.paths.data, "notes.md"), `- ${note}\n`);
-  ctx.notify("Saved to notes");
-  return { handled: true };
-});
-```
-
-Send each dictation to an API. The URL comes from `~/.voz/settings.json`:
-
-```ts
-voz.on("afterInsert", async (event, ctx) => {
-  await fetch(String(voz.config.webhook), {
-    method: "POST",
-    body: JSON.stringify({ text: event.text, app: ctx.app.name }),
-  });
-});
-```
-
-Full API in [EXTENSIONS.md](EXTENSIONS.md). To have a coding agent write an extension, open it in `~/.voz`. Voz keeps a guide for agents there in `AGENTS.md`.
-
-Publish to npm with the `voz-package` keyword and your extension shows up on Voz's Extensions page, ranked by downloads. People install it from there or with `voz install npm:<name>`.
-
-Extensions run with your permissions, so install only ones you trust.
-
-## Install
-
-Paste this in Terminal. You need macOS 26 and Apple Silicon.
-
-```
-curl -fsSL https://raw.githubusercontent.com/Joelheile/voz/main/install.sh | bash
-```
-
-It downloads the latest release, puts Voz in `/Applications` and opens it. Voz then walks you through Microphone, Accessibility and Input Monitoring access. Run the same command to reinstall. Voz updates itself after that.
+The full API is in [EXTENSIONS.md](EXTENSIONS.md). Extensions run with your permissions, so install only ones you trust.
 
 ## Privacy
 
 Your audio and text stay on your Mac. Voz sends its version number on install and update, and you can turn that off. Usage analytics stay off unless you opt in. Details in [SECURITY.md](SECURITY.md).
 
-## Contribute
+## Contributing
 
-Pull requests are for what every user needs: speed, reliability, fixes, languages and extension points. Everything else ships as a package.
+Pull requests to the core are for what every user needs on every dictation: speed, reliability, fixes, languages and extension points. Features that only some people want ship as extension packages.
 
 ```
-scripts/test.sh
-scripts/make-app.sh
+scripts/test.sh          # run the tests
+scripts/make-app.sh      # build and sign build/voz.app
 ```
 
 ## License
