@@ -1,5 +1,5 @@
 import Foundation
-import VozCore
+@testable import VozCore
 
 let installedBun = ["BUN_PATH", "HOME"]
     .compactMap { ProcessInfo.processInfo.environment[$0] }
@@ -38,4 +38,24 @@ final class RecordedActions: @unchecked Sendable {
 
     func append(_ action: HostAction) { lock.withLock { actions.append(action) } }
     var all: [HostAction] { lock.withLock { actions } }
+}
+
+func hostOutlivesClosedInput(home: VozHome) async throws -> Bool {
+    let arguments = HostLaunchArguments(home: home.root.path, settings: home.settings.path, extensionsDirectory: home.extensions.path, packages: [])
+    let process = Process()
+    process.executableURL = installedBun
+    process.arguments = ["--no-install", hostScript.path, String(decoding: try JSONEncoder().encode(arguments), as: UTF8.self)]
+    let input = Pipe()
+    process.standardInput = input
+    process.standardOutput = FileHandle.nullDevice
+    try process.run()
+    defer { if process.isRunning { process.terminate() } }
+    try input.fileHandleForWriting.close()
+    for _ in 0..<30 where process.isRunning { try await Task.sleep(for: .milliseconds(100)) }
+    return process.isRunning
+}
+
+func processIsGone(_ pid: Int32) async throws -> Bool {
+    for _ in 0..<30 where kill(pid, 0) == 0 { try await Task.sleep(for: .milliseconds(100)) }
+    return kill(pid, 0) != 0
 }

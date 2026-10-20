@@ -19,12 +19,15 @@ public struct VozHome: Sendable {
     }
 
     public func writeAuthoringFiles(from resources: URL) throws {
-        let files = FileManager.default
-        let types = root.appendingPathComponent("node_modules/voz", isDirectory: true)
-        try files.createDirectory(at: types, withIntermediateDirectories: true)
-        try files.createDirectory(at: extensions, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: extensions, withIntermediateDirectories: true)
+        try Self.writeTypes(into: root, from: resources)
+        try Self.replace(root.appendingPathComponent("AGENTS.md"), with: resources.appendingPathComponent("AGENTS.md"))
+    }
+
+    public static func writeTypes(into folder: URL, from resources: URL) throws {
+        let types = folder.appendingPathComponent("node_modules/voz", isDirectory: true)
+        try FileManager.default.createDirectory(at: types, withIntermediateDirectories: true)
         try replace(types.appendingPathComponent("index.d.ts"), with: resources.appendingPathComponent("voz.d.ts"))
-        try replace(root.appendingPathComponent("AGENTS.md"), with: resources.appendingPathComponent("AGENTS.md"))
         try Data(#"{"name":"voz","private":true,"types":"index.d.ts"}"#.utf8).write(to: types.appendingPathComponent("package.json"))
     }
 
@@ -51,7 +54,7 @@ public struct VozHome: Sendable {
         }
     }
 
-    private func replace(_ destination: URL, with source: URL) throws {
+    private static func replace(_ destination: URL, with source: URL) throws {
         try? FileManager.default.removeItem(at: destination)
         try FileManager.default.copyItem(at: source, to: destination)
     }

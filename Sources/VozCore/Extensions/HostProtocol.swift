@@ -14,10 +14,15 @@ public struct HostManifest: Decodable, Equatable, Sendable {
     public let extensions: [String]
     public let events: [String]
     public let commands: [String]
-    public let errors: [String]
+    public let errors: [LoadError]
 
     public static let beforeInsert = "beforeInsert"
     public static let beforeCleanup = "beforeCleanup"
+}
+
+public struct LoadError: Decodable, Equatable, Sendable {
+    public let `extension`: String
+    public let message: String
 }
 
 public enum HostEvent: Encodable, Sendable {

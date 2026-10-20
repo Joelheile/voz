@@ -4,7 +4,13 @@ import VozCore
 
 @MainActor
 enum Headless {
-    static func run(_ arguments: [String]) async -> Int32? {
+    private nonisolated static let flags = ["--transcribe", "--clean", "--eval", "--simulate-dictation", "--render-design", "--measure-recorder"]
+
+    nonisolated static func handles(_ arguments: [String]) -> Bool {
+        flags.contains(where: arguments.contains)
+    }
+
+    static func run(_ arguments: [String]) async -> Int32 {
         if let text = value(of: "--clean", in: arguments) {
             return await clean(text, vocabulary: vocabulary(in: arguments))
         }
@@ -33,11 +39,8 @@ enum Headless {
         if let path = value(of: "--simulate-dictation", in: arguments) {
             return await simulateDictation(URL(fileURLWithPath: path), arguments: arguments)
         }
-        if ["--transcribe", "--clean", "--eval", "--simulate-dictation", "--render-design", "--measure-recorder"].contains(where: arguments.contains) {
-            printError("usage: voz --transcribe <audio file> [--model parakeet-ultra|parakeet-tdt-v2|apple-speech] [--vocab a,b]\n       voz --clean <text> [--vocab a,b]\n       voz --eval <cases.json> [--repeat n] [--budget-ms n]\n       voz --simulate-dictation <audio file> [--model parakeet-ultra|parakeet-tdt-v2|apple-speech] [--speed n] [--no-cleanup]")
-            return 64
-        }
-        return nil
+        printError("usage: voz --transcribe <audio file> [--model parakeet-ultra|parakeet-tdt-v2|apple-speech] [--vocab a,b]\n       voz --clean <text> [--vocab a,b]\n       voz --eval <cases.json> [--repeat n] [--budget-ms n]\n       voz --simulate-dictation <audio file> [--model parakeet-ultra|parakeet-tdt-v2|apple-speech] [--speed n] [--no-cleanup]")
+        return 64
     }
 
     private static func transcribe(_ url: URL, arguments: [String]) async -> Int32 {

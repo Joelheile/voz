@@ -45,7 +45,7 @@ public actor ExtensionHost {
         self.onExit = onExit
     }
 
-    public func start(timeout: Duration = .seconds(10)) async throws -> HostManifest {
+    public func start(timeout: Duration = .seconds(30)) async throws -> HostManifest {
         signal(SIGPIPE, SIG_IGN)
         let process = Process()
         process.executableURL = launch.bun
@@ -71,7 +71,7 @@ public actor ExtensionHost {
             readyWaiter = continuation
             Task { [weak self] in
                 try? await Task.sleep(for: timeout)
-                await self?.failReady(ExtensionHostError.startTimedOut)
+                await self?.startTimedOut()
             }
         }
     }
@@ -204,6 +204,12 @@ public actor ExtensionHost {
         guard pending[id] != nil else { return }
         onLog("Extension \(method) timed out")
         resolve(id, with: nil)
+    }
+
+    private func startTimedOut() {
+        guard readyWaiter != nil else { return }
+        failReady(.startTimedOut)
+        stop()
     }
 
     private func failReady(_ error: ExtensionHostError) {

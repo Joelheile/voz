@@ -21,7 +21,7 @@ export default defineExtension((voz) => {
 
 Voz writes the types to `~/.voz/node_modules/voz`, so editors type-check files in `~/.voz/extensions`. It also writes `~/.voz/AGENTS.md`, a guide for coding agents. Open a coding agent in `~/.voz` and describe the extension you want. The factory can be `async`. Voz waits for it before it loads the next extension.
 
-Voz reloads extensions when you save a file in `~/.voz/extensions` or in a local package, and when you install, remove or update a package. Keep an extension's own files in `voz.paths.data`, not next to its code, or every write reloads it.
+Voz reloads extensions when you save a file in `~/.voz/extensions`, a local package or `~/.voz/settings.json`, and when you install, remove or update a package. If an extension fails to load, Voz shows its name under the menu bar. Keep an extension's own files in `voz.paths.data`, not next to its code, or every write reloads it.
 
 To work on an extension or package in another folder, run:
 
@@ -29,7 +29,7 @@ To work on an extension or package in another folder, run:
 voz dev ./my-extension
 ```
 
-Voz loads it, reloads it on save and prints extension logs, including `console.log`. Press Ctrl-C to unload it.
+Voz loads it, reloads it on save and prints extension logs, including `console.log`. It also writes the types to `node_modules/voz` in that folder, so your editor type-checks it. Press Ctrl-C to unload it.
 
 ## API
 
@@ -61,7 +61,7 @@ Every handler gets `(event, ctx)`.
 - `ctx.press(key)`: presses a key, such as `"return"`, `"cmd+return"` or `"shift+tab"`. Modifiers: `cmd`, `shift`, `opt`, `ctrl`
 - `ctx.notify(text)`: shows a short message under the menu bar
 
-The types are in [`Resources/Extensions/host.ts`](Resources/Extensions/host.ts).
+The types are in [`Resources/Extensions/voz.d.ts`](Resources/Extensions/voz.d.ts).
 
 Extensions can use any Bun or Node API, such as `fetch`, `Bun.spawn` and `node:fs`.
 
@@ -84,8 +84,9 @@ export default defineExtension((voz) => {
 
 - All `beforeCleanup` handlers together have 300 ms, and so do all `beforeInsert` handlers. After that, Voz uses the prompt or text it had
 - A command has 10 seconds. `recording` and `afterInsert` handlers have 30 seconds
-- If a handler throws, Voz logs the error and skips that handler
-- If the extension process exits or stops answering for 2 seconds, Voz restarts it, up to 3 times
+- Each extension has 3 seconds to load. After that, Voz reports it as failed and loads the next one
+- If a handler throws or a promise rejects unhandled, Voz logs the error and skips that handler
+- If the extension process exits or stops answering for 2 seconds, Voz restarts it, up to 3 times in a row
 
 ## Packages
 
@@ -94,6 +95,8 @@ A package is a folder, git repo or npm package with extensions in it. Voz looks 
 1. The `voz.extensions` array in `package.json`, such as `{ "voz": { "extensions": ["src/main.ts"] } }`.
 2. An `extensions` folder.
 3. An `index.ts` or `index.js` file.
+
+Voz does not read `main`. A package with none of these fails to load with an error.
 
 Install and manage packages from the terminal. The `voz` binary is `/Applications/voz.app/Contents/MacOS/voz`.
 
@@ -107,7 +110,7 @@ voz dev ./my-package
 voz remove voz-jira
 ```
 
-- npm installs use the exact version. `voz install npm:voz-jira@1.2.0` and `git:...@v1.0.0` are pinned. `voz update` skips pinned packages and moves the others to the latest version
+- npm installs use the exact version. `voz install npm:voz-jira@1.2.0` and `git:...@v1.0.0` are pinned. A git ref is a tag or a branch. `voz update` skips pinned packages and moves the others to the latest version
 - Packages only change when you run `voz update`. Voz never updates them on its own
 - Voz never runs install scripts
 - Installed packages are listed in `~/.voz/settings.json`

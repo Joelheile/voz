@@ -75,8 +75,62 @@ struct ExtensionHostTests {
         let host = makeHost()
         let manifest = try await host.start()
         #expect(manifest.extensions == ["fine"])
-        #expect(manifest.errors.count == 1)
-        #expect(manifest.errors.first?.hasPrefix("broken") == true)
+        #expect(manifest.errors.map(\.extension) == ["broken"])
+        await host.stop()
+    }
+
+    @Test func hangingExtensionIsReportedAndOthersStillLoad() async throws {
+        try extensionFile("a-hang.ts", "export default async () => { await new Promise(() => {}) }")
+        try extensionFile("b-fine.ts", #"export default (voz) => voz.on("beforeInsert", () => ({ text: "fine" }))"#)
+        let host = makeHost()
+        let manifest = try await host.start()
+        #expect(manifest.extensions == ["b-fine"])
+        #expect(manifest.errors.map(\.extension) == ["a-hang"])
+        #expect(await host.beforeInsert(text: "x", raw: "x", app: app, timeout: .seconds(2)) == "fine")
+        await host.stop()
+    }
+
+    @Test func unhandledRejectionKeepsTheHostRunning() async throws {
+        try extensionFile("sloppy.ts", #"export default (voz) => voz.on("afterInsert", () => { Promise.reject(new Error("sloppy")) })"#)
+        let host = makeHost()
+        _ = try await host.start()
+        await host.emit(.afterInsert(text: "hi", raw: "hi"), app: app, timeout: .seconds(2))
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(await host.ping(timeout: .seconds(2)))
+        await host.stop()
+    }
+
+    @Test func strayStdoutWritesDoNotBreakTheProtocol() async throws {
+        try extensionFile("noisy.ts", #"export default (voz) => { process.stdout.write("no newline"); voz.on("beforeInsert", (e) => ({ text: e.text + "!" })) }"#)
+        let host = makeHost()
+        let manifest = try await host.start(timeout: .seconds(3))
+        #expect(manifest.extensions == ["noisy"])
+        #expect(await host.beforeInsert(text: "hi", raw: "hi", app: app, timeout: .seconds(2)) == "hi!")
+        await host.stop()
+    }
+
+    @Test func hostExitsWhenVozGoesAway() async throws {
+        try extensionFile("timer.ts", "export default () => { setInterval(() => {}, 1000) }")
+        #expect(try await !hostOutlivesClosedInput(home: home))
+    }
+
+    @Test func startTimeoutStopsTheProcess() async throws {
+        let script = home.root.appendingPathComponent("stuck.ts")
+        try writeFile(#"import { writeFileSync } from "node:fs"; writeFileSync(JSON.parse(process.argv[2]).home + "/pid", String(process.pid)); setInterval(() => {}, 1000)"#, named: "stuck.ts", in: home.root)
+        let host = ExtensionHost(launch: .init(bun: installedBun!, script: script, home: home, packageDirectories: []), onAction: { _ in }, onLog: { _ in }, onExit: { _ in })
+        await #expect(throws: ExtensionHostError.startTimedOut) { try await host.start(timeout: .seconds(1)) }
+        let pid = try #require(fileContents(home.root.appendingPathComponent("pid")).flatMap { Int32($0) })
+        #expect(try await processIsGone(pid))
+    }
+
+    @Test func packageWithoutAnEntryIsReported() async throws {
+        let package = home.packages.appendingPathComponent("node_modules/voz-dist")
+        try writeFile(#"{"name":"voz-dist","main":"dist/index.js"}"#, named: "package.json", in: package)
+        try writeFile("export default () => {}", named: "index.js", in: package.appendingPathComponent("dist"))
+        let host = makeHost(packages: [package.path])
+        let manifest = try await host.start()
+        #expect(manifest.extensions.isEmpty)
+        #expect(manifest.errors.map(\.extension) == ["voz-dist"])
         await host.stop()
     }
 

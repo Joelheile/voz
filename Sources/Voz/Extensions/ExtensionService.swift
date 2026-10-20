@@ -15,7 +15,8 @@ final class ExtensionService {
     private static let watchdogInterval: Duration = .seconds(5)
     private static let pingTimeout: Duration = .seconds(2)
     private static let eventTimeout: Duration = .seconds(30)
-    static let resources = Bundle.main.resourceURL!.appendingPathComponent("Extensions", isDirectory: true)
+    private static let healthyUptime: Duration = .seconds(60)
+    nonisolated static let resources = Bundle.main.resourceURL!.appendingPathComponent("Extensions", isDirectory: true)
 
     private let home = VozHome()
     private let output: TextOutput
@@ -24,6 +25,7 @@ final class ExtensionService {
     private var commands: [String] = []
     private var events: Set<String> = []
     private var restarts = 0
+    private var started = ContinuousClock.now
     private var observer: NSObjectProtocol?
     private var reloading: Task<Void, Never>?
     private var watchdog: Task<Void, Never>?
@@ -59,6 +61,7 @@ final class ExtensionService {
                 try await launch()
             } catch {
                 Log.extensions.error("Extensions failed to start: \(String(describing: error), privacy: .public)")
+                toast.show("Could not start extensions")
             }
         }
     }
@@ -119,9 +122,11 @@ final class ExtensionService {
             }
         )
         let manifest = try await host.start()
-        for error in manifest.errors { Log.extensions.error("Extension failed to load: \(error, privacy: .public)") }
+        for error in manifest.errors { Log.extensions.error("\(error.extension, privacy: .public) failed to load: \(error.message, privacy: .public)") }
+        if !manifest.errors.isEmpty { toast.show("Could not load \(manifest.errors.map(\.extension).joined(separator: ", "))") }
         Log.extensions.notice("Extensions loaded: \(manifest.extensions.joined(separator: ", "), privacy: .public)")
         self.host = host
+        started = .now
         commands = manifest.commands
         events = Set(manifest.events)
         watchdog = Task { [weak self] in await self?.watch(host) }
@@ -129,7 +134,7 @@ final class ExtensionService {
 
     private func watch() {
         try? FileManager.default.createDirectory(at: home.extensions, withIntermediateDirectories: true)
-        let paths = [home.extensions.path] + ((try? home.localPackageDirectories()) ?? []).map(\.path)
+        let paths = [home.extensions.path, home.settings.path] + ((try? home.localPackageDirectories()) ?? []).map(\.path)
         watcher = FileWatcher(paths: paths) { [weak self] in
             self?.restarts = 0
             self?.reload()
@@ -168,6 +173,7 @@ final class ExtensionService {
         host = nil
         commands = []
         events = []
+        if ContinuousClock.now - started > Self.healthyUptime { restarts = 0 }
         guard restarts < Self.maxRestarts else {
             Log.extensions.error("Extension host keeps exiting, last status \(status), extensions stay off until the next change")
             return

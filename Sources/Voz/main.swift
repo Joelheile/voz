@@ -4,12 +4,11 @@ import VozCore
 
 let arguments = CommandLine.arguments
 
-if let exitCode = await PackageCLI.run(arguments) {
-    exit(exitCode)
-}
-
-if let exitCode = await Headless.run(arguments) {
-    exit(exitCode)
+if PackageCLI.handles(arguments) || Headless.handles(arguments) {
+    Task {
+        exit(PackageCLI.handles(arguments) ? await PackageCLI.run(arguments) : await Headless.run(arguments))
+    }
+    dispatchMain()
 }
 
 let application = NSApplication.shared

@@ -25,6 +25,7 @@ The full types are in `~/.voz/node_modules/voz/index.d.ts`. Read them before you
 ## Rules
 
 - `beforeCleanup` and `beforeInsert` share a 300 ms budget with every other extension. No network calls or model calls there. Do slow work in a command or in `afterInsert`
+- The default export has 3 seconds to finish. Register handlers there and do nothing slow
 - Give feedback with `ctx.notify("Sent to Linear")`. It shows a short message under the menu bar
 - Read settings from `voz.config`. The user sets them in `~/.voz/settings.json` under `config.<extension name>`
 - Write files to `voz.paths.data`, never next to the extension, or Voz reloads it on every write
@@ -36,7 +37,7 @@ The full types are in `~/.voz/node_modules/voz/index.d.ts`. Read them before you
 
 Voz loads a file in `~/.voz/extensions` as soon as you save it. Dictate in any app to try it.
 
-To work on a folder elsewhere, give it an `index.ts` and run `voz dev ./my-extension`. Voz loads it, reloads it on save and prints its logs.
+To work on a folder elsewhere, give it an `index.ts` and run `voz dev ./my-extension`. Voz loads it, reloads it on save, prints its logs and writes the types to `node_modules/voz` in that folder.
 
 ## Share
 

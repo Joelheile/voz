@@ -27,6 +27,12 @@ struct VozHomeTests {
         #expect(!home.hasExtensions)
     }
 
+    @Test func typesGoIntoAnyFolderVozDevLoads() throws {
+        let folder = temporaryHome().root
+        try VozHome.writeTypes(into: folder, from: hostScript.deletingLastPathComponent())
+        #expect(fileContents(folder.appendingPathComponent("node_modules/voz/index.d.ts"))?.contains("defineExtension") == true)
+    }
+
     @Test func looseExtensionFileCounts() throws {
         try writeFile("export default () => {}", named: "hello.ts", in: home.extensions)
         #expect(home.hasExtensions)

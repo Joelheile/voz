@@ -41,9 +41,12 @@ type CleanupRequest = BeforeCleanupEvent & { app: App };
 type InsertRequest = BeforeInsertEvent & { app: App };
 type EmitRequest = { event: EventName; payload: object; app: App };
 type CommandRequest = CommandEvent & { phrase: string; app: App };
+type Entry = { name: string; path?: string };
+type LoadError = { extension: string; message: string };
 
-const send = (message: object) =>
-  process.stdout.write(JSON.stringify(message) + "\n");
+const loadTimeout = 3000;
+const write = process.stdout.write.bind(process.stdout);
+const send = (message: object) => write(JSON.stringify(message) + "\n");
 const log = (text: string) => send({ method: "log", params: { text } });
 const describe = (error: unknown) =>
   error instanceof Error ? error.stack ?? error.message : String(error);
@@ -52,6 +55,13 @@ console.log =
   console.info =
   console.debug =
     (...parts: unknown[]) => log(parts.map(String).join(" "));
+process.stdout.write = ((chunk: string | Uint8Array) => {
+  log(typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk));
+  return true;
+}) as typeof process.stdout.write;
+process.on("unhandledRejection", (error) =>
+  log(`Unhandled rejection: ${describe(error)}`),
+);
 
 const launch: Launch = JSON.parse(process.argv[2]);
 const eventNames: EventName[] = [
@@ -63,7 +73,7 @@ const eventNames: EventName[] = [
 const handlers = new Map<EventName, Handler[]>();
 const commands = new Map<string, Command>();
 const loaded: string[] = [];
-const errors: string[] = [];
+const errors: LoadError[] = [];
 const bus = new EventEmitter();
 
 Bun.plugin({
@@ -95,7 +105,7 @@ function entryIn(directory: string): string | undefined {
     .find(existsSync);
 }
 
-function looseEntries(directory: string): { name: string; path: string }[] {
+function looseEntries(directory: string): Entry[] {
   if (!existsSync(directory)) return [];
   return readdirSync(directory)
     .filter((file) => !file.startsWith("."))
@@ -112,7 +122,7 @@ function looseEntries(directory: string): { name: string; path: string }[] {
     });
 }
 
-function packageEntries(directory: string): { name: string; path: string }[] {
+function packageEntries(directory: string): Entry[] {
   const manifest = readJSON(join(directory, "package.json")) ?? {};
   const name: string = manifest.name ?? basename(directory);
   const declared: string[] | undefined = manifest.voz?.extensions;
@@ -127,8 +137,7 @@ function packageEntries(directory: string): { name: string; path: string }[] {
       ...entry,
       name: `${name}/${entry.name}`,
     }));
-  const entry = entryIn(directory);
-  return entry ? [{ name, path: entry }] : [];
+  return [{ name, path: entryIn(directory) }];
 }
 
 function api(name: string, config: ExtensionAPI["config"]): ExtensionAPI {
@@ -169,17 +178,33 @@ async function load() {
   ];
   for (const entry of entries) {
     try {
-      const module = await import(entry.path);
-      if (typeof module.default !== "function")
-        throw new Error("default export is not a function");
-      await module.default(
-        api(entry.name, settings.config?.[entry.name] ?? {}),
-      );
+      await withinLoadTimeout(loadEntry(entry, settings.config?.[entry.name]));
       loaded.push(entry.name);
     } catch (error) {
-      errors.push(`${entry.name}: ${describe(error)}`);
+      errors.push({ extension: entry.name, message: describe(error) });
     }
   }
+}
+
+async function loadEntry(entry: Entry, config: ExtensionAPI["config"] = {}) {
+  if (!entry.path)
+    throw new Error(
+      "No entry. Add voz.extensions to package.json, an extensions folder or an index.ts",
+    );
+  const module = await import(entry.path);
+  if (typeof module.default !== "function")
+    throw new Error("default export is not a function");
+  await module.default(api(entry.name, config));
+}
+
+function withinLoadTimeout(work: Promise<void>): Promise<void> {
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(
+      () => reject(new Error(`did not load within ${loadTimeout / 1000} s`)),
+      loadTimeout,
+    ).unref(),
+  );
+  return Promise.race([work, timeout]);
 }
 
 async function beforeCleanup({ prompt, app }: CleanupRequest) {
@@ -261,3 +286,4 @@ for await (const line of createInterface({ input: process.stdin })) {
     .then((result) => send({ id: request.id, result }))
     .catch((error) => send({ id: request.id, error: describe(error) }));
 }
+process.exit(0);

@@ -6,6 +6,7 @@ enum PackageCLIError: Error, CustomStringConvertible {
     case alreadyInstalled(String)
     case notInstalled(String)
     case missing(URL)
+    case notAFolder(URL)
     case failed(String, Int32)
 
     var description: String {
@@ -14,6 +15,7 @@ enum PackageCLIError: Error, CustomStringConvertible {
         case .alreadyInstalled(let path): "Already installed at \(path). Run voz update or voz remove first."
         case .notInstalled(let name): "No installed package matches \(name)."
         case .missing(let url): "No package at \(url.path)."
+        case .notAFolder(let url): "\(url.path) is not a folder. Put the extension in a folder as index.ts, then run voz dev on the folder."
         case .failed(let command, let status): "\(command) failed with status \(status)."
         }
     }
@@ -23,8 +25,11 @@ enum PackageCLI {
     private static let home = VozHome()
     private static let git = "/usr/bin/git"
 
-    static func run(_ arguments: [String]) async -> Int32? {
-        guard arguments.count > 1, ["install", "remove", "list", "update", "dev"].contains(arguments[1]) else { return nil }
+    static func handles(_ arguments: [String]) -> Bool {
+        arguments.count > 1 && ["install", "remove", "list", "update", "dev"].contains(arguments[1])
+    }
+
+    static func run(_ arguments: [String]) async -> Int32 {
         do {
             switch (arguments[1], arguments.dropFirst(2).first) {
             case ("install", let source?): try await install(source)
@@ -112,14 +117,21 @@ enum PackageCLI {
     private static func develop(_ raw: String) throws {
         let source = try PackageSource(parsing: raw, relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
         guard case .local(let url) = source else { throw PackageCLIError.usage }
-        guard FileManager.default.fileExists(atPath: url.path) else { throw PackageCLIError.missing(url) }
+        var isFolder: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isFolder) else { throw PackageCLIError.missing(url) }
+        guard isFolder.boolValue else { throw PackageCLIError.notAFolder(url) }
+        try VozHome.writeTypes(into: url, from: ExtensionService.resources)
+        let logs = Process()
+        logs.executableURL = URL(fileURLWithPath: "/usr/bin/log")
+        logs.arguments = ["stream", "--style", "compact", "--predicate", "subsystem == \"\(Log.subsystem)\" AND category == \"extensions\""]
+        try logs.run()
         let sources = try home.packageSources()
         let added = !sources.contains(source.description)
         if added { try home.setPackageSources(sources + [source.description]) }
         notifyApp()
         print("Loaded \(url.path). Voz reloads it when you save. Press Ctrl-C to stop.")
         signal(SIGINT) { _ in }
-        _ = try BunRuntime.run("/usr/bin/log", ["stream", "--style", "compact", "--predicate", "subsystem == \"\(Log.subsystem)\" AND category == \"extensions\""])
+        logs.waitUntilExit()
         if added { try home.setPackageSources(try home.packageSources().filter { $0 != source.description }) }
         notifyApp()
         print("\nUnloaded \(url.path)")
