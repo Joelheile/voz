@@ -49,6 +49,10 @@ private struct SpeechModelCard: View {
     let select: () -> Void
     @State private var hovering = false
 
+    private var errorRate: String {
+        model.errorRate.formatted(.percent.scale(1).precision(.fractionLength(1)).locale(Locale(identifier: "en_US")))
+    }
+
     var body: some View {
         Button(action: select) {
             VStack(alignment: .leading, spacing: 10) {
@@ -69,7 +73,7 @@ private struct SpeechModelCard: View {
                 Spacer(minLength: 0)
                 RowDivider()
                 VStack(alignment: .leading, spacing: 3) {
-                    Metric(value: model.errorRate.formatted(.percent.scale(1).precision(.fractionLength(1)).locale(Locale(identifier: "en_US"))), label: "errors")
+                    Metric(value: errorRate, label: "errors")
                     Metric(value: "\(model.speedFactor)×", label: "speed")
                     Metric(value: model.size, label: nil)
                 }
@@ -90,7 +94,7 @@ private struct SpeechModelCard: View {
         }
         .buttonStyle(.pressable(0.97))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(model.family) \(model.name), \(model.languages), \(model.errorRate) percent word errors, \(model.speedFactor) times real time, \(model.size)")
+        .accessibilityLabel("\(model.family) \(model.name), \(model.languages), \(errorRate) word errors, \(model.speedFactor) times real time, \(model.size)")
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
         .onHover { hovering = $0 }
         .animation(Theme.Motion.hover, value: hovering)
