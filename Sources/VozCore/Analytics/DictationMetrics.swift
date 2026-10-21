@@ -5,8 +5,8 @@ public struct DictationMetrics: Equatable, Sendable {
     public var cleanupMs: Int
     public var insertMs: Int
     public var totalMs: Int
-    public var model: SpeechModel
-    public var selectedModel: SpeechModel
+    public var model: String
+    public var selectedModel: String
     public var cleanupUsed: Bool
     public var cleanupTimedOut: Bool
     public var trigger: DictationTrigger
@@ -19,8 +19,8 @@ public struct DictationMetrics: Equatable, Sendable {
         cleanupMs: Int,
         insertMs: Int,
         totalMs: Int,
-        model: SpeechModel,
-        selectedModel: SpeechModel,
+        model: String,
+        selectedModel: String,
         cleanupUsed: Bool,
         cleanupTimedOut: Bool,
         trigger: DictationTrigger,

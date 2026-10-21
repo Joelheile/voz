@@ -162,7 +162,7 @@ final class StatusItemController: NSObject {
         default: break
         }
         if !Permissions.accessibilityGranted { return .permissionNeeded(.accessibility) }
-        switch modelStatus.state(for: settings.speechModel) {
+        switch modelStatus.state(for: settings.localSpeechModel) {
         case .ready: return .ready
         case .notLoaded: return .loadingModel(detail: "Starting", progress: nil)
         case let .downloading(fraction):

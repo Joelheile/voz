@@ -60,7 +60,7 @@ enum Headless {
             print(result.text)
             print(String(
                 format: "engine %@, load %.2fs, audio %.2fs, transcription %.3fs",
-                result.model.rawValue, loadSeconds, result.audioSeconds, result.processingSeconds
+                result.model, loadSeconds, result.audioSeconds, result.processingSeconds
             ))
             return 0
         } catch {
@@ -82,10 +82,10 @@ enum Headless {
             cleaner.prewarm(prompt: CleanupPrompt.standard, vocabulary: [])
             try? await Task.sleep(for: .seconds(1))
             _ = await cleaner.clean("Warm up the cleanup model before we start timing anything.", prompt: CleanupPrompt.standard, vocabulary: [])
+            let engine = SpeechEngine(parakeet: transcriber)
             let session = StreamingDictation(
-                engine: SpeechEngine(parakeet: transcriber),
+                transcribe: { try await engine.transcribe($0, model: model, vocabulary: []) },
                 cleaner: cleaner,
-                model: model,
                 vocabulary: [],
                 prompt: Task { CleanupPrompt.standard },
                 cleanupEnabled: cleanupEnabled

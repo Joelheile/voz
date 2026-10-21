@@ -6,7 +6,9 @@ import Testing
         #expect(FillerWords.removeObvious(from: "so uh I think, uhm, we should go") == FillerPassResult(text: "So I think, we should go", removed: 2))
         #expect(FillerWords.removeObvious(from: "ähm ich glaube äh wir sollten gehen") == FillerPassResult(text: "Ich glaube wir sollten gehen", removed: 2))
         #expect(FillerWords.removeObvious(from: "Um, we should go").text == "We should go")
-        for kept in ["Wir treffen uns um 4 Uhr.", "um 3 Uhr", "The umbrella is humming under the umlaut"] {
+        #expect(FillerWords.removeObvious(from: "um so I was thinking we should move the meeting") == FillerPassResult(text: "So I was thinking we should move the meeting", removed: 1))
+        #expect(FillerWords.removeObvious(from: "does it do like um redoing the prompt").text == "Does it do like redoing the prompt")
+        for kept in ["Wir treffen uns um 4 Uhr.", "um 3 Uhr", "um das zu machen brauchen wir Zeit", "The umbrella is humming under the umlaut"] {
             #expect(FillerWords.removeObvious(from: kept) == FillerPassResult(text: kept, removed: 0))
         }
         #expect(FillerWords.estimateRemoved(before: "um so you know I mean it was like fine", after: "So it was fine.") == 4)
@@ -19,6 +21,8 @@ import Testing
         #expect(SpokenPunctuation.apply(to: "kommst du morgen Fragezeichen") == "kommst du morgen?")
         #expect(SpokenPunctuation.apply(to: "done full stop new paragraph next topic") == "done.\n\nNext topic")
         #expect(SpokenPunctuation.apply(to: "Thanks Sam, comma see you") == "Thanks Sam, see you")
+        #expect(SpokenPunctuation.apply(to: "set NODE underscore ENV to production") == "set NODE_ENV to production")
+        #expect(SpokenPunctuation.apply(to: "die Datei heißt backup unterstrich alt") == "die Datei heißt backup_alt")
         let literal = [
             "the word comma is spelled with two m's",
             "a long period of time",
@@ -28,6 +32,7 @@ import Testing
             "drei Komma fünf Prozent",
             "he said \"comma\" twice",
             "period",
+            "underscore",
         ]
         for text in literal {
             #expect(SpokenPunctuation.apply(to: text) == text)
@@ -65,5 +70,12 @@ import Testing
         #expect(SegmentJoiner.join(cleaned: ["We went to.", "the store today."], fallback: ["we went to", "the store today."]) == "We went to the store today.")
         #expect(SegmentJoiner.join(cleaned: ["We left.", "Then it rained."], fallback: ["we left.", "then it rained."]) == "We left. Then it rained.")
         #expect(SegmentJoiner.join(cleaned: ["We left."], fallback: ["we left"]) == "We left.")
+    }
+
+    @Test func cleanupRulesRunOnlyListedStepsInOrder() {
+        let raw = "uh send it to voz comma please"
+        #expect(CleanupStep.applyRules(CleanupStep.standard, to: raw, vocabulary: ["Voz"]) == FillerPassResult(text: "Send it to Voz, please", removed: 1))
+        #expect(CleanupStep.applyRules(["punctuation", "llm/jira", "model"], to: raw, vocabulary: ["Voz"]).text == "uh send it to voz, please")
+        #expect(CleanupStep.applyRules([], to: raw, vocabulary: ["Voz"]) == FillerPassResult(text: raw, removed: 0))
     }
 }

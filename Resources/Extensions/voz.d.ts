@@ -16,6 +16,30 @@ export type BeforeInsertResult = { text: string } | { handled: true } | void;
 export type CommandEvent = { text: string };
 export type RecordingEvent = { path: string; seconds: number };
 export type AfterInsertEvent = { text: string; raw: string };
+export type TranscribeEvent = { path: string; seconds: number };
+export type CleanEvent = { text: string; prompt: string };
+export type CleanupStepEvent = { text: string };
+
+export type SpeechModel = {
+  id: string;
+  name: string;
+  transcribe(
+    event: TranscribeEvent,
+    ctx: Context,
+  ): Awaitable<{ text: string }>;
+};
+
+export type CleanupModel = {
+  id: string;
+  name: string;
+  clean(event: CleanEvent, ctx: Context): Awaitable<{ text: string }>;
+};
+
+export type CleanupStep = {
+  id: string;
+  name: string;
+  run(event: CleanupStepEvent, ctx: Context): Awaitable<{ text: string } | void>;
+};
 
 type Awaitable<T> = T | Promise<T>;
 
@@ -55,9 +79,14 @@ export type ExtensionAPI = {
     phrase: string,
     handler: (event: CommandEvent, ctx: Context) => Awaitable<void>,
   ): void;
+  registerSpeechModel(model: SpeechModel): void;
+  registerCleanupModel(model: CleanupModel): void;
+  registerCleanupStep(step: CleanupStep): void;
   log(message: string): void;
 };
 
 export type Extension = (voz: ExtensionAPI) => Awaitable<void>;
+
+export const apiVersion: 1;
 
 export function defineExtension(extension: Extension): Extension;

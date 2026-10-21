@@ -16,23 +16,24 @@ final class ExtensionsModel: ObservableObject {
     @Published var query = ""
     @Published var order = PackageOrder.popular
     @Published private(set) var listings: [PackageListing] = []
-    @Published private(set) var installed: [PackageSource] = []
+    @Published private(set) var installed: [InstalledExtension] = []
+    @Published private(set) var disabled: [String] = []
     @Published private(set) var loading = true
     @Published private(set) var working: String?
     @Published private(set) var message: String?
     @Published private(set) var commandInstalled = CommandLineTool.isInstalled
 
-    var installedRows: [PackageSource] {
-        installed.filter { matches($0.name, summary(for: $0)) }
+    var installedRows: [InstalledExtension] {
+        installed.filter { matches($0.name, summary(for: $0.source)) }
     }
 
     var browseRows: [PackageListing] {
-        let installedFromNpm = Set(installed.compactMap { Self.npmName(of: $0) })
+        let installedFromNpm = Set(installed.compactMap { $0.source.flatMap(Self.npmName(of:)) })
         return listings.filter { !installedFromNpm.contains($0.name) && matches($0.name, $0.summary) }.ordered(by: order)
     }
 
-    func summary(for source: PackageSource) -> String? {
-        guard let name = Self.npmName(of: source) else { return nil }
+    func summary(for source: PackageSource?) -> String? {
+        guard let name = source.flatMap(Self.npmName(of:)) else { return nil }
         return listings.first { $0.name == name }?.summary
     }
 
@@ -55,6 +56,20 @@ final class ExtensionsModel: ObservableObject {
 
     func install(_ listing: PackageListing) async {
         await run(listing.name) { try await PackageCLI.install("npm:\(listing.name)") }
+    }
+
+    func setEnabled(_ name: String, _ enabled: Bool) {
+        do {
+            try home.setExtension(name, enabled: enabled)
+            disabled = try home.disabledExtensions()
+            message = nil
+        } catch {
+            message = "\(error)"
+        }
+    }
+
+    func isEnabled(_ name: String) -> Bool {
+        !disabled.contains(name)
     }
 
     func remove(_ source: PackageSource) async {
@@ -92,7 +107,7 @@ final class ExtensionsModel: ObservableObject {
         refreshInstalled()
     }
 
-    private func matches(_ name: String, _ summary: String?) -> Bool {
+    func matches(_ name: String, _ summary: String?) -> Bool {
         let needle = query.trimmingCharacters(in: .whitespaces)
         guard !needle.isEmpty else { return true }
         return name.localizedCaseInsensitiveContains(needle) || summary?.localizedCaseInsensitiveContains(needle) == true
@@ -100,9 +115,11 @@ final class ExtensionsModel: ObservableObject {
 
     private func refreshInstalled() {
         do {
-            installed = try home.packageSources().map { try PackageSource(parsing: $0, relativeTo: home.root) }
+            installed = try home.installedExtensions()
+            disabled = try home.disabledExtensions()
         } catch {
             installed = []
+            disabled = []
             message = "\(error)"
         }
     }
@@ -115,6 +132,7 @@ final class ExtensionsModel: ObservableObject {
 
 struct ExtensionsPage: View {
     @ObservedObject var model: ExtensionsModel
+    @ObservedObject var catalog: ExtensionCatalog
     let back: () -> Void
     @State private var confirming: String?
     @FocusState private var searchFocused: Bool
@@ -150,17 +168,32 @@ struct ExtensionsPage: View {
 
     private var installed: some View {
         PanelGroup(title: "Installed") {
-            ForEach(model.installedRows, id: \.description) { source in
-                PanelRow(title: source.name, detail: model.summary(for: source) ?? source.description) {
-                    if model.working == source.name {
-                        ProgressView()
-                    } else {
-                        Button("Remove") { Task { await model.remove(source) } }
-                            .buttonStyle(.pill(.quiet, height: 26))
-                            .disabled(model.working != nil)
+            ForEach(model.installedRows, id: \.name) { item in
+                PanelRow(title: item.name, detail: detail(for: item)) {
+                    HStack(spacing: 8) {
+                        if let source = item.source { removeButton(source) }
+                        Toggle(item.name, isOn: Binding { model.isEnabled(item.name) } set: { model.setEnabled(item.name, $0) })
+                            .labelsHidden()
                     }
                 }
             }
+        }
+    }
+
+    private func detail(for item: InstalledExtension) -> String? {
+        if !model.isEnabled(item.name) { return "Off" }
+        if let error = catalog.errors.first(where: { $0.key == item.name || $0.key.hasPrefix("\(item.name)/") })?.value { return error }
+        return model.summary(for: item.source) ?? item.source?.description ?? "In your extensions folder"
+    }
+
+    @ViewBuilder
+    private func removeButton(_ source: PackageSource) -> some View {
+        if model.working == source.name {
+            ProgressView()
+        } else {
+            Button("Remove") { Task { await model.remove(source) } }
+                .buttonStyle(.pill(.quiet, height: 26))
+                .disabled(model.working != nil)
         }
     }
 

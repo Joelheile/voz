@@ -42,7 +42,7 @@ actor AppleSpeechTranscriber {
             text: text,
             audioSeconds: Double(samples.count) / RecordingFilter.sampleRate,
             processingSeconds: Date().timeIntervalSince(started),
-            model: .appleSpeech
+            model: SpeechModel.appleSpeech.rawValue
         )
     }
 

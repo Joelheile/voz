@@ -7,9 +7,26 @@ struct ExtensionDelivery {
 }
 
 @MainActor
+final class ExtensionCatalog: ObservableObject {
+    @Published fileprivate(set) var errors: [String: String] = [:]
+    @Published fileprivate(set) var speechModels: [HostComponent] = []
+    @Published fileprivate(set) var cleanupModels: [HostComponent] = []
+    @Published fileprivate(set) var cleanupSteps: [HostComponent] = []
+
+    fileprivate func show(_ manifest: HostManifest?) {
+        errors = Dictionary(manifest?.errors.map { ($0.extension, $0.message) } ?? [], uniquingKeysWith: { first, _ in first })
+        speechModels = manifest?.speechModels ?? []
+        cleanupModels = manifest?.cleanupModels ?? []
+        cleanupSteps = manifest?.cleanupSteps ?? []
+    }
+}
+
+@MainActor
 final class ExtensionService {
     private static let insertTimeout: Duration = .milliseconds(300)
     private static let cleanupPromptTimeout: Duration = .milliseconds(300)
+    private static let cleanupStepTimeout: Duration = .milliseconds(300)
+    private static let transcribeTimeout: Duration = .seconds(2)
     private static let commandTimeout: Duration = .seconds(10)
     private static let maxRestarts = 3
     private static let watchdogInterval: Duration = .seconds(5)
@@ -21,6 +38,8 @@ final class ExtensionService {
     private let home = VozHome()
     private let output: TextOutput
     private let toast: ToastController
+    private let settings: AppSettings
+    let catalog = ExtensionCatalog()
     private var host: ExtensionHost?
     private var manifest: HostManifest?
     private var restarts = 0
@@ -29,10 +48,12 @@ final class ExtensionService {
     private var reloading: Task<Void, Never>?
     private var watchdog: Task<Void, Never>?
     private var watcher: FileWatcher?
+    private var loadedExtensionSettings: Data?
 
-    init(output: TextOutput, toast: ToastController) {
+    init(output: TextOutput, toast: ToastController, settings: AppSettings) {
         self.output = output
         self.toast = toast
+        self.settings = settings
     }
 
     func start() {
@@ -52,14 +73,16 @@ final class ExtensionService {
             await host?.stop()
             host = nil
             manifest = nil
+            loadedExtensionSettings = try? home.extensionSettings()
             watch()
-            guard home.hasExtensions else { return }
+            guard home.hasEnabledExtensions else { return catalog.show(nil) }
             do {
                 try home.writeAuthoringFiles(from: Self.resources)
                 try await launch()
             } catch {
                 Log.extensions.error("Extensions failed to start: \(String(describing: error), privacy: .public)")
                 toast.show("Could not start extensions")
+                catalog.show(nil)
             }
         }
     }
@@ -67,6 +90,40 @@ final class ExtensionService {
     func cleanupPrompt(_ prompt: String, app: HostApp) async -> String {
         guard let host, manifest?.subscribes(to: .beforeCleanup) == true else { return prompt }
         return await host.beforeCleanup(prompt: prompt, app: app, timeout: Self.cleanupPromptTimeout)
+    }
+
+    func hasSpeechModel(_ id: String) -> Bool {
+        manifest?.speechModels.contains { $0.id == id } == true
+    }
+
+    func cleanupExtensions(model: String, app: HostApp) -> CleanupExtensions {
+        let extensionModel: CleanupExtensions.Model = { [weak self] text, prompt, timeout in
+            await self?.host?.clean(model: model, text: text, prompt: prompt, app: app, timeout: timeout)
+        }
+        let usesExtensionModel = manifest?.cleanupModels.contains { $0.id == model } == true
+        return CleanupExtensions(model: usesExtensionModel ? extensionModel : nil) { [weak self] id, text, deadline in
+            await self?.runStep(id, text: text, app: app, deadline: deadline) ?? text
+        }
+    }
+
+    func transcribe(_ samples: [Float], model: String, app: HostApp) async -> String? {
+        guard let host, hasSpeechModel(model) else { return nil }
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("voz-segment-\(UUID().uuidString).wav")
+        defer { try? FileManager.default.removeItem(at: file) }
+        do {
+            try WAVEncoder.encode(samples, sampleRate: Int(RecordingFilter.sampleRate)).write(to: file)
+        } catch {
+            Log.extensions.error("Segment file write failed: \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
+        let seconds = Double(samples.count) / RecordingFilter.sampleRate
+        return await host.transcribe(model: model, path: file.path, seconds: seconds, app: app, timeout: Self.transcribeTimeout)
+    }
+
+    private func runStep(_ id: String, text: String, app: HostApp, deadline: ContinuousClock.Instant) async -> String {
+        let timeout = min(Self.cleanupStepTimeout, deadline - .now)
+        guard timeout > .zero, let host, manifest?.cleanupSteps.contains(where: { $0.id == id }) == true else { return text }
+        return await host.cleanupStep(id, text: text, app: app, timeout: timeout) ?? text
     }
 
     func prepare(_ text: String, raw: String, app: HostApp) async -> ExtensionDelivery {
@@ -125,6 +182,7 @@ final class ExtensionService {
         Log.extensions.notice("Extensions loaded: \(manifest.extensions.joined(separator: ", "), privacy: .public)")
         self.host = host
         self.manifest = manifest
+        catalog.show(manifest)
         started = .now
         watchdog = Task { [weak self] in await self?.watch(host) }
     }
@@ -132,10 +190,17 @@ final class ExtensionService {
     private func watch() {
         try? FileManager.default.createDirectory(at: home.extensions, withIntermediateDirectories: true)
         let paths = [home.extensions.path, home.settings.path] + ((try? home.localPackageDirectories()) ?? []).map(\.path)
-        watcher = FileWatcher(paths: paths) { [weak self] in
-            self?.restarts = 0
-            self?.reload()
+        watcher = FileWatcher(paths: paths) { [weak self] changed in
+            self?.filesChanged(changed)
         }
+    }
+
+    private func filesChanged(_ changed: [String]) {
+        settings.reloadPipeline()
+        let onlySettingsFolder = changed.allSatisfy { URL(fileURLWithPath: $0).deletingLastPathComponent().standardizedFileURL == home.root.standardizedFileURL }
+        if onlySettingsFolder, (try? home.extensionSettings()) == loadedExtensionSettings { return }
+        restarts = 0
+        reload()
     }
 
     private func watch(_ host: ExtensionHost) async {

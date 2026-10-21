@@ -2,14 +2,24 @@ import SwiftUI
 import VozCore
 
 struct SpeechModelPicker: View {
-    @Binding var selection: SpeechModel
+    @Binding var selection: String
+    var extensions: [ModelOption] = []
     var status: ModelStatus?
     var showsTitle = true
     @Namespace private var highlight
 
+    private var downloadable: SpeechModel? {
+        SpeechModel(rawValue: selection).flatMap { $0 == .appleSpeech ? nil : $0 }
+    }
+
+    private var extensionRows: [ModelOption] {
+        let known = SpeechModel(rawValue: selection) != nil || extensions.contains { $0.id == selection }
+        return known ? extensions : extensions + [ModelOption(id: selection, name: selection, detail: "Not loaded")]
+    }
+
     private var showsStatus: Bool {
-        guard let status, selection != .appleSpeech else { return false }
-        if case .ready = status.state(for: selection) { return false }
+        guard let status, let downloadable else { return false }
+        if case .ready = status.state(for: downloadable) { return false }
         return true
     }
 
@@ -18,22 +28,31 @@ struct SpeechModelPicker: View {
             if showsTitle { title }
             HStack(spacing: 6) {
                 ForEach(SpeechModel.allCases, id: \.self) { model in
-                    SpeechModelCard(model: model, selected: model == selection, highlight: highlight) {
-                        withAnimation(.spring(duration: 0.3, bounce: 0.15)) { selection = model }
+                    SpeechModelCard(model: model, selected: model.rawValue == selection, highlight: highlight) {
+                        choose(model.rawValue)
                     }
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
+            ForEach(extensionRows, id: \.self) { option in
+                ModelOptionRow(option: option, selected: option.id == selection, highlight: highlight) {
+                    choose(option.id)
+                }
+            }
         }
         .padding(.vertical, showsTitle ? 10 : 0)
+    }
+
+    private func choose(_ id: String) {
+        withAnimation(.spring(duration: 0.3, bounce: 0.15)) { selection = id }
     }
 
     private var title: some View {
         HStack(spacing: 12) {
             Text("Speech model").font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
             Spacer(minLength: 0)
-            if showsStatus, let status {
-                ModelStatusLabel(status: status, model: selection)
+            if showsStatus, let status, let downloadable {
+                ModelStatusLabel(status: status, model: downloadable)
                     .font(.meta)
                     .foregroundStyle(Theme.inkSecondary)
                     .lineLimit(1)

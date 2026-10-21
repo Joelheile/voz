@@ -14,10 +14,13 @@ import type {
   BeforeCleanupResult,
   BeforeInsertEvent,
   BeforeInsertResult,
+  CleanupModel,
+  CleanupStep,
   CommandEvent,
   Context,
   Extension,
   ExtensionAPI,
+  SpeechModel,
 } from "./voz.d.ts";
 
 type Launch = {
@@ -41,9 +44,14 @@ type CleanupRequest = BeforeCleanupEvent & { app: App };
 type InsertRequest = BeforeInsertEvent & { app: App };
 type EmitRequest = { event: EventName; payload: object; app: App };
 type CommandRequest = CommandEvent & { phrase: string; app: App };
-type Entry = { name: string; path?: string };
+type TranscribeRequest = { model: string; path: string; seconds: number; app: App };
+type CleanRequest = { model: string; text: string; prompt: string; app: App };
+type StepRequest = { step: string; text: string; app: App };
+type Component = { id: string; name: string };
+type Entry = { name: string; path?: string; requires?: number };
 type LoadError = { extension: string; message: string };
 
+const apiVersion = 1;
 const loadTimeout = 3000;
 const write = process.stdout.write.bind(process.stdout);
 const send = (message: object) => write(JSON.stringify(message) + "\n");
@@ -72,6 +80,9 @@ const eventNames: EventName[] = [
 ];
 const handlers = new Map<EventName, Handler[]>();
 const commands = new Map<string, Command>();
+const speechModels = new Map<string, SpeechModel>();
+const cleanupModels = new Map<string, CleanupModel>();
+const cleanupSteps = new Map<string, CleanupStep>();
 const loaded: string[] = [];
 const errors: LoadError[] = [];
 const bus = new EventEmitter();
@@ -80,7 +91,7 @@ Bun.plugin({
   name: "voz",
   setup(build) {
     build.module("voz", () => ({
-      exports: { defineExtension: (extension: Extension) => extension },
+      exports: { apiVersion, defineExtension: (extension: Extension) => extension },
       loader: "object",
     }));
   },
@@ -93,6 +104,28 @@ function context(app: App): Context {
     press: (key) => send({ method: "press", params: { key } }),
     notify: (text) => send({ method: "notify", params: { text } }),
   };
+}
+
+function register<T extends Component>(
+  registry: Map<string, T>,
+  kind: string,
+  extension: string,
+  component: T,
+) {
+  if (!component.id || !component.name)
+    throw new Error(`A ${kind} needs an id and a name`);
+  const id = `${extension}/${component.id}`;
+  registry.set(id, { ...component, id });
+}
+
+function components(registry: Map<string, Component>): Component[] {
+  return [...registry.values()].map(({ id, name }) => ({ id, name }));
+}
+
+function find<T>(registry: Map<string, T>, kind: string, id: string): T {
+  const component = registry.get(id);
+  if (!component) throw new Error(`No ${kind} "${id}"`);
+  return component;
 }
 
 function readJSON(path: string): any {
@@ -125,9 +158,11 @@ function looseEntries(directory: string): Entry[] {
 function packageEntries(directory: string): Entry[] {
   const manifest = readJSON(join(directory, "package.json")) ?? {};
   const name: string = manifest.name ?? basename(directory);
+  const origin = { requires: manifest.voz?.apiVersion };
   const declared: string[] | undefined = manifest.voz?.extensions;
   if (declared)
     return declared.map((path, index) => ({
+      ...origin,
       name: declared.length > 1 ? `${name}/${index}` : name,
       path: resolve(directory, path),
     }));
@@ -135,9 +170,14 @@ function packageEntries(directory: string): Entry[] {
   if (existsSync(folder))
     return looseEntries(folder).map((entry) => ({
       ...entry,
+      ...origin,
       name: `${name}/${entry.name}`,
     }));
-  return [{ name, path: entryIn(directory) }];
+  return [{ ...origin, name, path: entryIn(directory) }];
+}
+
+function isDisabled(name: string, disabled: string[]) {
+  return disabled.some((off) => name === off || name.startsWith(`${off}/`));
 }
 
 function api(name: string, config: ExtensionAPI["config"]): ExtensionAPI {
@@ -166,6 +206,12 @@ function api(name: string, config: ExtensionAPI["config"]): ExtensionAPI {
         log(`${name} replaces command "${phrase}" from ${existing.extension}`);
       commands.set(key, { extension: name, phrase, run: handler });
     },
+    registerSpeechModel: (model) =>
+      register(speechModels, "speech model", name, model),
+    registerCleanupModel: (model) =>
+      register(cleanupModels, "cleanup model", name, model),
+    registerCleanupStep: (step) =>
+      register(cleanupSteps, "cleanup step", name, step),
     log: (message) => log(`[${name}] ${message}`),
   };
 }
@@ -176,7 +222,9 @@ async function load() {
     ...looseEntries(launch.extensionsDirectory),
     ...launch.packages.flatMap(packageEntries),
   ];
+  const disabled: string[] = settings.disabled ?? [];
   for (const entry of entries) {
+    if (isDisabled(entry.name, disabled)) continue;
     try {
       await withinLoadTimeout(loadEntry(entry, settings.config?.[entry.name]));
       loaded.push(entry.name);
@@ -190,6 +238,10 @@ async function loadEntry(entry: Entry, config: ExtensionAPI["config"] = {}) {
   if (!entry.path)
     throw new Error(
       "No entry. Add voz.extensions to package.json, an extensions folder or an index.ts",
+    );
+  if (entry.requires && entry.requires > apiVersion)
+    throw new Error(
+      `Needs Voz extension API ${entry.requires}, this Voz has ${apiVersion}. Update Voz.`,
     );
   const module = await import(entry.path);
   if (typeof module.default !== "function")
@@ -255,10 +307,37 @@ async function command({ phrase, text, app }: CommandRequest) {
   return { handled: true };
 }
 
+async function transcribe({ model, path, seconds, app }: TranscribeRequest) {
+  const result = await find(speechModels, "speech model", model).transcribe(
+    { path, seconds },
+    context(app),
+  );
+  return { text: String(result.text) };
+}
+
+async function clean({ model, text, prompt, app }: CleanRequest) {
+  const result = await find(cleanupModels, "cleanup model", model).clean(
+    { text, prompt },
+    context(app),
+  );
+  return { text: String(result.text) };
+}
+
+async function cleanupStep({ step, text, app }: StepRequest) {
+  const result = await find(cleanupSteps, "cleanup step", step).run(
+    { text },
+    context(app),
+  );
+  return { text: result && typeof result.text === "string" ? result.text : text };
+}
+
 const methods: Record<string, (params: any) => Promise<object>> = {
   beforeCleanup,
   beforeInsert,
+  clean,
+  cleanupStep,
   command,
+  transcribe,
   emit,
   ping: async () => ({}),
 };
@@ -270,6 +349,9 @@ send({
     extensions: loaded,
     events: [...handlers.keys()],
     commands: [...commands.values()].map((command) => command.phrase),
+    speechModels: components(speechModels),
+    cleanupModels: components(cleanupModels),
+    cleanupSteps: components(cleanupSteps),
     errors,
   },
 });
