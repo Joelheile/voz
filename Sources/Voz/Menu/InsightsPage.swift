@@ -55,7 +55,7 @@ struct InsightsPage: View {
             sentences.append("You speak at \(Int(pace.rounded())) words per minute.")
         }
         if stats.currentStreak > 0 {
-            sentences.append("You are on a \(stats.currentStreak)-day streak. Your longest is \(StatsFormat.days(stats.longestStreak)).")
+            sentences.append("You're on a \(stats.currentStreak)-day streak. Your best is \(StatsFormat.days(stats.longestStreak)).")
         }
         if stats.fillerWordsRemoved > 0 {
             sentences.append("Voz removed \(stats.fillerWordsRemoved.formatted()) filler words.")

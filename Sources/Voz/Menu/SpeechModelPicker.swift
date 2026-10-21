@@ -4,6 +4,7 @@ import VozCore
 struct SpeechModelPicker: View {
     @Binding var selection: SpeechModel
     var status: ModelStatus?
+    var showsTitle = true
     @Namespace private var highlight
 
     private var showsStatus: Bool {
@@ -14,16 +15,7 @@ struct SpeechModelPicker: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                Text("Speech model").font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
-                Spacer(minLength: 0)
-                if showsStatus, let status {
-                    ModelStatusLabel(status: status, model: selection)
-                        .font(.meta)
-                        .foregroundStyle(Theme.inkSecondary)
-                        .lineLimit(1)
-                }
-            }
+            if showsTitle { title }
             HStack(spacing: 6) {
                 ForEach(SpeechModel.allCases, id: \.self) { model in
                     SpeechModelCard(model: model, selected: model == selection, highlight: highlight) {
@@ -33,7 +25,20 @@ struct SpeechModelPicker: View {
             }
             .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, showsTitle ? 10 : 0)
+    }
+
+    private var title: some View {
+        HStack(spacing: 12) {
+            Text("Speech model").font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
+            Spacer(minLength: 0)
+            if showsStatus, let status {
+                ModelStatusLabel(status: status, model: selection)
+                    .font(.meta)
+                    .foregroundStyle(Theme.inkSecondary)
+                    .lineLimit(1)
+            }
+        }
     }
 }
 
@@ -64,7 +69,7 @@ private struct SpeechModelCard: View {
                 Spacer(minLength: 0)
                 RowDivider()
                 VStack(alignment: .leading, spacing: 3) {
-                    Metric(value: model.errorRate.formatted(.percent.scale(1).precision(.fractionLength(1))), label: "errors")
+                    Metric(value: model.errorRate.formatted(.percent.scale(1).precision(.fractionLength(1)).locale(Locale(identifier: "en_US"))), label: "errors")
                     Metric(value: "\(model.speedFactor)×", label: "speed")
                     Metric(value: model.size, label: nil)
                 }

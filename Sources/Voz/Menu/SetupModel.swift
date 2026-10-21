@@ -3,8 +3,15 @@ import Combine
 import Foundation
 import VozCore
 
+enum SetupStep: Int, CaseIterable {
+    case access
+    case model
+    case tryIt
+}
+
 @MainActor
 final class SetupModel: ObservableObject {
+    @Published var step = SetupStep.access
     @Published private(set) var microphoneStatus = Permissions.microphoneStatus
     @Published private(set) var accessibilityGranted = Permissions.accessibilityGranted
     @Published private(set) var inputMonitoringGranted = Permissions.inputMonitoringGranted

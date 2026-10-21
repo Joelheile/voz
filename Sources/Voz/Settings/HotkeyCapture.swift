@@ -6,10 +6,11 @@ import VozCore
 final class HotkeyCapture: ObservableObject {
     @Published private(set) var isListening = false
     @Published private(set) var warning: String?
+    @Published private(set) var preview: Hotkey?
 
     private let settings: AppSettings
     private var monitor: Any?
-    private var pendingModifier: Hotkey?
+    private var heldKey: UInt16?
 
     init(settings: AppSettings) {
         self.settings = settings
@@ -20,7 +21,7 @@ final class HotkeyCapture: ObservableObject {
         isListening = true
         warning = nil
         settings.isCapturingHotkey = true
-        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp, .flagsChanged]) { [weak self] event in
             guard let self else { return event }
             MainActor.assumeIsolated { self.handle(event) }
             return nil
@@ -31,7 +32,8 @@ final class HotkeyCapture: ObservableObject {
         guard isListening else { return }
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
-        pendingModifier = nil
+        preview = nil
+        heldKey = nil
         isListening = false
         settings.isCapturingHotkey = false
     }
@@ -40,30 +42,35 @@ final class HotkeyCapture: ObservableObject {
         let flags = event.cgEvent?.flags ?? []
         switch event.type {
         case .keyDown:
-            pendingModifier = nil
+            guard !event.isARepeat else { return }
             if event.keyCode == 53, flags.intersection(Hotkey.relevantModifiers).isEmpty {
                 cancel()
                 return
             }
-            commit(Hotkey(keyCode: event.keyCode, modifiers: flags))
+            heldKey = event.keyCode
+            preview = Hotkey(keyCode: event.keyCode, modifiers: flags)
+        case .keyUp:
+            if event.keyCode == heldKey { heldKey = nil }
+            commitIfReleased(flags)
         case .flagsChanged:
-            handleModifier(keyCode: event.keyCode, flags: flags)
+            grow(keyCode: event.keyCode, flags: flags)
+            commitIfReleased(flags)
         default:
             break
         }
     }
 
-    private func handleModifier(keyCode: UInt16, flags: CGEventFlags) {
+    private func grow(keyCode: UInt16, flags: CGEventFlags) {
+        guard heldKey == nil, preview?.isModifierOnly ?? true else { return }
         let candidate = Hotkey(keyCode: keyCode, modifiers: flags)
-        guard let ownFlag = candidate.ownModifierFlag else { return }
-        if flags.contains(ownFlag) {
-            let others = flags.intersection(Hotkey.relevantModifiers).subtracting(ownFlag)
-            pendingModifier = others.isEmpty ? candidate : nil
-        } else if let pending = pendingModifier, pending.keyCode == keyCode {
-            commit(pending)
-        } else {
-            pendingModifier = nil
-        }
+        guard let ownFlag = candidate.ownModifierFlag, flags.contains(ownFlag) else { return }
+        if let preview, !candidate.modifiers.isStrictSuperset(of: preview.modifiers) { return }
+        preview = candidate
+    }
+
+    private func commitIfReleased(_ flags: CGEventFlags) {
+        guard heldKey == nil, flags.intersection(Hotkey.chordModifiers).isEmpty, let preview else { return }
+        commit(preview)
     }
 
     private func commit(_ hotkey: Hotkey) {

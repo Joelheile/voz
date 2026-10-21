@@ -21,7 +21,10 @@ enum DesignRender {
             for (title, page) in pages {
                 try write(fixture.popover(page: page), to: outputDirectory, name: "popover-\(title)-\(suffix)", appearance: appearance)
             }
-            try write(fixture.popover(needsSetup: true), to: outputDirectory, name: "popover-setup-\(suffix)", appearance: appearance)
+            for step in SetupStep.allCases {
+                fixture.sources.setup.step = step
+                try write(fixture.popover(needsSetup: true), to: outputDirectory, name: "popover-setup-\(step)-\(suffix)", appearance: appearance)
+            }
         }
     }
 

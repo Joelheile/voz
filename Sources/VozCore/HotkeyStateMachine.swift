@@ -66,14 +66,26 @@ public struct HotkeyStateMachine: Sendable {
         keyCode: UInt16, flags: CGEventFlags, time: TimeInterval, isRecording: Bool
     ) -> HotkeyAction {
         guard let ownFlag = hotkey.ownModifierFlag else { return .none }
+        if hotkey.isChord { return handleChordFlags(flags: flags, time: time, isRecording: isRecording) }
         guard keyCode == hotkey.keyCode else {
             markChordIfDown()
             return .none
         }
         if downSince != nil { return release(at: time) }
-        guard flags.contains(ownFlag), flags.intersection(Hotkey.relevantModifiers) == hotkey.modifiers else {
+        guard flags.contains(ownFlag), flags.intersection(hotkey.matchedModifiers) == hotkey.modifiers else {
             return .none
         }
+        return press(at: time, isRecording: isRecording)
+    }
+
+    private mutating func handleChordFlags(flags: CGEventFlags, time: TimeInterval, isRecording: Bool) -> HotkeyAction {
+        let held = flags.intersection(hotkey.matchedModifiers)
+        if downSince != nil {
+            guard held.isSuperset(of: hotkey.modifiers) else { return release(at: time) }
+            if held != hotkey.modifiers { chordDetected = true }
+            return .none
+        }
+        guard held == hotkey.modifiers else { return .none }
         return press(at: time, isRecording: isRecording)
     }
 

@@ -9,7 +9,7 @@ struct PageBar: View {
             IconButton(symbol: "chevron.left", help: "Back", action: back)
                 .keyboardShortcut("[", modifiers: .command)
             Text(title)
-                .font(.display(20))
+                .font(.display(17))
                 .foregroundStyle(Theme.ink)
             Spacer(minLength: 0)
         }

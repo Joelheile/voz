@@ -23,13 +23,14 @@ extension Hotkey {
     ]
 
     public var displayName: String {
+        if isChord { return modifierSymbols }
         if let name = Hotkey.modifierKeyNames[keyCode] { return name }
         let key = Hotkey.keyNames[keyCode] ?? "Key \(keyCode)"
         return modifierSymbols + key
     }
 
     private var modifierSymbols: String {
-        var symbols = ""
+        var symbols = modifiers.contains(.maskSecondaryFn) ? "fn " : ""
         if modifiers.contains(.maskControl) { symbols += "⌃" }
         if modifiers.contains(.maskAlternate) { symbols += "⌥" }
         if modifiers.contains(.maskShift) { symbols += "⇧" }

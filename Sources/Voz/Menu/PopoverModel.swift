@@ -10,7 +10,7 @@ enum PermissionFix: Equatable {
     var detail: String {
         switch self {
         case .microphone, .microphoneBlocked: "Allow microphone access to dictate."
-        case .accessibility: "Allow Accessibility to insert text into other apps."
+        case .accessibility: "Allow Accessibility so Voz can type into other apps."
         }
     }
 

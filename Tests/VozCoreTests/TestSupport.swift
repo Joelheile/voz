@@ -25,3 +25,7 @@ func removeFile(atPath path: String) {
 func roundTripThroughJSON(_ hotkey: Hotkey) throws -> Hotkey {
     try JSONDecoder().decode(Hotkey.self, from: JSONEncoder().encode(hotkey))
 }
+
+func decodeHotkey(_ json: String) throws -> Hotkey {
+    try JSONDecoder().decode(Hotkey.self, from: Data(json.utf8))
+}

@@ -50,7 +50,7 @@ struct SettingsPage: View {
     private var dictation: some View {
         PanelGroup(title: "Dictation") {
             PanelRow(title: "Shortcut", detail: capture.warning) {
-                Button(capture.isListening ? "Press a key…" : settings.hotkey.displayName) {
+                Button(capture.isListening ? capture.preview?.displayName ?? "Press keys…" : settings.hotkey.displayName) {
                     capture.isListening ? capture.cancel() : capture.begin()
                 }
                 .buttonStyle(.pill(capture.isListening ? .accent : .quiet, height: 28))
@@ -65,7 +65,7 @@ struct SettingsPage: View {
                 .fixedSize()
             }
             SpeechModelPicker(selection: $settings.speechModel, status: status)
-            PanelRow(title: "Clean up text", detail: "Removes filler words, fixes punctuation") {
+            PanelRow(title: "Clean up text", detail: "Drops filler words and fixes punctuation") {
                 Toggle("Clean up text", isOn: $settings.cleanupEnabled).labelsHidden()
             }
             if settings.cleanupEnabled {

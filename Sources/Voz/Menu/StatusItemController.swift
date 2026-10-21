@@ -177,7 +177,7 @@ final class StatusItemController: NSObject {
         switch status {
         case .ready: DictationHint.idle(hotkey: settings.hotkey, holdToTalk: settings.holdToTalk)
         case .recording: DictationHint.recording(hotkey: settings.hotkey, holdToTalk: settings.holdToTalk)
-        case .transcribing: "Processing your recording"
+        case .transcribing: "Turning your speech into text"
         case let .loadingModel(detail, _): detail
         case let .modelFailed(message): message
         case let .permissionNeeded(fix): fix.detail

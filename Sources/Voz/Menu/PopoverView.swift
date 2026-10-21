@@ -39,7 +39,7 @@ struct PopoverView: View {
     @ViewBuilder
     private var page: some View {
         if model.needsSetup {
-            SetupPage(model: sources.setup, settings: sources.settings, finish: model.actions.finishSetup)
+            SetupPage(model: sources.setup, settings: sources.settings, history: sources.history, finish: model.actions.finishSetup)
         } else {
             switch model.page {
             case .home:
@@ -95,7 +95,7 @@ private struct HomePage: View {
             HStack(spacing: 8) {
                 if model.status == .recording { RecordingMark() }
                 Text(model.status.title)
-                    .font(.display(20))
+                    .font(.display(17))
                     .foregroundStyle(Theme.ink)
             }
             Text(model.hint)
