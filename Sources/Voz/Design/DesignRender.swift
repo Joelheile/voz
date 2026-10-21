@@ -101,7 +101,7 @@ private final class Fixture {
             setup: SetupModel(analytics: analytics),
             extensions: ExtensionsModel(home: VozHome(root: FileManager.default.temporaryDirectory.appendingPathComponent("voz-render-home")), fetch: { Self.listings })
         )
-        status.update(.parakeetV3, .ready(bytes: 483_000_000))
+        status.update(.parakeetUltra, .ready(bytes: 483_000_000))
     }
 
     func popover(status: PopoverStatus = .ready, hint: String = "", page: PopoverPage = .home, needsSetup: Bool = false) -> some View {
@@ -162,7 +162,7 @@ private final class Fixture {
             audioSeconds: Double(text.split(separator: " ").count) / 2.6,
             sttMs: 180,
             totalMs: 420,
-            model: SpeechModel.parakeetV3.rawValue,
+            model: SpeechModel.parakeetUltra.rawValue,
             appBundleID: nil,
             appName: app,
             fillerWordsRemoved: text.count % 4

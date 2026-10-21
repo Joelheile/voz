@@ -79,7 +79,7 @@ public final class AppSettings: ObservableObject {
             SettingsKey.muteWhileRecording: true,
             SettingsKey.copyToClipboard: true,
             SettingsKey.insertIntoApp: true,
-            SettingsKey.speechModel: SpeechModel.parakeetV3.rawValue,
+            SettingsKey.speechModel: SpeechModel.parakeetUltra.rawValue,
             SettingsKey.soundCues: false,
             SettingsKey.launchAtLogin: true,
             SettingsKey.onboardingCompleted: false,
@@ -94,7 +94,7 @@ public final class AppSettings: ObservableObject {
         muteWhileRecording = defaults.bool(forKey: SettingsKey.muteWhileRecording)
         copyToClipboard = defaults.bool(forKey: SettingsKey.copyToClipboard)
         insertIntoApp = defaults.bool(forKey: SettingsKey.insertIntoApp)
-        speechModel = defaults.string(forKey: SettingsKey.speechModel).flatMap(SpeechModel.init) ?? .parakeetV3
+        speechModel = defaults.string(forKey: SettingsKey.speechModel).flatMap(SpeechModel.init) ?? .parakeetUltra
         soundCues = defaults.bool(forKey: SettingsKey.soundCues)
         launchAtLogin = defaults.bool(forKey: SettingsKey.launchAtLogin)
         onboardingCompleted = defaults.bool(forKey: SettingsKey.onboardingCompleted)

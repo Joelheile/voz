@@ -160,7 +160,7 @@ enum Headless {
     }
 
     private static func speechModel(in arguments: [String]) -> SpeechModel {
-        value(of: "--model", in: arguments).flatMap(SpeechModel.init) ?? .parakeetV3
+        value(of: "--model", in: arguments).flatMap(SpeechModel.init) ?? .parakeetUltra
     }
 
     private static func vocabulary(in arguments: [String]) -> [String] {
