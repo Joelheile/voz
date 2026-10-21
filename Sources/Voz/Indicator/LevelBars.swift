@@ -12,24 +12,17 @@ struct LevelBars: View {
             let time = timeline.date.timeIntervalSinceReferenceDate
             HStack(spacing: LevelBarsGeometry.barSpacing) {
                 ForEach(0...LevelBarsGeometry.barCount, id: \.self) { slot in
+                    let taper = reduceMotion ? 1 : LevelBarsGeometry.taper(slot: slot, time: time)
                     Capsule()
                         .fill(Theme.accent)
-                        .frame(width: LevelBarsGeometry.barWidth, height: LevelBarsGeometry.height(level: level(slot: slot, time: time)))
+                        .frame(width: LevelBarsGeometry.barWidth, height: LevelBarsGeometry.height(level: level(slot: slot, time: time), taper: taper))
+                        .opacity(taper)
                 }
             }
             .offset(x: reduceMotion ? 0 : LevelBarsGeometry.scrollOffset(time: time))
             .frame(width: LevelBarsGeometry.visibleWidth, height: LevelBarsGeometry.maxHeight, alignment: .trailing)
-            .mask(fade)
         }
         .padding(.trailing, LevelBarsGeometry.trailingInset)
-    }
-
-    private var fade: LinearGradient {
-        LinearGradient(
-            stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.45)],
-            startPoint: .leading,
-            endPoint: .trailing
-        )
     }
 
     private func level(slot: Int, time: Double) -> Float {
@@ -45,7 +38,7 @@ struct ProgressDots: View {
         HStack(spacing: 4) {
             ForEach(0..<3, id: \.self) { index in
                 Circle()
-                    .fill(.white)
+                    .fill(.primary)
                     .frame(width: 4.5, height: 4.5)
                     .opacity(phase ? 0.95 : 0.25)
                     .scaleEffect(phase ? 1 : 0.7)

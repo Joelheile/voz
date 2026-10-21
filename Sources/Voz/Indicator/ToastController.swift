@@ -60,37 +60,17 @@ private struct ToastView: View {
     var body: some View {
         Text(model.text)
             .font(.ui(13, weight: .medium))
-            .foregroundStyle(.white)
+            .foregroundStyle(.primary)
             .multilineTextAlignment(.center)
             .lineLimit(3)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
             .frame(maxWidth: maxWidth)
-            .background {
-                ZStack {
-                    VisualEffectBackground()
-                    Color.black.opacity(0.35)
-                }
-            }
-            .clipShape(Capsule())
-            .overlay(Capsule().strokeBorder(.white.opacity(0.1), lineWidth: 0.5))
+            .hudCapsule()
             .scaleEffect(reduceMotion || model.isShown ? 1 : 0.9, anchor: .top)
             .opacity(model.isShown ? 1 : 0)
             .animation(reduceMotion ? IndicatorMotion.reducedMotion : IndicatorMotion.open, value: model.isShown)
             .fixedSize()
     }
-}
-
-private struct VisualEffectBackground: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView()
-        view.material = .hudWindow
-        view.blendingMode = .behindWindow
-        view.state = .active
-        view.appearance = NSAppearance(named: .darkAqua)
-        return view
-    }
-
-    func updateNSView(_ view: NSVisualEffectView, context: Context) {}
 }

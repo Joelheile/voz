@@ -12,7 +12,7 @@ struct IndicatorLeading: View {
         )
         .font(.ui(12, weight: .medium))
         .monospacedDigit()
-        .foregroundStyle(.white.opacity(model.state == .recording ? 0.9 : 0.4))
+        .foregroundStyle(.primary.opacity(model.state == .recording ? 0.9 : 0.4))
         .animation(.easeOut(duration: 0.2), value: model.state)
     }
 }
@@ -29,7 +29,7 @@ struct IndicatorTrailing: View {
             case .transcribing:
                 ProgressDots().transition(swap)
             case .done:
-                ResultSymbol(name: "checkmark", color: .white, effect: .drawOn).transition(swap)
+                ResultSymbol(name: "checkmark", color: .primary, effect: .drawOn).transition(swap)
             case .failed:
                 ResultSymbol(name: "exclamationmark", color: .orange, effect: .bounce).transition(swap)
             }

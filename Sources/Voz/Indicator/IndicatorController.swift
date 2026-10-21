@@ -164,6 +164,7 @@ final class IndicatorController {
 
     private func install(_ layout: IndicatorLayout) {
         self.layout = layout
+        panel.appearance = layout.style == .notch ? NSAppearance(named: .darkAqua) : nil
         let hosting = NSHostingView(rootView: IndicatorView(model: model, layout: layout))
         hosting.sizingOptions = []
         panel.contentView = hosting

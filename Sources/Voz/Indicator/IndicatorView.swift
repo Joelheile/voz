@@ -14,6 +14,9 @@ enum IndicatorMotion {
     static let exitBlur: CGFloat = 4
     static let hiddenScaleX: CGFloat = 0.4
     static let hiddenScaleY: CGFloat = 0.85
+    static let pillExit = Animation.easeOut(duration: 0.15)
+    static let pillHiddenScale: CGFloat = 0.9
+    static let pillHiddenOffset: CGFloat = -6
 }
 
 struct NotchContentEffect: ViewModifier {
@@ -48,6 +51,16 @@ extension AnyTransition {
                 .animation(IndicatorMotion.contentExit)
         )
     }
+
+    static var pill: AnyTransition {
+        let hidden = AnyTransition.scale(scale: IndicatorMotion.pillHiddenScale, anchor: .top)
+            .combined(with: .offset(y: IndicatorMotion.pillHiddenOffset))
+            .combined(with: .opacity)
+        return .asymmetric(
+            insertion: hidden.animation(IndicatorMotion.open),
+            removal: hidden.animation(IndicatorMotion.pillExit)
+        )
+    }
 }
 
 struct IndicatorView: View {
@@ -61,7 +74,7 @@ struct IndicatorView: View {
     }
 
     var body: some View {
-        notch
+        indicator
             .frame(width: layout.panelFrame.width, height: layout.panelFrame.height, alignment: .top)
             .keyframeAnimator(initialValue: 0.0, trigger: model.shakeCount) { view, offset in
                 view.offset(x: offset)
@@ -73,6 +86,13 @@ struct IndicatorView: View {
                     CubicKeyframe(0, duration: 0.13)
                 }
             }
+    }
+
+    @ViewBuilder private var indicator: some View {
+        switch layout.style {
+        case .notch: notch
+        case .floating: pill
+        }
     }
 
     private func transition(anchor: UnitPoint, delay: Double) -> AnyTransition {
@@ -114,8 +134,34 @@ struct IndicatorView: View {
         .animation(animation, value: model.isExpanded)
     }
 
-    private func wing<Content: View>(
-        alignment: Alignment,
+    private var pill: some View {
+        ZStack {
+            if model.isExpanded {
+                ZStack {
+                    Capsule().fill(.black).shadow(color: .black.opacity(0.25), radius: 8, y: 3)
+                    Color.clear.hudCapsule()
+                }
+                .transition(reduceMotion ? .opacity.animation(IndicatorMotion.reducedMotion) : .pill)
+            }
+            HStack(spacing: 0) {
+                revealed(anchor: .trailing, delay: IndicatorMotion.leadingDelay) {
+                    IndicatorLeading(model: model)
+                }
+                Spacer(minLength: 0)
+                revealed(anchor: .leading, delay: IndicatorMotion.trailingDelay) {
+                    IndicatorTrailing(model: model)
+                }
+                .frame(width: LevelBarsGeometry.visibleWidth + LevelBarsGeometry.trailingInset)
+            }
+            .padding(.leading, 14)
+            .padding(.trailing, 8)
+        }
+        .frame(width: IndicatorLayout.pillSize.width, height: IndicatorLayout.pillSize.height)
+        .frame(maxHeight: .infinity)
+        .animation(animation, value: model.isExpanded)
+    }
+
+    private func revealed<Content: View>(
         anchor: UnitPoint,
         delay: Double,
         @ViewBuilder content: () -> Content
@@ -125,6 +171,15 @@ struct IndicatorView: View {
                 content().transition(transition(anchor: anchor, delay: delay))
             }
         }
+    }
+
+    private func wing<Content: View>(
+        alignment: Alignment,
+        anchor: UnitPoint,
+        delay: Double,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        revealed(anchor: anchor, delay: delay, content: content)
         .frame(width: IndicatorLayout.sideWidth - notchShape.topRadius)
         .frame(width: IndicatorLayout.sideWidth, alignment: alignment)
     }

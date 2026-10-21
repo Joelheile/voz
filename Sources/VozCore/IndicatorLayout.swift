@@ -23,24 +23,48 @@ public struct ScreenMetrics: Equatable, Sendable {
 }
 
 public struct IndicatorLayout: Equatable, Sendable {
+    public enum Style: Equatable, Sendable {
+        case notch
+        case floating
+    }
+
     public static let minimumMenuBarHeight: CGFloat = 24
     public static let sideWidth: CGFloat = 68
     public static let seamOverlap: CGFloat = 1
+    public static let pillSize = CGSize(width: 108, height: 32)
+    public static let pillGap: CGFloat = 8
+    public static let shadowMargin: CGFloat = 16
 
+    public let style: Style
     public let panelFrame: CGRect
     public let collapsedWidth: CGFloat
 
     public static func make(screen: ScreenMetrics) -> IndicatorLayout {
-        let notch = screen.notchSize ?? CGSize(width: 0, height: screen.menuBarHeight)
+        guard let notch = screen.notchSize else { return floating(screen: screen) }
         let size = CGSize(width: notch.width + 2 * sideWidth, height: notch.height)
         return IndicatorLayout(
+            style: .notch,
             panelFrame: CGRect(
                 x: screen.frame.midX - size.width / 2,
                 y: screen.frame.maxY - size.height,
                 width: size.width,
                 height: size.height
             ),
-            collapsedWidth: screen.notchSize == nil ? 0 : notch.width + 2 * seamOverlap
+            collapsedWidth: notch.width + 2 * seamOverlap
+        )
+    }
+
+    private static func floating(screen: ScreenMetrics) -> IndicatorLayout {
+        let pill = CGRect(
+            x: screen.frame.midX - pillSize.width / 2,
+            y: screen.frame.maxY - screen.menuBarHeight - pillGap - pillSize.height,
+            width: pillSize.width,
+            height: pillSize.height
+        )
+        return IndicatorLayout(
+            style: .floating,
+            panelFrame: pill.insetBy(dx: -shadowMargin, dy: -shadowMargin),
+            collapsedWidth: 0
         )
     }
 }
