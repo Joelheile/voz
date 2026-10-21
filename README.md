@@ -81,6 +81,14 @@ scripts/test.sh          # run the tests
 scripts/make-app.sh      # build and sign build/voz.app
 ```
 
+## Releases and recovery
+
+Pushes to `main` publish a beta; `vX.Y.Z` tags publish stable releases. Both run the release tests, sign the app and archive, upload the release, then publish its Sparkle feed. Signing identities and the Sparkle key must stay unchanged.
+
+Updates download in the background. A requested restart waits for dictation to finish. Sparkle verifies the archive before extraction.
+
+To withdraw a broken update, remove its item from `appcast.xml` first. This protects users who have not installed it. For users already affected, revert the bad change on `main` and publish again, using a new stable patch tag if needed. Sparkle 2 requires an increasing build number and does not automatically downgrade apps. Keep data migrations compatible with the previous release when possible.
+
 ## License
 
 [MIT](LICENSE)

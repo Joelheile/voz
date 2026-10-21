@@ -23,8 +23,8 @@ jobs:
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .build
-          key: spm-${{ runner.os }}-${{ env.SWIFT_VERSION }}-${{ hashFiles('Package.resolved') }}
-          restore-keys: spm-${{ runner.os }}-${{ env.SWIFT_VERSION }}-
+          key: spm-v2-${{ runner.os }}-${{ runner.arch }}-${{ env.SWIFT_VERSION }}-${{ hashFiles('Package.swift', 'Package.resolved') }}-${{ github.sha }}
+          restore-keys: spm-v2-${{ runner.os }}-${{ runner.arch }}-${{ env.SWIFT_VERSION }}-${{ hashFiles('Package.swift', 'Package.resolved') }}-
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         id: bun
         with:
@@ -32,6 +32,4 @@ jobs:
       - name: Test
         env:
           BUN_PATH: ${{ steps.bun.outputs.bun-path }}
-        run: scripts/test.sh
-      - name: Build release
-        run: swift build -c release
+        run: scripts/test.sh release

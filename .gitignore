@@ -4,3 +4,8 @@ build/
 *.app
 .DS_Store
 docs/
+node_modules/
+__pycache__/
+*.py[cod]
+CLAUDE.local.md
+.claude/settings.local.json

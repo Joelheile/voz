@@ -34,8 +34,8 @@ jobs:
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .build
-          key: spm-${{ runner.os }}-${{ env.SWIFT_VERSION }}-${{ hashFiles('Package.resolved') }}
-          restore-keys: spm-${{ runner.os }}-${{ env.SWIFT_VERSION }}-
+          key: spm-v2-${{ runner.os }}-${{ runner.arch }}-${{ env.SWIFT_VERSION }}-${{ hashFiles('Package.swift', 'Package.resolved') }}-${{ github.sha }}
+          restore-keys: spm-v2-${{ runner.os }}-${{ runner.arch }}-${{ env.SWIFT_VERSION }}-${{ hashFiles('Package.swift', 'Package.resolved') }}-
 
       - name: Set keychain path
         run: echo "KEYCHAIN=$RUNNER_TEMP/voz.keychain-db" >> "$GITHUB_ENV"
@@ -64,7 +64,7 @@ jobs:
       - name: Test
         env:
           BUN_PATH: ${{ steps.bun.outputs.bun-path }}
-        run: scripts/test.sh
+        run: scripts/test.sh release
 
       - name: Import signing identity
         env:

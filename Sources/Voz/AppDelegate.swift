@@ -42,7 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotkeyMonitor: HotkeyMonitor?
     private var quitRequested = false
     private let indicator = IndicatorController()
-    private lazy var updater = Updater(settings: settings)
+    private lazy var updater = Updater(settings: settings, isBusy: { [weak self] in self?.dictation.phase != .idle })
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         dictation.recoverFromPreviousRun()
@@ -69,6 +69,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             self.statusItemController?.dictationChanged()
             self.indicator.sync(phase: self.dictation.phase)
+            self.updater.resumePendingInstall()
         }
         hotkeyMonitor = HotkeyMonitor(
             hotkey: settings.hotkey,

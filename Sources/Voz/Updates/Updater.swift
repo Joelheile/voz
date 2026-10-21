@@ -4,10 +4,13 @@ import VozCore
 @MainActor
 final class Updater: NSObject, SPUUpdaterDelegate {
     private let settings: AppSettings
+    private let isBusy: () -> Bool
     private var controller: SPUStandardUpdaterController?
+    private var pendingInstall: (() -> Void)?
 
-    init(settings: AppSettings) {
+    init(settings: AppSettings, isBusy: @escaping () -> Bool) {
         self.settings = settings
+        self.isBusy = isBusy
         super.init()
     }
 
@@ -19,11 +22,23 @@ final class Updater: NSObject, SPUUpdaterDelegate {
         controller?.checkForUpdates(nil)
     }
 
-    nonisolated func allowedChannels(for updater: SPUUpdater) -> Set<String> {
-        MainActor.assumeIsolated { settings.receiveBetaUpdates ? [UpdateChannel.beta.rawValue] : [] }
+    func resumePendingInstall() {
+        guard !isBusy(), let install = pendingInstall else { return }
+        pendingInstall = nil
+        install()
     }
 
-    nonisolated func updaterWillRelaunchApplication(_ updater: SPUUpdater) {
+    func updater(_ updater: SPUUpdater, shouldPostponeRelaunchForUpdate item: SUAppcastItem, untilInvokingBlock installHandler: @escaping () -> Void) -> Bool {
+        guard isBusy() else { return false }
+        pendingInstall = installHandler
+        return true
+    }
+
+    func allowedChannels(for updater: SPUUpdater) -> Set<String> {
+        settings.receiveBetaUpdates ? [UpdateChannel.beta.rawValue] : []
+    }
+
+    func updaterWillRelaunchApplication(_ updater: SPUUpdater) {
         LaunchAgent.bootOut()
     }
 }
