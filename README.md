@@ -66,7 +66,7 @@ To have a coding agent write one, open it in `~/.voz`. Voz keeps a guide for age
 
 The full API is in [EXTENSIONS.md](EXTENSIONS.md). Extensions run with your permissions, so install only ones you trust.
 
-Packages on npm come from their authors. I do not review them and I am not responsible for them or for npm. Voz never runs install scripts and skips npm versions less than a day old.
+Packages on npm come from their authors. I do not review them and I am not responsible for them or for npm. Voz never runs install scripts.
 
 ## Privacy
 
