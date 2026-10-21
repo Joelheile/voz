@@ -11,19 +11,30 @@ struct LevelBars: View {
         TimelineView(.animation(minimumInterval: reduceMotion ? 1.0 / 15 : nil, paused: !isLive)) { timeline in
             let time = timeline.date.timeIntervalSinceReferenceDate
             HStack(spacing: LevelBarsGeometry.barSpacing) {
-                ForEach(0..<LevelBarsGeometry.barCount, id: \.self) { index in
+                ForEach(0...LevelBarsGeometry.barCount, id: \.self) { slot in
                     Capsule()
-                        .fill(.white.opacity(0.9))
-                        .frame(width: LevelBarsGeometry.barWidth, height: height(index: index, time: time))
+                        .fill(Theme.accent)
+                        .frame(width: LevelBarsGeometry.barWidth, height: LevelBarsGeometry.height(level: level(slot: slot, time: time)))
                 }
             }
-            .frame(height: LevelBarsGeometry.maxHeight)
+            .offset(x: reduceMotion ? 0 : LevelBarsGeometry.scrollOffset(time: time))
+            .frame(width: LevelBarsGeometry.visibleWidth, height: LevelBarsGeometry.maxHeight, alignment: .trailing)
+            .mask(fade)
         }
+        .padding(.trailing, LevelBarsGeometry.trailingInset)
     }
 
-    private func height(index: Int, time: Double) -> CGFloat {
-        if reduceMotion { return LevelBarsGeometry.staticHeight(level: model.level, index: index) }
-        return LevelBarsGeometry.height(level: model.level, time: time, index: index)
+    private var fade: LinearGradient {
+        LinearGradient(
+            stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.45)],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+    }
+
+    private func level(slot: Int, time: Double) -> Float {
+        if reduceMotion { return model.levels.latest }
+        return model.levels.level(at: LevelBarsGeometry.sampleTime(slot: slot, time: time))
     }
 }
 

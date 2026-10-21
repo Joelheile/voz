@@ -24,7 +24,7 @@ public struct ScreenMetrics: Equatable, Sendable {
 
 public struct IndicatorLayout: Equatable, Sendable {
     public static let minimumMenuBarHeight: CGFloat = 24
-    public static let sideWidth: CGFloat = 56
+    public static let sideWidth: CGFloat = 68
     public static let seamOverlap: CGFloat = 1
 
     public let panelFrame: CGRect

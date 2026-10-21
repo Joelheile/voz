@@ -37,9 +37,9 @@ Voz answers each problem: free and open source, a tiny core with no settings maz
 
 ## Design
 
-- Dark and light mode, following the system. No other themes
+- Dark and light mode, following the system. No other themes. The notch indicator stays dark, like the hardware notch
 - Quiet look: warm canvas, white panel, Geist Pixel Square for titles, Geist for everything else. SF Pro only inside SF Symbols
-- Indigo accent (#5163F9 light, #6475FA dark) only for the status dot and Insights bars. Controls use the system accent color
+- Indigo accent (#5163F9 light, #6475FA dark) only for the status dot, Insights bars and the notch level bars. Controls use the system accent color
 - Everything lives in the menu bar panel, no main window
 - Copy: short, active, sentence case. Inline lists join with commas, no middle dots
 - The name is Voz. Lowercase `voz` only for the CLI command, module name, paths and bundle files

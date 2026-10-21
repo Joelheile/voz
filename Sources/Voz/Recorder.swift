@@ -3,34 +3,28 @@ import AudioToolbox
 import VozCore
 
 final class SampleBuffer: @unchecked Sendable {
-    struct Sink {
-        let level: LevelTap
-        let onSamples: (@Sendable ([Float]) -> Void)?
-    }
-
     private let lock = NSLock()
     private var samples: [Float] = []
-    private var sink: Sink?
+    private var onSamples: (@Sendable ([Float]) -> Void)?
 
-    func begin(_ sink: Sink) {
+    func begin(onSamples: (@Sendable ([Float]) -> Void)?) {
         lock.withLock {
             samples = []
-            self.sink = sink
+            self.onSamples = onSamples
         }
     }
 
     func append(_ chunk: [Float]) {
-        let sink = lock.withLock {
+        let onSamples = lock.withLock {
             samples.append(contentsOf: chunk)
-            return self.sink
+            return self.onSamples
         }
-        sink?.level.process(chunk)
-        sink?.onSamples?(chunk)
+        onSamples?(chunk)
     }
 
     func end() -> [Float] {
         lock.withLock {
-            sink = nil
+            onSamples = nil
             let taken = samples
             samples = []
             return taken
@@ -96,7 +90,7 @@ final class Recorder {
     private var configurationObserver: NSObjectProtocol?
 
     private(set) var isRecording = false
-    var onLevel: (@MainActor (Float) -> Void)?
+    let level = LiveLevel()
     var onSamples: (@Sendable ([Float]) -> Void)?
     var onInterrupted: (@MainActor () -> Void)?
 
@@ -122,13 +116,8 @@ final class Recorder {
     func start() throws {
         if let stale = capture, !isCurrent(stale) { discard() }
         let capture = try capture ?? makeCapture()
-        let onLevel = onLevel
-        buffer.begin(SampleBuffer.Sink(
-            level: LevelTap { level in
-                DispatchQueue.main.async { MainActor.assumeIsolated { onLevel?(level) } }
-            },
-            onSamples: onSamples
-        ))
+        level.store(0)
+        buffer.begin(onSamples: onSamples)
         do {
             try capture.engine.start()
         } catch {
@@ -179,13 +168,26 @@ final class Recorder {
             guard let converted = resampler.convert(pcm) else { return }
             buffer.append(converted)
         }
+        let meter = Self.makeMeter(storingInto: level)
+        engine.attach(meter)
+        engine.connect(input, to: meter, format: inputFormat)
         engine.prepare()
         return Capture(engine: engine, device: device, format: inputFormat)
+    }
+
+    private nonisolated static func makeMeter(storingInto level: LiveLevel) -> AVAudioSinkNode {
+        AVAudioSinkNode { @Sendable _, frameCount, audioBufferList in
+            let buffers = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: audioBufferList))
+            let samples = buffers.first?.mData?.assumingMemoryBound(to: Float.self)
+            level.store(AudioLevel.rms(samples, count: Int(frameCount)))
+            return noErr
+        }
     }
 
     private func rebuildWhileRecording() {
         Log.app.notice("Audio configuration changed, rebuilding engine")
         discard()
+        level.store(0)
         do {
             let capture = try makeCapture()
             try capture.engine.start()

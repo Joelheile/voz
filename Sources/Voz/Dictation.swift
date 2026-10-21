@@ -43,10 +43,10 @@ final class Dictation {
         }
     }
     var isRecording: Bool { phase == .recording }
+    var inputLevel: Float { AudioLevel.normalized(rms: recorder.level.rms) }
 
     var onChange: () -> Void = {}
     var onOutcome: (Outcome) -> Void = { _ in }
-    var onLevel: (Float) -> Void = { _ in }
     var onBusy: () -> Void = {}
 
     init(pipeline: DictationPipeline, settings: AppSettings, output: TextOutput, analytics: Analytics) {
@@ -54,7 +54,6 @@ final class Dictation {
         self.settings = settings
         self.output = output
         self.analytics = analytics
-        recorder.onLevel = { [weak self] level in self?.onLevel(level) }
         recorder.onInterrupted = { [weak self] in self?.stopIfRecording() }
     }
 

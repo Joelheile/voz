@@ -8,6 +8,7 @@ final class IndicatorController {
     private static let discardHold = Duration.milliseconds(250)
     private static let failureHold = Duration.milliseconds(700)
     private static let closeDuration = Duration.milliseconds(300)
+    private static let sampleInterval = 1.0 / 120
 
     private let model = IndicatorModel()
     private let panel = IndicatorPanel()
@@ -15,6 +16,10 @@ final class IndicatorController {
     private var lifecycle: Task<Void, Never>?
     private var observers: [NSObjectProtocol] = []
     private var lastPhase = Dictation.Phase.idle
+    private var sampler: Timer?
+    private var smoother = LevelSmoother()
+    private var lastSampleTime = 0.0
+    var levelSource: () -> Float = { 0 }
 
     init() {
         let reposition: @Sendable (Notification) -> Void = { [weak self] _ in
@@ -29,7 +34,8 @@ final class IndicatorController {
     func showRecording() {
         lifecycle?.cancel()
         if !panel.isVisible { present() }
-        model.level = 0
+        model.levels.reset()
+        startSampling()
         model.recordingStart = .now
         model.recordingEnd = nil
         model.state = .recording
@@ -75,7 +81,7 @@ final class IndicatorController {
             case .failed: self?.showOutcome(.failed)
             }
         }
-        dictation.onLevel = { [weak self] level in self?.pushLevel(level) }
+        levelSource = { [weak dictation] in dictation?.inputLevel ?? 0 }
         dictation.onBusy = { [weak self] in self?.shake() }
     }
 
@@ -95,12 +101,27 @@ final class IndicatorController {
         collapseAndHide()
     }
 
-    func pushLevel(_ level: Float) {
-        guard model.state == .recording else { return }
-        model.level = level
+    private func startSampling() {
+        sampler?.invalidate()
+        smoother = LevelSmoother()
+        lastSampleTime = Date.now.timeIntervalSinceReferenceDate
+        let timer = Timer(timeInterval: Self.sampleInterval, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.sampleLevel() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        sampler = timer
+    }
+
+    private func sampleLevel() {
+        let now = Date.now.timeIntervalSinceReferenceDate
+        let level = smoother.update(target: levelSource(), elapsedSeconds: now - lastSampleTime)
+        lastSampleTime = now
+        model.levels.append(level, at: now)
     }
 
     private func stopTimer() {
+        sampler?.invalidate()
+        sampler = nil
         if model.recordingEnd == nil { model.recordingEnd = .now }
     }
 
@@ -114,6 +135,7 @@ final class IndicatorController {
     }
 
     private func collapseAndHide() {
+        stopTimer()
         model.isExpanded = false
         lifecycle = Task { [weak self] in
             try? await Task.sleep(for: Self.closeDuration)

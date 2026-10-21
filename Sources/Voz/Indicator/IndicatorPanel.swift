@@ -10,6 +10,7 @@ final class IndicatorPanel: NSPanel {
         )
         isOpaque = false
         backgroundColor = .clear
+        appearance = NSAppearance(named: .darkAqua)
         hasShadow = false
         isFloatingPanel = true
         ignoresMouseEvents = true

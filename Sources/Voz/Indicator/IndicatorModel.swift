@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import VozCore
 
 enum IndicatorState: Equatable {
     case recording
@@ -17,5 +18,5 @@ final class IndicatorModel {
     var shakeCount = 0
     var recordingStart = Date.now
     var recordingEnd: Date?
-    @ObservationIgnored var level: Float = 0
+    @ObservationIgnored var levels = LevelHistory()
 }
