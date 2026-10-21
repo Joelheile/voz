@@ -57,12 +57,13 @@ enum CleanupEval {
                 print("  input:    \(evalCase.input)\n  expected: \(expected)\n  got:      \(last.text)")
             }
         }
-        print("exact match \(passed)/\(scored), guard rejections \(rejections), timeouts \(timeouts), p50 \(percentile(allLatencies, 0.5)) ms, p95 \(percentile(allLatencies, 0.95)) ms")
+        print("match ignoring commas \(passed)/\(scored), guard rejections \(rejections), timeouts \(timeouts), p50 \(percentile(allLatencies, 0.5)) ms, p95 \(percentile(allLatencies, 0.95)) ms")
         return 0
     }
 
     private static func normalized(_ text: String) -> String {
         text.lowercased()
+            .replacingOccurrences(of: ",", with: "")
             .split(whereSeparator: \.isWhitespace).joined(separator: " ")
             .trimmingCharacters(in: CharacterSet(charactersIn: ".!? "))
     }

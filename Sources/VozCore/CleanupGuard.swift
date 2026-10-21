@@ -7,6 +7,7 @@ public enum CleanupRejection: String, Sendable, Equatable {
     case tooLong
     case lowOverlap
     case droppedWords
+    case changedMeaning
 }
 
 public enum CleanupGuard {
@@ -26,6 +27,12 @@ public enum CleanupGuard {
         "no", "nein", "nee", "wait", "warte", "sorry", "mean",
     ]
 
+    private static let negations: Set<String> = [
+        "not", "never", "nothing", "nobody", "nowhere", "cannot", "nicht", "nie", "niemals", "nichts", "niemand",
+        "kein", "keine", "keinen", "keinem", "keiner", "keines",
+    ]
+    private static let clockFractions: Set<String> = ["halb", "viertel", "dreiviertel"]
+
     private static let spokenSymbolWords: Set<String> = ["dot", "at", "slash", "underscore", "dash", "colon"]
 
     public static func rejection(raw: String, cleaned: String) -> CleanupRejection? {
@@ -35,6 +42,7 @@ public enum CleanupGuard {
         if isRefusal(raw: raw, cleaned: cleaned) { return .refusal }
         if hasLeakedMarkup(raw: raw, cleaned: cleaned) { return .leakedTags }
         guard Double(cleanedWords.count) <= Double(rawWords.count) * maxLengthRatio else { return .tooLong }
+        if changesMeaning(raw: raw, cleaned: cleaned) { return .changedMeaning }
         let rawVocabulary = Set(rawWords)
         let cleanedVocabulary = Set(cleanedWords)
         let comparable = cleanedWords.filter { !$0.contains(where: \.isNumber) }
@@ -47,6 +55,21 @@ public enum CleanupGuard {
         let kept = expected.filter { cleanedVocabulary.contains($0) }.count
         let minimum = corrections == 0 ? minCoverageWithoutCorrections : minCoverageWithCorrections
         return Double(kept) / Double(expected.count) < minimum ? .droppedWords : nil
+    }
+
+    private static func changesMeaning(raw: String, cleaned: String) -> Bool {
+        let rawWords = meaningWords(raw)
+        let cleanedWords = meaningWords(cleaned)
+        return Set(rawWords).contains { word in
+            cleanedWords.filter { $0 == word }.count < rawWords.filter { $0 == word }.count
+        }
+    }
+
+    private static func meaningWords(_ text: String) -> [String] {
+        WordTokens.normalized(text).compactMap { word in
+            if negations.contains(word) || word.hasSuffix("n't") || word.hasSuffix("n\u{2019}t") { return "not" }
+            return clockFractions.contains(word) ? word : nil
+        }
     }
 
     private static func isRefusal(raw: String, cleaned: String) -> Bool {

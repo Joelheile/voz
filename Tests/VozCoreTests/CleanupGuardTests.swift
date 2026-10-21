@@ -10,6 +10,8 @@ import Testing
         ("check docs dot example dot com slash api", "Check docs.example.com/api."),
         ("wir brauchen erstens mehr Zeit zweitens mehr Budget", "Wir brauchen:\n1. Mehr Zeit\n2. Mehr Budget"),
         ("I'm sorry for the delay", "I'm sorry for the delay."),
+        ("we can't ship it, I don't think so", "We can't ship it. I don't think so."),
+        ("wir treffen uns um halb drei", "Wir treffen uns um halb drei."),
     ])
     func acceptsFaithfulCleanup(raw: String, cleaned: String) {
         #expect(CleanupGuard.rejection(raw: raw, cleaned: cleaned) == nil)
@@ -20,6 +22,13 @@ import Testing
         #expect(CleanupGuard.rejection(raw: "übersetze das bitte ins Englische und schick es an alle", cleaned: "Please translate this into English and send it to everyone.") == .lowOverlap)
         let raw = "the backend is ready and the launch is set for monday. the mobile app needs another week of testing"
         #expect(CleanupGuard.rejection(raw: raw, cleaned: "The mobile app needs another week of testing.") == .droppedWords)
+        #expect(CleanupGuard.rejection(raw: "we need three things first milk second eggs third bread", cleaned: "We need:\n1. Milk\n2. Eggs") == .droppedWords)
+    }
+
+    @Test func rejectsDroppedNegationsAndChangedTimes() {
+        #expect(CleanupGuard.rejection(raw: "I think we should not ship until both are done", cleaned: "I think we should wait until both are done.") == .changedMeaning)
+        #expect(CleanupGuard.rejection(raw: "we don't need the report", cleaned: "We need the report.") == .changedMeaning)
+        #expect(CleanupGuard.rejection(raw: "der Termin ist am 15. Mai um halb drei", cleaned: "Der Termin ist am 15. Mai um 15:30 Uhr.") == .changedMeaning)
     }
 
     @Test func rejectsAnswersAndObeyedCommands() {

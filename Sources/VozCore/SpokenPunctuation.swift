@@ -49,6 +49,7 @@ public enum SpokenPunctuation {
         "der", "die", "das", "den", "dem", "ein", "eine", "einen", "einem", "dieser", "diese", "diesem", "kein", "keinen",
         "zum", "am", "bis", "auf", "für", "wort",
     ]
+    private static let joiners: Set<String> = ["underscore", "unterstrich"]
     private static let quoteCharacters = CharacterSet(charactersIn: "\"\u{201C}\u{201D}\u{201E}\u{00AB}\u{00BB}")
 
     public static func apply(to text: String) -> String {
@@ -64,6 +65,12 @@ public enum SpokenPunctuation {
                 separator = match.symbol == .line || match.symbol == .paragraph ? "" : " "
                 capitalizeNext = match.symbol.startsSentence
                 index += match.length
+                continue
+            }
+            if joiners.contains(tokens[index].lowercased()), !output.isEmpty, index + 1 < tokens.count {
+                output += "_" + tokens[index + 1]
+                separator = " "
+                index += 2
                 continue
             }
             output += separator + (capitalizeNext ? capitalizingStart(tokens[index]) : tokens[index])

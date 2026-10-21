@@ -1,4 +1,5 @@
 import Foundation
+import NaturalLanguage
 
 public struct FillerPassResult: Equatable, Sendable {
     public let text: String
@@ -23,16 +24,30 @@ public enum FillerWords {
         options: [.caseInsensitive]
     )
 
+    private static let englishUmPattern = try! NSRegularExpression(
+        pattern: #"(?<![\p{L}\p{N}])um(?![\p{L}\p{N}])[,.…]*\s*"#,
+        options: [.caseInsensitive]
+    )
+
     public static func removeObvious(from text: String) -> FillerPassResult {
         var result = text
         var removed = 0
-        for pattern in [unambiguousPattern, punctuatedUmPattern] {
+        let patterns = isEnglish(text) ? [unambiguousPattern, englishUmPattern] : [unambiguousPattern, punctuatedUmPattern]
+        for pattern in patterns {
             let range = NSRange(result.startIndex..., in: result)
             removed += pattern.numberOfMatches(in: result, range: range)
             result = pattern.stringByReplacingMatches(in: result, range: range, withTemplate: "")
         }
         guard removed > 0 else { return FillerPassResult(text: text, removed: 0) }
         return FillerPassResult(text: capitalizingStart(tidy(result)), removed: removed)
+    }
+
+    private static func isEnglish(_ text: String) -> Bool {
+        guard WordTokens.normalized(text).contains("um") else { return false }
+        let recognizer = NLLanguageRecognizer()
+        recognizer.languageConstraints = [.english, .german]
+        recognizer.processString(text)
+        return (recognizer.languageHypotheses(withMaximum: 1)[.english] ?? 0) >= 0.9
     }
 
     public static func estimateRemoved(before: String, after: String) -> Int {
