@@ -11,7 +11,7 @@ enum PackageCLIError: Error, CustomStringConvertible {
 
     var description: String {
         switch self {
-        case .usage: "usage: voz install <npm:name | git:host/owner/repo[@ref] | https URL | path>\n       voz remove <source or name>\n       voz list\n       voz update\n       voz dev <path>"
+        case .usage: "usage: voz install <name | git:host/owner/repo[@ref] | https URL | path>\n       voz remove <source or name>\n       voz list\n       voz update\n       voz new <name>\n       voz dev <path>"
         case .alreadyInstalled(let path): "Already installed at \(path). Run voz update or voz remove first."
         case .notInstalled(let name): "No installed package matches \(name)."
         case .missing(let url): "No package at \(url.path)."
@@ -26,7 +26,7 @@ enum PackageCLI {
     private static let git = "/usr/bin/git"
 
     static func handles(_ arguments: [String]) -> Bool {
-        arguments.count > 1 && ["install", "remove", "list", "update", "dev"].contains(arguments[1])
+        arguments.count > 1 && ["install", "remove", "list", "update", "new", "dev"].contains(arguments[1])
     }
 
     static func run(_ arguments: [String]) async -> Int32 {
@@ -36,6 +36,7 @@ enum PackageCLI {
             case ("remove", let target?): try remove(target)
             case ("list", nil): try list()
             case ("update", nil): try await update()
+            case ("new", let name?): try create(name)
             case ("dev", let path?): try develop(path)
             default: throw PackageCLIError.usage
             }
@@ -96,22 +97,34 @@ enum PackageCLI {
     }
 
     private static func update() async throws {
-        let packages = try installed()
-        let bun = try await BunRuntime.ensure()
-        for package in packages where !package.source.isPinned {
-            switch package.source {
-            case .npm(let name, _):
-                try execute(bun.path, ["add", "--ignore-scripts", "--exact", "\(name)@latest"], in: home.packages)
-            case .git:
-                let directory = package.source.directory(in: home)
-                try execute(git, ["-C", directory.path, "pull", "--ff-only"])
-                try installDependencies(in: directory, bun: bun)
-            case .local:
-                break
-            }
-        }
+        let packages = try installed().filter { !$0.source.isPinned }
+        for package in packages { try await pull(package.source) }
         notifyApp()
         print("Updated \(packages.count) package\(packages.count == 1 ? "" : "s")")
+    }
+
+    static func update(_ source: PackageSource) async throws {
+        try await pull(source)
+        notifyApp()
+    }
+
+    private static func pull(_ source: PackageSource) async throws {
+        let bun = try await BunRuntime.ensure()
+        switch source {
+        case .npm(let name, _):
+            try execute(bun.path, ["add", "--ignore-scripts", "--exact", "\(name)@latest"], in: home.packages)
+        case .git:
+            let directory = source.directory(in: home)
+            try execute(git, ["-C", directory.path, "pull", "--ff-only"])
+            try installDependencies(in: directory, bun: bun)
+        case .local:
+            break
+        }
+    }
+
+    private static func create(_ name: String) throws {
+        let folder = try ExtensionTemplate.create(named: name, in: URL(fileURLWithPath: FileManager.default.currentDirectoryPath), from: ExtensionService.resources)
+        print("Created \(folder.path). Next:\n  voz dev \(folder.lastPathComponent)\n  dictate \"say hello\" in any app\n  npm publish when it works")
     }
 
     private static func develop(_ raw: String) throws {
@@ -121,6 +134,9 @@ enum PackageCLI {
         guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isFolder) else { throw PackageCLIError.missing(url) }
         guard isFolder.boolValue else { throw PackageCLIError.notAFolder(url) }
         try VozHome.writeTypes(into: url, from: ExtensionService.resources)
+        if !ExtensionTemplate.mapsTypes(in: url) {
+            print(#"Add "paths": { "voz": ["./voz.d.ts"] } to compilerOptions in tsconfig.json to get types for "voz"."#)
+        }
         let logs = Process()
         logs.executableURL = URL(fileURLWithPath: "/usr/bin/log")
         logs.arguments = ["stream", "--style", "compact", "--predicate", "subsystem == \"\(Log.subsystem)\" AND category == \"extensions\""]

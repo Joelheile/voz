@@ -108,6 +108,10 @@ public actor ExtensionHost {
         return decodeResult(CommandResult.self, from: data)?.handled ?? false
     }
 
+    public func runAction(_ id: String, app: HostApp, timeout: Duration) async -> Bool {
+        decodeResult(EmptyParams.self, from: await request("action", ActionParams(action: id, app: app), timeout: timeout)) != nil
+    }
+
     public func emit(_ event: HostEvent, app: HostApp, timeout: Duration) async {
         guard manifest?.subscribes(to: event.hook) == true else { return }
         _ = decodeResult(EmptyParams.self, from: await request("emit", EmitParams(event: event.hook.rawValue, payload: event, app: app), timeout: timeout))

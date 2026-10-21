@@ -37,6 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var statsModel = StatsModel(store: history)
     private lazy var vocabularyModel = VocabularyModel(store: history.vocabulary, analytics: analytics)
     private lazy var setupModel = SetupModel(analytics: analytics)
+    private lazy var extensionsModel = ExtensionsModel()
     private var statusItemController: StatusItemController?
     private var hotkeyMonitor: HotkeyMonitor?
     private var quitRequested = false
@@ -55,7 +56,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 stats: statsModel,
                 vocabulary: vocabularyModel,
                 setup: setupModel,
-                extensions: ExtensionsModel(),
+                extensions: extensionsModel,
                 catalog: extensions.catalog
             ),
             analytics: analytics,
@@ -108,6 +109,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updater.start()
         analytics.capture(installID.isNew ? .appInstalled : .appLaunched)
         manageLaunchAgent()
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        guard let name = urls.lazy.compactMap(ExtensionLink.packageName(in:)).first else { return }
+        statusItemController?.open(.extensions)
+        Task { await extensionsModel.reveal(name) }
     }
 
     private func manageLaunchAgent() {

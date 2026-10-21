@@ -49,16 +49,11 @@ final class TextOutput {
             Log.app.error("Accessibility not granted, key press skipped")
             return
         }
-        switch chord.key {
-        case .code(let code):
-            Self.post(keyCode: CGKeyCode(code), flags: chord.modifiers.eventFlags)
-        case .character(let character):
-            guard let code = KeyboardLayout.keyCode(producing: character) else {
-                Log.app.error("No key produces \(character, privacy: .public) on the current keyboard layout")
-                return
-            }
-            Self.post(keyCode: CGKeyCode(code), flags: chord.modifiers.eventFlags)
+        guard let code = chord.keyCode else {
+            Log.app.error("No key on the current keyboard layout produces \(String(describing: chord.key), privacy: .public)")
+            return
         }
+        Self.post(keyCode: CGKeyCode(code), flags: chord.modifiers.eventFlags)
     }
 
     func copy(_ text: String) {

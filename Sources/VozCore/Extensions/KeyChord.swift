@@ -41,8 +41,22 @@ public struct KeyChord: Equatable, Sendable {
         "opt": .option, "option": .option, "alt": .option, "ctrl": .control, "control": .control,
     ]
 
+    private static let keySymbols: [String: String] = [
+        "return": "↩", "enter": "↩", "tab": "⇥", "space": "Space", "delete": "⌫", "backspace": "⌫", "escape": "⎋", "esc": "⎋",
+        "forwarddelete": "⌦", "home": "↖", "end": "↘", "pageup": "⇞", "pagedown": "⇟",
+        "left": "←", "right": "→", "down": "↓", "up": "↑",
+    ]
+
     public let key: Key
     public let modifiers: Modifiers
+    public let label: String
+
+    public var keyCode: UInt16? {
+        switch key {
+        case .code(let code): code
+        case .character(let character): KeyboardLayout.keyCode(producing: character)
+        }
+    }
 
     public init(parsing raw: String) throws(KeyChordError) {
         let parts = raw.lowercased().split(separator: "+", omittingEmptySubsequences: false).map(String.init)
@@ -60,5 +74,13 @@ public struct KeyChord: Equatable, Sendable {
             throw .unknownKey(keyName)
         }
         self.modifiers = modifiers
+        label = Self.symbols(for: modifiers) + (Self.keySymbols[keyName] ?? keyName.uppercased())
+    }
+
+    private static func symbols(for modifiers: Modifiers) -> String {
+        [(Modifiers.control, "⌃"), (.option, "⌥"), (.shift, "⇧"), (.command, "⌘")]
+            .filter { modifiers.contains($0.0) }
+            .map(\.1)
+            .joined()
     }
 }

@@ -9,6 +9,7 @@ import { EventEmitter } from "node:events";
 import { basename, extname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import type {
+  Action,
   App,
   BeforeCleanupEvent,
   BeforeCleanupResult,
@@ -20,6 +21,8 @@ import type {
   Context,
   Extension,
   ExtensionAPI,
+  Setting,
+  SettingsSchema,
   SpeechModel,
 } from "./voz.d.ts";
 
@@ -47,6 +50,7 @@ type CommandRequest = CommandEvent & { phrase: string; app: App };
 type TranscribeRequest = { model: string; path: string; seconds: number; app: App };
 type CleanRequest = { model: string; text: string; prompt: string; app: App };
 type StepRequest = { step: string; text: string; app: App };
+type ActionRequest = { action: string; app: App };
 type Component = { id: string; name: string };
 type Entry = { name: string; path?: string; requires?: number };
 type LoadError = { extension: string; message: string };
@@ -83,6 +87,8 @@ const commands = new Map<string, Command>();
 const speechModels = new Map<string, SpeechModel>();
 const cleanupModels = new Map<string, CleanupModel>();
 const cleanupSteps = new Map<string, CleanupStep>();
+const actions = new Map<string, Action & { extension: string }>();
+const settingsSchemas = new Map<string, SettingsSchema>();
 const loaded: string[] = [];
 const errors: LoadError[] = [];
 const bus = new EventEmitter();
@@ -126,6 +132,21 @@ function find<T>(registry: Map<string, T>, kind: string, id: string): T {
   const component = registry.get(id);
   if (!component) throw new Error(`No ${kind} "${id}"`);
   return component;
+}
+
+function checkSetting(key: string, setting: Setting) {
+  if (!["string", "number", "boolean"].includes(setting.type))
+    throw new Error(`Setting "${key}" needs type "string", "number" or "boolean"`);
+  if (!setting.title) throw new Error(`Setting "${key}" needs a title`);
+  if (typeof setting.default !== setting.type)
+    throw new Error(`Setting "${key}" needs a ${setting.type} default`);
+}
+
+function settingValue(setting: Setting, value: unknown) {
+  if (typeof value !== setting.type) return setting.default;
+  if (setting.type === "string" && setting.options && !setting.options.includes(value as string))
+    return setting.default;
+  return value;
 }
 
 function readJSON(path: string): any {
@@ -212,6 +233,14 @@ function api(name: string, config: ExtensionAPI["config"]): ExtensionAPI {
       register(cleanupModels, "cleanup model", name, model),
     registerCleanupStep: (step) =>
       register(cleanupSteps, "cleanup step", name, step),
+    registerAction: (action) => register(actions, "action", name, { ...action, extension: name }),
+    settings(schema) {
+      for (const [key, setting] of Object.entries(schema)) checkSetting(key, setting);
+      settingsSchemas.set(name, schema);
+      return Object.fromEntries(
+        Object.entries(schema).map(([key, setting]) => [key, settingValue(setting, config[key])]),
+      ) as ReturnType<ExtensionAPI["settings"]>;
+    },
     log: (message) => log(`[${name}] ${message}`),
   };
 }
@@ -331,8 +360,14 @@ async function cleanupStep({ step, text, app }: StepRequest) {
   return { text: result && typeof result.text === "string" ? result.text : text };
 }
 
+async function action({ action, app }: ActionRequest) {
+  await find(actions, "action", action).run(context(app));
+  return {};
+}
+
 const methods: Record<string, (params: any) => Promise<object>> = {
   beforeCleanup,
+  action,
   beforeInsert,
   clean,
   cleanupStep,
@@ -348,10 +383,15 @@ send({
   params: {
     extensions: loaded,
     events: [...handlers.keys()],
-    commands: [...commands.values()].map((command) => command.phrase),
+    commands: [...commands.values()].map(({ extension, phrase }) => ({ extension, phrase })),
     speechModels: components(speechModels),
     cleanupModels: components(cleanupModels),
     cleanupSteps: components(cleanupSteps),
+    actions: [...actions.values()].map(({ id, name, hotkey, extension }) => ({ id, name, hotkey, extension })),
+    settings: [...settingsSchemas].map(([extension, schema]) => ({
+      extension,
+      fields: Object.entries(schema).map(([key, setting]) => ({ key, ...setting })),
+    })),
     errors,
   },
 });

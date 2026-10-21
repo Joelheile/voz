@@ -41,6 +41,26 @@ export type CleanupStep = {
   run(event: CleanupStepEvent, ctx: Context): Awaitable<{ text: string } | void>;
 };
 
+export type Action = {
+  id: string;
+  name: string;
+  hotkey?: string;
+  run(ctx: Context): Awaitable<void>;
+};
+
+type SettingBase = { title: string; description?: string };
+
+export type Setting =
+  | (SettingBase & { type: "string"; default: string; options?: string[]; secret?: boolean; required?: boolean })
+  | (SettingBase & { type: "number"; default: number })
+  | (SettingBase & { type: "boolean"; default: boolean });
+
+export type SettingsSchema = Record<string, Setting>;
+
+export type SettingsValues<Schema extends SettingsSchema> = {
+  [Key in keyof Schema]: Schema[Key]["default"];
+};
+
 type Awaitable<T> = T | Promise<T>;
 
 export type EventBus = {
@@ -82,6 +102,8 @@ export type ExtensionAPI = {
   registerSpeechModel(model: SpeechModel): void;
   registerCleanupModel(model: CleanupModel): void;
   registerCleanupStep(step: CleanupStep): void;
+  registerAction(action: Action): void;
+  settings<Schema extends SettingsSchema>(schema: Schema): SettingsValues<Schema>;
   log(message: string): void;
 };
 

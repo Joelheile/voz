@@ -6,7 +6,7 @@ public enum PackageOrder: String, CaseIterable, Sendable {
     case name = "A-Z"
 }
 
-public struct PackageListing: Equatable, Identifiable, Sendable {
+public struct PackageListing: Codable, Equatable, Identifiable, Sendable {
     public let name: String
     public let summary: String?
     public let version: String
@@ -23,6 +23,21 @@ public struct PackageListing: Equatable, Identifiable, Sendable {
             .ordered(by: .popular)
     }
 
+    public static func decodePackument(_ data: Data) throws -> PackageListing {
+        try PackageListing(JSONDecoder().decode(Packument.self, from: data))
+    }
+
+    private init(_ packument: Packument) throws {
+        guard let version = packument.distTags.latest else { throw DecodingError.valueNotFound(String.self, .init(codingPath: [], debugDescription: "\(packument.name) has no latest version")) }
+        name = packument.name
+        summary = packument.description
+        self.version = version
+        publisher = packument.versions[version]?.npmUser?.name ?? "unknown"
+        monthlyDownloads = 0
+        published = packument.time[version].flatMap { try? Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse($0) }
+        page = URL(string: "https://www.npmjs.com/package/\(packument.name)")
+    }
+
     private init(_ object: SearchResult.Object) {
         name = object.package.name
         summary = object.package.description
@@ -32,6 +47,23 @@ public struct PackageListing: Equatable, Identifiable, Sendable {
         published = object.package.date.flatMap { try? Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse($0) }
         page = object.package.links?.npm.flatMap(URL.init(string:)).flatMap { $0.scheme == "https" ? $0 : nil }
     }
+}
+
+private struct Packument: Decodable {
+    struct DistTags: Decodable { let latest: String? }
+    struct Version: Decodable {
+        struct User: Decodable { let name: String }
+        let npmUser: User?
+        enum CodingKeys: String, CodingKey { case npmUser = "_npmUser" }
+    }
+
+    let name: String
+    let description: String?
+    let distTags: DistTags
+    let versions: [String: Version]
+    let time: [String: String]
+
+    enum CodingKeys: String, CodingKey { case name, description, distTags = "dist-tags", versions, time }
 }
 
 private struct SearchResult: Decodable {

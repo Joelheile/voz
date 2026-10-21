@@ -46,11 +46,18 @@ Voz lives in the menu bar. The panel shows your recent transcripts, and a click 
 
 The core records, transcribes, cleans up, inserts and saves history. Speech recognition and cleanup both run on your Mac, so Voz works offline.
 
-Extensions hook in between those steps: after recording, before cleanup, before insert, after insert, and on voice commands. They can also add speech models, cleanup models and cleanup steps, which you pick in Settings. Bun runs them in a separate process. If you install none or turn them all off, Voz skips the Bun download and starts no extra process. A slow or crashing extension never blocks dictation: after 300 ms, Voz inserts the original text.
+Extensions hook in between those steps: after recording, before cleanup, before insert, after insert, and on voice commands. They can also add speech models, cleanup models, cleanup steps, settings forms and panel actions with hotkeys. Bun runs them in a separate process. If you install none or turn them all off, Voz skips the Bun download and starts no extra process. A slow or crashing extension never blocks dictation: after 300 ms, Voz inserts the original text.
 
 ## Extensions
 
-An extension is a TypeScript file in `~/.voz/extensions`:
+Start one with `voz new`, try it with `voz dev`, share it with `npm publish`:
+
+```
+voz new voz-hello
+voz dev voz-hello
+```
+
+An extension is a TypeScript file:
 
 ```ts
 import { defineExtension } from "voz";
@@ -62,7 +69,7 @@ export default defineExtension((voz) => {
 
 Say "let's ship it, send it" and Voz types "Let's ship it", then presses Return.
 
-To have a coding agent write one, open it in `~/.voz`. Voz keeps a guide for agents there in `AGENTS.md`. Publish to npm with the `voz-package` keyword to list it on [voz.joels.tech/extensions](https://voz.joels.tech/extensions/). Install one with `voz install npm:<name>`.
+To have a coding agent write one, open it in `~/.voz`. Voz keeps a guide for agents there in `AGENTS.md`. Packages with the `voz-package` keyword show up in the Extensions page and on [voz.joels.tech/extensions](https://voz.joels.tech/extensions/). Install one with `voz install <name>`.
 
 The full API is in [EXTENSIONS.md](EXTENSIONS.md). Extensions run with your permissions, so install only ones you trust.
 

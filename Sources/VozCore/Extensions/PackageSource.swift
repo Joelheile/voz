@@ -31,7 +31,8 @@ public enum PackageSource: Equatable, Sendable, CustomStringConvertible {
             let url = expanded.hasPrefix("/") ? URL(fileURLWithPath: expanded) : base.appendingPathComponent(expanded)
             self = .local(url.standardizedFileURL)
         } else {
-            throw .unrecognized(raw)
+            guard let source = try? PackageSource(parsing: "npm:\(raw)", relativeTo: base) else { throw .unrecognized(raw) }
+            self = source
         }
     }
 

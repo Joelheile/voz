@@ -1,6 +1,6 @@
 {
   "name": "voz-send-it",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Say \"send it\" at the end of a dictation to press Return",
   "keywords": ["voz-package"],
   "license": "MIT",
@@ -9,5 +9,6 @@
     "url": "git+https://github.com/Joelheile/voz.git",
     "directory": "examples/send-it"
   },
-  "files": ["index.ts"]
+  "files": ["index.ts"],
+  "voz": { "apiVersion": 1 }
 }

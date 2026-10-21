@@ -104,7 +104,7 @@ private final class Fixture {
             stats: StatsModel(store: history),
             vocabulary: VocabularyModel(store: history.vocabulary, analytics: analytics),
             setup: SetupModel(analytics: analytics),
-            extensions: ExtensionsModel(home: home, fetch: { Self.listings }),
+            extensions: ExtensionsModel(home: home, cache: nil, fetch: { _ in Self.listings }),
             catalog: ExtensionCatalog()
         )
         status.update(.parakeetUltra, .ready(bytes: 483_000_000))

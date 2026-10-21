@@ -4,22 +4,49 @@ import VozCore
 
 @MainActor
 final class ExtensionsModel: ObservableObject {
-    private static let search = URL(string: "https://registry.npmjs.org/-/v1/search?text=keywords:voz-package&size=250")!
-    private let home: VozHome
-    private let fetch: @Sendable () async throws -> Data
+    enum Stage: Equatable {
+        case gettingBun, installing, updating, removing
 
-    init(home: VozHome = VozHome(), fetch: @escaping @Sendable () async throws -> Data = { try await URLSession.shared.data(from: search).0 }) {
+        var label: String {
+            switch self {
+            case .gettingBun: "Getting Bun"
+            case .installing: "Installing"
+            case .updating: "Updating"
+            case .removing: "Removing"
+            }
+        }
+    }
+
+    private static let search = URL(string: "https://registry.npmjs.org/-/v1/search?text=keywords:voz-package&size=250")!
+    private static let undoWindow: Duration = .seconds(5)
+    private let home: VozHome
+    private let cache: URL?
+    private let fetch: @Sendable (URL) async throws -> Data
+    private var undoExpiry: Task<Void, Never>?
+
+    init(
+        home: VozHome = VozHome(),
+        cache: URL? = try? AppStorage.directory().appendingPathComponent("extension-listings.json"),
+        fetch: @escaping @Sendable (URL) async throws -> Data = { try await URLSession.shared.data(from: $0).0 }
+    ) {
         self.home = home
+        self.cache = cache
         self.fetch = fetch
+        let cached = cache.flatMap { try? JSONDecoder().decode([PackageListing].self, from: Data(contentsOf: $0)) } ?? []
+        listings = cached
+        loading = cached.isEmpty
+        refreshInstalled()
     }
 
     @Published var query = ""
-    @Published var order = PackageOrder.popular
-    @Published private(set) var listings: [PackageListing] = []
+    @Published var confirming: String?
+    @Published var expanded: String?
+    @Published private(set) var listings: [PackageListing]
     @Published private(set) var installed: [InstalledExtension] = []
     @Published private(set) var disabled: [String] = []
-    @Published private(set) var loading = true
-    @Published private(set) var working: String?
+    @Published private(set) var loading: Bool
+    @Published private(set) var working: (name: String, stage: Stage)?
+    @Published private(set) var removed: PackageSource?
     @Published private(set) var message: String?
     @Published private(set) var commandInstalled = CommandLineTool.isInstalled
 
@@ -29,33 +56,89 @@ final class ExtensionsModel: ObservableObject {
 
     var browseRows: [PackageListing] {
         let installedFromNpm = Set(installed.compactMap { $0.source.flatMap(Self.npmName(of:)) })
-        return listings.filter { !installedFromNpm.contains($0.name) && matches($0.name, $0.summary) }.ordered(by: order)
+        return listings.filter { !installedFromNpm.contains($0.name) && matches($0.name, $0.summary, $0.publisher) }.ordered(by: .popular)
+    }
+
+    var updateCount: Int {
+        installed.filter { latestVersion(for: $0) != nil }.count
     }
 
     func summary(for source: PackageSource?) -> String? {
-        guard let name = source.flatMap(Self.npmName(of:)) else { return nil }
-        return listings.first { $0.name == name }?.summary
+        listing(for: source)?.summary
+    }
+
+    func latestVersion(for item: InstalledExtension) -> String? {
+        guard let source = item.source, !source.isPinned, let latest = listing(for: source)?.version, latest != item.version else { return nil }
+        return latest
+    }
+
+    func stage(for name: String) -> Stage? {
+        working?.name == name ? working?.stage : nil
     }
 
     func load() async {
         refreshInstalled()
         defer { loading = false }
-        let data: Data
         do {
-            data = try await fetch()
-        } catch {
-            message = "Could not reach npm. Check your connection."
-            return
-        }
-        do {
+            let data = try await fetch(Self.search)
             listings = try PackageListing.decodeSearch(data)
-        } catch {
+            message = nil
+            if let cache { try? data.write(to: cache) }
+        } catch is DecodingError {
             message = "Could not read the npm search results."
+        } catch {
+            if listings.isEmpty { message = "Could not reach npm. Check your connection." }
         }
     }
 
+    func reveal(_ name: String) async {
+        query = name
+        if installed.contains(where: { $0.name == name }) {
+            expanded = name
+            return
+        }
+        if !listings.contains(where: { $0.name == name }) {
+            do {
+                let url = URL(string: "https://registry.npmjs.org/\(name.replacingOccurrences(of: "/", with: "%2F"))")!
+                listings.append(try PackageListing.decodePackument(await fetch(url)))
+            } catch {
+                message = "Could not find \(name) on npm."
+                return
+            }
+        }
+        confirming = name
+    }
+
     func install(_ listing: PackageListing) async {
-        await run(listing.name) { try await PackageCLI.install("npm:\(listing.name)") }
+        confirming = nil
+        await install("npm:\(listing.name)", name: listing.name)
+        expanded = listing.name
+    }
+
+    func update(_ item: InstalledExtension) async {
+        guard let source = item.source else { return }
+        await run(item.name, .updating) { try await PackageCLI.update(source) }
+    }
+
+    func remove(_ item: InstalledExtension) async {
+        guard let source = item.source else { return }
+        if expanded == item.name { expanded = nil }
+        await run(item.name, .removing) { try PackageCLI.remove(source.name) }
+        guard message == nil else { return }
+        removed = source
+        undoExpiry?.cancel()
+        undoExpiry = Task { [weak self] in
+            try? await Task.sleep(for: Self.undoWindow)
+            guard !Task.isCancelled else { return }
+            self?.removed = nil
+        }
+    }
+
+    func undoRemove() async {
+        guard let source = removed else { return }
+        removed = nil
+        undoExpiry?.cancel()
+        await install(source.description, name: source.name)
     }
 
     func setEnabled(_ name: String, _ enabled: Bool) {
@@ -68,12 +151,30 @@ final class ExtensionsModel: ObservableObject {
         }
     }
 
+    func config(for name: String) -> [String: SettingValue] {
+        do {
+            return try home.config(for: name)
+        } catch {
+            message = "\(error)"
+            return [:]
+        }
+    }
+
+    func setConfig(_ value: SettingValue, key: String, for name: String) {
+        do {
+            try home.setConfig(value, key: key, for: name)
+            message = nil
+        } catch {
+            message = "\(error)"
+        }
+    }
+
     func isEnabled(_ name: String) -> Bool {
         !disabled.contains(name)
     }
 
-    func remove(_ source: PackageSource) async {
-        await run(source.name) { try PackageCLI.remove(source.name) }
+    func toggleExpanded(_ name: String) {
+        expanded = expanded == name ? nil : name
     }
 
     func openExtensionsFolder() {
@@ -95,8 +196,23 @@ final class ExtensionsModel: ObservableObject {
         commandInstalled = CommandLineTool.isInstalled
     }
 
-    private func run(_ name: String, _ operation: @escaping @Sendable () async throws -> Void) async {
-        working = name
+    func matches(_ fields: String?...) -> Bool {
+        let needle = query.trimmingCharacters(in: .whitespaces)
+        guard !needle.isEmpty else { return true }
+        return fields.contains { $0?.localizedCaseInsensitiveContains(needle) == true }
+    }
+
+    private func install(_ raw: String, name: String) async {
+        let stage: Stage = BunRuntime.isInstalled ? .installing : .gettingBun
+        await run(name, stage) {
+            _ = try await BunRuntime.ensure()
+            await MainActor.run { [weak self] in self?.working = (name, .installing) }
+            try await PackageCLI.install(raw)
+        }
+    }
+
+    private func run(_ name: String, _ stage: Stage, _ operation: @escaping @Sendable () async throws -> Void) async {
+        working = (name, stage)
         do {
             try await Task.detached(operation: operation).value
             message = nil
@@ -105,12 +221,6 @@ final class ExtensionsModel: ObservableObject {
         }
         working = nil
         refreshInstalled()
-    }
-
-    func matches(_ name: String, _ summary: String?) -> Bool {
-        let needle = query.trimmingCharacters(in: .whitespaces)
-        guard !needle.isEmpty else { return true }
-        return name.localizedCaseInsensitiveContains(needle) || summary?.localizedCaseInsensitiveContains(needle) == true
     }
 
     private func refreshInstalled() {
@@ -124,6 +234,11 @@ final class ExtensionsModel: ObservableObject {
         }
     }
 
+    private func listing(for source: PackageSource?) -> PackageListing? {
+        guard let name = source.flatMap(Self.npmName(of:)) else { return nil }
+        return listings.first { $0.name == name }
+    }
+
     private static func npmName(of source: PackageSource) -> String? {
         guard case .npm(let name, _) = source else { return nil }
         return name
@@ -134,18 +249,12 @@ struct ExtensionsPage: View {
     @ObservedObject var model: ExtensionsModel
     @ObservedObject var catalog: ExtensionCatalog
     let back: () -> Void
-    @State private var confirming: String?
     @FocusState private var searchFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             PageBar(title: "Extensions", back: back)
             SearchField(text: $model.query, prompt: "Search extensions", focused: $searchFocused)
-            Picker("Sort", selection: $model.order) {
-                ForEach(PackageOrder.allCases, id: \.self) { Text($0.rawValue) }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
             if let message = model.message {
                 Text(message)
                     .font(.ui(12))
@@ -153,48 +262,79 @@ struct ExtensionsPage: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .textSelection(.enabled)
             }
+            if let removed = model.removed { undoBar(removed) }
             CappedScrollView(maxHeight: 420) {
                 VStack(alignment: .leading, spacing: 16) {
                     if !model.installedRows.isEmpty { installed }
                     browse
                     yourOwn
                 }
+                .animation(Theme.Motion.section, value: model.expanded)
+                .animation(Theme.Motion.section, value: model.confirming)
             }
         }
         .controlSize(.small)
-        .onAppear { searchFocused = true }
+        .onExitCommand { model.confirming = nil }
+        .onAppear { if model.confirming == nil { searchFocused = true } }
         .task { await model.load() }
     }
 
     private var installed: some View {
         PanelGroup(title: "Installed") {
             ForEach(model.installedRows, id: \.name) { item in
-                PanelRow(title: item.name, detail: detail(for: item)) {
-                    HStack(spacing: 8) {
-                        if let source = item.source { removeButton(source) }
-                        Toggle(item.name, isOn: Binding { model.isEnabled(item.name) } set: { model.setEnabled(item.name, $0) })
-                            .labelsHidden()
+                VStack(alignment: .leading, spacing: 0) {
+                    PanelRow(title: item.name, detail: detail(for: item)) { installedControls(item) }
+                    if model.expanded == item.name {
+                        ExtensionDetails(item: item, model: model, catalog: catalog)
+                            .transition(.opacity)
                     }
                 }
             }
         }
     }
 
+    private func installedControls(_ item: InstalledExtension) -> some View {
+        HStack(spacing: 8) {
+            if let stage = model.stage(for: item.name) {
+                StageLabel(text: stage.label)
+            } else if model.latestVersion(for: item) != nil {
+                Button("Update") { Task { await model.update(item) } }
+                    .buttonStyle(.pill(.quiet, height: 26))
+                    .disabled(model.working != nil)
+            }
+            IconButton(symbol: model.expanded == item.name ? "chevron.up" : "chevron.down", help: "Details") {
+                model.toggleExpanded(item.name)
+            }
+            Toggle(item.name, isOn: Binding { model.isEnabled(item.name) } set: { model.setEnabled(item.name, $0) })
+                .labelsHidden()
+        }
+        .transition(.blurReplace)
+        .animation(Theme.Motion.section, value: model.stage(for: item.name))
+    }
+
     private func detail(for item: InstalledExtension) -> String? {
         if !model.isEnabled(item.name) { return "Off" }
-        if let error = catalog.errors.first(where: { $0.key == item.name || $0.key.hasPrefix("\(item.name)/") })?.value { return error }
+        if catalog.error(for: item.name) != nil { return "Could not load" }
+        if needsSetup(item.name) { return "Needs setup" }
+        if let latest = model.latestVersion(for: item) { return "Version \(latest) is out" }
         return model.summary(for: item.source) ?? item.source?.description ?? "In your extensions folder"
     }
 
-    @ViewBuilder
-    private func removeButton(_ source: PackageSource) -> some View {
-        if model.working == source.name {
-            ProgressView()
-        } else {
-            Button("Remove") { Task { await model.remove(source) } }
-                .buttonStyle(.pill(.quiet, height: 26))
-                .disabled(model.working != nil)
+    private func needsSetup(_ name: String) -> Bool {
+        catalog.settings(for: name).contains { group in
+            let config = model.config(for: group.extension)
+            return group.fields.contains { $0.needsValue(in: config) }
         }
+    }
+
+    private func undoBar(_ source: PackageSource) -> some View {
+        HStack {
+            Text("Removed \(source.name)").font(.ui(12)).foregroundStyle(Theme.inkSecondary)
+            Spacer(minLength: 0)
+            Button("Undo") { Task { await model.undoRemove() } }
+                .buttonStyle(.pill(.quiet, height: 24))
+        }
+        .transition(.opacity)
     }
 
     @ViewBuilder
@@ -210,13 +350,15 @@ struct ExtensionsPage: View {
             PanelGroup(title: "Browse") {
                 ForEach(model.browseRows) { listing in
                     VStack(alignment: .leading, spacing: 0) {
-                        ListingRow(listing: listing) { control(for: listing) }
-                        if confirming == listing.name { confirmation(for: listing) }
+                        PanelRow(title: listing.name, detail: listing.summary) { control(for: listing) }
+                        if model.confirming == listing.name {
+                            confirmation(for: listing).transition(.opacity)
+                        }
                     }
                 }
             }
         } else if model.message == nil {
-            Text(model.query.isEmpty ? "No extensions published yet." : "No extensions match \"\(model.query)\".")
+            Text(model.query.isEmpty ? "Nothing published yet" : "No matches")
                 .font(.meta)
                 .foregroundStyle(Theme.inkTertiary)
         }
@@ -224,12 +366,11 @@ struct ExtensionsPage: View {
 
     private var yourOwn: some View {
         PanelGroup(title: "Your own") {
-            PanelRow(title: "Extensions folder", detail: "Drop a .ts file here and Voz loads it") {
-                Button("Open", action: model.openExtensionsFolder).buttonStyle(.pill(.quiet, height: 26))
-            }
-            PanelRow(title: "voz command", detail: model.commandInstalled ? "Run voz install <package> in Terminal" : "Install packages from Terminal") {
-                if !model.commandInstalled {
-                    Button("Install", action: model.installCommand).buttonStyle(.pill(.quiet, height: 26))
+            PanelRow(title: "Build one", detail: model.commandInstalled ? "Run voz new in Terminal" : nil) {
+                if model.commandInstalled {
+                    Button("Folder", action: model.openExtensionsFolder).buttonStyle(.pill(.quiet, height: 26))
+                } else {
+                    Button("Add voz to Terminal", action: model.installCommand).buttonStyle(.pill(.quiet, height: 26))
                 }
             }
         }
@@ -237,60 +378,125 @@ struct ExtensionsPage: View {
 
     @ViewBuilder
     private func control(for listing: PackageListing) -> some View {
-        if model.working == listing.name {
-            ProgressView()
-        } else if confirming != listing.name {
-            Button("Install") { confirming = listing.name }
-                .buttonStyle(.pill(.quiet, height: 26))
-                .disabled(model.working != nil)
+        Group {
+            if let stage = model.stage(for: listing.name) {
+                StageLabel(text: stage.label)
+            } else if model.confirming == listing.name {
+                Button("Install") { Task { await model.install(listing) } }
+                    .buttonStyle(.pill(.accent, height: 26))
+                    .keyboardShortcut(.defaultAction)
+            } else {
+                Button("Get") { model.confirming = listing.name }
+                    .buttonStyle(.pill(.quiet, height: 26))
+                    .disabled(model.working != nil)
+            }
         }
+        .transition(.blurReplace)
+        .animation(Theme.Motion.section, value: model.stage(for: listing.name))
+        .animation(Theme.Motion.section, value: model.confirming)
     }
 
     private func confirmation(for listing: PackageListing) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("\(listing.name) by \(listing.publisher) can read your transcripts, your files and the network. Read its source before you install it.")
-                .font(.meta)
-                .lineSpacing(2)
-                .foregroundStyle(Theme.inkSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 8) {
-                if let page = listing.page { Link("Read source", destination: page).font(.ui(12)) }
-                Spacer(minLength: 0)
-                Button("Cancel") { confirming = nil }
-                    .buttonStyle(.pill(.quiet, height: 26))
-                Button("Install") {
-                    confirming = nil
-                    Task { await model.install(listing) }
-                }
-                .buttonStyle(.pill(.accent, height: 26))
-            }
+        HStack(spacing: 4) {
+            Text("By \(listing.publisher). Can read your transcripts and files.")
+            if let page = listing.page { Link("Source", destination: page) }
         }
+        .font(.ui(11.5))
+        .foregroundStyle(Theme.inkTertiary)
         .padding(.bottom, 10)
     }
 }
 
-private struct ListingRow<Control: View>: View {
-    let listing: PackageListing
-    @ViewBuilder var control: Control
+private struct StageLabel: View {
+    let text: String
 
     var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(listing.name).font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
-                if let summary = listing.summary {
-                    Text(summary)
-                        .font(.meta)
-                        .foregroundStyle(Theme.inkSecondary)
-                        .lineLimit(1)
-                }
-                Text("by \(listing.publisher), \(listing.monthlyDownloads.formatted(.number.notation(.compactName))) a month")
-                    .font(.ui(11))
-                    .foregroundStyle(Theme.inkTertiary)
-            }
-            Spacer(minLength: 0)
-            control
+        HStack(spacing: 6) {
+            ProgressView().controlSize(.mini)
+            Text(text).font(.ui(12)).foregroundStyle(Theme.inkSecondary)
         }
-        .frame(minHeight: 40)
-        .padding(.vertical, 6)
+        .frame(height: 26)
+    }
+}
+
+private struct ExtensionDetails: View {
+    let item: InstalledExtension
+    @ObservedObject var model: ExtensionsModel
+    @ObservedObject var catalog: ExtensionCatalog
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let error = catalog.error(for: item.name) {
+                errorView(error)
+            } else if model.isEnabled(item.name) && !catalog.isLoaded(item.name) {
+                StageLabel(text: "Loading")
+            } else {
+                added
+            }
+            ForEach(catalog.settings(for: item.name), id: \.extension) { group in
+                ExtensionSettingsForm(fields: group.fields, config: model.config(for: group.extension)) { value, key in
+                    model.setConfig(value, key: key, for: group.extension)
+                }
+            }
+            footer
+        }
+        .padding(.bottom, 10)
+    }
+
+    @ViewBuilder
+    private var added: some View {
+        let commands = catalog.commands(for: item.name)
+        let actions = catalog.actions(for: item.name)
+        if !commands.isEmpty || !actions.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(commands, id: \.self) { command in
+                    line("Say \u{201C}\(command.phrase)\u{201D}")
+                }
+                ForEach(actions, id: \.self) { action in
+                    HStack {
+                        line(action.name)
+                        Spacer(minLength: 0)
+                        if let hotkey = action.hotkey.flatMap({ try? KeyChord(parsing: $0).label }) {
+                            Text(hotkey).font(.ui(12)).foregroundStyle(Theme.inkTertiary)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func errorView(_ error: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(error)
+                .font(.ui(11.5))
+                .foregroundStyle(.red)
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
+            Button("Copy error") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString("\(item.name) failed to load in Voz: \(error)", forType: .string)
+            }
+            .buttonStyle(.pill(.quiet, height: 24))
+        }
+    }
+
+    private var footer: some View {
+        HStack {
+            if let version = item.version { note("Version \(version)") }
+            Spacer(minLength: 0)
+            if item.source != nil {
+                Button("Remove") { Task { await model.remove(item) } }
+                    .buttonStyle(.pill(.quiet, height: 24))
+                    .disabled(model.working != nil)
+            }
+        }
+    }
+
+    private func line(_ text: String) -> some View {
+        Text(text).font(.ui(12)).foregroundStyle(Theme.ink)
+    }
+
+    private func note(_ text: String) -> some View {
+        Text(text).font(.ui(11.5)).foregroundStyle(Theme.inkTertiary)
     }
 }

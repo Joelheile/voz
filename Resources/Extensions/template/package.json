@@ -1,0 +1,11 @@
+{
+  "name": "{{name}}",
+  "version": "0.1.0",
+  "description": "Says hello when you dictate \"say hello\"",
+  "type": "module",
+  "keywords": ["voz-package"],
+  "license": "MIT",
+  "voz": { "apiVersion": 1 },
+  "files": ["index.ts"],
+  "devDependencies": { "@types/bun": "latest" }
+}

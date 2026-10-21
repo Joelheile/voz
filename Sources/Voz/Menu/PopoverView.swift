@@ -44,7 +44,7 @@ struct PopoverView: View {
         } else {
             switch model.page {
             case .home:
-                HomePage(model: model, history: sources.history, settings: sources.settings)
+                HomePage(model: model, history: sources.history, settings: sources.settings, catalog: sources.catalog, extensions: sources.extensions)
             case .settings:
                 SettingsPage(model: model, settings: sources.settings, status: sources.modelStatus, vocabulary: sources.vocabulary, catalog: sources.catalog)
             case .dictionary:
@@ -69,6 +69,8 @@ private struct HomePage: View {
     @ObservedObject var model: PopoverModel
     @ObservedObject var history: HistoryModel
     @ObservedObject var settings: AppSettings
+    @ObservedObject var catalog: ExtensionCatalog
+    @ObservedObject var extensions: ExtensionsModel
     @FocusState private var searchFocused: Bool
 
     private var isSearching: Bool { !history.query.isEmpty }
@@ -88,6 +90,7 @@ private struct HomePage: View {
                     .onSubmit(copyFirstResult)
             }
             transcripts
+            if !catalog.actions.isEmpty { actions }
             footer
         }
         .onAppear { searchFocused = showsSearch }
@@ -148,16 +151,39 @@ private struct HomePage: View {
         }
     }
 
+    private var actions: some View {
+        PanelGroup(title: "Actions") {
+            ForEach(catalog.actions, id: \.id) { action in
+                ActionRow(title: action.name, value: action.hotkey.flatMap { try? KeyChord(parsing: $0).label } ?? "") {
+                    catalog.run(action)
+                }
+            }
+        }
+    }
+
     private var footer: some View {
         HStack(spacing: 2) {
             Spacer(minLength: 0)
             IconButton(symbol: "chart.bar", help: "Insights") { model.page = .insights }
-            IconButton(symbol: "puzzlepiece.extension", help: "Extensions") { model.page = .extensions }
+            IconButton(symbol: "puzzlepiece.extension", help: extensionsHelp) { model.page = .extensions }
+                .overlay(alignment: .topTrailing) {
+                    if extensions.updateCount > 0 {
+                        Circle().fill(Color.accentColor).frame(width: 6, height: 6).offset(x: -6, y: 6)
+                    }
+                }
             IconButton(symbol: "gearshape", help: "Settings") { model.page = .settings }
                 .keyboardShortcut(",", modifiers: .command)
             IconButton(symbol: "power", help: "Quit Voz", action: model.actions.quit)
         }
         .padding(.trailing, -8)
+    }
+
+    private var extensionsHelp: String {
+        switch extensions.updateCount {
+        case 0: "Extensions"
+        case 1: "Extensions, 1 update"
+        case let count: "Extensions, \(count) updates"
+        }
     }
 
     private func copyFirstResult() {

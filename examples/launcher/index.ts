@@ -3,9 +3,11 @@ import { defineExtension } from "voz";
 const reserved = new Set(["trigger", "searchURL"]);
 
 export default defineExtension((voz) => {
-  const trigger = String(voz.config.trigger ?? "computer").toLowerCase();
-  const searchURL = String(voz.config.searchURL ?? "https://www.google.com/search?q=");
-  const pattern = new RegExp(`^${trigger},?\\s+(open|search for|run)\\s+(.+?)[.!?]*$`, "i");
+  const { trigger, searchURL } = voz.settings({
+    trigger: { type: "string", title: "Trigger word", description: "Start a dictation with it to run it", default: "computer" },
+    searchURL: { type: "string", title: "Search URL", default: "https://www.google.com/search?q=" },
+  });
+  const pattern = new RegExp(`^${trigger.toLowerCase()},?\\s+(open|search for|run)\\s+(.+?)[.!?]*$`, "i");
 
   const spawn = (command: string[], ctx: { notify(text: string): void }, failure: string) =>
     Bun.spawn(command).exited.then((code) => code !== 0 && ctx.notify(failure));

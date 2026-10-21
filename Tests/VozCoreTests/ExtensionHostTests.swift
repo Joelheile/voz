@@ -39,7 +39,7 @@ struct ExtensionHostTests {
         let actions = RecordedActions()
         let host = makeHost(actions: actions)
         let manifest = try await host.start()
-        #expect(manifest.commands == ["send it"])
+        #expect(manifest.commands == [ExtensionCommand(extension: "c-send", phrase: "send it")])
         #expect(await host.beforeInsert(text: "hello", raw: "hello", app: app, timeout: .seconds(2)) == "")
         #expect(await host.runCommand(phrase: "send it", text: "hello", app: app, timeout: .seconds(2)))
         #expect(actions.all == [.insert("elsewhere"), .insert("[hello]"), .press("cmd+return"), .notify("sent")])
@@ -112,6 +112,36 @@ struct ExtensionHostTests {
         #expect(await host.cleanupStep("llm/keep", text: "same", app: app, timeout: .seconds(2)) == "same")
         #expect(await host.cleanupStep("llm/boom", text: "x", app: app, timeout: .seconds(2)) == nil)
         #expect(await host.transcribe(model: "missing/model", path: "/tmp/a.wav", seconds: 1, app: app, timeout: .seconds(2)) == nil)
+        await host.stop()
+    }
+
+    @Test func actionsRunByIdAndSettingsFallBackToDefaults() async throws {
+        try writeFile(#"{"config":{"jira":{"project":"WEB","count":"three","mode":"loud"}}}"#, named: "settings.json", in: home.root)
+        try extensionFile("jira.ts", #"export default (voz) => { const s = voz.settings({ project: { type: "string", title: "Project", default: "VOZ" }, count: { type: "number", title: "Count", default: 2 }, mode: { type: "string", title: "Mode", default: "quiet", options: ["quiet", "casual"] }, on: { type: "boolean", title: "On", default: true } }); voz.registerAction({ id: "open", name: "Open board", hotkey: "ctrl+opt+j", run: (ctx) => ctx.notify(`${s.project} ${s.count} ${s.mode} ${s.on} ${ctx.app.name}`) }) }"#)
+        try extensionFile("typo.ts", #"export default (voz) => voz.settings({ project: { type: "text", title: "Project", default: "" } })"#)
+        let actions = RecordedActions()
+        let host = makeHost(actions: actions)
+        let manifest = try await host.start()
+        #expect(manifest.actions == [ExtensionAction(id: "jira/open", name: "Open board", hotkey: "ctrl+opt+j", extension: "jira")])
+        #expect(manifest.settings.map(\.extension) == ["jira"])
+        #expect(manifest.settings.first?.fields.map(\.key) == ["project", "count", "mode", "on"])
+        #expect(manifest.settings.first?.fields.map(\.default) == [.string("VOZ"), .number(2), .string("quiet"), .boolean(true)])
+        #expect(manifest.errors.map(\.extension) == ["typo"])
+        #expect(await host.runAction("jira/open", app: app, timeout: .seconds(2)))
+        #expect(actions.all == [.notify("WEB 2 quiet true Slack")])
+        #expect(await host.runAction("jira/missing", app: app, timeout: .seconds(2)) == false)
+        await host.stop()
+    }
+
+    @Test func newExtensionTemplateLoadsAndRuns() async throws {
+        let folder = try ExtensionTemplate.create(named: "voz-hello", in: home.root, from: extensionResources)
+        let actions = RecordedActions()
+        let host = makeHost(packages: [folder.path], actions: actions)
+        let manifest = try await host.start()
+        #expect(manifest.errors.isEmpty)
+        #expect(manifest.commands == [ExtensionCommand(extension: "voz-hello", phrase: "say hello")])
+        #expect(await host.runCommand(phrase: "say hello", text: "", app: app, timeout: .seconds(2)))
+        #expect(actions.all == [.notify("Hello from voz-hello")])
         await host.stop()
     }
 

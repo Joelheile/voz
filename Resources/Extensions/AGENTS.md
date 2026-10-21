@@ -24,6 +24,8 @@ The full types are in `~/.voz/node_modules/voz/index.d.ts`. Read them before you
 6. `registerSpeechModel({ id, name, transcribe })`: a speech model. `transcribe` gets a WAV `path` and returns `{ text }`
 7. `registerCleanupModel({ id, name, clean })`: replaces the on-device cleanup model. `clean` gets `text` and `prompt` and returns `{ text }`
 8. `registerCleanupStep({ id, name, run })`: a cleanup step. `run` gets `text` and returns `{ text }`
+9. `registerAction({ id, name, hotkey, run })`: a button in the Voz panel, with an optional global hotkey such as `"ctrl+opt+j"`. `run` gets `ctx`
+10. `settings(schema)`: a settings form in the Extensions page. Returns the typed values with defaults filled in
 
 Registering a model or step only makes it available. The user picks it in Settings, or you set `speechModel`, `cleanupModel` or `cleanupSteps` in `~/.voz/settings.json` to `<extension name>/<id>`. `cleanupSteps` is the full ordered list, by default `["fillers", "punctuation", "dictionary", "model"]`
 
@@ -33,10 +35,10 @@ Registering a model or step only makes it available. The user picks it in Settin
 - A cleanup step has 300 ms, cut short if the cleanup budget runs out. A speech model has 2 seconds per part. A cleanup model has what is left of 1.5 seconds after the user stops talking. Prefer local, fast models. On failure or timeout Voz falls back to its built-in models
 - The default export has 3 seconds to finish. Register handlers there and do nothing slow
 - Give feedback with `ctx.notify("Sent to Linear")`. It shows a short message under the menu bar
-- Read settings from `voz.config`. The user sets them in `~/.voz/settings.json` under `config.<extension name>`
+- Anything the user may want to change is a setting. Declare it with `voz.settings({ key: { type, title, default } })`. `type` is `string`, `number` or `boolean`. A string can have `options` for a picker, `secret: true` for a token, or `required: true` when the extension can't work without it. Never ask the user to edit `settings.json`
 - Write files to `voz.paths.data`, never next to the extension, or Voz reloads it on every write
 - A package declares the API it targets with `"voz": { "apiVersion": 1 }` in `package.json`
-- The user turns extensions on or off in Settings, Extensions. Don't build your own on/off switch
+- The user turns extensions on or off in the Extensions page. Don't build your own on/off switch
 - Log with `voz.log` or `console.log`
 - Use Bun and Node APIs (`fetch`, `Bun.spawn`, `node:fs`). Files in `~/.voz/extensions` can't import npm packages. If you need one, make a folder with a `package.json` and an `index.ts`, then run `voz install ./that-folder`
 - Never read or send transcripts anywhere the user didn't ask for
@@ -45,8 +47,8 @@ Registering a model or step only makes it available. The user picks it in Settin
 
 Voz loads a file in `~/.voz/extensions` as soon as you save it. Dictate in any app to try it.
 
-To work on a folder elsewhere, give it an `index.ts` and run `voz dev ./my-extension`. Voz loads it, reloads it on save, prints its logs and writes the types to `node_modules/voz` in that folder.
+To start an extension the user wants to share, run `voz new voz-<name>` in the folder where they keep code, then `voz dev voz-<name>`. Voz loads it, reloads it on save, prints its logs and writes the types to `voz.d.ts` in that folder.
 
 ## Share
 
-Publish the folder to npm with `"keywords": ["voz-package"]` in `package.json`. It then shows up on the Extensions page in Voz.
+Run `npm publish` in a folder made with `voz new`. Its `package.json` already has `"keywords": ["voz-package"]`, so it shows up in the Extensions page. Others install it with `voz install <name>`.

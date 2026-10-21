@@ -7,18 +7,16 @@ Start a dictation with "computer" and Voz runs it instead of typing it.
 - "Computer, run deploy" runs the `deploy` command from your settings
 
 ```
-voz install npm:voz-launcher
+voz install voz-launcher
 ```
 
-Add commands in `~/.voz/settings.json`. Each key is the name you say, each value is a shell command:
+Change the trigger word and search engine in the Extensions page. Add commands in `~/.voz/settings.json`. Each key is the name you say, each value is a shell command:
 
 ```json
 {
   "config": {
     "voz-launcher": {
-      "deploy": "cd ~/site && npm run deploy",
-      "trigger": "computer",
-      "searchURL": "https://duckduckgo.com/?q="
+      "deploy": "cd ~/site && npm run deploy"
     }
   }
 }

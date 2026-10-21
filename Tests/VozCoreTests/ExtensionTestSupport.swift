@@ -10,6 +10,8 @@ let hostScript = URL(fileURLWithPath: #filePath)
     .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     .appendingPathComponent("Resources/Extensions/host.ts")
 
+let extensionResources = hostScript.deletingLastPathComponent()
+
 func temporaryHome() -> VozHome {
     VozHome(root: FileManager.default.temporaryDirectory.appendingPathComponent("voz-home-\(UUID().uuidString)"))
 }
@@ -53,4 +55,16 @@ func hostOutlivesClosedInput(home: VozHome) async throws -> Bool {
 func processIsGone(_ pid: Int32) async throws -> Bool {
     for _ in 0..<30 where kill(pid, 0) == 0 { try await Task.sleep(for: .milliseconds(100)) }
     return kill(pid, 0) != 0
+}
+
+func decodeJSON<Value: Decodable>(_ type: Value.Type, _ json: String) throws -> Value {
+    try JSONDecoder().decode(type, from: Data(json.utf8))
+}
+
+func jsonData(_ json: String) -> Data {
+    Data(json.utf8)
+}
+
+func webURL(_ string: String) -> URL? {
+    URL(string: string)
 }

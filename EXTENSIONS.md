@@ -2,34 +2,40 @@
 
 Extensions are TypeScript or JavaScript modules that change what Voz does with your dictation. Voz runs them with Bun in a separate process. If an extension crashes or hangs, dictation keeps working.
 
-## Write an extension
+## Quick start
 
-Put a file in `~/.voz/extensions`. Voz loads every `.ts` and `.js` file there, and every folder with an `index.ts` or `index.js`, in alphabetical order.
+```
+voz new voz-hello
+voz dev voz-hello
+```
+
+`voz new` creates a package in `./voz-hello` with `index.ts`, `package.json`, a README and the Voz types in `voz.d.ts`. `voz dev` loads it, reloads it when you save and prints its logs, including `console.log`. Say "say hello" at the end of a dictation to run its command. Press Ctrl-C to unload it.
+
+The template adds a setting and a command:
 
 ```ts
 import { defineExtension } from "voz";
 
 export default defineExtension((voz) => {
-  voz.on("beforeInsert", (event, ctx) => {
-    if (ctx.app.bundleID !== "com.tinyspeck.slackmacgap") return;
-    return { text: event.text.replace(/\bjira (\d+)/gi, "JIRA-$1") };
+  const settings = voz.settings({
+    greeting: { type: "string", title: "Greeting", default: "Hello from voz-hello" },
   });
 
-  voz.registerCommand("send it", (event, ctx) => ctx.press("return"));
+  voz.registerCommand("say hello", (event, ctx) => ctx.notify(settings.greeting));
 });
 ```
 
-Voz writes the types to `~/.voz/node_modules/voz`, so editors type-check files in `~/.voz/extensions`. It also writes `~/.voz/AGENTS.md`, a guide for coding agents. Open a coding agent in `~/.voz` and describe the extension you want. The factory can be `async`. Voz waits for it before it loads the next extension.
+To share it, run `npm publish` in the folder. Anyone can then install it with `voz install voz-hello`, or open `voz://extensions/voz-hello` to see it in Voz with an Install button. The `voz-package` keyword in `package.json` lists it in the Extensions page and on [voz.joels.tech/extensions](https://voz.joels.tech/extensions/).
+
+`voz dev` writes `voz.d.ts` again each time, so the types match the Voz you run. In a folder you did not create with `voz new`, add `"paths": { "voz": ["./voz.d.ts"] }` to `compilerOptions` in `tsconfig.json`.
+
+## Loose files
+
+For a quick change you do not plan to share, put a file in `~/.voz/extensions`. Voz loads every `.ts` and `.js` file there, and every folder with an `index.ts` or `index.js`, in alphabetical order. Voz writes the types to `~/.voz/node_modules/voz`, so editors type-check these files. It also writes `~/.voz/AGENTS.md`, a guide for coding agents. Open a coding agent in `~/.voz` and describe the extension you want.
+
+The factory can be `async`. Voz waits for it before it loads the next extension.
 
 Voz reloads extensions when you save a file in `~/.voz/extensions`, a local package or `~/.voz/settings.json`, and when you install, remove or update a package. If an extension fails to load, Voz shows its name under the menu bar. Keep an extension's own files in `voz.paths.data`, not next to its code, or every write reloads it.
-
-To work on an extension or package in another folder, run:
-
-```
-voz dev ./my-extension
-```
-
-Voz loads it, reloads it on save and prints extension logs, including `console.log`. It also writes the types to `node_modules/voz` in that folder, so your editor type-checks it. Press Ctrl-C to unload it.
 
 ## API
 
@@ -43,6 +49,8 @@ Voz loads it, reloads it on save and prints extension logs, including `console.l
 | `voz.registerCleanupModel(model)`      | Adds a cleanup model to Settings. `model` has `id`, `name` and `clean(event, ctx)`, which returns `{ text }`. |
 | `voz.registerCleanupStep(step)`        | Adds a cleanup step to Settings. `step` has `id`, `name` and `run(event, ctx)`, which returns `{ text }` or nothing to keep the text. |
 | `voz.registerCommand(phrase, handler)` | Runs `handler` when a dictation ends with `phrase`. Voz inserts the words before the phrase, then runs the command.                   |
+| `voz.registerAction(action)`           | Adds a button to the Actions group in the Voz panel. `action` has `id`, `name`, an optional `hotkey` such as `"ctrl+opt+j"`, and `run(ctx)`. |
+| `voz.settings(schema)`                 | Adds a settings form to the extension's row in the Extensions page, and returns the values. See [Settings](#settings). |
 | `voz.config`                           | The object at `config.<extension name>` in `~/.voz/settings.json`.                                                                    |
 | `voz.log(message)`                     | Writes to the Voz log. `console.log` does the same.                                                                                   |
 | `voz.name`                             | The extension name: the file name, or the package name.                                                                               |
@@ -70,6 +78,46 @@ Every handler gets `(event, ctx)`.
 The types are in [`Resources/Extensions/voz.d.ts`](Resources/Extensions/voz.d.ts).
 
 Extensions can use any Bun or Node API, such as `fetch`, `Bun.spawn` and `node:fs`.
+
+## Settings
+
+`voz.settings(schema)` describes the settings your extension has. Voz shows them as a form in the Extensions page, and returns the current values with your defaults filled in.
+
+```ts
+const settings = voz.settings({
+  project: { type: "string", title: "Jira project", default: "VOZ" },
+  tone: { type: "string", title: "Tone", default: "casual", options: ["casual", "formal"] },
+  token: { type: "string", title: "API token", default: "", secret: true, required: true },
+  limit: { type: "number", title: "Results", default: 5 },
+  enabled: { type: "boolean", title: "Send on save", default: true },
+});
+```
+
+- Each setting has `type` (`string`, `number` or `boolean`), `title`, `default` and an optional `description`
+- A string with `options` shows a picker. A string with `secret` hides what you type
+- A string with `required` shows "Needs setup" on the extension's row until the user fills it in
+- Voz saves the values under `config.<extension name>` in `~/.voz/settings.json` and reloads the extension when they change
+- A missing value, or one of the wrong type, gives the default. The values are typed, so `settings.limit` is a `number`
+- A setting with an unknown `type`, no `title` or a `default` of the wrong type fails the extension's load with an error
+
+`~/.voz/settings.json` is a plain file. Do not keep secrets there that you would not keep in your shell profile.
+
+## Actions
+
+An action is a button in the Voz panel, with an optional global hotkey.
+
+```ts
+voz.registerAction({
+  id: "board",
+  name: "Open Jira board",
+  hotkey: "ctrl+opt+j",
+  run: (ctx) => {
+    Bun.spawn(["open", `https://jira.example.com/browse/${settings.project}`]);
+  },
+});
+```
+
+The hotkey uses the same keys as `ctx.press`. If another app holds the hotkey, Voz shows a message and the button still works. An action has 10 seconds, like a command.
 
 ## Per-app prompts
 
@@ -143,16 +191,18 @@ Voz does not read `main`. A package with none of these fails to load with an err
 Install and manage packages from the terminal. The `voz` binary is `/Applications/voz.app/Contents/MacOS/voz`.
 
 ```
-voz install npm:voz-jira
+voz install voz-jira
 voz install git:github.com/user/voz-jira@v1.0.0
 voz install ./my-package
+voz new voz-jira
 voz list
 voz update
 voz dev ./my-package
 voz remove voz-jira
 ```
 
-- npm installs use the exact version. `voz install npm:voz-jira@1.2.0` and `git:...@v1.0.0` are pinned. A git ref is a tag or a branch. `voz update` skips pinned packages and moves the others to the latest version
+- A bare name such as `voz-jira` installs from npm. Local paths start with `./`, `/` or `~`
+- npm installs use the exact version. `voz install voz-jira@1.2.0` and `git:...@v1.0.0` are pinned. A git ref is a tag or a branch. `voz update` skips pinned packages and moves the others to the latest version
 - Packages only change when you run `voz update`. Voz never updates them on its own
 - Voz never runs install scripts
 - Installed packages are listed in `~/.voz/settings.json`
@@ -175,7 +225,7 @@ voz remove voz-jira
 
 - `speechModel` is `parakeet-ultra`, `parakeet-english-v2`, `apple-speech` or an extension model. If the extension model is not loaded, Voz uses Parakeet Ultra
 - `cleanupModel` is `apple` or an extension model. If the extension model is not loaded, Voz uses Apple's on-device model
-- `disabled` lists extensions that stay installed but don't load. A package name turns off every extension in it. Settings, Extensions has one switch per package and per file in `~/.voz/extensions`, and writes this list. With every extension off, Voz starts no Bun process
+- `disabled` lists extensions that stay installed but don't load. A package name turns off every extension in it. The Extensions page has one switch per package and per file in `~/.voz/extensions`, and writes this list. With every extension off, Voz starts no Bun process
 - `cleanupSteps` lists the steps in the order they run. Leave a step out to turn it off
 
 Settings writes these keys when you change them. Voz reads the file again when you save it, and restarts extensions only when something other than these keys changed.

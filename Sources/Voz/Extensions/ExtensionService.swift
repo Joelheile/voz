@@ -8,16 +8,53 @@ struct ExtensionDelivery {
 
 @MainActor
 final class ExtensionCatalog: ObservableObject {
+    @Published fileprivate(set) var loaded: [String] = []
     @Published fileprivate(set) var errors: [String: String] = [:]
+    @Published fileprivate(set) var commands: [ExtensionCommand] = []
     @Published fileprivate(set) var speechModels: [HostComponent] = []
     @Published fileprivate(set) var cleanupModels: [HostComponent] = []
     @Published fileprivate(set) var cleanupSteps: [HostComponent] = []
+    @Published fileprivate(set) var actions: [ExtensionAction] = []
+    @Published fileprivate(set) var settings: [ExtensionSettings] = []
+    fileprivate var perform: (ExtensionAction) -> Void = { _ in }
+
+    func run(_ action: ExtensionAction) {
+        perform(action)
+    }
+
+    func settings(for name: String) -> [ExtensionSettings] {
+        settings.filter { Self.belongs($0.extension, to: name) }
+    }
+
+    func commands(for name: String) -> [ExtensionCommand] {
+        commands.filter { Self.belongs($0.extension, to: name) }
+    }
+
+    func actions(for name: String) -> [ExtensionAction] {
+        actions.filter { Self.belongs($0.extension, to: name) }
+    }
+
+    func error(for name: String) -> String? {
+        errors.first { Self.belongs($0.key, to: name) }?.value
+    }
+
+    func isLoaded(_ name: String) -> Bool {
+        loaded.contains { Self.belongs($0, to: name) } || error(for: name) != nil
+    }
+
+    private static func belongs(_ extension: String, to name: String) -> Bool {
+        `extension` == name || `extension`.hasPrefix("\(name)/")
+    }
 
     fileprivate func show(_ manifest: HostManifest?) {
+        loaded = manifest?.extensions ?? []
+        commands = manifest?.commands ?? []
         errors = Dictionary(manifest?.errors.map { ($0.extension, $0.message) } ?? [], uniquingKeysWith: { first, _ in first })
         speechModels = manifest?.speechModels ?? []
         cleanupModels = manifest?.cleanupModels ?? []
         cleanupSteps = manifest?.cleanupSteps ?? []
+        actions = manifest?.actions ?? []
+        settings = manifest?.settings ?? []
     }
 }
 
@@ -49,11 +86,16 @@ final class ExtensionService {
     private var watchdog: Task<Void, Never>?
     private var watcher: FileWatcher?
     private var loadedExtensionSettings: Data?
+    private lazy var hotkeys = ActionHotkeys { [weak self] id in
+        guard let action = self?.manifest?.actions.first(where: { $0.id == id }) else { return }
+        self?.runAction(action)
+    }
 
     init(output: TextOutput, toast: ToastController, settings: AppSettings) {
         self.output = output
         self.toast = toast
         self.settings = settings
+        catalog.perform = { [weak self] action in self?.runAction(action) }
     }
 
     func start() {
@@ -70,6 +112,7 @@ final class ExtensionService {
         reloading = Task { [previous = reloading] in
             await previous?.value
             watchdog?.cancel()
+            hotkeys.unregisterAll()
             await host?.stop()
             host = nil
             manifest = nil
@@ -128,7 +171,7 @@ final class ExtensionService {
 
     func prepare(_ text: String, raw: String, app: HostApp) async -> ExtensionDelivery {
         guard let host, let manifest else { return ExtensionDelivery(text: text, command: nil) }
-        let match = VoiceCommands.match(text, phrases: manifest.commands)
+        let match = VoiceCommands.match(text, phrases: manifest.commands.map(\.phrase))
         let dictated = match?.leadingText ?? text
         guard manifest.subscribes(to: .beforeInsert), !dictated.isEmpty else { return ExtensionDelivery(text: dictated, command: match?.phrase) }
         let transformed = await host.beforeInsert(text: dictated, raw: raw, app: app, timeout: Self.insertTimeout)
@@ -164,6 +207,14 @@ final class ExtensionService {
         }
     }
 
+    func runAction(_ action: ExtensionAction) {
+        guard let host else { return }
+        let app = HostApp.current
+        Task {
+            if await !host.runAction(action.id, app: app, timeout: Self.commandTimeout) { toast.show("\(action.name) failed") }
+        }
+    }
+
     private func launch() async throws {
         let script = Self.resources.appendingPathComponent("host.ts")
         let host = ExtensionHost(
@@ -183,6 +234,8 @@ final class ExtensionService {
         self.host = host
         self.manifest = manifest
         catalog.show(manifest)
+        let unusable = hotkeys.register(manifest.actions)
+        if !unusable.isEmpty { toast.show("Could not use the hotkey for \(unusable.map(\.name).joined(separator: ", "))") }
         started = .now
         watchdog = Task { [weak self] in await self?.watch(host) }
     }
@@ -232,6 +285,7 @@ final class ExtensionService {
 
     private func hostExited(_ status: Int32) {
         watchdog?.cancel()
+        hotkeys.unregisterAll()
         host = nil
         manifest = nil
         if ContinuousClock.now - started > Self.healthyUptime { restarts = 0 }

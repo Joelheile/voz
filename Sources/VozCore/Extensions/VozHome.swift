@@ -3,11 +3,13 @@ import Foundation
 public enum VozHomeError: Error, CustomStringConvertible {
     case malformedSettings(URL)
     case malformedPipeline(URL)
+    case malformedConfig(URL, String)
 
     public var description: String {
         switch self {
         case .malformedSettings(let url): "\(url.path) must be a JSON object with \"packages\" and \"disabled\" as lists of strings"
         case .malformedPipeline(let url): "\(url.path) must have \"speechModel\" and \"cleanupModel\" as strings and \"cleanupSteps\" as a list of strings"
+        case .malformedConfig(let url, let name): "\(url.path) must have \"config.\(name)\" as an object"
         }
     }
 }
@@ -22,6 +24,7 @@ private enum PipelineKey {
 public struct InstalledExtension: Equatable, Sendable {
     public let name: String
     public let source: PackageSource?
+    public var version: String? = nil
 }
 
 public struct VozHome: Sendable {
@@ -29,6 +32,7 @@ public struct VozHome: Sendable {
 
     public let root: URL
     private static let disabledKey = "disabled"
+    private static let configKey = "config"
 
     public init(root: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".voz", isDirectory: true)) {
         self.root = root
@@ -50,7 +54,9 @@ public struct VozHome: Sendable {
     public func installedExtensions() throws -> [InstalledExtension] {
         let packages = try packageSources().map { raw in
             let source = try PackageSource(parsing: raw, relativeTo: root)
-            return InstalledExtension(name: Self.packageName(in: source.directory(in: self)), source: source)
+            let directory = source.directory(in: self)
+            let manifest = Self.manifest(in: directory)
+            return InstalledExtension(name: manifest.name ?? directory.lastPathComponent, source: source, version: manifest.version)
         }
         return looseExtensionNames().map { InstalledExtension(name: $0, source: nil) } + packages
     }
@@ -68,22 +74,22 @@ public struct VozHome: Sendable {
         .sorted()
     }
 
-    private static func packageName(in directory: URL) -> String {
+    private static func manifest(in directory: URL) -> (name: String?, version: String?) {
         let manifest = (try? Data(contentsOf: directory.appendingPathComponent("package.json"))).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
-        return manifest?["name"] as? String ?? directory.lastPathComponent
+        return (manifest?["name"] as? String, manifest?["version"] as? String)
     }
 
     public func writeAuthoringFiles(from resources: URL) throws {
         try FileManager.default.createDirectory(at: extensions, withIntermediateDirectories: true)
-        try Self.writeTypes(into: root, from: resources)
+        let types = root.appendingPathComponent("node_modules/voz", isDirectory: true)
+        try FileManager.default.createDirectory(at: types, withIntermediateDirectories: true)
+        try Self.replace(types.appendingPathComponent("index.d.ts"), with: resources.appendingPathComponent("voz.d.ts"))
+        try Data(#"{"name":"voz","private":true,"types":"index.d.ts"}"#.utf8).write(to: types.appendingPathComponent("package.json"))
         try Self.replace(root.appendingPathComponent("AGENTS.md"), with: resources.appendingPathComponent("AGENTS.md"))
     }
 
     public static func writeTypes(into folder: URL, from resources: URL) throws {
-        let types = folder.appendingPathComponent("node_modules/voz", isDirectory: true)
-        try FileManager.default.createDirectory(at: types, withIntermediateDirectories: true)
-        try replace(types.appendingPathComponent("index.d.ts"), with: resources.appendingPathComponent("voz.d.ts"))
-        try Data(#"{"name":"voz","private":true,"types":"index.d.ts"}"#.utf8).write(to: types.appendingPathComponent("package.json"))
+        try replace(folder.appendingPathComponent("voz.d.ts"), with: resources.appendingPathComponent("voz.d.ts"))
     }
 
     public func packageSources() throws -> [String] {
@@ -132,6 +138,35 @@ public struct VozHome: Sendable {
         settings[PipelineKey.cleanupModel] = choices.cleanupModel
         settings[PipelineKey.cleanupSteps] = choices.cleanupSteps
         try writeSettings(settings)
+    }
+
+    public func config(for name: String) throws -> [String: SettingValue] {
+        try configObject(for: name).compactMapValues { value in
+            guard let data = try? JSONSerialization.data(withJSONObject: value, options: .fragmentsAllowed) else { return nil }
+            return try? JSONDecoder().decode(SettingValue.self, from: data)
+        }
+    }
+
+    public func setConfig(_ value: SettingValue, key: String, for name: String) throws {
+        var object = try configObject(for: name)
+        switch value {
+        case .string(let string): object[key] = string
+        case .number(let number): object[key] = number
+        case .boolean(let boolean): object[key] = boolean
+        }
+        var settings = try readSettings()
+        var config = settings[Self.configKey] as? [String: Any] ?? [:]
+        config[name] = object
+        settings[Self.configKey] = config
+        try writeSettings(settings)
+    }
+
+    private func configObject(for name: String) throws -> [String: Any] {
+        guard let config = try readSettings()[Self.configKey] else { return [:] }
+        guard let config = config as? [String: Any] else { throw VozHomeError.malformedSettings(settings) }
+        guard let object = config[name] else { return [:] }
+        guard let object = object as? [String: Any] else { throw VozHomeError.malformedConfig(settings, name) }
+        return object
     }
 
     public func extensionSettings() throws -> Data {

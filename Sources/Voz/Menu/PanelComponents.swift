@@ -68,6 +68,21 @@ struct LinkRow: View {
     let title: String
     let value: String
     let action: () -> Void
+
+    var body: some View {
+        ActionRow(title: title, value: value, action: action) { hovering in
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(hovering ? Theme.ink : Theme.inkTertiary)
+        }
+    }
+}
+
+struct ActionRow<Trailing: View>: View {
+    let title: String
+    let value: String
+    let action: () -> Void
+    @ViewBuilder var trailing: (Bool) -> Trailing
     @State private var hovering = false
 
     var body: some View {
@@ -76,9 +91,7 @@ struct LinkRow: View {
                 Text(title).font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
                 Spacer(minLength: 0)
                 Text(value).font(.meta).foregroundStyle(Theme.inkSecondary)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(hovering ? Theme.ink : Theme.inkTertiary)
+                trailing(hovering)
             }
             .frame(minHeight: 40)
             .padding(.vertical, 4)
@@ -87,6 +100,12 @@ struct LinkRow: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .animation(Theme.Motion.hover, value: hovering)
+    }
+}
+
+extension ActionRow where Trailing == EmptyView {
+    init(title: String, value: String, action: @escaping () -> Void) {
+        self.init(title: title, value: value, action: action) { _ in EmptyView() }
     }
 }
 

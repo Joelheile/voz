@@ -22,6 +22,10 @@ enum BunRuntime {
         try AppStorage.directory().appendingPathComponent("bun/\(version)/bun")
     }
 
+    static var isInstalled: Bool {
+        (try? executable()).map { FileManager.default.isExecutableFile(atPath: $0.path) } ?? false
+    }
+
     static func ensure() async throws -> URL {
         let destination = try executable()
         if FileManager.default.isExecutableFile(atPath: destination.path) { return destination }

@@ -59,4 +59,23 @@ import Testing
         #expect(try home.disabledExtensions() == ["notes"])
         #expect(try home.packageSources() == ["npm:voz-a"])
     }
+
+    @Test func configRoundTripsTypedValuesAndKeepsOtherSettings() throws {
+        let home = temporaryHome()
+        try writeFile(#"{"packages":["npm:voz-jira"],"config":{"jira":{"project":"VOZ","nested":{"a":1}},"other":{"x":1}}}"#, named: "settings.json", in: home.root)
+        try home.setConfig(.number(3), key: "count", for: "jira")
+        try home.setConfig(.boolean(false), key: "on", for: "jira")
+        try home.setConfig(.string("WEB"), key: "project", for: "jira")
+        #expect(try home.config(for: "jira") == ["project": .string("WEB"), "count": .number(3), "on": .boolean(false)])
+        #expect(try home.config(for: "other") == ["x": .number(1)])
+        #expect(try home.config(for: "missing") == [:])
+        #expect(try home.packageSources() == ["npm:voz-jira"])
+    }
+
+    @Test func malformedConfigFailsLoudly() throws {
+        let home = temporaryHome()
+        try writeFile(#"{"config":{"jira":"VOZ"}}"#, named: "settings.json", in: home.root)
+        #expect(throws: VozHomeError.self) { try home.config(for: "jira") }
+        #expect(throws: VozHomeError.self) { try home.setConfig(.string("x"), key: "project", for: "jira") }
+    }
 }
