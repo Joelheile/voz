@@ -18,22 +18,23 @@ final class TextOutput {
         let copies = settings.copyToClipboard
         let pastes = settings.insertIntoApp
         guard copies || pastes else { return }
+        let accessibilityGranted = !pastes || AXIsProcessTrusted()
+        let pasteKeyCode = pastes ? KeyboardLayout.keyCode(producing: "v") : nil
+        let canPaste = pastes && accessibilityGranted && pasteKeyCode != nil
+        if pastes && !accessibilityGranted {
+            Log.app.error("Accessibility not granted, text \(copies ? "copied but not pasted" : "not delivered", privacy: .public)")
+        } else if pastes && pasteKeyCode == nil {
+            Log.app.error("No key produces v on the current keyboard layout, text \(copies ? "copied but not pasted" : "not delivered", privacy: .public)")
+        }
+        guard copies || canPaste else { return }
         let pasteboard = NSPasteboard.general
         pendingRestore?.task.cancel()
-        let snapshot = pastes && !copies ? pendingRestore?.snapshot ?? Self.snapshot(of: pasteboard) : nil
+        let snapshot = canPaste && !copies ? pendingRestore?.snapshot ?? Self.snapshot(of: pasteboard) : nil
         pendingRestore = nil
         let changeCountAtWrite = write(text, to: pasteboard, markers: copies ? [] : Self.privateMarkers)
-        guard pastes else { return }
-        guard AXIsProcessTrusted() else {
-            Log.app.error("Accessibility not granted, text copied but not pasted")
-            return
-        }
+        guard canPaste, let pasteKeyCode else { return }
         try? await Task.sleep(for: .seconds(Self.pasteDelay))
-        guard let keyCode = KeyboardLayout.keyCode(producing: "v") else {
-            Log.app.error("No key produces v on the current keyboard layout, text copied but not pasted")
-            return
-        }
-        Self.post(keyCode: CGKeyCode(keyCode), flags: .maskCommand)
+        Self.post(keyCode: CGKeyCode(pasteKeyCode), flags: .maskCommand)
         guard let snapshot else { return }
         let task = Task { [weak self] in
             guard (try? await Task.sleep(for: .seconds(Self.restoreDelay))) != nil else { return }

@@ -1,5 +1,7 @@
 public enum AnalyticsEvent: Equatable, Sendable {
-    case appInstalled
+    case appOpened
+    case appSession(seconds: Int, state: SessionState)
+    case modelFailed(model: SpeechModel)
     case appLaunched
     case permissionResult(permission: PermissionName, granted: Bool)
     case dictationCompleted(DictationMetrics)
@@ -14,7 +16,9 @@ public enum AnalyticsEvent: Equatable, Sendable {
 
     public var name: String {
         switch self {
-        case .appInstalled: "app_installed"
+        case .appOpened: "app_opened"
+        case .appSession: "app_session"
+        case .modelFailed: "model_failed"
         case .appLaunched: "app_launched"
         case .permissionResult: "permission_result"
         case .dictationCompleted: "dictation_completed"
@@ -39,7 +43,11 @@ public enum AnalyticsEvent: Equatable, Sendable {
             ["stage": .text(stage.rawValue), "error_code": .text(errorCode.rawValue)]
         case let .dictationDiscarded(reason):
             ["reason": .text(reason.rawValue)]
-        case .appInstalled, .appLaunched, .historyOpened, .statsOpened:
+        case let .appSession(seconds, state):
+            ["seconds": .integer(seconds), "state": .text(state.rawValue)]
+        case let .modelFailed(model):
+            ["model": .text(model.rawValue)]
+        case .appLaunched, .appOpened, .historyOpened, .statsOpened:
             [:]
         case let .modelDownload(model, seconds, success, bytes):
             ["model": .text(model.rawValue), "seconds": .integer(seconds), "success": .flag(success), "bytes": .integer(bytes)]
@@ -49,6 +57,15 @@ public enum AnalyticsEvent: Equatable, Sendable {
             ["accepted": .flag(accepted)]
         case let .updateInstalled(from, to, channel):
             ["from": .text(from), "to": .text(to), "channel": .text(channel.rawValue)]
+        }
+    }
+
+    public var failure: (stage: String, code: String)? {
+        switch self {
+        case let .dictationFailed(stage, errorCode): (stage.rawValue, errorCode.rawValue)
+        case .modelFailed: ("model_loading", "model_load_failed")
+        case .modelDownload(_, _, false, _): ("model_download", "model_download_failed")
+        default: nil
         }
     }
 

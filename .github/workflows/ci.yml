@@ -25,7 +25,13 @@ jobs:
           path: .build
           key: spm-${{ runner.os }}-${{ env.SWIFT_VERSION }}-${{ hashFiles('Package.resolved') }}
           restore-keys: spm-${{ runner.os }}-${{ env.SWIFT_VERSION }}-
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        id: bun
+        with:
+          bun-version: '1.4.0'
       - name: Test
+        env:
+          BUN_PATH: ${{ steps.bun.outputs.bun-path }}
         run: scripts/test.sh
       - name: Build release
         run: swift build -c release

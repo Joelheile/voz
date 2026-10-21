@@ -70,6 +70,10 @@ public final class HistoryStore: Sendable {
         try queue.write { try record.insert($0) }
     }
 
+    public func insert(_ record: TranscriptRecord) async throws {
+        try await queue.write { try record.insert($0) }
+    }
+
     public func delete(id: UUID) throws {
         _ = try queue.write { try TranscriptRecord.deleteOne($0, key: id) }
     }

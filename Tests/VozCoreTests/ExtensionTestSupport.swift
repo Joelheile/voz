@@ -1,5 +1,5 @@
 import Foundation
-@testable import VozCore
+import VozCore
 
 let installedBun = ["BUN_PATH", "HOME"]
     .compactMap { ProcessInfo.processInfo.environment[$0] }
@@ -29,6 +29,10 @@ func fileContents(_ url: URL) -> String? {
     try? String(contentsOf: url, encoding: .utf8)
 }
 
+func posixPermissions(_ url: URL) -> Int? {
+    try? FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int
+}
+
 final class RecordedActions: @unchecked Sendable {
     private let lock = NSLock()
     private var actions: [HostAction] = []
@@ -37,8 +41,15 @@ final class RecordedActions: @unchecked Sendable {
     var all: [HostAction] { lock.withLock { actions } }
 }
 
+private struct HostLaunch: Encodable {
+    let home: String
+    let settings: String
+    let extensionsDirectory: String
+    let packages: [String] = []
+}
+
 func hostOutlivesClosedInput(home: VozHome) async throws -> Bool {
-    let arguments = HostLaunchArguments(home: home.root.path, settings: home.settings.path, extensionsDirectory: home.extensions.path, packages: [])
+    let arguments = HostLaunch(home: home.root.path, settings: home.settings.path, extensionsDirectory: home.extensions.path)
     let process = Process()
     process.executableURL = installedBun
     process.arguments = ["--no-install", hostScript.path, String(decoding: try JSONEncoder().encode(arguments), as: UTF8.self)]
@@ -55,16 +66,4 @@ func hostOutlivesClosedInput(home: VozHome) async throws -> Bool {
 func processIsGone(_ pid: Int32) async throws -> Bool {
     for _ in 0..<30 where kill(pid, 0) == 0 { try await Task.sleep(for: .milliseconds(100)) }
     return kill(pid, 0) != 0
-}
-
-func decodeJSON<Value: Decodable>(_ type: Value.Type, _ json: String) throws -> Value {
-    try JSONDecoder().decode(type, from: Data(json.utf8))
-}
-
-func jsonData(_ json: String) -> Data {
-    Data(json.utf8)
-}
-
-func webURL(_ string: String) -> URL? {
-    URL(string: string)
 }

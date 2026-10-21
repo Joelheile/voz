@@ -21,11 +21,3 @@ func makeTemporaryStorePath() -> String {
 func removeFile(atPath path: String) {
     try? FileManager.default.removeItem(atPath: path)
 }
-
-func roundTripThroughJSON(_ hotkey: Hotkey) throws -> Hotkey {
-    try JSONDecoder().decode(Hotkey.self, from: JSONEncoder().encode(hotkey))
-}
-
-func decodeHotkey(_ json: String) throws -> Hotkey {
-    try JSONDecoder().decode(Hotkey.self, from: Data(json.utf8))
-}

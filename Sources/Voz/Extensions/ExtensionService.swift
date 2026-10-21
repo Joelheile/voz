@@ -70,6 +70,7 @@ final class ExtensionService {
     private static let pingTimeout: Duration = .seconds(2)
     private static let eventTimeout: Duration = .seconds(30)
     private static let healthyUptime: Duration = .seconds(60)
+    nonisolated private static let audioDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("voz-extension-audio", isDirectory: true)
     nonisolated static let resources = Bundle.main.resourceURL!.appendingPathComponent("Extensions", isDirectory: true)
 
     private let home = VozHome()
@@ -99,6 +100,15 @@ final class ExtensionService {
     }
 
     func start() {
+        do {
+            if FileManager.default.fileExists(atPath: Self.audioDirectory.path) {
+                try FileManager.default.removeItem(at: Self.audioDirectory)
+            }
+        } catch {
+            Log.extensions.error("Could not clear extension audio files: \(error.localizedDescription, privacy: .public)")
+            toast.show("Could not prepare extensions")
+            return
+        }
         observer = DistributedNotificationCenter.default().addObserver(forName: VozHome.changedNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.restarts = 0
@@ -151,10 +161,10 @@ final class ExtensionService {
 
     func transcribe(_ samples: [Float], model: String, app: HostApp) async -> String? {
         guard let host, hasSpeechModel(model) else { return nil }
-        let file = FileManager.default.temporaryDirectory.appendingPathComponent("voz-segment-\(UUID().uuidString).wav")
+        let file = Self.audioDirectory.appendingPathComponent("segment-\(UUID().uuidString).wav")
         defer { try? FileManager.default.removeItem(at: file) }
         do {
-            try WAVEncoder.encode(samples, sampleRate: Int(RecordingFilter.sampleRate)).write(to: file)
+            try await Task.detached { try Self.writeAudio(samples, to: file) }.value
         } catch {
             Log.extensions.error("Segment file write failed: \(error.localizedDescription, privacy: .public)")
             return nil
@@ -180,18 +190,25 @@ final class ExtensionService {
 
     func recorded(_ samples: [Float], app: HostApp) {
         guard let host, manifest?.subscribes(to: .recording) == true else { return }
-        let file = FileManager.default.temporaryDirectory.appendingPathComponent("voz-recording-\(UUID().uuidString).wav")
+        let file = Self.audioDirectory.appendingPathComponent("recording-\(UUID().uuidString).wav")
         let seconds = Double(samples.count) / RecordingFilter.sampleRate
         Task.detached {
+            defer { try? FileManager.default.removeItem(at: file) }
             do {
-                try WAVEncoder.encode(samples, sampleRate: Int(RecordingFilter.sampleRate)).write(to: file)
+                try Self.writeAudio(samples, to: file)
             } catch {
                 Log.extensions.error("Recording file write failed: \(error.localizedDescription, privacy: .public)")
                 return
             }
             await host.emit(.recording(path: file.path, seconds: seconds), app: app, timeout: Self.eventTimeout)
-            try? FileManager.default.removeItem(at: file)
         }
+    }
+
+    nonisolated private static func writeAudio(_ samples: [Float], to file: URL) throws {
+        try FileManager.default.createDirectory(at: audioDirectory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: audioDirectory.path)
+        try WAVEncoder.encode(samples, sampleRate: Int(RecordingFilter.sampleRate)).write(to: file)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
     }
 
     func inserted(_ text: String, raw: String, app: HostApp) {

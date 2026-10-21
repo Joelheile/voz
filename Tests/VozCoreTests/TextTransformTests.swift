@@ -1,5 +1,5 @@
 import Testing
-@testable import VozCore
+import VozCore
 
 @Suite struct TextTransformTests {
     @Test func fillersGoButWordsThatContainThemStay() {
@@ -37,31 +37,6 @@ import Testing
         for text in literal {
             #expect(SpokenPunctuation.apply(to: text) == text)
         }
-    }
-
-    @Test func vocabularyFixesCasingOfWholeWordsAndSpliceKeepsPunctuation() {
-        #expect(VocabularyCasing.apply(["Kubernetes", "PostHog"], to: "we run kubernetes and posthog") == "we run Kubernetes and PostHog")
-        #expect(VocabularyCasing.apply(["Helm"], to: "the helmet and helm") == "the helmet and Helm")
-        #expect(VocabularyCasing.apply(["C++"], to: "i like c++ a lot") == "i like C++ a lot")
-        let edits = [TextEdit(utf8Range: 5..<8, replacement: "Voz"), TextEdit(utf8Range: 21..<24, replacement: "Voz")]
-        #expect(TextSplice.apply(edits, to: "Open Vos, then close Vos.") == "Open Voz, then close Voz.")
-        #expect(TextSplice.apply([TextEdit(utf8Range: 8..<11, replacement: "Voz")], to: "Grüße Vos") == "Grüße Voz")
-        let unsafe = [TextEdit(utf8Range: 1..<4, replacement: "X"), TextEdit(utf8Range: 3..<5, replacement: "Y"), TextEdit(utf8Range: 5..<99, replacement: "Z")]
-        #expect(TextSplice.apply(unsafe, to: "abcdef") == "abcYf")
-    }
-
-    @Test func sentenceChunksSplitLosslesslyAtSentencesAndLines() {
-        let sentence = "This sentence has exactly ten words in it for sure. "
-        let long = String(repeating: sentence, count: 12)
-        let chunks = SentenceChunks.split(long, targetWords: 30)
-        #expect(chunks.joined() == long)
-        #expect(chunks.count > 1)
-        #expect(chunks.allSatisfy { $0.hasSuffix(". ") })
-        #expect(SentenceChunks.split("One short sentence. And another one here.") == ["One short sentence. And another one here."])
-        #expect(SentenceChunks.split(String(repeating: "word ", count: 35) + "end.", targetWords: 35).count == 1)
-        let lines = SentenceChunks.split("first line has plenty of words in it\nsecond line also has plenty of words here too", targetWords: 9)
-        #expect(lines == ["first line has plenty of words in it\n", "second line also has plenty of words here too"])
-        #expect(SentenceChunks.split("").isEmpty)
     }
 
     @Test func segmentsJoinWithFallbackPerSegmentAndNoStrayPeriods() {

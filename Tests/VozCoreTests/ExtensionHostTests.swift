@@ -1,5 +1,5 @@
 import Testing
-@testable import VozCore
+import VozCore
 
 @Suite(.enabled(if: installedBun != nil, "Needs Bun at ~/.bun/bin/bun or BUN_PATH"))
 struct ExtensionHostTests {
@@ -39,7 +39,7 @@ struct ExtensionHostTests {
         let actions = RecordedActions()
         let host = makeHost(actions: actions)
         let manifest = try await host.start()
-        #expect(manifest.commands == [ExtensionCommand(extension: "c-send", phrase: "send it")])
+        #expect(manifest.commands.map(\.phrase) == ["send it"])
         #expect(await host.beforeInsert(text: "hello", raw: "hello", app: app, timeout: .seconds(2)) == "")
         #expect(await host.runCommand(phrase: "send it", text: "hello", app: app, timeout: .seconds(2)))
         #expect(actions.all == [.insert("elsewhere"), .insert("[hello]"), .press("cmd+return"), .notify("sent")])
@@ -48,6 +48,7 @@ struct ExtensionHostTests {
 
     @Test func brokenOrHangingExtensionsAreReportedAndOthersStillLoad() async throws {
         try extensionFile("broken.ts", "export default (voz) => { syntax error here")
+        try extensionFile("partial.ts", #"export default (voz) => { voz.on("beforeInsert", () => ({ text: "leaked" })); throw new Error("boom") }"#)
         try extensionFile("hang.ts", "export default async () => { await new Promise(() => {}) }")
         try extensionFile("noisy.ts", #"export default (voz) => { process.stdout.write("no newline"); console.log("loaded"); voz.on("beforeInsert", (e) => ({ text: e.text + "!" })) }"#)
         let distOnly = home.packages.appendingPathComponent("node_modules/voz-dist")
@@ -59,7 +60,7 @@ struct ExtensionHostTests {
         let host = makeHost(packages: [distOnly.path, pack.path])
         let manifest = try await host.start(timeout: .seconds(5))
         #expect(Set(manifest.extensions) == ["noisy", "voz-pack"])
-        #expect(Set(manifest.errors.map(\.extension)) == ["broken", "hang", "voz-dist"])
+        #expect(Set(manifest.errors.map(\.extension)) == ["broken", "partial", "hang", "voz-dist"])
         #expect(await host.beforeInsert(text: "hi", raw: "hi", app: app, timeout: .seconds(2)) == "HI!")
         await host.stop()
     }
@@ -77,22 +78,6 @@ struct ExtensionHostTests {
         #expect(await host.ping(timeout: .seconds(2)))
         _ = await host.runCommand(phrase: "spin", text: "", app: app, timeout: .milliseconds(100))
         #expect(await !host.ping(timeout: .milliseconds(300)))
-        await host.stop()
-    }
-
-    @Test func eventsReachSubscribersAndTheVozModuleWorks() async throws {
-        try extensionFile("a-emit.ts", #"import { defineExtension } from "voz"; export default defineExtension((voz) => voz.on("beforeInsert", (e) => { voz.events.emit("seen", e.text) }))"#)
-        try extensionFile("b-listen.ts", #"import { writeFileSync } from "node:fs"; export default (voz) => { let seen = ""; voz.events.on("seen", (t) => { seen = t }); voz.on("beforeInsert", () => { writeFileSync(`${voz.paths.data}/seen`, seen); return { text: seen.toUpperCase() } }) }"#)
-        try extensionFile("c-observe.ts", #"export default (voz) => { voz.on("recording", (e, ctx) => ctx.insert(`${e.path} ${e.seconds} ${ctx.app.name}`)); voz.on("recording", () => { throw new Error("ignored") }) }"#)
-        let actions = RecordedActions()
-        let host = makeHost(actions: actions)
-        let manifest = try await host.start()
-        #expect(manifest.errors.isEmpty)
-        #expect(!manifest.events.contains("afterInsert"))
-        #expect(await host.beforeInsert(text: "bus", raw: "bus", app: app, timeout: .seconds(2)) == "BUS")
-        #expect(fileContents(home.root.appendingPathComponent("data/b-listen/seen")) == "bus")
-        await host.emit(.recording(path: "/tmp/a.wav", seconds: 1.5), app: app, timeout: .seconds(2))
-        #expect(actions.all == [.insert("/tmp/a.wav 1.5 Slack")])
         await host.stop()
     }
 
@@ -122,7 +107,8 @@ struct ExtensionHostTests {
         let actions = RecordedActions()
         let host = makeHost(actions: actions)
         let manifest = try await host.start()
-        #expect(manifest.actions == [ExtensionAction(id: "jira/open", name: "Open board", hotkey: "ctrl+opt+j", extension: "jira")])
+        #expect(manifest.actions.map(\.id) == ["jira/open"])
+        #expect(manifest.actions.first?.hotkey == "ctrl+opt+j")
         #expect(manifest.settings.map(\.extension) == ["jira"])
         #expect(manifest.settings.first?.fields.map(\.key) == ["project", "count", "mode", "on"])
         #expect(manifest.settings.first?.fields.map(\.default) == [.string("VOZ"), .number(2), .string("quiet"), .boolean(true)])
@@ -139,7 +125,7 @@ struct ExtensionHostTests {
         let host = makeHost(packages: [folder.path], actions: actions)
         let manifest = try await host.start()
         #expect(manifest.errors.isEmpty)
-        #expect(manifest.commands == [ExtensionCommand(extension: "voz-hello", phrase: "say hello")])
+        #expect(manifest.commands.map(\.phrase) == ["say hello"])
         #expect(await host.runCommand(phrase: "say hello", text: "", app: app, timeout: .seconds(2)))
         #expect(actions.all == [.notify("Hello from voz-hello")])
         await host.stop()

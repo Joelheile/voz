@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 public enum VozHomeError: Error, CustomStringConvertible {
@@ -58,11 +59,12 @@ public struct VozHome: Sendable {
             let manifest = Self.manifest(in: directory)
             return InstalledExtension(name: manifest.name ?? directory.lastPathComponent, source: source, version: manifest.version)
         }
-        return looseExtensionNames().map { InstalledExtension(name: $0, source: nil) } + packages
+        return try looseExtensionNames().map { InstalledExtension(name: $0, source: nil) } + packages
     }
 
-    private func looseExtensionNames() -> [String] {
-        let files = (try? FileManager.default.contentsOfDirectory(at: extensions, includingPropertiesForKeys: [.isDirectoryKey])) ?? []
+    private func looseExtensionNames() throws -> [String] {
+        guard FileManager.default.fileExists(atPath: extensions.path) else { return [] }
+        let files = try FileManager.default.contentsOfDirectory(at: extensions, includingPropertiesForKeys: [.isDirectoryKey])
         return files.filter { !$0.lastPathComponent.hasPrefix(".") }.compactMap { file in
             let isFolder = (try? file.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
             if isFolder {
@@ -93,34 +95,45 @@ public struct VozHome: Sendable {
     }
 
     public func packageSources() throws -> [String] {
-        let packages = try readSettings()["packages"]
+        try packageSources(in: readSettings())
+    }
+
+    private func packageSources(in settings: [String: Any]) throws -> [String] {
+        let packages = settings["packages"]
         guard let packages else { return [] }
-        guard let list = packages as? [String] else { throw VozHomeError.malformedSettings(settings) }
+        guard let list = packages as? [String] else { throw VozHomeError.malformedSettings(self.settings) }
         return list
     }
 
     public func setPackageSources(_ sources: [String]) throws {
-        _ = try packageSources()
-        var settings = try readSettings()
-        settings["packages"] = sources
-        try writeSettings(settings)
+        try updateSettings { settings in
+            _ = try packageSources(in: settings)
+            settings["packages"] = sources
+        }
     }
 
     public func disabledExtensions() throws -> [String] {
-        guard let disabled = try readSettings()[Self.disabledKey] else { return [] }
-        guard let list = disabled as? [String] else { throw VozHomeError.malformedSettings(settings) }
+        try disabledExtensions(in: readSettings())
+    }
+
+    private func disabledExtensions(in settings: [String: Any]) throws -> [String] {
+        guard let disabled = settings[Self.disabledKey] else { return [] }
+        guard let list = disabled as? [String] else { throw VozHomeError.malformedSettings(self.settings) }
         return list
     }
 
     public func setExtension(_ name: String, enabled: Bool) throws {
-        let others = try disabledExtensions().filter { $0 != name }
-        var settings = try readSettings()
-        settings[Self.disabledKey] = enabled ? others : others + [name]
-        try writeSettings(settings)
+        try updateSettings { settings in
+            let others = try disabledExtensions(in: settings).filter { $0 != name }
+            settings[Self.disabledKey] = enabled ? others : others + [name]
+        }
     }
 
     public func pipelineChoices() throws -> PipelineChoices {
-        let settings = try readSettings()
+        try pipelineChoices(in: readSettings())
+    }
+
+    private func pipelineChoices(in settings: [String: Any]) throws -> PipelineChoices {
         let standard = PipelineChoices.standard
         let speechModel = settings[PipelineKey.speechModel] ?? standard.speechModel
         let cleanupModel = settings[PipelineKey.cleanupModel] ?? standard.cleanupModel
@@ -132,12 +145,12 @@ public struct VozHome: Sendable {
     }
 
     public func setPipelineChoices(_ choices: PipelineChoices) throws {
-        _ = try pipelineChoices()
-        var settings = try readSettings()
-        settings[PipelineKey.speechModel] = choices.speechModel
-        settings[PipelineKey.cleanupModel] = choices.cleanupModel
-        settings[PipelineKey.cleanupSteps] = choices.cleanupSteps
-        try writeSettings(settings)
+        try updateSettings { settings in
+            _ = try pipelineChoices(in: settings)
+            settings[PipelineKey.speechModel] = choices.speechModel
+            settings[PipelineKey.cleanupModel] = choices.cleanupModel
+            settings[PipelineKey.cleanupSteps] = choices.cleanupSteps
+        }
     }
 
     public func config(for name: String) throws -> [String: SettingValue] {
@@ -148,24 +161,28 @@ public struct VozHome: Sendable {
     }
 
     public func setConfig(_ value: SettingValue, key: String, for name: String) throws {
-        var object = try configObject(for: name)
-        switch value {
-        case .string(let string): object[key] = string
-        case .number(let number): object[key] = number
-        case .boolean(let boolean): object[key] = boolean
+        try updateSettings { settings in
+            var object = try configObject(for: name, in: settings)
+            switch value {
+            case .string(let string): object[key] = string
+            case .number(let number): object[key] = number
+            case .boolean(let boolean): object[key] = boolean
+            }
+            var config = settings[Self.configKey] as? [String: Any] ?? [:]
+            config[name] = object
+            settings[Self.configKey] = config
         }
-        var settings = try readSettings()
-        var config = settings[Self.configKey] as? [String: Any] ?? [:]
-        config[name] = object
-        settings[Self.configKey] = config
-        try writeSettings(settings)
     }
 
     private func configObject(for name: String) throws -> [String: Any] {
-        guard let config = try readSettings()[Self.configKey] else { return [:] }
-        guard let config = config as? [String: Any] else { throw VozHomeError.malformedSettings(settings) }
+        try configObject(for: name, in: readSettings())
+    }
+
+    private func configObject(for name: String, in settings: [String: Any]) throws -> [String: Any] {
+        guard let config = settings[Self.configKey] else { return [:] }
+        guard let config = config as? [String: Any] else { throw VozHomeError.malformedSettings(self.settings) }
         guard let object = config[name] else { return [:] }
-        guard let object = object as? [String: Any] else { throw VozHomeError.malformedConfig(settings, name) }
+        guard let object = object as? [String: Any] else { throw VozHomeError.malformedConfig(self.settings, name) }
         return object
     }
 
@@ -192,8 +209,24 @@ public struct VozHome: Sendable {
 
     private func writeSettings(_ settings: [String: Any]) throws {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: root.path)
         let data = try JSONSerialization.data(withJSONObject: settings, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
         try data.write(to: self.settings, options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: self.settings.path)
+    }
+
+    private func updateSettings(_ update: (inout [String: Any]) throws -> Void) throws {
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let lock = root.appendingPathComponent(".settings.lock").path
+        let descriptor = Darwin.open(lock, O_CREAT | O_RDWR, 0o600)
+        guard descriptor >= 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+        defer { Darwin.close(descriptor) }
+        guard flock(descriptor, LOCK_EX) == 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+        defer { flock(descriptor, LOCK_UN) }
+        guard fchmod(descriptor, 0o600) == 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+        var settings = try readSettings()
+        try update(&settings)
+        try writeSettings(settings)
     }
 
     private func readSettings() throws -> [String: Any] {

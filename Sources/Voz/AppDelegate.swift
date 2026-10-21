@@ -103,11 +103,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             analytics.capture(.updateInstalled(from: previous, to: launch.current, channel: UpdateChannel(version: launch.current)))
         }
         let ping: VersionPing? = installID.isNew ? .install : launch.updatedFrom.map { _ in .update }
-        if settings.versionPingEnabled, let ping {
-            VersionPinger.send(ping, version: launch.current)
-        }
+        VersionPinger.sendPending(ping, version: launch.current, enabled: settings.versionPingEnabled)
         updater.start()
-        analytics.capture(installID.isNew ? .appInstalled : .appLaunched)
+        analytics.capture(.appLaunched)
         manageLaunchAgent()
     }
 
@@ -151,6 +149,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard settings.analyticsEnabled else { return .terminateNow }
+        analytics.finishSession()
         analytics.flush()
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             NSApp.reply(toApplicationShouldTerminate: true)
@@ -258,6 +257,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 Log.app.error("Model load failed: \(error.localizedDescription, privacy: .private)")
                 if !wasDownloaded {
                     analytics.capture(.modelDownload(model: model, seconds: Int(Date().timeIntervalSince(started)), success: false, bytes: 0))
+                } else {
+                    analytics.capture(.modelFailed(model: model))
                 }
             }
         }

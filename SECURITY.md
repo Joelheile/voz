@@ -21,8 +21,8 @@ Only the latest stable release and the latest beta get fixes.
 
 ## What leaves your Mac
 
-- A version ping to PostHog (EU), once on install and once after each update. It holds the version number and whether it's an install or an update, with a new random ID each time. Turn it off in Settings
-- Anonymous usage events to PostHog (EU), only if you opt in. They hold timings, counts, the app and macOS version, the chip and a random install ID. They never hold transcript text, dictionary words or app names
+- A version ping to PostHog (EU), once on install and once after each update. It holds the version number and whether it's an install or an update, with a new random ID for each install or update. Failed pings stay on disk and retry up to three times per launch with the same event ID and timestamp. Turn it off in Settings
+- Anonymous usage events to PostHog (EU), only if you opt in. They hold launch and panel-open counts, dictated word counts and seconds, processing timings, awake running time (including idle time), the app and macOS version, the chip and a random install ID. Running time is checkpointed every five minutes and on a normal quit; a crash can lose the last partial checkpoint. Recording, transcription and model failures send fixed error codes to PostHog Error Tracking, without raw error messages, stack traces or crash dumps. They never hold transcript text, dictionary words or app names
 - Update checks and downloads from GitHub through Sparkle
 - Speech model downloads from Hugging Face
 - The extension list from the npm registry, when you open Extensions

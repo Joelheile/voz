@@ -85,7 +85,7 @@ final class DictationPipeline {
             let insertMs = (ContinuousClock.now - insertStarted).wholeMilliseconds
             if !delivery.text.isEmpty { extensions.inserted(delivery.text, raw: transcript.raw, app: recording.app) }
             if let command = delivery.command { extensions.run(command, text: delivery.text, app: recording.app) }
-            let record = save(transcript, finalText: delivery.text.isEmpty ? transcript.cleaned.text : delivery.text, app: recording.app, released: released)
+            let record = await save(transcript, finalText: delivery.text.isEmpty ? transcript.cleaned.text : delivery.text, app: recording.app, released: released)
             report(record, model: transcript.model, insertMs: insertMs, trigger: recording.trigger)
             return .done
         } catch {
@@ -121,7 +121,7 @@ final class DictationPipeline {
         )))
     }
 
-    private func save(_ transcript: StreamedTranscript, finalText: String, app: HostApp, released: ContinuousClock.Instant) -> TranscriptRecord {
+    private func save(_ transcript: StreamedTranscript, finalText: String, app: HostApp, released: ContinuousClock.Instant) async -> TranscriptRecord {
         let record = TranscriptRecord(
             rawText: transcript.raw,
             finalText: finalText,
@@ -136,7 +136,7 @@ final class DictationPipeline {
             cleanupTimedOut: transcript.cleaned.timedOut
         )
         do {
-            try history.insert(record)
+            try await history.insert(record)
         } catch {
             Log.app.error("History save failed: \(error.localizedDescription, privacy: .private)")
         }

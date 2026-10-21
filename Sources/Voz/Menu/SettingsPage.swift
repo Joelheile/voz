@@ -125,7 +125,7 @@ struct SettingsPage: View {
             PanelRow(title: "Launch at login") {
                 Toggle("Launch at login", isOn: $settings.launchAtLogin).labelsHidden()
             }
-            PanelRow(title: "Share anonymous usage stats", detail: "Counts and timings, never text or audio") {
+            PanelRow(title: "Share anonymous usage stats", detail: "Counts, timings and error codes, never text or audio") {
                 Toggle("Share anonymous usage stats", isOn: $settings.analyticsEnabled).labelsHidden()
             }
             PanelRow(title: "Send version on install and update", detail: "Version number only, no ID") {

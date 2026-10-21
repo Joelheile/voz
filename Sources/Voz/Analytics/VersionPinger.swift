@@ -1,22 +1,53 @@
 import Foundation
 import VozCore
 
+@MainActor
 enum VersionPinger {
     private static let endpoint = URL(string: "\(Analytics.host)/i/v0/e/")!
 
-    static func send(_ ping: VersionPing, version: String) {
-        Task.detached(priority: .background) {
+    static func sendPending(_ ping: VersionPing?, version: String, enabled: Bool) {
+        do {
+            let queue = try VersionPingQueue()
+            guard enabled else { return try queue.clear() }
+            if let ping {
+                try queue.enqueue(ping, version: version, projectToken: Analytics.projectToken)
+            }
+            Task {
+                do {
+                    for body in queue.pending {
+                        guard UserDefaults.standard.bool(forKey: "versionPingEnabled") else {
+                            try queue.clear()
+                            return
+                        }
+                        if try await send(body) { try queue.acknowledge(body) }
+                    }
+                } catch {
+                    Log.app.error("Version ping retry stopped: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+        } catch {
+            Log.app.error("Version ping queue failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private static func send(_ body: Data) async throws -> Bool {
+        for attempt in 1...3 {
+            guard UserDefaults.standard.bool(forKey: "versionPingEnabled") else { return false }
+            var request = URLRequest(url: endpoint)
+            request.httpMethod = "POST"
+            request.timeoutInterval = 15
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = body
             do {
-                var request = URLRequest(url: endpoint)
-                request.httpMethod = "POST"
-                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                request.httpBody = try ping.body(version: version, projectToken: Analytics.projectToken)
                 let (_, response) = try await URLSession.shared.data(for: request)
                 let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-                if status != 200 { Log.app.error("Version ping returned status \(status)") }
-            } catch {
-                Log.app.error("Version ping failed: \(error.localizedDescription, privacy: .public)")
+                if (200..<300).contains(status) { return true }
+                Log.app.error("Version ping attempt \(attempt) returned status \(status), retained for retry")
+            } catch let error as URLError {
+                Log.app.error("Version ping attempt \(attempt) failed, retained for retry: \(error.localizedDescription, privacy: .public)")
             }
+            if attempt < 3 { try await Task.sleep(for: .seconds(attempt * 5)) }
         }
+        return false
     }
 }

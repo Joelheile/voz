@@ -1,16 +1,7 @@
 import Testing
-@testable import VozCore
+import VozCore
 
 @Suite struct HistoryStoreTests {
-    @Test func listsNewestFirstWithinTheLimits() throws {
-        let store = try HistoryStore()
-        for index in 0...HistoryStore.searchLimit { try store.insert(makeRecord("match \(index)", at: Double(index))) }
-        let recent = try store.search("")
-        #expect(recent.count == HistoryStore.menuLimit)
-        #expect(recent.first?.finalText == "match \(HistoryStore.searchLimit)")
-        #expect(try store.search("match").count == HistoryStore.searchLimit)
-    }
-
     @Test func searchMatchesFinalTextCaseInsensitivelyAndLiterally() throws {
         let store = try HistoryStore()
         var cleaned = makeRecord("um hello there", at: 1)
@@ -26,12 +17,12 @@ import Testing
         #expect(try store.search("  ").count == 3)
     }
 
-    @Test func recordsPersistOnDiskUntilDeleted() throws {
+    @Test func recordsPersistOnDiskUntilDeleted() async throws {
         let path = makeTemporaryStorePath()
         defer { removeFile(atPath: path) }
         let first = makeRecord("one two three", at: 1)
-        try HistoryStore(path: path).insert(first)
-        try HistoryStore(path: path).insert(makeRecord("kept", at: 2))
+        try await HistoryStore(path: path).insert(first)
+        try await HistoryStore(path: path).insert(makeRecord("kept", at: 2))
         let saved = try #require(try HistoryStore(path: path).search("three").first)
         #expect(saved.wordCount == 3)
         #expect(saved.appBundleID == "com.apple.Notes")

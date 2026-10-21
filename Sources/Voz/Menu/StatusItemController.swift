@@ -214,6 +214,7 @@ final class StatusItemController: NSObject {
     }
 
     private func showPanel() {
+        analytics.capture(.appOpened)
         refresh()
         if !model.needsSetup { analytics.capture(.historyOpened) }
         hosting.layoutSubtreeIfNeeded()

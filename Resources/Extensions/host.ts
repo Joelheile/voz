@@ -54,6 +54,37 @@ type ActionRequest = { action: string; app: App };
 type Component = { id: string; name: string };
 type Entry = { name: string; path?: string; requires?: number };
 type LoadError = { extension: string; message: string };
+type Request = { id?: number; method: string; params: never };
+type SettingsFile = {
+  disabled?: string[];
+  config?: Record<string, ExtensionAPI["config"]>;
+};
+type PackageManifest = {
+  name?: string;
+  voz?: { apiVersion?: number; extensions?: string[] };
+};
+
+class Registration {
+  private active = true;
+  private tracking = true;
+  private undo: (() => void)[] = [];
+
+  track(undo: () => void) {
+    if (!this.active) throw new Error("Extension initialization already failed");
+    if (this.tracking) this.undo.push(undo);
+  }
+
+  commit() {
+    this.tracking = false;
+    this.undo = [];
+  }
+
+  rollback() {
+    this.active = false;
+    for (const undo of this.undo.reverse()) undo();
+    this.undo = [];
+  }
+}
 
 const apiVersion = 1;
 const loadTimeout = 3000;
@@ -117,11 +148,22 @@ function register<T extends Component>(
   kind: string,
   extension: string,
   component: T,
+  registration: Registration,
 ) {
   if (!component.id || !component.name)
     throw new Error(`A ${kind} needs an id and a name`);
   const id = `${extension}/${component.id}`;
-  registry.set(id, { ...component, id });
+  setRegistered(registry, id, { ...component, id }, registration);
+}
+
+function setRegistered<Key, Value>(registry: Map<Key, Value>, key: Key, value: Value, registration: Registration) {
+  const previous = registry.get(key);
+  registration.track(() => {
+    if (registry.get(key) !== value) return;
+    if (previous === undefined) registry.delete(key);
+    else registry.set(key, previous);
+  });
+  registry.set(key, value);
 }
 
 function components(registry: Map<string, Component>): Component[] {
@@ -149,8 +191,8 @@ function settingValue(setting: Setting, value: unknown) {
   return value;
 }
 
-function readJSON(path: string): any {
-  return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : undefined;
+function readJSON<Value>(path: string): Value | undefined {
+  return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) as Value : undefined;
 }
 
 function entryIn(directory: string): string | undefined {
@@ -177,7 +219,7 @@ function looseEntries(directory: string): Entry[] {
 }
 
 function packageEntries(directory: string): Entry[] {
-  const manifest = readJSON(join(directory, "package.json")) ?? {};
+  const manifest = readJSON<PackageManifest>(join(directory, "package.json")) ?? {};
   const name: string = manifest.name ?? basename(directory);
   const origin = { requires: manifest.voz?.apiVersion };
   const declared: string[] | undefined = manifest.voz?.extensions;
@@ -201,7 +243,7 @@ function isDisabled(name: string, disabled: string[]) {
   return disabled.some((off) => name === off || name.startsWith(`${off}/`));
 }
 
-function api(name: string, config: ExtensionAPI["config"]): ExtensionAPI {
+function api(name: string, config: ExtensionAPI["config"], registration: Registration): ExtensionAPI {
   const data = join(launch.home, "data", name);
   mkdirSync(data, { recursive: true });
   return {
@@ -209,34 +251,40 @@ function api(name: string, config: ExtensionAPI["config"]): ExtensionAPI {
     config,
     paths: { home: launch.home, data },
     events: {
-      on: (event, handler) => bus.on(event, handler),
+      on: (event, handler) => {
+        registration.track(() => bus.off(event, handler));
+        bus.on(event, handler);
+      },
       emit: (event, payload) => bus.emit(event, payload),
     },
     on(event: EventName, handler: Handler["run"]) {
       if (!eventNames.includes(event))
         throw new Error(`Unknown event "${event}"`);
-      handlers.set(event, [
-        ...(handlers.get(event) ?? []),
-        { extension: name, run: handler },
-      ]);
+      const registered = { extension: name, run: handler };
+      registration.track(() => {
+        const remaining = (handlers.get(event) ?? []).filter((item) => item !== registered);
+        if (remaining.length) handlers.set(event, remaining);
+        else handlers.delete(event);
+      });
+      handlers.set(event, [...(handlers.get(event) ?? []), registered]);
     },
     registerCommand(phrase, handler) {
       const key = phrase.trim().toLowerCase();
       const existing = commands.get(key);
       if (existing)
         log(`${name} replaces command "${phrase}" from ${existing.extension}`);
-      commands.set(key, { extension: name, phrase, run: handler });
+      setRegistered(commands, key, { extension: name, phrase, run: handler }, registration);
     },
     registerSpeechModel: (model) =>
-      register(speechModels, "speech model", name, model),
+      register(speechModels, "speech model", name, model, registration),
     registerCleanupModel: (model) =>
-      register(cleanupModels, "cleanup model", name, model),
+      register(cleanupModels, "cleanup model", name, model, registration),
     registerCleanupStep: (step) =>
-      register(cleanupSteps, "cleanup step", name, step),
-    registerAction: (action) => register(actions, "action", name, { ...action, extension: name }),
+      register(cleanupSteps, "cleanup step", name, step, registration),
+    registerAction: (action) => register(actions, "action", name, { ...action, extension: name }, registration),
     settings(schema) {
       for (const [key, setting] of Object.entries(schema)) checkSetting(key, setting);
-      settingsSchemas.set(name, schema);
+      setRegistered(settingsSchemas, name, schema, registration);
       return Object.fromEntries(
         Object.entries(schema).map(([key, setting]) => [key, settingValue(setting, config[key])]),
       ) as ReturnType<ExtensionAPI["settings"]>;
@@ -246,7 +294,7 @@ function api(name: string, config: ExtensionAPI["config"]): ExtensionAPI {
 }
 
 async function load() {
-  const settings = readJSON(launch.settings) ?? {};
+  const settings = readJSON<SettingsFile>(launch.settings) ?? {};
   const entries = [
     ...looseEntries(launch.extensionsDirectory),
     ...launch.packages.flatMap(packageEntries),
@@ -254,16 +302,19 @@ async function load() {
   const disabled: string[] = settings.disabled ?? [];
   for (const entry of entries) {
     if (isDisabled(entry.name, disabled)) continue;
+    const registration = new Registration();
     try {
-      await withinLoadTimeout(loadEntry(entry, settings.config?.[entry.name]));
+      await withinLoadTimeout(loadEntry(entry, settings.config?.[entry.name], registration));
+      registration.commit();
       loaded.push(entry.name);
     } catch (error) {
+      registration.rollback();
       errors.push({ extension: entry.name, message: describe(error) });
     }
   }
 }
 
-async function loadEntry(entry: Entry, config: ExtensionAPI["config"] = {}) {
+async function loadEntry(entry: Entry, config: ExtensionAPI["config"] = {}, registration: Registration) {
   if (!entry.path)
     throw new Error(
       "No entry. Add voz.extensions to package.json, an extensions folder or an index.ts",
@@ -275,7 +326,7 @@ async function loadEntry(entry: Entry, config: ExtensionAPI["config"] = {}) {
   const module = await import(entry.path);
   if (typeof module.default !== "function")
     throw new Error("default export is not a function");
-  await module.default(api(entry.name, config));
+  await module.default(api(entry.name, config, registration));
 }
 
 function withinLoadTimeout(work: Promise<void>): Promise<void> {
@@ -365,7 +416,7 @@ async function action({ action, app }: ActionRequest) {
   return {};
 }
 
-const methods: Record<string, (params: any) => Promise<object>> = {
+const methods = {
   beforeCleanup,
   action,
   beforeInsert,
@@ -375,7 +426,24 @@ const methods: Record<string, (params: any) => Promise<object>> = {
   transcribe,
   emit,
   ping: async () => ({}),
-};
+} satisfies Record<string, (params: never) => Promise<object>>;
+
+function parseRequest(line: string): Request | undefined {
+  let value: unknown;
+  try {
+    value = JSON.parse(line);
+  } catch (error) {
+    log(`Invalid request: ${describe(error)}`);
+    return;
+  }
+  if (!value || typeof value !== "object" || !("method" in value) || typeof value.method !== "string") {
+    log("Invalid request: method must be a string");
+    return;
+  }
+  const id = "id" in value && typeof value.id === "number" ? value.id : undefined;
+  const params = "params" in value ? value.params : {};
+  return { id, method: value.method, params: params as never };
+}
 
 await load();
 send({
@@ -398,8 +466,11 @@ send({
 
 for await (const line of createInterface({ input: process.stdin })) {
   if (!line.trim()) continue;
-  const request = JSON.parse(line);
-  const method = methods[request.method];
+  const request = parseRequest(line);
+  if (!request) continue;
+  const method = Object.hasOwn(methods, request.method)
+    ? methods[request.method as keyof typeof methods]
+    : undefined;
   if (!method) {
     send({ id: request.id, error: `Unknown method ${request.method}` });
     continue;

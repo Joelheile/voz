@@ -1,3 +1,4 @@
+@preconcurrency import CoreFoundation
 import CoreGraphics
 import Foundation
 import VozCore

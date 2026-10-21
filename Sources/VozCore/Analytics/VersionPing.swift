@@ -6,6 +6,8 @@ public enum VersionPing: String, Sendable, Encodable {
 
     public func body(version: String, projectToken: String) throws -> Data {
         let payload = Payload(
+            uuid: UUID().uuidString,
+            timestamp: ISO8601DateFormatter().string(from: Date()),
             apiKey: projectToken,
             distinctID: UUID().uuidString,
             properties: .init(kind: self, version: version)
@@ -28,6 +30,8 @@ private struct Payload: Encodable {
         }
     }
 
+    let uuid: String
+    let timestamp: String
     let apiKey: String
     let event = "version_ping"
     let distinctID: String
@@ -35,7 +39,7 @@ private struct Payload: Encodable {
 
     enum CodingKeys: String, CodingKey {
         case apiKey = "api_key"
-        case event
+        case event, uuid, timestamp
         case distinctID = "distinct_id"
         case properties
     }

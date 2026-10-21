@@ -141,7 +141,7 @@ private struct ModelStep: View {
             StepHeader(title: "Pick a model", detail: "All three run on this Mac. You can switch later.")
             SpeechModelPicker(selection: $settings.speechModel, showsTitle: false)
             Toggle(isOn: $settings.analyticsEnabled) {
-                Text("Share anonymous usage stats, never text or audio")
+                Text("Share anonymous usage and errors, never text or audio")
                     .font(.meta)
                     .foregroundStyle(Theme.inkSecondary)
             }

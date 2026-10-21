@@ -56,7 +56,14 @@ jobs:
           fi
           { echo "VERSION=$version"; echo "BUILD=$build"; echo "TAG=$tag"; } >> "$GITHUB_ENV"
 
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        id: bun
+        with:
+          bun-version: '1.4.0'
+
       - name: Test
+        env:
+          BUN_PATH: ${{ steps.bun.outputs.bun-path }}
         run: scripts/test.sh
 
       - name: Import signing identity
