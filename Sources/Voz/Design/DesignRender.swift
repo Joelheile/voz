@@ -42,6 +42,7 @@ enum DesignRender {
         ("insights", .insights),
         ("extensions", .extensions),
         ("cleanup-prompt", .cleanupPrompt),
+        ("cleanup-steps", .cleanupSteps),
     ]
 
     private static func write(_ view: some View, to directory: URL, name: String, appearance: NSAppearance) throws {
@@ -89,7 +90,8 @@ private final class Fixture {
     init() throws {
         let suite = "com.joelheile.voz.render"
         UserDefaults.standard.removePersistentDomain(forName: suite)
-        settings = AppSettings(defaults: UserDefaults(suiteName: suite)!)
+        let home = VozHome(root: FileManager.default.temporaryDirectory.appendingPathComponent("voz-render-home"))
+        settings = AppSettings(defaults: UserDefaults(suiteName: suite)!, home: home)
         history = try HistoryStore()
         records = Self.makeRecords()
         for record in records { try history.insert(record) }
@@ -102,7 +104,8 @@ private final class Fixture {
             stats: StatsModel(store: history),
             vocabulary: VocabularyModel(store: history.vocabulary, analytics: analytics),
             setup: SetupModel(analytics: analytics),
-            extensions: ExtensionsModel(home: VozHome(root: FileManager.default.temporaryDirectory.appendingPathComponent("voz-render-home")), fetch: { Self.listings })
+            extensions: ExtensionsModel(home: home, fetch: { Self.listings }),
+            catalog: ExtensionCatalog()
         )
         status.update(.parakeetUltra, .ready(bytes: 483_000_000))
     }

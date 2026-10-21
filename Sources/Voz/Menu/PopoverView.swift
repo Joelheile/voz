@@ -9,6 +9,7 @@ struct PopoverSources {
     let vocabulary: VocabularyModel
     let setup: SetupModel
     let extensions: ExtensionsModel
+    let catalog: ExtensionCatalog
 }
 
 struct PopoverView: View {
@@ -45,15 +46,17 @@ struct PopoverView: View {
             case .home:
                 HomePage(model: model, history: sources.history, settings: sources.settings)
             case .settings:
-                SettingsPage(model: model, settings: sources.settings, status: sources.modelStatus, vocabulary: sources.vocabulary)
+                SettingsPage(model: model, settings: sources.settings, status: sources.modelStatus, vocabulary: sources.vocabulary, catalog: sources.catalog)
             case .dictionary:
                 DictionaryPage(model: sources.vocabulary, back: model.goBack)
             case .insights:
                 InsightsPage(model: sources.stats, back: model.goBack)
             case .extensions:
-                ExtensionsPage(model: sources.extensions, back: model.goBack)
+                ExtensionsPage(model: sources.extensions, catalog: sources.catalog, back: model.goBack)
             case .cleanupPrompt:
                 CleanupPromptPage(settings: sources.settings, back: model.goBack)
+            case .cleanupSteps:
+                CleanupStepsPage(settings: sources.settings, catalog: sources.catalog, back: model.goBack)
             }
         }
     }

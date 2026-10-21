@@ -4,6 +4,7 @@ import VozCore
 enum CleanupError: Error {
     case modelUnavailable(String)
     case timedOut
+    case extensionFailed
 }
 
 @MainActor

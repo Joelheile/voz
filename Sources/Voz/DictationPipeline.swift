@@ -38,14 +38,33 @@ final class DictationPipeline {
 
     func makeStreaming(app: HostApp) -> StreamingDictation {
         let prompt = settings.cleanupPrompt
+        let vocabulary = vocabularyWords()
         return StreamingDictation(
-            engine: engine,
+            transcribe: transcriber(app: app, vocabulary: vocabulary),
             cleaner: cleaner,
-            model: settings.speechModel,
-            vocabulary: vocabularyWords(),
+            vocabulary: vocabulary,
             prompt: Task { [extensions] in await extensions.cleanupPrompt(prompt, app: app) },
-            cleanupEnabled: settings.cleanupEnabled
+            cleanupEnabled: settings.cleanupEnabled,
+            steps: settings.cleanupSteps,
+            extensions: extensions.cleanupExtensions(model: settings.cleanupModel, app: app)
         )
+    }
+
+    private func transcriber(app: HostApp, vocabulary: [String]) -> SegmentTranscriber {
+        let selected = settings.speechModel
+        let local = settings.localSpeechModel
+        return { [engine, extensions] samples in
+            guard extensions.hasSpeechModel(selected) else {
+                return try await engine.transcribe(samples, model: local, vocabulary: vocabulary)
+            }
+            let started = ContinuousClock.now
+            guard let text = await extensions.transcribe(samples, model: selected, app: app) else {
+                Log.extensions.error("Speech model \(selected, privacy: .public) failed, using \(local.rawValue, privacy: .public)")
+                return try await engine.transcribe(samples, model: local, vocabulary: vocabulary)
+            }
+            let elapsed = Double((ContinuousClock.now - started).wholeMilliseconds) / 1000
+            return TranscriptionResult(text: text, audioSeconds: Double(samples.count) / RecordingFilter.sampleRate, processingSeconds: elapsed, model: selected)
+        }
     }
 
     func run(_ recording: Recording, streaming session: StreamingDictation, released: ContinuousClock.Instant) async -> Dictation.Outcome {
@@ -56,7 +75,7 @@ final class DictationPipeline {
                 analytics.capture(.dictationDiscarded(reason: .emptyTranscript))
                 return .discarded
             }
-            Log.app.notice("Transcribed \(transcript.audioSeconds, format: .fixed(precision: 1))s with \(transcript.model.rawValue): \(transcript.segmentCount) segments, \(transcript.cleanedInTime) cleaned in time, tail STT \(transcript.sttMs) ms, cleanup wait \(transcript.cleaned.milliseconds) ms")
+            Log.app.notice("Transcribed \(transcript.audioSeconds, format: .fixed(precision: 1))s with \(transcript.model): \(transcript.segmentCount) segments, \(transcript.cleanedInTime) cleaned in time, tail STT \(transcript.sttMs) ms, cleanup wait \(transcript.cleaned.milliseconds) ms")
             let delivery = await extensions.prepare(transcript.cleaned.text, raw: transcript.raw, app: recording.app)
             let insertStarted = ContinuousClock.now
             if !delivery.text.isEmpty {
@@ -85,7 +104,7 @@ final class DictationPipeline {
         }
     }
 
-    private func report(_ record: TranscriptRecord, model: SpeechModel, insertMs: Int, trigger: DictationTrigger) {
+    private func report(_ record: TranscriptRecord, model: String, insertMs: Int, trigger: DictationTrigger) {
         analytics.capture(.dictationCompleted(DictationMetrics(
             audioSeconds: record.audioSeconds,
             wordCount: record.wordCount,
@@ -93,8 +112,8 @@ final class DictationPipeline {
             cleanupMs: record.cleanupMs,
             insertMs: insertMs,
             totalMs: record.totalMs,
-            model: model,
-            selectedModel: settings.speechModel,
+            model: SpeechModel.analyticsLabel(for: model),
+            selectedModel: SpeechModel.analyticsLabel(for: settings.speechModel),
             cleanupUsed: settings.cleanupEnabled,
             cleanupTimedOut: record.cleanupTimedOut,
             trigger: trigger,
@@ -109,7 +128,7 @@ final class DictationPipeline {
             audioSeconds: transcript.audioSeconds,
             sttMs: transcript.sttMs,
             totalMs: (ContinuousClock.now - released).wholeMilliseconds,
-            model: transcript.model.rawValue,
+            model: transcript.model,
             appBundleID: app.bundleID,
             appName: app.name,
             fillerWordsRemoved: transcript.cleaned.fillerWordsRemoved,

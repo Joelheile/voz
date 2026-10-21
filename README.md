@@ -46,7 +46,7 @@ Voz lives in the menu bar. The panel shows your recent transcripts, and a click 
 
 The core records, transcribes, cleans up, inserts and saves history. Speech recognition and cleanup both run on your Mac, so Voz works offline.
 
-Extensions hook in between those steps: after recording, before cleanup, before insert, after insert, and on voice commands. Bun runs them in a separate process. If you install none, Voz skips the Bun download and starts no extra process. A slow or crashing extension never blocks dictation: after 300 ms, Voz inserts the original text.
+Extensions hook in between those steps: after recording, before cleanup, before insert, after insert, and on voice commands. They can also add speech models, cleanup models and cleanup steps, which you pick in Settings. Bun runs them in a separate process. If you install none or turn them all off, Voz skips the Bun download and starts no extra process. A slow or crashing extension never blocks dictation: after 300 ms, Voz inserts the original text.
 
 ## Extensions
 

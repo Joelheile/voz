@@ -79,7 +79,22 @@ public actor ExtensionHost {
     public func beforeInsert(text: String, raw: String, app: HostApp, timeout: Duration) async -> String {
         guard manifest?.subscribes(to: .beforeInsert) == true else { return text }
         let data = await request("beforeInsert", InsertParams(text: text, raw: raw, app: app), timeout: timeout)
-        return decodeResult(InsertResult.self, from: data)?.text ?? text
+        return decodeResult(TextResult.self, from: data)?.text ?? text
+    }
+
+    public func transcribe(model: String, path: String, seconds: Double, app: HostApp, timeout: Duration) async -> String? {
+        let data = await request("transcribe", TranscribeParams(model: model, path: path, seconds: seconds, app: app), timeout: timeout)
+        return decodeResult(TextResult.self, from: data)?.text
+    }
+
+    public func clean(model: String, text: String, prompt: String, app: HostApp, timeout: Duration) async -> String? {
+        let data = await request("clean", CleanParams(model: model, text: text, prompt: prompt, app: app), timeout: timeout)
+        return decodeResult(TextResult.self, from: data)?.text
+    }
+
+    public func cleanupStep(_ step: String, text: String, app: HostApp, timeout: Duration) async -> String? {
+        let data = await request("cleanupStep", StepParams(step: step, text: text, app: app), timeout: timeout)
+        return decodeResult(TextResult.self, from: data)?.text
     }
 
     public func beforeCleanup(prompt: String, app: HostApp, timeout: Duration) async -> String {

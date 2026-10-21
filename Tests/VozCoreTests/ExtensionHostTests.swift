@@ -96,6 +96,43 @@ struct ExtensionHostTests {
         await host.stop()
     }
 
+    @Test func registeredModelsAndStepsAreNamespacedAndRun() async throws {
+        try extensionFile("whisper.ts", #"export default (voz) => voz.registerSpeechModel({ id: "base", name: "Whisper", transcribe: (e, ctx) => ({ text: `${e.path} ${e.seconds} ${ctx.app.name}` }) })"#)
+        try extensionFile("llm.ts", #"export default (voz) => { voz.registerCleanupModel({ id: "fast", name: "Fast LLM", clean: (e) => ({ text: `${e.text.toUpperCase()} (${e.prompt})` }) }); voz.registerCleanupStep({ id: "jira", name: "Jira keys", run: (e) => ({ text: e.text.replace(/jira (\d+)/, "JIRA-$1") }) }); voz.registerCleanupStep({ id: "keep", name: "Keeps text", run: () => {} }); voz.registerCleanupStep({ id: "boom", name: "Throws", run: () => { throw new Error("boom") } }) }"#)
+        try extensionFile("nameless.ts", #"export default (voz) => voz.registerCleanupStep({ id: "x", run: (e) => e })"#)
+        let host = makeHost()
+        let manifest = try await host.start()
+        #expect(manifest.speechModels == [HostComponent(id: "whisper/base", name: "Whisper")])
+        #expect(manifest.cleanupModels == [HostComponent(id: "llm/fast", name: "Fast LLM")])
+        #expect(manifest.cleanupSteps.map(\.id) == ["llm/jira", "llm/keep", "llm/boom"])
+        #expect(manifest.errors.map(\.extension) == ["nameless"])
+        #expect(await host.transcribe(model: "whisper/base", path: "/tmp/a.wav", seconds: 2, app: app, timeout: .seconds(2)) == "/tmp/a.wav 2 Slack")
+        #expect(await host.clean(model: "llm/fast", text: "hi", prompt: "Clean.", app: app, timeout: .seconds(2)) == "HI (Clean.)")
+        #expect(await host.cleanupStep("llm/jira", text: "see jira 12", app: app, timeout: .seconds(2)) == "see JIRA-12")
+        #expect(await host.cleanupStep("llm/keep", text: "same", app: app, timeout: .seconds(2)) == "same")
+        #expect(await host.cleanupStep("llm/boom", text: "x", app: app, timeout: .seconds(2)) == nil)
+        #expect(await host.transcribe(model: "missing/model", path: "/tmp/a.wav", seconds: 1, app: app, timeout: .seconds(2)) == nil)
+        await host.stop()
+    }
+
+    @Test func disabledExtensionsAndNewerApiPackagesDoNotLoad() async throws {
+        try writeFile(#"{"disabled":["off","pack"]}"#, named: "settings.json", in: home.root)
+        try extensionFile("on.ts", #"import { apiVersion } from "voz"; export default (voz) => voz.on("beforeInsert", (e) => ({ text: `${e.text} ${apiVersion}` }))"#)
+        try extensionFile("off.ts", #"export default (voz) => voz.on("beforeInsert", () => ({ text: "off ran" }))"#)
+        let pack = home.packages.appendingPathComponent("node_modules/pack")
+        try writeFile(#"{"name":"pack"}"#, named: "package.json", in: pack)
+        try writeFile(#"export default (voz) => voz.on("beforeInsert", () => ({ text: "pack ran" }))"#, named: "index.ts", in: pack.appendingPathComponent("extensions/a"))
+        let future = home.packages.appendingPathComponent("node_modules/future")
+        try writeFile(#"{"name":"future","voz":{"apiVersion":2}}"#, named: "package.json", in: future)
+        try writeFile("export default () => {}", named: "index.ts", in: future)
+        let host = makeHost(packages: [pack.path, future.path])
+        let manifest = try await host.start()
+        #expect(manifest.extensions == ["on"])
+        #expect(manifest.errors.first?.message.contains("Update Voz") == true)
+        #expect(await host.beforeInsert(text: "hi", raw: "hi", app: app, timeout: .seconds(2)) == "hi 1")
+        await host.stop()
+    }
+
     @Test func hostProcessNeverOutlivesVoz() async throws {
         try extensionFile("timer.ts", "export default () => { setInterval(() => {}, 1000) }")
         #expect(try await !hostOutlivesClosedInput(home: home))

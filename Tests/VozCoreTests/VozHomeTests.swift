@@ -9,6 +9,54 @@ import Testing
         #expect(throws: VozHomeError.self) { try home.packageSources() }
         #expect(throws: VozHomeError.self) { try home.setPackageSources(["npm:voz-b"]) }
         #expect(fileContents(home.settings) == settings)
-        #expect(home.hasExtensions)
+        #expect(home.hasEnabledExtensions)
+    }
+
+    @Test func pipelineChoicesDefaultRoundTripAndKeepOtherSettings() throws {
+        let home = temporaryHome()
+        #expect(try home.pipelineChoices() == .standard)
+        try home.setPackageSources(["npm:voz-a"])
+        let before = try home.extensionSettings()
+        let choices = PipelineChoices(speechModel: "whisper/base", cleanupModel: "llm/fast", cleanupSteps: ["llm/jira", "model"])
+        try home.setPipelineChoices(choices)
+        #expect(try home.pipelineChoices() == choices)
+        #expect(try home.packageSources() == ["npm:voz-a"])
+        #expect(try home.extensionSettings() == before)
+    }
+
+    @Test func malformedPipelineFailsLoudlyAndStaysUntouched() throws {
+        let home = temporaryHome()
+        let settings = #"{"cleanupSteps":"model"}"#
+        try writeFile(settings, named: "settings.json", in: home.root)
+        #expect(throws: VozHomeError.self) { try home.pipelineChoices() }
+        #expect(throws: VozHomeError.self) { try home.setPipelineChoices(.standard) }
+        #expect(fileContents(home.settings) == settings)
+    }
+
+    @Test func installedExtensionsAreLooseFilesAndPackagesByTheirOwnName() throws {
+        let home = temporaryHome()
+        #expect(!home.hasEnabledExtensions)
+        try writeFile("export default () => {}", named: "notes.ts", in: home.extensions)
+        try writeFile("export default () => {}", named: "index.ts", in: home.extensions.appendingPathComponent("folder"))
+        try writeFile("", named: "README.md", in: home.extensions)
+        let pack = home.root.appendingPathComponent("pack-src")
+        try writeFile(#"{"name":"voz-pack"}"#, named: "package.json", in: pack)
+        try home.setPackageSources([pack.path])
+        #expect(try home.installedExtensions().map(\.name) == ["folder", "notes", "voz-pack"])
+        #expect(try home.installedExtensions().last?.source?.directory(in: home).standardizedFileURL.path == pack.standardizedFileURL.path)
+        for name in ["folder", "notes"] { try home.setExtension(name, enabled: false) }
+        #expect(home.hasEnabledExtensions)
+        try home.setExtension("voz-pack", enabled: false)
+        #expect(!home.hasEnabledExtensions)
+    }
+
+    @Test func turningExtensionsOffAndOnKeepsOtherSettings() throws {
+        let home = temporaryHome()
+        try home.setPackageSources(["npm:voz-a"])
+        try home.setExtension("voz-a", enabled: false)
+        try home.setExtension("notes", enabled: false)
+        try home.setExtension("voz-a", enabled: true)
+        #expect(try home.disabledExtensions() == ["notes"])
+        #expect(try home.packageSources() == ["npm:voz-a"])
     }
 }

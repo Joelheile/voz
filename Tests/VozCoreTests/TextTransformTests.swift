@@ -66,4 +66,11 @@ import Testing
         #expect(SegmentJoiner.join(cleaned: ["We left.", "Then it rained."], fallback: ["we left.", "then it rained."]) == "We left. Then it rained.")
         #expect(SegmentJoiner.join(cleaned: ["We left."], fallback: ["we left"]) == "We left.")
     }
+
+    @Test func cleanupRulesRunOnlyListedStepsInOrder() {
+        let raw = "uh send it to voz comma please"
+        #expect(CleanupStep.applyRules(CleanupStep.standard, to: raw, vocabulary: ["Voz"]) == FillerPassResult(text: "Send it to Voz, please", removed: 1))
+        #expect(CleanupStep.applyRules(["punctuation", "llm/jira", "model"], to: raw, vocabulary: ["Voz"]).text == "uh send it to voz, please")
+        #expect(CleanupStep.applyRules([], to: raw, vocabulary: ["Voz"]) == FillerPassResult(text: raw, removed: 0))
+    }
 }

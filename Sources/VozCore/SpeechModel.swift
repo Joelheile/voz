@@ -49,4 +49,8 @@ public enum SpeechModel: String, CaseIterable, Sendable {
         case .appleSpeech: "Built in"
         }
     }
+
+    public static func analyticsLabel(for id: String) -> String {
+        SpeechModel(rawValue: id)?.rawValue ?? "extension"
+    }
 }

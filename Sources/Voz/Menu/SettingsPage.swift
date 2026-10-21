@@ -6,6 +6,7 @@ struct SettingsPage: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var status: ModelStatus
     @ObservedObject var vocabulary: VocabularyModel
+    @ObservedObject var catalog: ExtensionCatalog
     @StateObject private var capture: HotkeyCapture
     @State private var microphone = Permissions.microphoneStatus
     @State private var accessibility = Permissions.accessibilityGranted
@@ -15,11 +16,12 @@ struct SettingsPage: View {
         microphone == .authorized && accessibility && inputMonitoring
     }
 
-    init(model: PopoverModel, settings: AppSettings, status: ModelStatus, vocabulary: VocabularyModel) {
+    init(model: PopoverModel, settings: AppSettings, status: ModelStatus, vocabulary: VocabularyModel, catalog: ExtensionCatalog) {
         self.model = model
         self.settings = settings
         self.status = status
         self.vocabulary = vocabulary
+        self.catalog = catalog
         _capture = StateObject(wrappedValue: HotkeyCapture(settings: settings))
     }
 
@@ -64,12 +66,19 @@ struct SettingsPage: View {
                 .labelsHidden()
                 .fixedSize()
             }
-            SpeechModelPicker(selection: $settings.speechModel, status: status)
+            SpeechModelPicker(selection: $settings.speechModel, extensions: ModelOption.extensions(catalog.speechModels), status: status)
             PanelRow(title: "Clean up text", detail: "Drops filler words and fixes punctuation") {
                 Toggle("Clean up text", isOn: $settings.cleanupEnabled).labelsHidden()
             }
             if settings.cleanupEnabled {
+                if !catalog.cleanupModels.isEmpty || settings.cleanupModel != CleanupModelID.apple {
+                    ModelPicker(title: "Cleanup model", selection: $settings.cleanupModel, options: [ModelOption(id: CleanupModelID.apple, name: "Apple", detail: "On device")] + ModelOption.extensions(catalog.cleanupModels))
+                }
+                LinkRow(title: "Cleanup steps", value: settings.cleanupSteps == CleanupStep.standard ? "Default" : "Edited") { model.page = .cleanupSteps }
                 LinkRow(title: "Cleanup prompt", value: settings.cleanupPrompt == CleanupPrompt.standard ? "Default" : "Edited") { model.page = .cleanupPrompt }
+            }
+            if let error = settings.pipelineError {
+                PanelRow(title: "Could not read settings.json", detail: error) { EmptyView() }
             }
             LinkRow(title: "Dictionary", value: vocabulary.snapshot.words.count.formatted()) { model.page = .dictionary }
         }

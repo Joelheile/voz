@@ -15,7 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var output = TextOutput(settings: settings)
     private let cleaner = TextCleaner()
     private let toast = ToastController()
-    private lazy var extensions = ExtensionService(output: output, toast: toast)
+    private lazy var extensions = ExtensionService(output: output, toast: toast, settings: settings)
     private var vocabularyWords: [String] = []
     private lazy var dictation = Dictation(
         pipeline: DictationPipeline(
@@ -55,7 +55,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 stats: statsModel,
                 vocabulary: vocabularyModel,
                 setup: setupModel,
-                extensions: ExtensionsModel()
+                extensions: ExtensionsModel(),
+                catalog: extensions.catalog
             ),
             analytics: analytics,
             checkForUpdates: { [weak self] in self?.updater.checkForUpdates() },
@@ -88,7 +89,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 await Permissions.requestMicrophone()
                 dictation.prepareRecorder()
             }
-            warmUpModel(settings.speechModel)
+            warmUpModel(settings.localSpeechModel)
             if !Permissions.accessibilityGranted {
                 Permissions.promptForAccessibility()
             }
@@ -177,6 +178,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .sink { [weak self] enabled in self?.analytics.setEnabled(enabled) }
             .store(in: &cancellables)
         settings.$speechModel
+            .map { SpeechModel(rawValue: $0) ?? .parakeetUltra }
+            .removeDuplicates()
             .dropFirst()
             .sink { [weak self] model in
                 guard let self, self.settings.onboardingCompleted else { return }
@@ -231,7 +234,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func finishSetup() {
         setupModel.reportPermissions()
         settings.onboardingCompleted = true
-        warmUpModel(settings.speechModel)
+        warmUpModel(settings.localSpeechModel)
     }
 
     private func warmUpModel(_ model: SpeechModel) {

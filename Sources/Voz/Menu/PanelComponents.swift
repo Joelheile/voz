@@ -26,9 +26,11 @@ struct PanelGroup<Content: View>: View {
             if let title { SectionLabel(text: title).padding(.leading, 2) }
             Group(subviews: content) { rows in
                 VStack(spacing: 0) {
-                    ForEach(rows.indices, id: \.self) { index in
-                        if index > 0 { RowDivider() }
-                        rows[index].padding(.horizontal, 12)
+                    ForEach(rows) { row in
+                        VStack(spacing: 0) {
+                            if row.id != rows.first?.id { RowDivider() }
+                            row.padding(.horizontal, 12)
+                        }
                     }
                 }
                 .overlay(RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous).strokeBorder(Theme.hairline))

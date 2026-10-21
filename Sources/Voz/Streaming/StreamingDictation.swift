@@ -5,7 +5,7 @@ struct StreamedTranscript {
     let raw: String
     let cleaned: CleanedText
     let sttMs: Int
-    let model: SpeechModel
+    let model: String
     let audioSeconds: Double
     let segmentCount: Int
     let cleanedInTime: Int
@@ -26,14 +26,17 @@ private final class Segment {
     }
 }
 
+typealias SegmentTranscriber = @MainActor ([Float]) async throws -> TranscriptionResult
+
 @MainActor
 final class StreamingDictation {
-    private let engine: SpeechEngine
+    private let transcribe: SegmentTranscriber
     private let cleaner: TextCleaner
-    private let model: SpeechModel
     private let vocabulary: [String]
     private let prompt: Task<String, Never>
     private let cleanupEnabled: Bool
+    private let steps: [String]
+    private let extensions: CleanupExtensions
     private var detector = PauseDetector()
     private var pendingAudio: [Float] = []
     private var committedSamples = 0
@@ -41,13 +44,22 @@ final class StreamingDictation {
     private var releaseDeadline: ContinuousClock.Instant?
     private var closed = false
 
-    init(engine: SpeechEngine, cleaner: TextCleaner, model: SpeechModel, vocabulary: [String], prompt: Task<String, Never>, cleanupEnabled: Bool) {
-        self.engine = engine
+    init(
+        transcribe: @escaping SegmentTranscriber,
+        cleaner: TextCleaner,
+        vocabulary: [String],
+        prompt: Task<String, Never>,
+        cleanupEnabled: Bool,
+        steps: [String] = CleanupStep.standard,
+        extensions: CleanupExtensions = .none
+    ) {
+        self.transcribe = transcribe
         self.cleaner = cleaner
-        self.model = model
         self.vocabulary = vocabulary
         self.prompt = prompt
         self.cleanupEnabled = cleanupEnabled
+        self.steps = steps
+        self.extensions = extensions
     }
 
     func feed(_ samples: [Float]) {
@@ -105,7 +117,7 @@ final class StreamingDictation {
         var timedOut = false
         var cleanedInTime = 0
         for (segment, raw) in zip(segments, raws) {
-            let rules = cleanupEnabled ? cleaner.ruleText(raw, vocabulary: vocabulary) : FillerPassResult(text: raw, removed: 0)
+            let rules = cleanupEnabled ? cleaner.ruleText(raw, steps: steps, vocabulary: vocabulary) : FillerPassResult(text: raw, removed: 0)
             fallbacks.append(rules.text)
             cleanedTexts.append(segment.cleaned?.text)
             guard !raw.isEmpty else { continue }
@@ -137,12 +149,10 @@ final class StreamingDictation {
     }
 
     private func makeSegment(_ audio: [Float]) -> Segment {
-        let engine = engine
-        let model = model
-        let vocabulary = vocabulary
+        let transcribe = transcribe
         let transcription = Task { () -> TranscriptionResult? in
             do {
-                return try await engine.transcribe(audio, model: model, vocabulary: vocabulary)
+                return try await transcribe(audio)
             } catch {
                 Log.app.error("Segment transcription failed: \(error.localizedDescription, privacy: .private)")
                 return nil
@@ -165,7 +175,7 @@ final class StreamingDictation {
             return CleanedText(text: raw, fillerWordsRemoved: 0, milliseconds: 0, timedOut: false, rejection: nil)
         }
         let deadline = releaseDeadline ?? ContinuousClock.now + CleanupBudget.segmentTimeout
-        return await cleaner.clean(raw, prompt: await prompt.value, vocabulary: vocabulary, deadline: deadline)
+        return await cleaner.clean(raw, prompt: await prompt.value, vocabulary: vocabulary, steps: steps, extensions: extensions, deadline: deadline)
     }
 
     private func wait(for task: Task<Void, Never>, until deadline: ContinuousClock.Instant) async {

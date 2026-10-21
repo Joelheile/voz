@@ -7,7 +7,6 @@ private enum SettingsKey {
     static let muteWhileRecording = "muteWhileRecording"
     static let copyToClipboard = "copyToClipboard"
     static let insertIntoApp = "insertIntoApp"
-    static let speechModel = "speechModel"
     static let soundCues = "soundCues"
     static let launchAtLogin = "launchAtLogin"
     static let onboardingCompleted = "onboardingCompleted"
@@ -37,9 +36,16 @@ public final class AppSettings: ObservableObject {
     @Published public var insertIntoApp: Bool {
         didSet { defaults.set(insertIntoApp, forKey: SettingsKey.insertIntoApp) }
     }
-    @Published public var speechModel: SpeechModel {
-        didSet { defaults.set(speechModel.rawValue, forKey: SettingsKey.speechModel) }
+    @Published public var speechModel: String {
+        didSet { storePipeline() }
     }
+    @Published public var cleanupModel: String {
+        didSet { storePipeline() }
+    }
+    @Published public var cleanupSteps: [String] {
+        didSet { storePipeline() }
+    }
+    @Published public private(set) var pipelineError: String?
     @Published public var soundCues: Bool {
         didSet { defaults.set(soundCues, forKey: SettingsKey.soundCues) }
     }
@@ -71,15 +77,25 @@ public final class AppSettings: ObservableObject {
         }
     }
     @Published public var isCapturingHotkey = false
+    private let home: VozHome
+    private var loadingPipeline = false
 
-    public init(defaults: UserDefaults = .standard) {
+    public var localSpeechModel: SpeechModel {
+        SpeechModel(rawValue: speechModel) ?? .parakeetUltra
+    }
+
+    public var pipelineChoices: PipelineChoices {
+        PipelineChoices(speechModel: speechModel, cleanupModel: cleanupModel, cleanupSteps: cleanupSteps)
+    }
+
+    public init(defaults: UserDefaults = .standard, home: VozHome = VozHome()) {
         self.defaults = defaults
+        self.home = home
         defaults.register(defaults: [
             SettingsKey.holdToTalk: false,
             SettingsKey.muteWhileRecording: true,
             SettingsKey.copyToClipboard: true,
             SettingsKey.insertIntoApp: true,
-            SettingsKey.speechModel: SpeechModel.parakeetUltra.rawValue,
             SettingsKey.soundCues: false,
             SettingsKey.launchAtLogin: true,
             SettingsKey.onboardingCompleted: false,
@@ -94,7 +110,6 @@ public final class AppSettings: ObservableObject {
         muteWhileRecording = defaults.bool(forKey: SettingsKey.muteWhileRecording)
         copyToClipboard = defaults.bool(forKey: SettingsKey.copyToClipboard)
         insertIntoApp = defaults.bool(forKey: SettingsKey.insertIntoApp)
-        speechModel = defaults.string(forKey: SettingsKey.speechModel).flatMap(SpeechModel.init) ?? .parakeetUltra
         soundCues = defaults.bool(forKey: SettingsKey.soundCues)
         launchAtLogin = defaults.bool(forKey: SettingsKey.launchAtLogin)
         onboardingCompleted = defaults.bool(forKey: SettingsKey.onboardingCompleted)
@@ -103,6 +118,38 @@ public final class AppSettings: ObservableObject {
         receiveBetaUpdates = defaults.bool(forKey: SettingsKey.receiveBetaUpdates)
         versionPingEnabled = defaults.bool(forKey: SettingsKey.versionPingEnabled)
         cleanupPrompt = defaults.string(forKey: SettingsKey.cleanupPrompt) ?? CleanupPrompt.standard
+        let choices = PipelineChoices.standard
+        speechModel = choices.speechModel
+        cleanupModel = choices.cleanupModel
+        cleanupSteps = choices.cleanupSteps
+        reloadPipeline()
+    }
+
+    public func reloadPipeline() {
+        let choices: PipelineChoices
+        do {
+            choices = try home.pipelineChoices()
+            pipelineError = nil
+        } catch {
+            pipelineError = String(describing: error)
+            return
+        }
+        guard choices != pipelineChoices else { return }
+        loadingPipeline = true
+        defer { loadingPipeline = false }
+        speechModel = choices.speechModel
+        cleanupModel = choices.cleanupModel
+        cleanupSteps = choices.cleanupSteps
+    }
+
+    private func storePipeline() {
+        guard !loadingPipeline else { return }
+        do {
+            try home.setPipelineChoices(pipelineChoices)
+            pipelineError = nil
+        } catch {
+            pipelineError = String(describing: error)
+        }
     }
 
     private func store(_ hotkey: Hotkey) {

@@ -39,6 +39,9 @@ Voz loads it, reloads it on save and prints extension logs, including `console.l
 | `voz.on("beforeInsert", handler)`      | Runs before Voz inserts text. Return `{ text }` to replace it, or `{ handled: true }` to insert nothing and skip the remaining handlers. Handlers run in load order, and each one gets the previous one's text. |
 | `voz.on("recording", handler)`         | Runs after each recording with a 16 kHz mono WAV file. Voz deletes the file after all handlers finish. Voz does not wait for it. |
 | `voz.on("afterInsert", handler)`       | Runs after Voz inserts text. Voz does not wait for it. |
+| `voz.registerSpeechModel(model)`       | Adds a speech model to Settings. `model` has `id`, `name` and `transcribe(event, ctx)`, which returns `{ text }`. |
+| `voz.registerCleanupModel(model)`      | Adds a cleanup model to Settings. `model` has `id`, `name` and `clean(event, ctx)`, which returns `{ text }`. |
+| `voz.registerCleanupStep(step)`        | Adds a cleanup step to Settings. `step` has `id`, `name` and `run(event, ctx)`, which returns `{ text }` or nothing to keep the text. |
 | `voz.registerCommand(phrase, handler)` | Runs `handler` when a dictation ends with `phrase`. Voz inserts the words before the phrase, then runs the command.                   |
 | `voz.config`                           | The object at `config.<extension name>` in `~/.voz/settings.json`.                                                                    |
 | `voz.log(message)`                     | Writes to the Voz log. `console.log` does the same.                                                                                   |
@@ -53,6 +56,9 @@ Every handler gets `(event, ctx)`.
 - The `recording` event has `path` and `seconds`
 - The `afterInsert` event has `text` (what Voz inserted) and `raw`
 - The command event has `text`, the words before the phrase
+- The `transcribe` event has `path`, a 16 kHz mono WAV of one stretch of speech, and `seconds`
+- The `clean` event has `text` and `prompt`, the cleanup prompt with your dictionary words
+- The cleanup step event has `text`
 
 `ctx` has:
 
@@ -80,9 +86,45 @@ export default defineExtension((voz) => {
 });
 ```
 
+## Models and cleanup steps
+
+Voz runs each dictation through a speech model, then through cleanup steps in order. The built-in steps are `fillers`, `punctuation`, `dictionary` and `model`. The `model` step uses the cleanup model.
+
+An extension that registers a model or step only makes it available. You turn it on in Settings, or in `~/.voz/settings.json`. Voz names it `<extension name>/<id>`.
+
+```ts
+import { defineExtension } from "voz";
+
+export default defineExtension((voz) => {
+  voz.registerCleanupModel({
+    id: "llama",
+    name: "Llama 3.2",
+    async clean(event) {
+      const response = await fetch("http://localhost:11434/api/generate", {
+        method: "POST",
+        body: JSON.stringify({ model: "llama3.2", system: event.prompt, prompt: event.text, stream: false }),
+      });
+      return { text: (await response.json()).response };
+    },
+  });
+
+  voz.registerCleanupStep({
+    id: "jira",
+    name: "Jira keys",
+    run: (event) => ({ text: event.text.replace(/\bjira (\d+)/gi, "JIRA-$1") }),
+  });
+});
+```
+
+Voz splits a dictation at pauses and transcribes and cleans up each part while you talk. A speech model or cleanup step runs once per part.
+
 ## Limits
 
 - All `beforeCleanup` handlers together have 300 ms, and so do all `beforeInsert` handlers. After that, Voz uses the prompt or text it had
+- A speech model has 2 seconds per part. If it fails or runs over, Voz transcribes that part with Parakeet
+- A cleanup model shares the cleanup budget with the other steps: Voz waits at most 1.5 seconds after you stop talking. If it fails, runs over or changes the meaning, Voz uses the text from the other steps
+- A cleanup step has 300 ms, or less if the 1.5 second cleanup budget runs out first. If it fails or runs over, Voz keeps the text from the step before
+- If the cleanup budget runs out before a part is done, Voz uses the built-in steps only for that part
 - A command has 10 seconds. `recording` and `afterInsert` handlers have 30 seconds
 - Each extension has 3 seconds to load. After that, Voz reports it as failed and loads the next one
 - If a handler throws or a promise rejects unhandled, Voz logs the error and skips that handler
@@ -114,17 +156,29 @@ voz remove voz-jira
 - Packages only change when you run `voz update`. Voz never updates them on its own
 - Voz never runs install scripts
 - Installed packages are listed in `~/.voz/settings.json`
+- A package that needs a newer Voz sets `"voz": { "apiVersion": 2 }` in its `package.json`. Older Voz versions show "Update Voz" instead of loading it. Within one API version, Voz only adds to the API and never changes or removes what is there. `import { apiVersion } from "voz"` gives the version that runs
 
 ## Settings file
 
 ```json
 {
   "packages": ["npm:voz-jira", "git:github.com/user/voz-slack"],
+  "disabled": ["voz-slack"],
   "config": {
     "voz-jira": { "project": "VOZ" }
-  }
+  },
+  "speechModel": "parakeet-ultra",
+  "cleanupModel": "voz-ollama/llama",
+  "cleanupSteps": ["fillers", "punctuation", "dictionary", "model", "voz-jira/jira"]
 }
 ```
+
+- `speechModel` is `parakeet-ultra`, `parakeet-english-v2`, `apple-speech` or an extension model. If the extension model is not loaded, Voz uses Parakeet Ultra
+- `cleanupModel` is `apple` or an extension model. If the extension model is not loaded, Voz uses Apple's on-device model
+- `disabled` lists extensions that stay installed but don't load. A package name turns off every extension in it. Settings, Extensions has one switch per package and per file in `~/.voz/extensions`, and writes this list. With every extension off, Voz starts no Bun process
+- `cleanupSteps` lists the steps in the order they run. Leave a step out to turn it off
+
+Settings writes these keys when you change them. Voz reads the file again when you save it, and restarts extensions only when something other than these keys changed.
 
 ## Bun
 

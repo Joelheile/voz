@@ -26,6 +26,7 @@ enum Theme {
         static let press = Animation.easeOut(duration: 0.12)
         static let hover = Animation.easeOut(duration: 0.15)
         static let section = Animation.easeOut(duration: 0.18)
+        static let reorder = Animation.spring(duration: 0.22, bounce: 0)
     }
 
     fileprivate static func isDark(_ appearance: NSAppearance) -> Bool {

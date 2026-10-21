@@ -14,10 +14,23 @@ public struct HostManifest: Decodable, Equatable, Sendable {
     public let extensions: [String]
     public let events: [String]
     public let commands: [String]
+    public let speechModels: [HostComponent]
+    public let cleanupModels: [HostComponent]
+    public let cleanupSteps: [HostComponent]
     public let errors: [LoadError]
 
     public func subscribes(to hook: HostHook) -> Bool {
         events.contains(hook.rawValue)
+    }
+}
+
+public struct HostComponent: Decodable, Equatable, Hashable, Sendable {
+    public let id: String
+    public let name: String
+
+    public init(id: String, name: String) {
+        self.id = id
+        self.name = name
     }
 }
 
@@ -93,6 +106,26 @@ struct CleanupParams: Encodable {
     let app: HostApp
 }
 
+struct TranscribeParams: Encodable {
+    let model: String
+    let path: String
+    let seconds: Double
+    let app: HostApp
+}
+
+struct CleanParams: Encodable {
+    let model: String
+    let text: String
+    let prompt: String
+    let app: HostApp
+}
+
+struct StepParams: Encodable {
+    let step: String
+    let text: String
+    let app: HostApp
+}
+
 struct CommandParams: Encodable {
     let phrase: String
     let text: String
@@ -121,7 +154,7 @@ struct PressParams: Decodable {
     let key: String
 }
 
-struct InsertResult: Decodable {
+struct TextResult: Decodable {
     let text: String
 }
 

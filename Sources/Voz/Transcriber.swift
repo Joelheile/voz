@@ -6,7 +6,7 @@ struct TranscriptionResult: Sendable {
     let text: String
     let audioSeconds: Double
     let processingSeconds: Double
-    let model: SpeechModel
+    let model: String
 }
 
 enum TranscriberError: Error {
@@ -60,7 +60,7 @@ actor Transcriber {
         var decoderState = TdtDecoderState.make()
         let result = try await manager.transcribe(samples, decoderState: &decoderState)
         let text = await booster.rescore(result, samples: samples, words: vocabulary)
-        return TranscriptionResult(text: text, audioSeconds: result.duration, processingSeconds: result.processingTime, model: model)
+        return TranscriptionResult(text: text, audioSeconds: result.duration, processingSeconds: result.processingTime, model: model.rawValue)
     }
 
     private func manager(for model: SpeechModel) async throws -> AsrManager {
