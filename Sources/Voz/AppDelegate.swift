@@ -6,7 +6,7 @@ import VozCore
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let settings = AppSettings()
     private let modelStatus = ModelStatus()
-    private let installID = InstallID()
+    private let installID = InstallID(key: InstallID.usage)
     private lazy var analytics = Analytics(enabled: settings.analyticsEnabled, installID: installID.value)
     private let history = AppDelegate.openHistory()
     private lazy var transcriber = Transcriber { [modelStatus] mode, state in
@@ -36,8 +36,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var historyModel = HistoryModel(store: history)
     private lazy var statsModel = StatsModel(store: history)
     private lazy var vocabularyModel = VocabularyModel(store: history.vocabulary, analytics: analytics)
-    private lazy var setupModel = SetupModel(analytics: analytics)
-    private lazy var extensionsModel = ExtensionsModel()
+    private lazy var setupModel = SetupModel(analytics: analytics) { [weak self] in self?.retryModel() }
+    private lazy var extensionsModel = ExtensionsModel(analytics: analytics)
     private var statusItemController: StatusItemController?
     private var hotkeyMonitor: HotkeyMonitor?
     private var quitRequested = false
@@ -61,6 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ),
             analytics: analytics,
             checkForUpdates: { [weak self] in self?.updater.checkForUpdates() },
+            retryModel: { [weak self] in self?.retryModel() },
             finishSetup: { [weak self] in self?.finishSetup() },
             quit: { [weak self] in self?.quitFromMenu() }
         )
@@ -104,7 +105,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             analytics.capture(.updateInstalled(from: previous, to: launch.current, channel: UpdateChannel(version: launch.current)))
         }
         let ping: VersionPing? = installID.isNew ? .install : launch.updatedFrom.map { _ in .update }
-        VersionPinger.sendPending(ping, version: launch.current, enabled: settings.versionPingEnabled)
+        VersionPinger.sendPending(ping, launch: launch, enabled: settings.versionPingEnabled)
         updater.start()
         analytics.capture(.appLaunched)
         manageLaunchAgent()
@@ -188,10 +189,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .map { SpeechModel(rawValue: $0) ?? .parakeetUltra }
             .removeDuplicates()
             .dropFirst()
-            .sink { [weak self] model in
-                guard let self, self.settings.onboardingCompleted else { return }
-                self.warmUpModel(model)
-            }
+            .sink { [weak self] model in self?.warmUpModel(model) }
             .store(in: &cancellables)
         settings.$cleanupPrompt
             .dropFirst()
@@ -239,8 +237,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func finishSetup() {
-        setupModel.reportPermissions()
+        setupModel.reportCompletion()
         settings.onboardingCompleted = true
+    }
+
+    private func retryModel() {
         warmUpModel(settings.localSpeechModel)
     }
 
@@ -249,11 +250,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task {
             let started = Date()
             do {
-                if model != .appleSpeech { try await transcriber.prepare(model) }
+                try await transcriber.prepare(model)
                 await transcriber.removeUnusedModels(keeping: model)
                 let seconds = Date().timeIntervalSince(started)
                 Log.app.notice("Model \(model.rawValue) ready in \(seconds, format: .fixed(precision: 1))s")
                 reportModelReady(model, wasDownloaded: wasDownloaded, seconds: seconds)
+            } catch TranscriberError.superseded {
+                Log.app.notice("Model \(model.rawValue) load stopped for a newer choice")
             } catch {
                 Log.app.error("Model load failed: \(error.localizedDescription, privacy: .private)")
                 if !wasDownloaded {

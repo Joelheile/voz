@@ -7,6 +7,11 @@ func makeVersionPingQueue() -> () throws -> VersionPingQueue {
     return { try VersionPingQueue(defaults: defaults) }
 }
 
+func makePingID() -> (UUID, String) {
+    let id = UUID()
+    return (id, id.uuidString)
+}
+
 func decodeVersionPing(_ data: Data) throws -> PingPayload {
     try JSONDecoder().decode(PingPayload.self, from: data)
 }
@@ -14,10 +19,12 @@ func decodeVersionPing(_ data: Data) throws -> PingPayload {
 struct PingPayload: Decodable {
     struct Properties: Decodable {
         let kind: String
+        let channel: String
+        let previous: String?
         let processPersonProfile: Bool
         let geoIPDisable: Bool
         enum CodingKeys: String, CodingKey {
-            case kind
+            case kind, channel, previous
             case processPersonProfile = "$process_person_profile"
             case geoIPDisable = "$geoip_disable"
         }

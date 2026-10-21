@@ -13,6 +13,10 @@ public enum AnalyticsEvent: Equatable, Sendable {
     case historyOpened
     case statsOpened
     case updateInstalled(from: String, to: String, channel: UpdateChannel)
+    case setupStepViewed(SetupStage)
+    case setupCompleted(allPermissionsGranted: Bool, triedDictation: Bool)
+    case extensionChanged(change: ExtensionChange, source: PackageSource)
+    case extensionFailed(change: ExtensionChange, source: PackageSource, failure: ExtensionFailure)
 
     public var name: String {
         switch self {
@@ -30,6 +34,10 @@ public enum AnalyticsEvent: Equatable, Sendable {
         case .historyOpened: "history_opened"
         case .statsOpened: "stats_opened"
         case .updateInstalled: "update_installed"
+        case .setupStepViewed: "setup_step_viewed"
+        case .setupCompleted: "setup_completed"
+        case let .extensionChanged(change, _): change.eventName
+        case .extensionFailed: "extension_failed"
         }
     }
 
@@ -57,6 +65,14 @@ public enum AnalyticsEvent: Equatable, Sendable {
             ["accepted": .flag(accepted)]
         case let .updateInstalled(from, to, channel):
             ["from": .text(from), "to": .text(to), "channel": .text(channel.rawValue)]
+        case let .setupStepViewed(step):
+            ["step": .text(step.rawValue)]
+        case let .setupCompleted(allPermissionsGranted, triedDictation):
+            ["all_permissions_granted": .flag(allPermissionsGranted), "tried_dictation": .flag(triedDictation)]
+        case let .extensionChanged(_, source):
+            Self.properties(of: source)
+        case let .extensionFailed(change, source, failure):
+            Self.properties(of: source).merging(["change": .text(change.rawValue), "error_code": .text(failure.rawValue)]) { $1 }
         }
     }
 
@@ -65,7 +81,16 @@ public enum AnalyticsEvent: Equatable, Sendable {
         case let .dictationFailed(stage, errorCode): (stage.rawValue, errorCode.rawValue)
         case .modelFailed: ("model_loading", "model_load_failed")
         case .modelDownload(_, _, false, _): ("model_download", "model_download_failed")
+        case let .extensionFailed(change, _, failure): ("extension_\(change.rawValue)", failure.rawValue)
         default: nil
+        }
+    }
+
+    private static func properties(of source: PackageSource) -> [String: AnalyticsValue] {
+        switch source {
+        case let .npm(name, _): ["source": .text("npm"), "package": .text(name)]
+        case .git: ["source": .text("git")]
+        case .local: ["source": .text("local")]
         }
     }
 

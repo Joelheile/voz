@@ -1,19 +1,20 @@
 import Foundation
 
 struct InstallID {
-    private static let key = "installId"
+    static let usage = "installId"
+    static let versionPing = "versionPingId"
 
     let value: UUID
     let isNew: Bool
 
-    init(defaults: UserDefaults = .standard) {
-        if let stored = defaults.string(forKey: Self.key).flatMap(UUID.init) {
+    init(key: String, defaults: UserDefaults = .standard) {
+        if let stored = defaults.string(forKey: key).flatMap(UUID.init) {
             value = stored
             isNew = false
         } else {
             value = UUID()
             isNew = true
-            defaults.set(value.uuidString, forKey: Self.key)
+            defaults.set(value.uuidString, forKey: key)
         }
     }
 }

@@ -74,6 +74,7 @@ final class StatusItemController: NSObject {
         sources: PopoverSources,
         analytics: Analytics,
         checkForUpdates: @escaping () -> Void,
+        retryModel: @escaping () -> Void,
         finishSetup: @escaping () -> Void,
         quit: @escaping () -> Void
     ) {
@@ -94,6 +95,7 @@ final class StatusItemController: NSObject {
         model.actions = PopoverActions(
             copy: { [dictation] in dictation.copy($0.finalText) },
             fixPermission: { [weak self] in self?.fix($0) },
+            retryModel: retryModel,
             checkForUpdates: { [weak self] in self?.dismissThen(checkForUpdates) },
             finishSetup: { [weak self] in
                 self?.closePanel()

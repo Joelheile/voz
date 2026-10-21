@@ -125,10 +125,10 @@ struct SettingsPage: View {
             PanelRow(title: "Launch at login") {
                 Toggle("Launch at login", isOn: $settings.launchAtLogin).labelsHidden()
             }
-            PanelRow(title: "Share anonymous usage stats", detail: "Counts, timings and error codes, never text or audio") {
+            PanelRow(title: "Share anonymous usage stats", detail: "Counts, timings, error codes and npm extensions you add, never text or audio") {
                 Toggle("Share anonymous usage stats", isOn: $settings.analyticsEnabled).labelsHidden()
             }
-            PanelRow(title: "Send version on install and update", detail: "Version number only, no ID") {
+            PanelRow(title: "Send version on install and update", detail: "Version and channel, with a random ID for this Mac") {
                 Toggle("Send version on install and update", isOn: $settings.versionPingEnabled).labelsHidden()
             }
             PanelRow(title: "Beta updates") {

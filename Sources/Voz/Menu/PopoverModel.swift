@@ -72,6 +72,7 @@ enum PopoverPage {
 struct PopoverActions {
     var copy: (TranscriptRecord) -> Void = { _ in }
     var fixPermission: (PermissionFix) -> Void = { _ in }
+    var retryModel: () -> Void = {}
     var checkForUpdates: () -> Void = {}
     var finishSetup: () -> Void = {}
     var resize: (CGSize) -> Void = { _ in }

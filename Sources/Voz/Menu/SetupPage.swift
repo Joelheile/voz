@@ -5,6 +5,8 @@ struct SetupPage: View {
     @ObservedObject var model: SetupModel
     @ObservedObject var settings: AppSettings
     @ObservedObject var history: HistoryModel
+    let status: PopoverStatus
+    let retryModel: () -> Void
     let finish: () -> Void
     @State private var forward = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -26,7 +28,7 @@ struct SetupPage: View {
         switch model.step {
         case .access: AccessStep(model: model)
         case .model: ModelStep(settings: settings)
-        case .tryIt: TryStep(settings: settings, history: history)
+        case .tryIt: TryStep(settings: settings, history: history, status: status, retryModel: retryModel, tried: $model.triedDictation)
         }
     }
 
@@ -140,12 +142,12 @@ private struct ModelStep: View {
         VStack(alignment: .leading, spacing: 16) {
             StepHeader(title: "Pick a model", detail: "All three run on this Mac. You can switch later.")
             SpeechModelPicker(selection: $settings.speechModel, showsTitle: false)
-            Toggle(isOn: $settings.analyticsEnabled) {
-                Text("Share anonymous usage and errors, never text or audio")
-                    .font(.meta)
-                    .foregroundStyle(Theme.inkSecondary)
+            PanelGroup {
+                PanelRow(title: "Share anonymous usage", detail: "Counts, timings, error codes and npm extensions you add, never text or audio") {
+                    Toggle("Share anonymous usage", isOn: $settings.analyticsEnabled).labelsHidden()
+                }
             }
-            .toggleStyle(.checkbox)
+            .controlSize(.small)
         }
     }
 }
@@ -153,12 +155,18 @@ private struct ModelStep: View {
 private struct TryStep: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var history: HistoryModel
+    let status: PopoverStatus
+    let retryModel: () -> Void
+    @Binding var triedDictation: Bool
     @StateObject private var capture: HotkeyCapture
     @State private var startedWith: TranscriptRecord.ID?
 
-    init(settings: AppSettings, history: HistoryModel) {
+    init(settings: AppSettings, history: HistoryModel, status: PopoverStatus, retryModel: @escaping () -> Void, tried: Binding<Bool>) {
         self.settings = settings
         self.history = history
+        self.status = status
+        self.retryModel = retryModel
+        _triedDictation = tried
         _capture = StateObject(wrappedValue: HotkeyCapture(settings: settings))
     }
 
@@ -206,7 +214,16 @@ private struct TryStep: View {
             result
         }
         .onAppear { startedWith = history.records.first?.id }
+        .onChange(of: tried?.id) { if tried != nil { triedDictation = true } }
         .onDisappear { capture.cancel() }
+    }
+
+    private var placeholder: String {
+        switch status {
+        case let .loadingModel(detail, _): "\(detail). Try it when it finishes."
+        case let .modelFailed(message): "\(message)."
+        default: "Your first dictation shows up here."
+        }
     }
 
     private var keyText: String {
@@ -227,9 +244,15 @@ private struct TryStep: View {
                     .lineLimit(2)
                     .transition(.opacity)
             } else {
-                Text("Your first dictation shows up here.")
+                Text(placeholder)
                     .font(.ui(13))
                     .foregroundStyle(Theme.inkTertiary)
+                    .contentTransition(.numericText())
+                if case .modelFailed = status {
+                    Spacer(minLength: 0)
+                    Button("Try again", action: retryModel)
+                        .buttonStyle(.pill(.quiet, height: 24))
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

@@ -67,3 +67,7 @@ func processIsGone(_ pid: Int32) async throws -> Bool {
     for _ in 0..<30 where kill(pid, 0) == 0 { try await Task.sleep(for: .milliseconds(100)) }
     return kill(pid, 0) != 0
 }
+
+func localSource(_ path: String) -> PackageSource {
+    .local(URL(fileURLWithPath: path))
+}

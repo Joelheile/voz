@@ -11,6 +11,7 @@ struct TranscriptionResult: Sendable {
 
 enum TranscriberError: Error {
     case notParakeet(String)
+    case superseded
 }
 
 actor Transcriber {
@@ -35,6 +36,11 @@ actor Transcriber {
     }
 
     func prepare(_ model: SpeechModel) async throws {
+        guard model.modelVersion != nil else {
+            loading?.task.cancel()
+            loading = nil
+            return
+        }
         _ = try await manager(for: model)
     }
 
@@ -69,17 +75,22 @@ actor Transcriber {
         if let loading, loading.model == model {
             task = loading.task
         } else {
+            loading?.task.cancel()
             task = makeLoadTask(for: model)
             loading = (model, task)
         }
+        defer { if loading?.task == task { loading = nil } }
         do {
             let manager = try await task.value
+            guard !task.isCancelled else { throw CancellationError() }
             loaded = (model, manager)
-            if loading?.model == model { loading = nil }
             return manager
+        } catch where task.isCancelled {
+            report(model, .notLoaded)
+            throw TranscriberError.superseded
         } catch {
-            if loading?.model == model { loading = nil }
-            report(model, .failed(error.localizedDescription))
+            Log.app.error("Model \(model.rawValue) failed: \(error.localizedDescription, privacy: .public)")
+            report(model, .failed(model.isDownloaded ? "Could not load the model" : "Download failed. Check your connection"))
             throw error
         }
     }

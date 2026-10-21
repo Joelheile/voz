@@ -38,7 +38,7 @@ main() {
     rm -rf "$APP"
     ditto "$work/voz.app" "$APP"
     open "$APP"
-    echo "Installed Voz. Finish setup from the menu bar."
+    echo "Installed Voz. Finish setup in the panel under its menu bar icon."
 }
 
 main

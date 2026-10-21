@@ -34,6 +34,7 @@ enum DesignRender {
         ("transcribing", .transcribing, "Processing your recording"),
         ("loading", .loadingModel(detail: "Downloading speech model, 42%", progress: 0.42), "Downloading speech model, 42%"),
         ("permission", .permissionNeeded(.accessibility), PermissionFix.accessibility.detail),
+        ("failed", .modelFailed("Download failed. Check your connection"), "Download failed. Check your connection"),
     ]
 
     private static let pages: [(String, PopoverPage)] = [
@@ -103,8 +104,8 @@ private final class Fixture {
             history: HistoryModel(store: history),
             stats: StatsModel(store: history),
             vocabulary: VocabularyModel(store: history.vocabulary, analytics: analytics),
-            setup: SetupModel(analytics: analytics),
-            extensions: ExtensionsModel(home: home, cache: nil, fetch: { _ in Self.listings }),
+            setup: SetupModel(analytics: analytics) {},
+            extensions: ExtensionsModel(analytics: analytics, home: home, cache: nil, fetch: { _ in Self.listings }),
             catalog: ExtensionCatalog()
         )
         status.update(.parakeetUltra, .ready(bytes: 483_000_000))

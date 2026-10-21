@@ -7,7 +7,7 @@ enum PackageCLIError: Error, CustomStringConvertible {
     case notInstalled(String)
     case missing(URL)
     case notAFolder(URL)
-    case failed(String, Int32)
+    case failed(command: String, status: Int32, reason: String?)
 
     var description: String {
         switch self {
@@ -16,7 +16,8 @@ enum PackageCLIError: Error, CustomStringConvertible {
         case .notInstalled(let name): "No installed package matches \(name)."
         case .missing(let url): "No package at \(url.path)."
         case .notAFolder(let url): "\(url.path) is not a folder. Put the extension in a folder as index.ts, then run voz dev on the folder."
-        case .failed(let command, let status): "\(command) failed with status \(status)."
+        case .failed(let command, let status, let reason?): "\(command) failed with status \(status): \(reason)"
+        case .failed(let command, let status, nil): "\(command) failed with status \(status)."
         }
     }
 }
@@ -33,7 +34,7 @@ enum PackageCLI {
         do {
             switch (arguments[1], arguments.dropFirst(2).first) {
             case ("install", let source?): try await install(source)
-            case ("remove", let target?): try remove(target)
+            case ("remove", let target?): try await remove(target)
             case ("list", nil): try list()
             case ("update", nil): try await update()
             case ("new", let name?): try create(name)
@@ -59,10 +60,13 @@ enum PackageCLI {
         case .git(_, _, let ref):
             guard !FileManager.default.fileExists(atPath: directory.path) else { throw PackageCLIError.alreadyInstalled(directory.path) }
             let bun = try await BunRuntime.ensure()
-            try FileManager.default.createDirectory(at: directory.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let staging = FileManager.default.temporaryDirectory.appendingPathComponent("voz-clone-\(UUID().uuidString)")
+            defer { try? FileManager.default.removeItem(at: staging) }
             let branch = ref.map { ["--branch", $0] } ?? []
-            try execute(git, ["clone", "--depth", "1"] + branch + [source.cloneURL!, directory.path])
-            try installDependencies(in: directory, bun: bun)
+            try execute(git, ["clone", "--quiet", "--depth", "1"] + branch + [source.cloneURL!, staging.path])
+            try installDependencies(in: staging, bun: bun)
+            try FileManager.default.createDirectory(at: directory.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try FileManager.default.moveItem(at: staging, to: directory)
         case .local(let url):
             guard FileManager.default.fileExists(atPath: url.path) else { throw PackageCLIError.missing(url) }
         }
@@ -72,14 +76,14 @@ enum PackageCLI {
         print("Installed \(source.description)")
     }
 
-    static func remove(_ target: String) throws {
+    static func remove(_ target: String) async throws {
         let packages = try installed()
         guard let match = packages.first(where: { $0.raw == target || $0.source.name == target }) else { throw PackageCLIError.notInstalled(target) }
         switch match.source {
         case .npm(let name, _):
-            try execute(try BunRuntime.executable().path, ["remove", name], in: home.packages)
+            try execute(try await BunRuntime.ensure().path, ["remove", name], in: home.packages)
         case .git:
-            try FileManager.default.removeItem(at: match.source.directory(in: home))
+            try removeCheckout(match.source.directory(in: home))
         case .local:
             break
         }
@@ -157,6 +161,15 @@ enum PackageCLI {
         try home.packageSources().map { ($0, try PackageSource(parsing: $0, relativeTo: home.root)) }
     }
 
+    private static func removeCheckout(_ directory: URL) throws {
+        try FileManager.default.removeItem(at: directory)
+        var parent = directory.deletingLastPathComponent()
+        while parent.path.hasPrefix(home.packages.path + "/"), try FileManager.default.contentsOfDirectory(atPath: parent.path).isEmpty {
+            try FileManager.default.removeItem(at: parent)
+            parent = parent.deletingLastPathComponent()
+        }
+    }
+
     private static func preparePackagesManifest() throws {
         let manifest = home.packages.appendingPathComponent("package.json")
         guard !FileManager.default.fileExists(atPath: manifest.path) else { return }
@@ -170,8 +183,11 @@ enum PackageCLI {
     }
 
     private static func execute(_ executable: String, _ arguments: [String], in directory: URL? = nil) throws {
-        let status = try BunRuntime.run(executable, arguments, in: directory)
-        guard status == 0 else { throw PackageCLIError.failed(([executable] + arguments).joined(separator: " "), status) }
+        let result = try BunRuntime.run(executable, arguments, in: directory)
+        guard result.status == 0 else {
+            let reason = result.errorOutput.split(whereSeparator: \.isNewline).last.map(String.init)
+            throw PackageCLIError.failed(command: URL(fileURLWithPath: executable).lastPathComponent, status: result.status, reason: reason)
+        }
     }
 
     private static func notifyApp() {

@@ -16,6 +16,7 @@ final class ExtensionCatalog: ObservableObject {
     @Published fileprivate(set) var cleanupSteps: [HostComponent] = []
     @Published fileprivate(set) var actions: [ExtensionAction] = []
     @Published fileprivate(set) var settings: [ExtensionSettings] = []
+    @Published fileprivate(set) var hostError: String?
     fileprivate var perform: (ExtensionAction) -> Void = { _ in }
 
     func run(_ action: ExtensionAction) {
@@ -35,7 +36,7 @@ final class ExtensionCatalog: ObservableObject {
     }
 
     func error(for name: String) -> String? {
-        errors.first { Self.belongs($0.key, to: name) }?.value
+        errors.first { Self.belongs($0.key, to: name) }?.value ?? hostError
     }
 
     func isLoaded(_ name: String) -> Bool {
@@ -55,6 +56,12 @@ final class ExtensionCatalog: ObservableObject {
         cleanupSteps = manifest?.cleanupSteps ?? []
         actions = manifest?.actions ?? []
         settings = manifest?.settings ?? []
+        hostError = nil
+    }
+
+    fileprivate func fail(_ message: String) {
+        show(nil)
+        hostError = message
     }
 }
 
@@ -135,7 +142,7 @@ final class ExtensionService {
             } catch {
                 Log.extensions.error("Extensions failed to start: \(String(describing: error), privacy: .public)")
                 toast.show("Could not start extensions")
-                catalog.show(nil)
+                catalog.fail("Extensions could not start: \(error)")
             }
         }
     }
@@ -308,6 +315,7 @@ final class ExtensionService {
         if ContinuousClock.now - started > Self.healthyUptime { restarts = 0 }
         guard restarts < Self.maxRestarts else {
             Log.extensions.error("Extension host keeps exiting, last status \(status), extensions stay off until the next change")
+            catalog.fail("Extensions keep crashing, so Voz turned them off. Voz tries again when you change an extension.")
             return
         }
         restarts += 1

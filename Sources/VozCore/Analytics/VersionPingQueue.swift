@@ -14,8 +14,8 @@ public final class VersionPingQueue {
         }
     }
 
-    public func enqueue(_ ping: VersionPing, version: String, projectToken: String) throws {
-        pending.append(try ping.body(version: version, projectToken: projectToken))
+    public func enqueue(_ ping: VersionPing, version: String, previous: String?, pingID: UUID, projectToken: String) throws {
+        pending.append(try ping.body(version: version, previous: previous, pingID: pingID, projectToken: projectToken))
         try save()
     }
 

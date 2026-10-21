@@ -5,12 +5,13 @@ import VozCore
 enum VersionPinger {
     private static let endpoint = URL(string: "\(Analytics.host)/i/v0/e/")!
 
-    static func sendPending(_ ping: VersionPing?, version: String, enabled: Bool) {
+    static func sendPending(_ ping: VersionPing?, launch: LaunchVersion, enabled: Bool) {
         do {
             let queue = try VersionPingQueue()
-            guard enabled else { return try queue.clear() }
+            guard enabled, UpdateChannel(version: launch.current) != .dev else { return try queue.clear() }
             if let ping {
-                try queue.enqueue(ping, version: version, projectToken: Analytics.projectToken)
+                let pingID = InstallID(key: InstallID.versionPing).value
+                try queue.enqueue(ping, version: launch.current, previous: launch.updatedFrom, pingID: pingID, projectToken: Analytics.projectToken)
             }
             Task {
                 do {

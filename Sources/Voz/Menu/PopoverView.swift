@@ -40,7 +40,7 @@ struct PopoverView: View {
     @ViewBuilder
     private var page: some View {
         if model.needsSetup {
-            SetupPage(model: sources.setup, settings: sources.settings, history: sources.history, finish: model.actions.finishSetup)
+            SetupPage(model: sources.setup, settings: sources.settings, history: sources.history, status: model.status, retryModel: model.actions.retryModel, finish: model.actions.finishSetup)
         } else {
             switch model.page {
             case .home:
@@ -120,6 +120,9 @@ private struct HomePage: View {
             ProgressView(value: progress).progressViewStyle(.linear)
         case let .permissionNeeded(fix):
             Button(fix.buttonTitle) { model.actions.fixPermission(fix) }
+                .buttonStyle(.pill(.accent, height: 32))
+        case .modelFailed:
+            Button("Try again", action: model.actions.retryModel)
                 .buttonStyle(.pill(.accent, height: 32))
         default:
             EmptyView()

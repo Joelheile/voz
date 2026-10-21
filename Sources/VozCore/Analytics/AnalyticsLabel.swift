@@ -30,3 +30,28 @@ public enum DeliveryOutput: String, Sendable {
     case paste
     case clipboard
 }
+
+public enum SetupStage: String, Sendable {
+    case access
+    case model
+    case tryIt = "try_it"
+}
+
+public enum ExtensionChange: String, Sendable {
+    case install
+    case update
+    case remove
+
+    var eventName: String {
+        switch self {
+        case .install: "extension_installed"
+        case .update: "extension_updated"
+        case .remove: "extension_removed"
+        }
+    }
+}
+
+public enum ExtensionFailure: String, Sendable {
+    case bunDownload = "bun_download_failed"
+    case packageCommand = "package_command_failed"
+}

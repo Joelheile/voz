@@ -5,11 +5,11 @@ import VozCore
 @MainActor
 final class ExtensionsModel: ObservableObject {
     enum Stage: Equatable {
-        case gettingBun, installing, updating, removing
+        case gettingBun(Double), installing, updating, removing
 
         var label: String {
             switch self {
-            case .gettingBun: "Getting Bun"
+            case .gettingBun(let fraction): "Getting Bun \(fraction.formatted(.percent.precision(.fractionLength(0))))"
             case .installing: "Installing"
             case .updating: "Updating"
             case .removing: "Removing"
@@ -20,16 +20,19 @@ final class ExtensionsModel: ObservableObject {
     private static let search = URL(string: "https://registry.npmjs.org/-/v1/search?text=keywords:voz-package&size=250")!
     private static let undoWindow: Duration = .seconds(5)
     private let home: VozHome
+    private let analytics: Analytics
     private let cache: URL?
     private let fetch: @Sendable (URL) async throws -> Data
     private var undoExpiry: Task<Void, Never>?
 
     init(
+        analytics: Analytics,
         home: VozHome = VozHome(),
         cache: URL? = try? AppStorage.directory().appendingPathComponent("extension-listings.json"),
         fetch: @escaping @Sendable (URL) async throws -> Data = { try await URLSession.shared.data(from: $0).0 }
     ) {
         self.home = home
+        self.analytics = analytics
         self.cache = cache
         self.fetch = fetch
         let cached = cache.flatMap { try? JSONDecoder().decode([PackageListing].self, from: Data(contentsOf: $0)) } ?? []
@@ -81,7 +84,9 @@ final class ExtensionsModel: ObservableObject {
         defer { loading = false }
         do {
             let data = try await fetch(Self.search)
-            listings = try PackageListing.decodeSearch(data)
+            let found = try PackageListing.decodeSearch(data)
+            let pending = listings.filter { listing in listing.name == confirming && !found.contains { $0.name == listing.name } }
+            listings = found + pending
             message = nil
             if let cache { try? data.write(to: cache) }
         } catch is DecodingError {
@@ -111,19 +116,19 @@ final class ExtensionsModel: ObservableObject {
 
     func install(_ listing: PackageListing) async {
         confirming = nil
-        await install("npm:\(listing.name)", name: listing.name)
+        await install(.npm(name: listing.name, spec: listing.name), name: listing.name)
         expanded = listing.name
     }
 
     func update(_ item: InstalledExtension) async {
         guard let source = item.source else { return }
-        await run(item.name, .updating) { try await PackageCLI.update(source) }
+        await run(item.name, .updating, change: .update, source: source) { _ in try await PackageCLI.update(source) }
     }
 
     func remove(_ item: InstalledExtension) async {
         guard let source = item.source else { return }
         if expanded == item.name { expanded = nil }
-        await run(item.name, .removing) { try PackageCLI.remove(source.name) }
+        await run(item.name, .removing, change: .remove, source: source) { _ in try await PackageCLI.remove(source.name) }
         guard message == nil else { return }
         removed = source
         undoExpiry?.cancel()
@@ -138,7 +143,7 @@ final class ExtensionsModel: ObservableObject {
         guard let source = removed else { return }
         removed = nil
         undoExpiry?.cancel()
-        await install(source.description, name: source.name)
+        await install(source, name: source.name)
     }
 
     func setEnabled(_ name: String, _ enabled: Bool) {
@@ -202,22 +207,39 @@ final class ExtensionsModel: ObservableObject {
         return fields.contains { $0?.localizedCaseInsensitiveContains(needle) == true }
     }
 
-    private func install(_ raw: String, name: String) async {
-        let stage: Stage = BunRuntime.isInstalled ? .installing : .gettingBun
-        await run(name, stage) {
-            _ = try await BunRuntime.ensure()
-            await MainActor.run { [weak self] in self?.working = (name, .installing) }
-            try await PackageCLI.install(raw)
+    private func install(_ source: PackageSource, name: String) async {
+        let stage: Stage = BunRuntime.isInstalled ? .installing : .gettingBun(0)
+        await run(name, stage, change: .install, source: source) { model in
+            _ = try await BunRuntime.ensure { fraction in
+                Task { @MainActor in model?.showBunProgress(fraction, for: name) }
+            }
+            await MainActor.run { model?.working = (name, .installing) }
+            try await PackageCLI.install(source.description)
         }
     }
 
-    private func run(_ name: String, _ stage: Stage, _ operation: @escaping @Sendable () async throws -> Void) async {
+    private func showBunProgress(_ fraction: Double, for name: String) {
+        let rounded = (fraction * 100).rounded() / 100
+        guard working?.name == name, case .gettingBun(let shown)? = working?.stage, shown != rounded else { return }
+        working = (name, .gettingBun(rounded))
+    }
+
+    private func run(
+        _ name: String,
+        _ stage: Stage,
+        change: ExtensionChange,
+        source: PackageSource,
+        _ operation: @escaping @Sendable (ExtensionsModel?) async throws -> Void
+    ) async {
         working = (name, stage)
         do {
-            try await Task.detached(operation: operation).value
+            try await Task.detached { [weak self] in try await operation(self) }.value
             message = nil
+            analytics.capture(.extensionChanged(change: change, source: source))
         } catch {
             message = "\(error)"
+            let failure: ExtensionFailure = if case .gettingBun = working?.stage { .bunDownload } else { .packageCommand }
+            analytics.capture(.extensionFailed(change: change, source: source, failure: failure))
         }
         working = nil
         refreshInstalled()
@@ -385,6 +407,7 @@ struct ExtensionsPage: View {
                 Button("Install") { Task { await model.install(listing) } }
                     .buttonStyle(.pill(.accent, height: 26))
                     .keyboardShortcut(.defaultAction)
+                    .disabled(model.working != nil)
             } else {
                 Button("Get") { model.confirming = listing.name }
                     .buttonStyle(.pill(.quiet, height: 26))
