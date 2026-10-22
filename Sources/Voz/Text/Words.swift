@@ -41,7 +41,7 @@ enum NumberWords {
     }
 }
 
-struct FillerPassResult: Equatable, Sendable {
+struct RulePassResult: Equatable, Sendable {
     let text: String
     let removed: Int
 }
@@ -64,7 +64,7 @@ enum FillerWords {
         options: [.caseInsensitive]
     )
 
-    static func removeObvious(from text: String) -> FillerPassResult {
+    static func removeObvious(from text: String) -> RulePassResult {
         var result = text
         var removed = 0
         let patterns = isEnglish(text) ? [unambiguousPattern, englishUmPattern] : [unambiguousPattern, punctuatedUmPattern]
@@ -73,8 +73,8 @@ enum FillerWords {
             removed += pattern.numberOfMatches(in: result, range: range)
             result = pattern.stringByReplacingMatches(in: result, range: range, withTemplate: "")
         }
-        guard removed > 0 else { return FillerPassResult(text: text, removed: 0) }
-        return FillerPassResult(text: capitalizingStart(tidy(result)), removed: removed)
+        guard removed > 0 else { return RulePassResult(text: text, removed: 0) }
+        return RulePassResult(text: capitalizingStart(tidy(result)), removed: removed)
     }
 
     private static func isEnglish(_ text: String) -> Bool {
