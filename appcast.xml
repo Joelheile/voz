@@ -3,6 +3,17 @@
   <channel>
     <title>voz</title>
     <item>
+      <title>voz 0.0.5-beta.100011</title>
+      <description>&lt;ul&gt;&lt;li&gt;Maintenance release&lt;/li&gt;&lt;/ul&gt;</description>
+      <link>https://github.com/Joelheile/voz/releases/tag/beta-100011</link>
+      <pubDate>Thu, 22 Oct 2026 23:12:21 GMT</pubDate>
+      <sparkle:version>100011</sparkle:version>
+      <sparkle:shortVersionString>0.0.5-beta.100011</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100011/voz-0.0.5-beta.100011.zip" length="8233139" sparkle:edSignature="7LjSfuck2RfuAKB+Z7DpzGI5cjCU97/SsWeaGKbfeSBqRdFBWzOOstYehxz09lWRRUh9tWTWMV7Ac3gKSMJ+Bg==" type="application/octet-stream" />
+    </item>
+    <item>
       <title>voz 0.0.5</title>
       <description>&lt;ul&gt;&lt;li&gt;Copy, paste, select all and undo work in the Voz panel&lt;/li&gt;&lt;li&gt;A tile next to System Settings lets you drag Voz into Accessibility and Input Monitoring&lt;/li&gt;&lt;li&gt;Adding the voz command asks for your password instead of showing a Terminal command&lt;/li&gt;&lt;li&gt;Voz tells you when its menu bar icon is hidden behind the notch&lt;/li&gt;&lt;li&gt;Paste one prompt into a coding agent to build an extension with it&lt;/li&gt;&lt;li&gt;Simplify the extension API: read settings with voz.settings, log with console.log, and return { text: &amp;quot;&amp;quot; } to insert nothing&lt;/li&gt;&lt;li&gt;See your top apps, with their icons, in Insights&lt;/li&gt;&lt;li&gt;Updates install only while your Mac is idle&lt;/li&gt;&lt;li&gt;Setup runs again after a fresh install&lt;/li&gt;&lt;li&gt;See the time left while a speech model downloads&lt;/li&gt;&lt;li&gt;Calmer settings and a red dot while you record&lt;/li&gt;&lt;li&gt;Smoother transcript navigation and consistent menu icons&lt;/li&gt;&lt;li&gt;Moving Voz to the Trash quits it and removes its login item&lt;/li&gt;&lt;li&gt;Slow extensions and cleanup can no longer stall dictation or startup&lt;/li&gt;&lt;li&gt;Voz tells you when microphone access is denied&lt;/li&gt;&lt;li&gt;The app includes the licenses of its dependencies&lt;/li&gt;&lt;/ul&gt;</description>
       <link>https://github.com/Joelheile/voz/releases/tag/v0.0.5</link>
@@ -105,16 +116,6 @@
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <sparkle:channel>beta</sparkle:channel>
       <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-81/voz-0.0.4-beta.81.zip" length="6737234" sparkle:edSignature="uvftOV52+o/q3magIym3eoZ/eGiJwu082Wagaq9NmzN4jzK1fWHiJ64oQGffwA8H+k+m+3qR3SKlMv8jjk13Dw==" type="application/octet-stream" />
-    </item>
-    <item>
-      <title>voz 0.0.4-beta.79</title>
-      <link>https://github.com/Joelheile/voz/releases/tag/beta-79</link>
-      <pubDate>Thu, 22 Oct 2026 09:55:20 GMT</pubDate>
-      <sparkle:version>79</sparkle:version>
-      <sparkle:shortVersionString>0.0.4-beta.79</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <sparkle:channel>beta</sparkle:channel>
-      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-79/voz-0.0.4-beta.79.zip" length="6734420" sparkle:edSignature="0P0mW5GSNTXNdIXv5uJ79ycncqRyfXvclE9T2CXxey/FTCU490CSCielm49Wb+TpBhvZh4BFKjq+yM7P7CqeCA==" type="application/octet-stream" />
     </item>
     <item>
       <title>voz 0.0.4</title>
