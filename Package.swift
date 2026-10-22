@@ -14,6 +14,7 @@ let package = Package(
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.11.1"),
         .package(url: "https://github.com/PostHog/posthog-ios.git", from: "3.92.0"),
         .package(url: "https://github.com/sparkle-project/Sparkle.git", from: "2.10.0"),
+        .package(url: "https://github.com/ajaxjiang96/lucide-swift.git", exact: "0.9.20"),
     ],
     targets: [
         .target(
@@ -27,6 +28,7 @@ let package = Package(
                 .product(name: "FluidAudio", package: "FluidAudio"),
                 .product(name: "PostHog", package: "posthog-ios"),
                 .product(name: "Sparkle", package: "Sparkle"),
+                .product(name: "LucideSwift", package: "lucide-swift"),
             ]
         ),
         .testTarget(

@@ -48,7 +48,7 @@ struct DictionaryPage: View {
                     HStack(spacing: 2) {
                         Button("Add") { model.accept(suggestion) }
                             .buttonStyle(.pill(.quiet, height: 26))
-                        IconButton(symbol: "xmark", help: "Dismiss") { model.dismiss(suggestion) }
+                        IconButton(icon: .x, help: "Dismiss") { model.dismiss(suggestion) }
                     }
                 }
             }
@@ -82,8 +82,7 @@ private struct WordChip: View {
         HStack(spacing: 6) {
             Text(word).font(.ui(13)).foregroundStyle(Theme.ink)
             Button(action: remove) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 9, weight: .bold))
+                Icon(.x, size: 11)
                     .foregroundStyle(hovering ? Theme.ink : Theme.inkTertiary)
             }
             .buttonStyle(.plain)

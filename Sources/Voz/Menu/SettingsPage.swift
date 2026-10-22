@@ -190,11 +190,10 @@ struct PermissionRow: View {
     var body: some View {
         PanelRow(title: title, detail: detail) {
             if granted {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 15))
+                Icon(.circleCheck, size: 16)
                     .foregroundStyle(Color.accentColor)
                     .help("Allowed")
-                    .transition(.symbolEffect(.drawOn))
+                    .transition(.scale(scale: 0.6).combined(with: .opacity))
             } else {
                 Button("Allow", action: fix)
                     .buttonStyle(.pill(.accent, height: 26))

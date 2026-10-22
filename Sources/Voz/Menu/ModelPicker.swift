@@ -66,8 +66,7 @@ struct ModelPicker: View {
                     .contentTransition(.interpolate)
             }
             Spacer(minLength: 0)
-            Image(systemName: "chevron.down")
-                .font(.system(size: 11, weight: .semibold))
+            Icon(.chevronDown, size: 13)
                 .foregroundStyle(Theme.inkTertiary)
                 .rotationEffect(.degrees(expanded ? 180 : 0))
                 .animation(.spring(duration: 0.3, bounce: 0.2), value: expanded)
@@ -90,10 +89,9 @@ struct ModelOptionRow: View {
             HStack(spacing: 8) {
                 ZStack {
                     if selected {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 11, weight: .semibold))
+                        Icon(.check, size: 13)
                             .foregroundStyle(Color.accentColor)
-                            .transition(.symbolEffect(.drawOn))
+                            .transition(.scale(scale: 0.6).combined(with: .opacity))
                     }
                 }
                 .frame(width: 14)

@@ -1,3 +1,4 @@
+import LucideSwift
 import SwiftUI
 
 struct SectionLabel: View {
@@ -73,15 +74,14 @@ extension ButtonStyle where Self == PressableButtonStyle {
 }
 
 struct IconButton: View {
-    let symbol: String
+    let icon: LucideIconName
     let help: String
     let action: () -> Void
     @State private var hovering = false
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 13, weight: .medium))
+            Icon(icon, size: 15)
                 .foregroundStyle(hovering ? Theme.ink : Theme.inkSecondary)
                 .frame(width: 30, height: 30)
                 .background(hovering ? Theme.selected : .clear, in: RoundedRectangle(cornerRadius: Theme.Radius.control))
@@ -101,8 +101,7 @@ struct SearchField: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .medium))
+            Icon(.search)
                 .foregroundStyle(Theme.inkTertiary)
             TextField(prompt, text: $text)
                 .textFieldStyle(.plain)

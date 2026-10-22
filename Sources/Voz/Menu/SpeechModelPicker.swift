@@ -101,8 +101,7 @@ private struct SpeechModelCard: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .overlay(alignment: .topTrailing) {
                 if selected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 13))
+                    Icon(.circleCheck, size: 15)
                         .foregroundStyle(Color.accentColor)
                         .padding(8)
                         .transition(.scale(scale: 0.6).combined(with: .opacity))
