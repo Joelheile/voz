@@ -35,6 +35,7 @@ download() {
 }
 
 install_app() {
+    [[ -d "$APP" ]] || defaults delete com.joelheile.voz onboardingCompleted 2>/dev/null || true
     launchctl bootout "gui/$(id -u)/$LAUNCH_AGENT" 2>/dev/null || true
     pkill -x voz || true
     for _ in $(seq 1 50); do

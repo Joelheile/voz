@@ -1,12 +1,18 @@
+import CoreGraphics
 import Sparkle
 import VozCore
 
 @MainActor
 final class Updater: NSObject, SPUUpdaterDelegate {
+    private static let idleBeforeInstall: TimeInterval = 600
+    private static let idleCheckInterval: TimeInterval = 60
+
     private let settings: AppSettings
     private let isBusy: () -> Bool
     private var controller: SPUStandardUpdaterController?
     private var pendingInstall: (() -> Void)?
+    private var installWhenIdle: (() -> Void)?
+    private var idleCheck: Timer?
 
     init(settings: AppSettings, isBusy: @escaping () -> Bool) {
         self.settings = settings
@@ -26,6 +32,27 @@ final class Updater: NSObject, SPUUpdaterDelegate {
         guard !isBusy(), let install = pendingInstall else { return }
         pendingInstall = nil
         install()
+    }
+
+    func updater(_ updater: SPUUpdater, willInstallUpdateOnQuit item: SUAppcastItem, immediateInstallationBlock immediateInstallHandler: @escaping () -> Void) -> Bool {
+        installWhenIdle = immediateInstallHandler
+        idleCheck?.invalidate()
+        idleCheck = Timer.scheduledTimer(withTimeInterval: Self.idleCheckInterval, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.installIfIdle() }
+        }
+        return true
+    }
+
+    private func installIfIdle() {
+        guard !isBusy(), Self.userIdleSeconds >= Self.idleBeforeInstall, let install = installWhenIdle else { return }
+        idleCheck?.invalidate()
+        idleCheck = nil
+        installWhenIdle = nil
+        install()
+    }
+
+    private static var userIdleSeconds: TimeInterval {
+        CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!)
     }
 
     func updater(_ updater: SPUUpdater, shouldPostponeRelaunchForUpdate item: SUAppcastItem, untilInvokingBlock installHandler: @escaping () -> Void) -> Bool {
