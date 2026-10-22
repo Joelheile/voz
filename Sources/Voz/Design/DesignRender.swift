@@ -10,6 +10,7 @@ enum DesignRender {
         _ = NSApplication.shared
         try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
         let fixture = try Fixture()
+        fixture.sources.stats.start()
         await fixture.sources.extensions.load()
         try await Task.sleep(for: .milliseconds(500))
         for (suffix, name) in appearances {

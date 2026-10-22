@@ -1,12 +1,4 @@
-import AppKit
-
-extension HostApp {
-    @MainActor
-    static var current: HostApp {
-        let app = NSWorkspace.shared.frontmostApplication
-        return HostApp(bundleID: app?.bundleIdentifier, name: app?.localizedName)
-    }
-}
+import Foundation
 
 struct Recording {
     let samples: [Float]
@@ -28,7 +20,6 @@ final class Dictation {
     private let muter = OutputMuter()
     private let pipeline: DictationPipeline
     private let settings: AppSettings
-    private let output: TextOutput
     private let analytics: Analytics
     private var recordingApp = HostApp(bundleID: nil, name: nil)
     private var recordingTrigger = DictationTrigger.tap
@@ -48,10 +39,9 @@ final class Dictation {
     var onOutcome: (Outcome) -> Void = { _ in }
     var onBusy: () -> Void = {}
 
-    init(pipeline: DictationPipeline, settings: AppSettings, output: TextOutput, analytics: Analytics) {
+    init(pipeline: DictationPipeline, settings: AppSettings, analytics: Analytics) {
         self.pipeline = pipeline
         self.settings = settings
-        self.output = output
         self.analytics = analytics
         recorder.onInterrupted = { [weak self] in self?.stopIfRecording() }
     }
@@ -75,10 +65,6 @@ final class Dictation {
         guard phase == .recording else { return }
         Log.app.notice("Recording interrupted, transcribing what was captured")
         stopAndTranscribe()
-    }
-
-    func copy(_ text: String) {
-        output.copy(text)
     }
 
     private func start(trigger: DictationTrigger) {

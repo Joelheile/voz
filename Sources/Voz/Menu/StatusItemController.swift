@@ -57,6 +57,7 @@ final class StatusItemController: NSObject {
     private let dictation: Dictation
     private let settings: AppSettings
     private let modelStatus: ModelStatus
+    private let stats: StatsModel
     private let history: HistoryModel
     private let setup: SetupModel
     private let analytics: Analytics
@@ -72,6 +73,7 @@ final class StatusItemController: NSObject {
         dictation: Dictation,
         sources: PopoverSources,
         analytics: Analytics,
+        copy: @escaping (TranscriptRecord) -> Void,
         checkForUpdates: @escaping () -> Void,
         retryModel: @escaping () -> Void,
         finishSetup: @escaping () -> Void,
@@ -81,6 +83,7 @@ final class StatusItemController: NSObject {
         settings = sources.settings
         modelStatus = sources.modelStatus
         history = sources.history
+        stats = sources.stats
         setup = sources.setup
         self.analytics = analytics
         self.checkForUpdates = checkForUpdates
@@ -92,7 +95,7 @@ final class StatusItemController: NSObject {
         panel.onCancel = { [weak self] in self?.cancel() }
         panel.onResignKey = { [weak self] in self?.dismissUnlessPinned() }
         model.actions = PopoverActions(
-            copy: { [dictation] in dictation.copy($0.finalText) },
+            copy: copy,
             fixPermission: { [weak self] in self?.fix($0) },
             retryModel: retryModel,
             checkForUpdates: { [weak self] in self?.dismissThen(checkForUpdates) },
@@ -143,6 +146,7 @@ final class StatusItemController: NSObject {
         model.$page
             .removeDuplicates()
             .sink { [weak self] page in
+                self?.syncStats(page: page)
                 if page == .insights { self?.analytics.capture(.statsOpened) }
             }
             .store(in: &cancellables)
@@ -219,6 +223,7 @@ final class StatusItemController: NSObject {
         layoutPanel(size: contentSize)
         panel.alphaValue = 0
         panel.makeKeyAndOrderFront(nil)
+        syncStats(page: model.page)
         NSAnimationContext.runAnimationGroup { context in
             context.duration = Self.fade
             panel.animator().alphaValue = 1
@@ -232,8 +237,14 @@ final class StatusItemController: NSObject {
         }
     }
 
+    private func syncStats(page: PopoverPage) {
+        guard panel.isVisible, !model.needsSetup, page == .insights else { return stats.stop() }
+        stats.start()
+    }
+
     private func closePanel() {
         guard panel.isVisible else { return }
+        stats.stop()
         panel.orderOut(nil)
         closedAt = Date()
         statusItem.button?.highlight(false)

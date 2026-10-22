@@ -28,7 +28,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             extensions: extensions
         ),
         settings: settings,
-        output: output,
         analytics: analytics
     )
     private var cancellables: Set<AnyCancellable> = []
@@ -64,6 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 catalog: extensions.catalog
             ),
             analytics: analytics,
+            copy: { [output] in output.copy($0.finalText) },
             checkForUpdates: { [weak self] in self?.updater.checkForUpdates() },
             retryModel: { [weak self] in self?.retryModel() },
             finishSetup: { [weak self] in self?.finishSetup() },

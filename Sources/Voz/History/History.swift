@@ -93,9 +93,9 @@ final class HistoryStore: Sendable {
         try queue.read { try Self.stats(in: $0, now: now, calendar: calendar) }
     }
 
-    func observeStats(calendar: Calendar = .current) -> AnyPublisher<UsageStats, Error> {
+    func observeStats(now: @escaping @Sendable () -> Date = Date.init, calendar: Calendar = .current) -> AnyPublisher<UsageStats, Error> {
         ValueObservation
-            .tracking { try Self.stats(in: $0, now: Date(), calendar: calendar) }
+            .tracking { try Self.stats(in: $0, now: now(), calendar: calendar) }
             .publisher(in: queue)
             .eraseToAnyPublisher()
     }
