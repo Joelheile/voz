@@ -3,6 +3,16 @@
   <channel>
     <title>voz</title>
     <item>
+      <title>voz 0.0.4-beta.100002</title>
+      <link>https://github.com/Joelheile/voz/releases/tag/beta-100002</link>
+      <pubDate>Thu, 22 Oct 2026 10:58:51 GMT</pubDate>
+      <sparkle:version>100002</sparkle:version>
+      <sparkle:shortVersionString>0.0.4-beta.100002</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100002/voz-0.0.4-beta.100002.zip" length="8204926" sparkle:edSignature="xKkewN6DaQKf9XprWmv362xDp+QRpB7QFxnT/8abwjg65G/rg9PNqmuCfhAELYWffAQ63AQqxYsL9c83BUGGBg==" type="application/octet-stream" />
+    </item>
+    <item>
       <title>voz 0.0.4-beta.81</title>
       <link>https://github.com/Joelheile/voz/releases/tag/beta-81</link>
       <pubDate>Thu, 22 Oct 2026 10:01:25 GMT</pubDate>
@@ -118,16 +128,6 @@
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <sparkle:channel>beta</sparkle:channel>
       <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-35/voz-0.0.1-beta.35.zip" length="6314277" sparkle:edSignature="ZfwuAb1gKSc1eEmxsUNAen7bXCPFO3GJYG5r1VSbwN/mi+Bj2IAZvRaFqWesi7GgWWo8Vqqh/+tTcEP9iCoKDg==" type="application/octet-stream" />
-    </item>
-    <item>
-      <title>voz 0.0.1-beta.32</title>
-      <link>https://github.com/Joelheile/voz/releases/tag/beta-32</link>
-      <pubDate>Tue, 20 Oct 2026 10:19:05 GMT</pubDate>
-      <sparkle:version>32</sparkle:version>
-      <sparkle:shortVersionString>0.0.1-beta.32</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <sparkle:channel>beta</sparkle:channel>
-      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-32/voz-0.0.1-beta.32.zip" length="6314276" sparkle:edSignature="h8CXhTY2opMfbHTdrdTutJNTy+LtPrA5uMZkEx7vTLMPE4EQPjJFfzKbBSFIe+uKGI9fUykzZtqfU/4RaiTZAg==" type="application/octet-stream" />
     </item>
     <item>
       <title>voz 0.0.1</title>
