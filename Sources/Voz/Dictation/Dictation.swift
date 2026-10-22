@@ -119,22 +119,20 @@ final class Dictation {
         }
         streaming = nil
         switch RecordingFilter.verdict(for: samples) {
-        case .tooShort:
-            session.cancel()
-            Log.app.notice("Recording discarded: too short")
-            analytics.capture(.dictationDiscarded(reason: .tooShort))
-            onOutcome(.discarded)
-            phase = .idle
-        case .silent:
-            session.cancel()
-            Log.app.notice("Recording discarded: silent")
-            analytics.capture(.dictationDiscarded(reason: .silent))
-            onOutcome(.discarded)
-            phase = .idle
+        case .tooShort: discard(session, reason: .tooShort)
+        case .silent: discard(session, reason: .silent)
         case .keep:
             let recording = Recording(samples: samples, app: recordingApp, trigger: recordingTrigger)
             transcribe(recording, streaming: session, released: released)
         }
+    }
+
+    private func discard(_ session: StreamingDictation, reason: DiscardReason) {
+        session.cancel()
+        Log.app.notice("Recording discarded: \(reason.rawValue, privacy: .public)")
+        analytics.capture(.dictationDiscarded(reason: reason))
+        onOutcome(.discarded)
+        phase = .idle
     }
 
     private func transcribe(_ recording: Recording, streaming: StreamingDictation, released: ContinuousClock.Instant) {
