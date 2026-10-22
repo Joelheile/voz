@@ -32,7 +32,7 @@ enum DesignRender {
         ("ready", .ready, ""),
         ("recording", .recording, ""),
         ("transcribing", .transcribing, "Processing your recording"),
-        ("loading", .loadingModel(detail: "Downloading speech model, 42%", progress: 0.42), "Downloading speech model, 42%"),
+        ("loading", .loadingModel(detail: "42%, 3 min left", progress: 0.42), "42%, 3 min left"),
         ("permission", .permissionNeeded(.accessibility), PermissionFix.accessibility.detail),
         ("failed", .modelFailed("Download failed. Check your connection"), "Download failed. Check your connection"),
     ]

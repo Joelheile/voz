@@ -36,7 +36,8 @@ enum PopoverStatus: Equatable {
         case .ready: "Ready"
         case .recording: "Recording"
         case .transcribing: "Transcribing"
-        case .loadingModel: "Loading model"
+        case .loadingModel(_, nil): "Preparing model"
+        case .loadingModel: "Downloading model"
         case .modelFailed: "Model unavailable"
         case .permissionNeeded: "Permission needed"
         }
@@ -51,6 +52,7 @@ enum PopoverPage {
     case extensions
     case cleanupPrompt
     case cleanupSteps
+    case speechModel
 
     var title: String {
         switch self {
@@ -61,11 +63,12 @@ enum PopoverPage {
         case .extensions: "Extensions"
         case .cleanupPrompt: "Cleanup prompt"
         case .cleanupSteps: "Cleanup steps"
+        case .speechModel: "Speech model"
         }
     }
 
     var parent: PopoverPage {
-        [.dictionary, .cleanupPrompt, .cleanupSteps].contains(self) ? .settings : .home
+        [.dictionary, .cleanupPrompt, .cleanupSteps, .speechModel].contains(self) ? .settings : .home
     }
 }
 

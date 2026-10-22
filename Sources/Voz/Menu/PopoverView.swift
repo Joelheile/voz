@@ -57,6 +57,8 @@ struct PopoverView: View {
                 CleanupPromptPage(settings: sources.settings, back: model.goBack)
             case .cleanupSteps:
                 CleanupStepsPage(settings: sources.settings, catalog: sources.catalog, back: model.goBack)
+            case .speechModel:
+                SpeechModelPage(settings: sources.settings, status: sources.modelStatus, catalog: sources.catalog, back: model.goBack)
             }
         }
     }
@@ -104,20 +106,24 @@ private struct HomePage: View {
                     .font(.display(17))
                     .foregroundStyle(Theme.ink)
             }
-            Text(model.hint)
-                .font(.meta)
-                .lineSpacing(2)
-                .foregroundStyle(Theme.inkSecondary)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
+            if !model.hint.isEmpty {
+                Text(model.hint)
+                    .font(.meta)
+                    .lineSpacing(2)
+                    .foregroundStyle(Theme.inkSecondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
     @ViewBuilder
     private var statusDetail: some View {
         switch model.status {
-        case let .loadingModel(_, progress):
+        case let .loadingModel(_, progress?):
             ProgressView(value: progress).progressViewStyle(.linear)
+        case .loadingModel:
+            IndeterminateBar()
         case let .permissionNeeded(fix):
             Button(fix.buttonTitle) { model.actions.fixPermission(fix) }
                 .buttonStyle(.pill(.accent, height: 32))
@@ -257,10 +263,34 @@ private struct RecordingMark: View {
 
     var body: some View {
         Circle()
-            .fill(Theme.accent)
+            .fill(Theme.recording)
             .frame(width: 6, height: 6)
             .opacity(dimmed ? 0.35 : 1)
             .animation(.easeInOut(duration: 1.1).repeatForever(), value: dimmed)
             .onAppear { dimmed = !reduceMotion }
+    }
+}
+
+private struct IndeterminateBar: View {
+    private static let segment: CGFloat = 0.3
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var sweeping = false
+
+    var body: some View {
+        GeometryReader { proxy in
+            let width = proxy.size.width * Self.segment
+            Capsule()
+                .fill(Theme.accent)
+                .frame(width: width)
+                .offset(x: sweeping ? proxy.size.width - width : 0)
+                .opacity(reduceMotion ? 0.5 : 1)
+        }
+        .frame(height: 4)
+        .background(Theme.hairline, in: Capsule())
+        .clipShape(Capsule())
+        .animation(.easeInOut(duration: 0.9).repeatForever(), value: sweeping)
+        .onAppear { sweeping = !reduceMotion }
+        .accessibilityLabel("Preparing")
     }
 }

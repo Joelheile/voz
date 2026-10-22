@@ -36,13 +36,9 @@ struct SettingsPage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             PageBar(title: "Settings", back: model.goBack)
-            Picker("Section", selection: $tab) {
-                ForEach(Tab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+            TabBar(tabs: Tab.allCases, selection: $tab)
             CappedScrollView(maxHeight: 520) {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 12) {
                     if !allGranted { permissions }
                     switch tab {
                     case .dictation: dictation
@@ -65,100 +61,118 @@ struct SettingsPage: View {
         }
     }
 
+    @ViewBuilder
     private var dictation: some View {
         PanelGroup {
             PanelRow(title: "Shortcut", detail: capture.warning) {
                 Button(capture.isListening ? capture.preview?.displayName ?? "Press keys…" : settings.hotkey.displayName) {
                     capture.isListening ? capture.cancel() : capture.begin()
                 }
-                .buttonStyle(.pill(capture.isListening ? .accent : .quiet, height: 28))
+                .buttonStyle(.pill(capture.isListening ? .accent : .quiet, height: 26))
             }
-            PanelRow(title: "Mode", detail: settings.holdToTalk ? "Hold to speak, release to stop" : "Tap to start, tap again to stop") {
-                Picker("Mode", selection: $settings.holdToTalk) {
-                    Text("Tap").tag(false)
-                    Text("Hold").tag(true)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
+            PanelRow(title: "Mode") {
+                TabBar(tabs: TalkMode.allCases, selection: talkMode)
+                    .frame(width: 120)
             }
-            SpeechModelPicker(selection: $settings.speechModel, extensions: ModelOption.extensions(catalog.speechModels), status: status)
-            PanelRow(title: "Clean up text", detail: "Drops filler words and fixes punctuation") {
+            LinkRow(title: "Speech model", value: speechModelName) { model.page = .speechModel }
+            LinkRow(title: "Dictionary", value: vocabulary.snapshot.words.count.formatted()) { model.page = .dictionary }
+        }
+        PanelGroup {
+            PanelRow(title: "Clean up text", detail: "Removes filler words, fixes punctuation") {
                 Toggle("Clean up text", isOn: $settings.cleanupEnabled).labelsHidden()
             }
             if settings.cleanupEnabled {
                 if !catalog.cleanupModels.isEmpty || settings.cleanupModel != CleanupModelID.apple {
                     ModelPicker(title: "Cleanup model", selection: $settings.cleanupModel, options: [ModelOption(id: CleanupModelID.apple, name: "Apple", detail: "On device")] + ModelOption.extensions(catalog.cleanupModels))
                 }
-                LinkRow(title: "Cleanup steps", value: settings.cleanupSteps == CleanupStep.standard ? "Default" : "Edited") { model.page = .cleanupSteps }
-                LinkRow(title: "Cleanup prompt", value: settings.cleanupPrompt == CleanupPrompt.standard ? "Default" : "Edited") { model.page = .cleanupPrompt }
+                LinkRow(title: "Steps", value: settings.cleanupSteps == CleanupStep.standard ? "Default" : "Edited") { model.page = .cleanupSteps }
+                LinkRow(title: "Prompt", value: settings.cleanupPrompt == CleanupPrompt.standard ? "Default" : "Edited") { model.page = .cleanupPrompt }
             }
             if let error = settings.pipelineError {
                 PanelRow(title: "Could not read settings.json", detail: error) { EmptyView() }
             }
-            LinkRow(title: "Dictionary", value: vocabulary.snapshot.words.count.formatted()) { model.page = .dictionary }
         }
+    }
+
+    private enum TalkMode: String, CaseIterable {
+        case tap = "Tap"
+        case hold = "Hold"
+    }
+
+    private var talkMode: Binding<TalkMode> {
+        Binding { settings.holdToTalk ? .hold : .tap } set: { settings.holdToTalk = $0 == .hold }
+    }
+
+    private var speechModelName: String {
+        SpeechModel(rawValue: settings.speechModel)?.name ?? catalog.speechModels.first { $0.id == settings.speechModel }?.name ?? settings.speechModel
     }
 
     private var output: some View {
         PanelGroup {
-            PanelRow(title: "Insert into app", detail: "Types at your cursor") {
-                Toggle("Insert into app", isOn: $settings.insertIntoApp).labelsHidden()
-            }
-            PanelRow(title: "Copy to clipboard", detail: "Keeps the last transcript on the clipboard") {
-                Toggle("Copy to clipboard", isOn: $settings.copyToClipboard).labelsHidden()
-            }
-            PanelRow(title: "Mute while recording") {
-                Toggle("Mute while recording", isOn: $settings.muteWhileRecording).labelsHidden()
-            }
-            PanelRow(title: "Sound cues") {
-                Toggle("Sound cues", isOn: $settings.soundCues).labelsHidden()
-            }
+            toggle("Type at cursor", isOn: $settings.insertIntoApp)
+            toggle("Copy to clipboard", isOn: $settings.copyToClipboard)
+            toggle("Mute other apps", isOn: $settings.muteWhileRecording)
+            toggle("Sound cues", isOn: $settings.soundCues)
         }
     }
 
     private var permissions: some View {
-        PanelGroup(title: "Permissions") {
-            PermissionRow(title: "Microphone", granted: microphone == .authorized) {
-                if microphone == .notDetermined {
-                    Task { await Permissions.requestMicrophone() }
-                } else {
-                    Permissions.openSettings(.microphone)
+        PanelGroup(title: "Needs access") {
+            if microphone != .authorized {
+                allowRow("Microphone") {
+                    if microphone == .notDetermined {
+                        Task { await Permissions.requestMicrophone() }
+                    } else {
+                        Permissions.openSettings(.microphone)
+                    }
                 }
             }
-            PermissionRow(title: "Accessibility", granted: accessibility) {
-                Permissions.promptForAccessibility()
+            if !accessibility {
+                allowRow("Accessibility") { Permissions.promptForAccessibility() }
             }
-            PermissionRow(title: "Input Monitoring", granted: inputMonitoring) {
-                Permissions.requestInputMonitoring()
-                Permissions.openSettings(.inputMonitoring)
+            if !inputMonitoring {
+                allowRow("Input Monitoring") {
+                    Permissions.requestInputMonitoring()
+                    Permissions.openSettings(.inputMonitoring)
+                }
             }
-            if settings.muteWhileRecording {
-                PermissionRow(title: "System Audio", granted: systemAudio) {
+            if settings.muteWhileRecording && !systemAudio {
+                allowRow("System Audio") {
                     Task { await Permissions.requestSystemAudio() }
                 }
             }
         }
     }
 
+    @ViewBuilder
     private var general: some View {
         PanelGroup {
-            PanelRow(title: "Launch at login") {
-                Toggle("Launch at login", isOn: $settings.launchAtLogin).labelsHidden()
-            }
-            PanelRow(title: "Share anonymous usage stats", detail: "Counts, timings, error codes and npm extensions you add, never text or audio") {
-                Toggle("Share anonymous usage stats", isOn: $settings.analyticsEnabled).labelsHidden()
-            }
-            PanelRow(title: "Send version on install and update", detail: "Version and channel, with a random ID for this Mac") {
-                Toggle("Send version on install and update", isOn: $settings.versionPingEnabled).labelsHidden()
-            }
-            PanelRow(title: "Beta updates") {
-                Toggle("Beta updates", isOn: $settings.receiveBetaUpdates).labelsHidden()
-            }
+            toggle("Launch at login", isOn: $settings.launchAtLogin)
+            toggle("Beta updates", isOn: $settings.receiveBetaUpdates)
             PanelRow(title: "Version \(Self.version)") {
                 Button("Check for updates", action: model.actions.checkForUpdates)
-                    .buttonStyle(.pill(.quiet, height: 28))
+                    .buttonStyle(.pill(.quiet, height: 26))
             }
+        }
+        PanelGroup(title: "Privacy") {
+            PanelRow(title: "Share usage stats", detail: "Counts and timings, never text or audio") {
+                Toggle("Share usage stats", isOn: $settings.analyticsEnabled).labelsHidden()
+            }
+            PanelRow(title: "Send version", detail: "On install and update") {
+                Toggle("Send version", isOn: $settings.versionPingEnabled).labelsHidden()
+            }
+        }
+    }
+
+    private func allowRow(_ title: String, fix: @escaping () -> Void) -> some View {
+        PanelRow(title: title) {
+            Button("Allow", action: fix).buttonStyle(.pill(.accent, height: 26))
+        }
+    }
+
+    private func toggle(_ title: String, isOn: Binding<Bool>) -> some View {
+        PanelRow(title: title) {
+            Toggle(title, isOn: isOn).labelsHidden()
         }
     }
 

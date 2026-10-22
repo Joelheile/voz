@@ -122,3 +122,36 @@ struct CappedScrollView<Content: View>: View {
         .frame(height: min(contentHeight, maxHeight))
     }
 }
+
+struct TabBar<Tab: Hashable & RawRepresentable<String>>: View {
+    let tabs: [Tab]
+    @Binding var selection: Tab
+    @Namespace private var pill
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(tabs, id: \.self) { tab in
+                Button { selection = tab } label: {
+                    Text(tab.rawValue)
+                        .font(.ui(12, weight: .medium))
+                        .foregroundStyle(tab == selection ? Theme.ink : Theme.inkSecondary)
+                        .frame(maxWidth: .infinity, minHeight: 26)
+                        .background {
+                            if tab == selection {
+                                RoundedRectangle(cornerRadius: Theme.Radius.control - 2, style: .continuous)
+                                    .fill(Theme.raised)
+                                    .shadow(color: .black.opacity(0.08), radius: 1, y: 1)
+                                    .matchedGeometryEffect(id: "pill", in: pill)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(tab == selection ? .isSelected : [])
+            }
+        }
+        .padding(2)
+        .background(Theme.selected, in: RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous))
+        .animation(.spring(duration: 0.25, bounce: 0), value: selection)
+    }
+}

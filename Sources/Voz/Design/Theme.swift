@@ -4,12 +4,14 @@ import SwiftUI
 enum Theme {
     static let canvas = Color(light: 0xF6F4EF, dark: 0x161618)
     static let surface = Color(light: 0xFFFFFF, dark: 0x0E0E10)
+    static let raised = Color(light: 0xFFFFFF, dark: 0x3A3A3E)
     static let ink = Color(light: 0x141414, dark: 0xF2F0EB)
     static let inkSecondary = Color(light: 0x5F5C55, dark: 0xA5A29A)
     static let inkTertiary = Color(light: 0x7B7870, dark: 0x7F7C75)
     static let hairline = Color(light: 0x141414, dark: 0xFFFFFF, lightAlpha: 0.08, darkAlpha: 0.09)
     static let selected = Color(light: 0xE9E6DF, dark: 0xFFFFFF, lightAlpha: 1, darkAlpha: 0.09)
     static let accent = Color(light: 0x5163F9, dark: 0x6475FA)
+    static let recording = Color(nsColor: .systemRed)
     static let onInk = Color(light: 0xFFFFFF, dark: 0x141414)
 
     enum Radius {

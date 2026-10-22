@@ -165,9 +165,9 @@ final class StatusItemController: NSObject {
         case .ready: return .ready
         case .notLoaded: return .loadingModel(detail: "Starting", progress: nil)
         case let .downloading(fraction):
-            let percent = fraction.formatted(.percent.precision(.fractionLength(0)))
-            return .loadingModel(detail: "Downloading speech model, \(percent)", progress: fraction)
-        case .compiling: return .loadingModel(detail: "Preparing the speech model", progress: nil)
+            let detail = DownloadEstimate.detail(fraction: fraction, elapsed: modelStatus.downloadElapsed(for: settings.localSpeechModel))
+            return .loadingModel(detail: detail, progress: fraction)
+        case .compiling: return .loadingModel(detail: "Optimizing for this Mac, about 20 seconds", progress: nil)
         case let .failed(message): return .modelFailed(message)
         }
     }
@@ -175,7 +175,7 @@ final class StatusItemController: NSObject {
     private func hint(for status: PopoverStatus) -> String {
         switch status {
         case .ready: DictationHint.idle(hotkey: settings.hotkey, holdToTalk: settings.holdToTalk)
-        case .recording: DictationHint.recording(hotkey: settings.hotkey, holdToTalk: settings.holdToTalk)
+        case .recording: history.records.isEmpty ? DictationHint.recording(hotkey: settings.hotkey, holdToTalk: settings.holdToTalk) : ""
         case .transcribing: "Turning your speech into text"
         case let .loadingModel(detail, _): detail
         case let .modelFailed(message): message
