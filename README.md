@@ -2,7 +2,7 @@
 
 # Voz
 
-**Free Wispr Flow alternative, extensible like pi.**
+**Free, offline dictation for your Mac. Talk, and clean text appears where you type.**
 
 [Website](https://voz.joels.tech), [Extensions](https://voz.joels.tech/extensions/)
 
@@ -13,44 +13,33 @@
 
 </div>
 
-Tap right Command and talk. Voz types clean text into any app on your Mac. It is open source and runs offline.
+You talk at 150 words a minute and type at 40. Dictation apps fix that, but they charge every month, pile on settings, and if you want a change you wait for someone else to build it.
+
+Voz is free and open source. It runs on your Mac and works offline. You talk, it types. Everything else is an extension you can write yourself.
 
 ## Install
 
-You need macOS 26 and Apple Silicon. Paste this in Terminal:
+macOS 26 on Apple Silicon:
 
 ```
 curl -fsSL https://voz.joels.tech/install | bash
 ```
 
-Voz asks for Microphone, Accessibility and Input Monitoring access, then updates itself.
+## Use
 
-## Why Voz
+Tap right Command, talk, tap again. You say:
 
-Dictation apps charge monthly to talk. They grow a hundred settings, and a change you want waits months on a pull request.
+> um so tell kaitlyn the uh deck is ready
 
-Voz is MIT licensed, with no account and no weekly word limit. The core records, transcribes, cleans up, inserts and saves your history. Nothing else runs on your words. Anything more is an extension you build and share.
+Voz types this at your cursor, in any app:
 
-## Usage
+> Tell Kaitlyn the deck is ready.
 
-Tap right Command, speak, tap again. Voz cuts the "um"s, fixes punctuation and types the text at your cursor.
-
-Voz lives in the menu bar. The panel shows your last transcripts. Click one to copy it. Insights counts your words and the time you saved.
-
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset=".github/images/insights-dark.png">
-    <img src=".github/images/insights-light.png" width="380" alt="Insights with words this week, a 30-day chart and top apps">
-  </picture>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset=".github/images/extensions-dark.png">
-    <img src=".github/images/extensions-light.png" width="380" alt="Extensions with packages to install and your extensions folder">
-  </picture>
-</p>
+Your recent transcripts live in the menu bar.
 
 ## Extensions
 
-An extension is a TypeScript file in `~/.voz/extensions` that hooks in between the core steps:
+An extension is a TypeScript file in `~/.voz/extensions`:
 
 ```ts
 import { defineExtension } from "voz";
@@ -60,34 +49,32 @@ export default defineExtension((voz) => {
 });
 ```
 
-Say "let's ship it, send it" and Voz types "Let's ship it", then presses Return.
+Now "let's ship it, send it" types "Let's ship it" and presses Return.
 
-Install none and Voz runs nothing extra. A slow or crashing extension never blocks dictation: after 300 ms, Voz inserts the original text.
+You don't have to learn the API. Open a coding agent in `~/.voz`, say what you want, and it writes the extension. Publish it to npm with the `voz-package` keyword and anyone can install it from the menu bar. The API is in [EXTENSIONS.md](EXTENSIONS.md).
 
-To build one, tell a coding agent in `~/.voz` what you want. It reads the guide Voz keeps there and writes the extension. Voz loads it when you save. Publish it to npm with the `voz-package` keyword and it shows up in Extensions for everyone.
-
-The full API is in [EXTENSIONS.md](EXTENSIONS.md). Extensions run with your permissions, so install only ones you trust. I do not review npm packages, and Voz never runs install scripts.
+Extensions run with your permissions, so install ones you trust. A slow or broken extension never blocks dictation.
 
 ## Privacy
 
-Audio stays in memory and transcripts stay in a private folder on your disk. Voz sends its version number on install and update, and you can turn that off. Usage analytics are off unless you opt in, and they never include what you said.
+Audio and transcripts never leave your Mac. Voz sends an anonymous version ping on install and update, which you can turn off. Usage analytics are off unless you opt in, and they never contain what you said.
+
+To mute other apps while you dictate, Voz asks for System Audio Recording access. It silences their sound and never records it.
+
+Found a vulnerability? Open a [private advisory](https://github.com/Joelheile/voz/security/advisories/new), not a public issue.
 
 ## Contributing
 
-Pull requests to the core are for what every user needs on every dictation: speed, reliability, fixes, languages and extension points. Features that only some people want ship as extensions.
+The core stays small: record, transcribe, clean up, type, save history. Pull requests that make that faster or more reliable, add languages or add extension points are welcome. Everything else ships as an extension, and if the API can't do what you need, open an issue.
+
+You need the Command Line Tools, not Xcode:
 
 ```
 scripts/test.sh          # run the tests
 scripts/make-app.sh      # build and sign build/voz.app
 ```
 
-## Releases and recovery
-
-Pushes to `main` publish a beta; `vX.Y.Z` tags publish stable releases. Both run the release tests, sign the app and archive, upload the release, then publish its Sparkle feed. Signing identities and the Sparkle key must stay unchanged.
-
-Updates download in the background. A requested restart waits for dictation to finish. Sparkle verifies the archive before extraction.
-
-To withdraw a broken update, remove its item from `appcast.xml` first. This protects users who have not installed it. For users already affected, revert the bad change on `main` and publish again, using a new stable patch tag if needed. Sparkle 2 requires an increasing build number and does not automatically downgrade apps. Keep data migrations compatible with the previous release when possible.
+Pushes to `main` publish a beta and `vX.Y.Z` tags publish a stable release. Keep the signing identity and Sparkle key unchanged and build numbers increasing. To pull a bad update, remove it from `appcast.xml`, then publish a fix.
 
 ## License
 
