@@ -23,6 +23,8 @@ macOS 26 on Apple Silicon:
 curl -fsSL https://voz.joels.tech/install | bash
 ```
 
+Current builds use a project signing certificate and are not notarized by Apple.
+
 ## Why I built Voz
 
 I paid for Wispr Flow until paying a subscription to talk to my own computer started to annoy me. The open source apps I tried felt bloated. Hex came closest. I liked it, but every change I wanted meant a pull request and a long wait.
@@ -70,9 +72,9 @@ Extensions run with your permissions, so only install ones you trust. If one is 
 
 ## Privacy
 
-Audio and transcripts never leave your Mac. Voz sends an anonymous version ping on install and update, which you can turn off. Usage analytics are off unless you opt in, and they never contain what you said.
+Built-in dictation processes audio and transcripts on your Mac. Extensions can send data to external services, so review what you install. Voz sends a version ping on install and update, which you can turn off. Usage analytics are off unless you opt in, and they never contain what you said.
 
-To mute other apps while you dictate, Voz asks for System Audio Recording access. It silences their sound and never records it.
+To mute other apps while you dictate, Voz asks for System Audio Recording access. It silences their sound and does not save their audio.
 
 Found a vulnerability? Open a [private advisory](https://github.com/Joelheile/voz/security/advisories/new), not a public issue.
 
@@ -94,4 +96,4 @@ Pushes to `main` publish a beta and `vX.Y.Z` tags publish a stable release. Keep
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE). Dependencies and downloaded models retain their own licenses. Signed apps include `Contents/Resources/ThirdPartyNotices.txt`, with dependency licenses and [model attributions](Resources/ModelNotices.txt).

@@ -24,11 +24,14 @@ enum Headless {
             }
         }
         if let path = value(of: "--eval", in: arguments) {
-            return await CleanupEval.run(
-                path: path,
-                repeats: value(of: "--repeat", in: arguments).flatMap(Int.init) ?? 1,
-                budget: value(of: "--budget-ms", in: arguments).flatMap(Int.init).map { Duration.milliseconds($0) } ?? CleanupBudget.total
-            )
+            guard let repeats = Int(value(of: "--repeat", in: arguments) ?? "1"),
+                  (1...1000).contains(repeats),
+                  let budget = Int(value(of: "--budget-ms", in: arguments) ?? String(CleanupBudget.total.wholeMilliseconds)),
+                  (1...60_000).contains(budget) else {
+                printError("Evaluation requires 1...1000 repeats and a 1...60000 ms budget")
+                return 64
+            }
+            return await CleanupEval.run(path: path, repeats: repeats, budget: .milliseconds(budget))
         }
         if let path = value(of: "--transcribe", in: arguments) {
             return await transcribe(URL(fileURLWithPath: path), arguments: arguments)
@@ -71,7 +74,10 @@ enum Headless {
 
     private static func simulateDictation(_ url: URL, arguments: [String]) async -> Int32 {
         let model = speechModel(in: arguments)
-        let speed = value(of: "--speed", in: arguments).flatMap(Double.init) ?? 1
+        guard let speed = Double(value(of: "--speed", in: arguments) ?? "1"), (0.01...100).contains(speed) else {
+            printError("Simulation speed must be between 0.01 and 100")
+            return 64
+        }
         let cleanupEnabled = !arguments.contains("--no-cleanup")
         let transcriber = Transcriber()
         let cleaner = TextCleaner()
@@ -115,6 +121,15 @@ enum Headless {
     }
 
     private static func measureRecorder(seconds: Double) async -> Int32 {
+        guard seconds > 0, seconds <= 60 else {
+            printError("Recorder measurement must be greater than zero and at most 60 seconds")
+            return 64
+        }
+        await Permissions.requestMicrophone()
+        guard Permissions.microphoneGranted else {
+            printError("Microphone permission is required. Grant access in System Settings, then retry.")
+            return 77
+        }
         setvbuf(stdout, nil, _IONBF, 0)
         let recorder = Recorder()
         for prepared in [false, true, true] {
@@ -137,7 +152,7 @@ enum Headless {
             try? await Task.sleep(for: .seconds(seconds))
             let samples = recorder.stop()
             let first = firstSample.elapsed(since: begin, clock: clock)
-            print("prepared=\(prepared) start_call_ms=\((started - begin).wholeMilliseconds) first_sample_ms=\(first.map { String($0.wholeMilliseconds) } ?? "none") samples=\(samples.count)")
+            print("prepared=\(prepared) start_call_ms=\((started - begin).wholeMilliseconds) first_sample_ms=\(first.map { String($0.wholeMilliseconds) } ?? "none") samples=\(samples.count) rms=\(AudioLevel.rms(of: samples))")
             try? await Task.sleep(for: .milliseconds(500))
             print("mic_running_after_stop=\(InputDevice.isRunningSomewhere())")
         }

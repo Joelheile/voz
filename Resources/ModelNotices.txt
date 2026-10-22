@@ -1,0 +1,25 @@
+Downloaded models and runtime
+
+These downloads are separate from the Voz application and retain their own licenses.
+
+Parakeet Ultra: original Parakeet TDT v3 by NVIDIA Corporation, post-training
+by Moondream, and Core ML conversion by FluidInference. Licensed under
+Creative Commons Attribution 4.0 International (CC BY 4.0).
+https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3
+https://huggingface.co/moondream/parakeet-ultra
+https://huggingface.co/FluidInference/parakeet-ultra-coreml
+https://creativecommons.org/licenses/by/4.0/
+
+Parakeet English v2: Parakeet TDT v2 by NVIDIA Corporation, with Core ML
+conversion by FluidInference. Licensed under CC BY 4.0.
+https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2
+https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml
+https://creativecommons.org/licenses/by/4.0/
+
+Voz downloads these models and does not modify their weights.
+
+Bun: downloaded from the official oven-sh/bun releases when extensions are
+first used. Bun is MIT licensed and incorporates additional third-party code.
+https://github.com/oven-sh/bun/blob/main/LICENSE.md
+
+Apple Speech and Foundation Models are supplied by Apple under Apple's terms.
