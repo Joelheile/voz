@@ -6,7 +6,8 @@ VERSION=${1:?version}
 BUILD=${2:?build number}
 CHANNEL=${3:?stable or beta}
 TAG=${4:?release tag}
-APPCAST=${5:-appcast.xml}
+NOTES=${5:?release notes file}
+APPCAST=${6:-appcast.xml}
 REPO=${GITHUB_REPOSITORY:-Joelheile/voz}
 
 SIGN_UPDATE=.build/artifacts/sparkle/Sparkle/bin/sign_update
@@ -27,5 +28,5 @@ LENGTH=$(stat -f%z "$ARCHIVE")
 
 python3 scripts/appcast.py "$APPCAST" "$VERSION" "$BUILD" "$CHANNEL" \
     "https://github.com/$REPO/releases/download/$TAG/voz-$VERSION.zip" \
-    "$SIGNATURE" "$LENGTH" "https://github.com/$REPO/releases/tag/$TAG"
+    "$SIGNATURE" "$LENGTH" "https://github.com/$REPO/releases/tag/$TAG" "$NOTES"
 echo "Packaged $ARCHIVE and updated $APPCAST"
