@@ -119,7 +119,7 @@ final class StreamingDictation {
         var timedOut = false
         var cleanedInTime = 0
         for (segment, raw) in zip(segments, raws) {
-            let rules = cleanupEnabled ? CleanupStep.applyRules(steps, to: raw, vocabulary: vocabulary) : FillerPassResult(text: raw, removed: 0)
+            let rules = cleanupEnabled ? CleanupStep.applyRules(steps, to: raw, vocabulary: vocabulary) : RulePassResult(text: raw, removed: 0)
             fallbacks.append(rules.text)
             cleanedTexts.append(segment.cleaned?.text)
             guard !raw.isEmpty else { continue }

@@ -31,7 +31,7 @@ enum CleanupEval {
         for evalCase in cases {
             var latencies: [Int] = []
             var last: CleanedText?
-            for _ in 0..<max(repeats, 1) {
+            for _ in 0..<repeats {
                 let result = await cleaner.clean(evalCase.input, prompt: CleanupPrompt.standard, vocabulary: evalCase.vocabulary ?? [])
                 latencies.append(result.milliseconds)
                 last = result

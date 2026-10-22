@@ -103,7 +103,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             statusItemController.open()
         }
-        hotkeyMonitor?.startHealthChecks()
+        hotkeyMonitor?.checkHealth()
         let launch = LaunchVersion.record(SystemContext.appVersion, in: .standard)
         if let previous = launch.updatedFrom {
             analytics.capture(.updateInstalled(from: previous, to: launch.current, channel: UpdateChannel(version: launch.current)))

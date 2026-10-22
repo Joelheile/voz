@@ -60,7 +60,7 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         id: bun
         with:
-          bun-version: '1.4.3'
+          bun-version: "1.4.3"
 
       - name: Test
         env:
@@ -118,13 +118,23 @@ jobs:
 
       - name: Publish appcast
         working-directory: ${{ runner.temp }}/appcast
+        env:
+          RELEASE_DEPLOY_KEY: ${{ secrets.RELEASE_DEPLOY_KEY }}
         run: |
+          [[ -n "$RELEASE_DEPLOY_KEY" ]] || { echo "RELEASE_DEPLOY_KEY is not set" >&2; exit 1; }
+          key="$RUNNER_TEMP/deploy-key"
+          hosts="$RUNNER_TEMP/known-hosts"
+          trap 'rm -f "$key"' EXIT
+          (umask 077; printf '%s\n' "$RELEASE_DEPLOY_KEY" > "$key")
+          echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" > "$hosts"
+          export GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o UserKnownHostsFile=$hosts"
+          remote="git@github.com:$GITHUB_REPOSITORY.git"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add appcast.xml
           git commit -m "Update appcast for $VERSION"
-          git pull --rebase origin main
-          git push origin HEAD:main
+          git pull --rebase "$remote" main
+          git push "$remote" HEAD:main
 
       - name: Prune old beta releases
         if: github.ref_type != 'tag'

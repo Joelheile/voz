@@ -118,9 +118,3 @@ enum LevelBarsGeometry {
         CGFloat(pow(Double(min(max(level, 0), 1)), loudnessExponent))
     }
 }
-
-enum DictationPhase: Sendable {
-    case idle
-    case recording
-    case transcribing
-}

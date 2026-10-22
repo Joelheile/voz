@@ -9,7 +9,6 @@ enum AppleSpeechError: Error {
 }
 
 actor AppleSpeechTranscriber {
-
     func transcribe(_ samples: [Float], locale: Locale, vocabulary: [String]) async throws -> TranscriptionResult {
         let started = Date()
         guard let supported = await SpeechTranscriber.supportedLocale(equivalentTo: locale) else {
@@ -44,7 +43,6 @@ actor AppleSpeechTranscriber {
             model: SpeechModel.appleSpeech.rawValue
         )
     }
-
 
     private static func collect(_ results: some AsyncSequence<SpeechTranscriber.Result, any Error>) async throws -> String {
         var text = ""

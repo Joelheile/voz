@@ -17,7 +17,7 @@ enum CleanupStep: String, CaseIterable, Sendable {
         }
     }
 
-    static func applyRules(_ steps: [String], to text: String, vocabulary: [String]) -> FillerPassResult {
+    static func applyRules(_ steps: [String], to text: String, vocabulary: [String]) -> RulePassResult {
         var text = text
         var removed = 0
         for step in steps.compactMap(CleanupStep.init) {
@@ -31,7 +31,7 @@ enum CleanupStep: String, CaseIterable, Sendable {
             case .model: break
             }
         }
-        return FillerPassResult(text: text, removed: removed)
+        return RulePassResult(text: text, removed: removed)
     }
 }
 
@@ -75,12 +75,6 @@ enum CleanupBudget {
 
     static func maxResponseTokens(forWords words: Int) -> Int {
         min(maxTokens, tokensPerWord * max(words, 0) + tokenAllowance)
-    }
-}
-
-extension Duration {
-    var wholeMilliseconds: Int {
-        Int(components.seconds * 1000 + components.attoseconds / 1_000_000_000_000_000)
     }
 }
 

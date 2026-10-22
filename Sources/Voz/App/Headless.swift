@@ -43,7 +43,7 @@ enum Headless {
             return await simulateDictation(URL(fileURLWithPath: path), arguments: arguments)
         }
         let models = SpeechModel.allCases.map(\.rawValue).joined(separator: "|")
-        printError("usage: voz --transcribe <audio file> [--model \(models)] [--vocab a,b]\n       voz --clean <text> [--vocab a,b]\n       voz --eval <cases.json> [--repeat n] [--budget-ms n]\n       voz --simulate-dictation <audio file> [--model \(models)] [--speed n] [--no-cleanup]")
+        printError("usage: voz --transcribe <audio file> [--model \(models)] [--vocab a,b]\n       voz --clean <text> [--vocab a,b]\n       voz --eval <cases.json> [--repeat n] [--budget-ms n]\n       voz --simulate-dictation <audio file> [--model \(models)] [--speed n] [--no-cleanup]\n       voz --measure-recorder <seconds>\n       voz --render-design <directory>")
         return 64
     }
 

@@ -28,7 +28,7 @@ struct Hotkey: Hashable, Sendable, Codable {
     }
 
     var isModifierOnly: Bool {
-        Hotkey.modifierFlags[keyCode] != nil
+        ownModifierFlag != nil
     }
 
     var isChord: Bool {
