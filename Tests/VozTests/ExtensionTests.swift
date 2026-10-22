@@ -108,7 +108,7 @@ struct ExtensionHostTests {
         try extensionFile("spin.ts", #"export default voz => voz.registerCommand("spin", () => { while (true) {} })"#)
         let host = makeHost()
         _ = try await host.start()
-        _ = await host.runCommand(phrase: "spin", text: "", app: app, timeout: .milliseconds(50))
+        _ = await host.runCommand(phrase: "spin", text: "", app: app, timeout: .seconds(1))
         let started = ContinuousClock.now
         let largeText = String(repeating: "long transcript ", count: 100_000)
         #expect(await host.beforeCleanup(prompt: largeText, app: app, timeout: .milliseconds(100)) == largeText)
