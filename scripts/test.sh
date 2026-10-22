@@ -14,12 +14,16 @@ case "$CONFIGURATION" in
     debug|release) ;;
     *) echo "usage: scripts/test.sh [debug|release]" >&2; exit 64 ;;
 esac
+SCRATCH=.build
 BUILD_FLAGS=(-c "$CONFIGURATION")
 if [[ "$CONFIGURATION" == release ]]; then
+    # -enable-testing differs from the app build, so a shared scratch path rebuilds every dependency.
+    SCRATCH=.build/test
     BUILD_FLAGS+=(-Xswiftc -Osize -Xswiftc -enable-testing)
 fi
+BUILD_FLAGS+=(--scratch-path "$SCRATCH")
 
 swift build --build-tests "${BUILD_FLAGS[@]}"
 mkdir -p build
 swiftc -F "$FRAMEWORKS" -Xlinker -rpath -Xlinker "$FRAMEWORKS" scripts/test-host/main.swift -o build/test-host
-build/test-host ".build/$CONFIGURATION/vozPackageTests.xctest/Contents/MacOS/vozPackageTests"
+build/test-host "$SCRATCH/$CONFIGURATION/vozPackageTests.xctest/Contents/MacOS/vozPackageTests"
