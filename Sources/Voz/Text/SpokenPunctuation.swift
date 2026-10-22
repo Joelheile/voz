@@ -73,7 +73,7 @@ enum SpokenPunctuation {
                 index += 2
                 continue
             }
-            output += separator + (capitalizeNext ? capitalizingStart(tokens[index]) : tokens[index])
+            output += separator + (capitalizeNext ? tokens[index].capitalizingStart : tokens[index])
             separator = " "
             capitalizeNext = false
             index += 1
@@ -113,10 +113,5 @@ enum SpokenPunctuation {
         var trimmed = text
         while let last = trimmed.last, ",.;:!?".contains(last) { trimmed.removeLast() }
         return trimmed
-    }
-
-    private static func capitalizingStart(_ word: String) -> String {
-        guard let first = word.first else { return word }
-        return first.uppercased() + word.dropFirst()
     }
 }

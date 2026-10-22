@@ -74,7 +74,7 @@ enum FillerWords {
             result = pattern.stringByReplacingMatches(in: result, range: range, withTemplate: "")
         }
         guard removed > 0 else { return RulePassResult(text: text, removed: 0) }
-        return RulePassResult(text: capitalizingStart(tidy(result)), removed: removed)
+        return RulePassResult(text: tidy(result).capitalizingStart, removed: removed)
     }
 
     private static func isEnglish(_ text: String) -> Bool {
@@ -108,9 +108,11 @@ enum FillerWords {
             .replacingOccurrences(of: #"\s+([,.;:!?])"#, with: "$1", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
+}
 
-    private static func capitalizingStart(_ text: String) -> String {
-        guard let first = text.first else { return text }
-        return first.uppercased() + text.dropFirst()
+extension String {
+    var capitalizingStart: String {
+        guard let first else { return self }
+        return first.uppercased() + dropFirst()
     }
 }
