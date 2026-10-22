@@ -42,9 +42,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotkeyMonitor: HotkeyMonitor?
     private var quitRequested = false
     private let indicator = IndicatorController()
+    private let uninstallWatcher = UninstallWatcher()
     private lazy var updater = Updater(settings: settings, isBusy: { [weak self] in self?.dictation.phase != .idle })
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        guard !LaunchAgent.isInTrash else {
+            LaunchAgent.unregisterIfRegistered()
+            return NSApp.terminate(nil)
+        }
+        uninstallWatcher.start()
         extensions.start()
         let statusItemController = StatusItemController(
             dictation: dictation,

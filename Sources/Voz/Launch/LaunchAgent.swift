@@ -11,8 +11,10 @@ enum LaunchAgent {
     static var isInstalledCopy: Bool { Bundle.main.bundlePath == installedPath }
     static var launchedByLaunchd: Bool { ProcessInfo.processInfo.environment["XPC_SERVICE_NAME"] == label }
 
+    static var isInTrash: Bool { Bundle.main.bundlePath.contains("/.Trash/") }
+
     static func unregisterIfRegistered() {
-        guard isInstalledCopy, service.status != .notRegistered, service.status != .notFound else { return }
+        guard isInstalledCopy || isInTrash, service.status != .notRegistered, service.status != .notFound else { return }
         removeLegacyLoginItem()
         do {
             try service.unregister()
