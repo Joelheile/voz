@@ -1,5 +1,5 @@
 {
-  "originHash" : "a65dc4cb49fefd5e0c61e8da82e59522d2e4db57e656ccb260ac2bf4cede1e86",
+  "originHash" : "df74d94bb0f32ae96e5b55597475a58655730e53c435f18c16a3f87cd97f2954",
   "pins" : [
     {
       "identity" : "fluidaudio",
@@ -17,6 +17,15 @@
       "state" : {
         "revision" : "b83108d10f42680d78f23fe4d4d80fc88dab3212",
         "version" : "7.11.1"
+      }
+    },
+    {
+      "identity" : "lucide-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ajaxjiang96/lucide-swift.git",
+      "state" : {
+        "revision" : "599bb6afae953b8ecd22834cfe9cdefa9d1b4c4b",
+        "version" : "0.9.20"
       }
     },
     {

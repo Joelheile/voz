@@ -1,5 +1,5 @@
+import CoreServices
 import Foundation
-import VozCore
 
 struct ExtensionDelivery {
     let text: String
@@ -91,6 +91,8 @@ final class ExtensionService {
     private var started = ContinuousClock.now
     private var observer: NSObjectProtocol?
     private var reloading: Task<Void, Never>?
+    private var reloadRequested = false
+    private var generation = UUID()
     private var watchdog: Task<Void, Never>?
     private var watcher: FileWatcher?
     private var loadedExtensionSettings: Data?
@@ -126,24 +128,34 @@ final class ExtensionService {
     }
 
     func reload() {
-        reloading = Task { [previous = reloading] in
-            await previous?.value
-            watchdog?.cancel()
-            hotkeys.unregisterAll()
-            await host?.stop()
-            host = nil
-            manifest = nil
-            loadedExtensionSettings = try? home.extensionSettings()
-            watch()
-            guard home.hasEnabledExtensions else { return catalog.show(nil) }
-            do {
-                try home.writeAuthoringFiles(from: Self.resources)
-                try await launch()
-            } catch {
-                Log.extensions.error("Extensions failed to start: \(String(describing: error), privacy: .public)")
-                toast.show("Could not start extensions")
-                catalog.fail("Extensions could not start: \(error)")
-            }
+        reloadRequested = true
+        guard reloading == nil else { return }
+        reloading = Task {
+            repeat {
+                reloadRequested = false
+                await reloadHost()
+            } while reloadRequested
+            reloading = nil
+        }
+    }
+
+    private func reloadHost() async {
+        generation = UUID()
+        watchdog?.cancel()
+        hotkeys.unregisterAll()
+        await host?.stop()
+        host = nil
+        manifest = nil
+        loadedExtensionSettings = try? home.extensionSettings()
+        watch()
+        guard home.hasEnabledExtensions else { return catalog.show(nil) }
+        do {
+            try home.writeAuthoringFiles(from: Self.resources)
+            try await launch()
+        } catch {
+            Log.extensions.error("Extensions failed to start: \(String(describing: error), privacy: .public)")
+            toast.show("Could not start extensions")
+            catalog.fail("Extensions could not start: \(error)")
         }
     }
 
@@ -227,7 +239,10 @@ final class ExtensionService {
         guard let host else { return }
         Task {
             let handled = await host.runCommand(phrase: command, text: text, app: app, timeout: Self.commandTimeout)
-            if !handled { Log.extensions.error("Voice command was not handled: \(command, privacy: .public)") }
+            if !handled {
+                Log.extensions.error("Voice command was not handled: \(command, privacy: .public)")
+                toast.show("Voice command failed")
+            }
         }
     }
 
@@ -240,15 +255,22 @@ final class ExtensionService {
     }
 
     private func launch() async throws {
+        let generation = generation
         let script = Self.resources.appendingPathComponent("host.ts")
         let host = ExtensionHost(
             launch: .init(bun: try await BunRuntime.ensure(), script: script, home: home, packageDirectories: try home.packageDirectories()),
             onAction: { [weak self] action in
-                Task { @MainActor in await self?.perform(action) }
+                Task { @MainActor in
+                    guard let self, self.generation == generation else { return }
+                    await self.perform(action)
+                }
             },
             onLog: { message in Log.extensions.notice("\(message, privacy: .public)") },
             onExit: { [weak self] status in
-                Task { @MainActor in self?.hostExited(status) }
+                Task { @MainActor in
+                    guard let self, self.generation == generation else { return }
+                    self.hostExited(status)
+                }
             }
         )
         let manifest = try await host.start()
@@ -321,5 +343,35 @@ final class ExtensionService {
         restarts += 1
         Log.extensions.error("Extension host exited with status \(status), restarting")
         reload()
+    }
+}
+
+@MainActor
+final class FileWatcher {
+    private static let latency: CFTimeInterval = 0.3
+
+    private let onChange: @MainActor ([String]) -> Void
+    private var stream: FSEventStreamRef?
+
+    init(paths: [String], onChange: @escaping @MainActor ([String]) -> Void) {
+        self.onChange = onChange
+        var context = FSEventStreamContext(version: 0, info: Unmanaged.passUnretained(self).toOpaque(), retain: nil, release: nil, copyDescription: nil)
+        let callback: FSEventStreamCallback = { _, info, count, eventPaths, _, _ in
+            guard let info else { return }
+            let watcher = Unmanaged<FileWatcher>.fromOpaque(info).takeUnretainedValue()
+            let changed = Unmanaged<CFArray>.fromOpaque(eventPaths).takeUnretainedValue() as? [String] ?? []
+            MainActor.assumeIsolated { watcher.onChange(Array(changed.prefix(count))) }
+        }
+        stream = FSEventStreamCreate(nil, callback, &context, paths as CFArray, FSEventStreamEventId(kFSEventStreamEventIdSinceNow), Self.latency, FSEventStreamCreateFlags(kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagUseCFTypes))
+        guard let stream else { return }
+        FSEventStreamSetDispatchQueue(stream, .main)
+        FSEventStreamStart(stream)
+    }
+
+    isolated deinit {
+        guard let stream else { return }
+        FSEventStreamStop(stream)
+        FSEventStreamInvalidate(stream)
+        FSEventStreamRelease(stream)
     }
 }

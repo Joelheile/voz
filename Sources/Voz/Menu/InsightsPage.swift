@@ -1,7 +1,7 @@
 import Charts
+import Combine
 import SwiftUI
 import UniformTypeIdentifiers
-import VozCore
 
 struct InsightsPage: View {
     @ObservedObject var model: StatsModel
@@ -78,9 +78,7 @@ private struct TopApps: View {
             SectionLabel(text: "Top apps")
             ForEach(apps, id: \.self) { app in
                 HStack(spacing: 8) {
-                    Image(nsImage: AppIcon.image(for: app.bundleID))
-                        .resizable()
-                        .frame(width: 18, height: 18)
+                    AppIcon(bundleID: app.bundleID, size: 18)
                     Text(app.name)
                         .font(.ui(13))
                         .foregroundStyle(Theme.ink)
@@ -93,15 +91,6 @@ private struct TopApps: View {
                 }
             }
         }
-    }
-}
-
-private enum AppIcon {
-    static func image(for bundleID: String?) -> NSImage {
-        guard let bundleID, let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
-            return NSWorkspace.shared.icon(for: .applicationBundle)
-        }
-        return NSWorkspace.shared.icon(forFile: url.path)
     }
 }
 
@@ -150,5 +139,33 @@ private struct WordsChart: View {
         case .month: .dateTime.month(.abbreviated).day()
         case .all: .dateTime.month(.abbreviated)
         }
+    }
+}
+
+@MainActor
+final class StatsModel: ObservableObject {
+    @Published private(set) var stats = UsageStats()
+
+    private var subscription: AnyCancellable?
+
+    init(store: HistoryStore) {
+        subscription = store.observeStats().receive(on: DispatchQueue.main).sink(
+            receiveCompletion: { completion in
+                if case let .failure(error) = completion {
+                    Log.app.error("Stats observation failed: \(error.localizedDescription, privacy: .private)")
+                }
+            },
+            receiveValue: { [weak self] in self?.stats = $0 }
+        )
+    }
+}
+
+enum StatsFormat {
+    static func duration(_ seconds: Double) -> String {
+        let total = Int(seconds.rounded())
+        guard total >= 60 else { return "\(total)s" }
+        let minutes = total / 60
+        guard minutes >= 60 else { return "\(minutes)m" }
+        return "\(minutes / 60)h \(minutes % 60)m"
     }
 }

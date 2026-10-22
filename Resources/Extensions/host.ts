@@ -6,10 +6,13 @@ import {
   statSync,
 } from "node:fs";
 import { EventEmitter } from "node:events";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { basename, extname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import type {
   Action,
+  AfterInsertEvent,
+  Awaitable,
   App,
   BeforeCleanupEvent,
   BeforeCleanupResult,
@@ -21,7 +24,9 @@ import type {
   Context,
   Extension,
   ExtensionAPI,
+  RecordingEvent,
   Setting,
+  SettingsValues,
   SettingsSchema,
   SpeechModel,
 } from "./voz.d.ts";
@@ -34,6 +39,12 @@ type Launch = {
 };
 type EventName = "beforeCleanup" | "beforeInsert" | "recording" | "afterInsert";
 type HandlerResult = BeforeInsertResult | BeforeCleanupResult;
+type HookPayload = {
+  beforeCleanup: BeforeCleanupEvent;
+  beforeInsert: BeforeInsertEvent;
+  recording: RecordingEvent;
+  afterInsert: AfterInsertEvent;
+};
 type Handler = {
   extension: string;
   run: (event: object, ctx: Context) => HandlerResult | Promise<HandlerResult>;
@@ -54,7 +65,9 @@ type ActionRequest = { action: string; app: App };
 type Component = { id: string; name: string };
 type Entry = { name: string; path?: string; requires?: number };
 type LoadError = { extension: string; message: string };
-type Request = { id?: number; method: string; params: never };
+type Request = { id?: number; method: string; params: never; deadline: number };
+type RequestScope = { id?: number; deadline: number; active: boolean };
+const requestScope = new AsyncLocalStorage<RequestScope>();
 type SettingsFile = {
   disabled?: string[];
   config?: Record<string, ExtensionAPI["config"]>;
@@ -135,11 +148,16 @@ Bun.plugin({
 });
 
 function context(app: App): Context {
+  const scope = requestScope.getStore();
+  const action = (method: string, params: { text: string } | { key: string }) => {
+    if (!scope?.active || Date.now() >= scope.deadline) return;
+    send({ method, params, requestID: scope.id });
+  };
   return {
     app,
-    insert: (text) => send({ method: "insert", params: { text } }),
-    press: (key) => send({ method: "press", params: { key } }),
-    notify: (text) => send({ method: "notify", params: { text } }),
+    insert: (text) => action("insert", { text }),
+    press: (key) => action("press", { key }),
+    notify: (text) => action("notify", { text }),
   };
 }
 
@@ -257,10 +275,16 @@ function api(name: string, config: ExtensionAPI["config"], registration: Registr
       },
       emit: (event, payload) => bus.emit(event, payload),
     },
-    on(event: EventName, handler: Handler["run"]) {
+    on<Event extends EventName>(
+      event: Event,
+      handler: (payload: HookPayload[Event], ctx: Context) => Awaitable<HandlerResult>,
+    ) {
       if (!eventNames.includes(event))
         throw new Error(`Unknown event "${event}"`);
-      const registered = { extension: name, run: handler };
+      const registered: Handler = {
+        extension: name,
+        run: (payload, ctx) => handler(payload as HookPayload[Event], ctx),
+      };
       registration.track(() => {
         const remaining = (handlers.get(event) ?? []).filter((item) => item !== registered);
         if (remaining.length) handlers.set(event, remaining);
@@ -282,12 +306,12 @@ function api(name: string, config: ExtensionAPI["config"], registration: Registr
     registerCleanupStep: (step) =>
       register(cleanupSteps, "cleanup step", name, step, registration),
     registerAction: (action) => register(actions, "action", name, { ...action, extension: name }, registration),
-    settings(schema) {
+    settings<Schema extends SettingsSchema>(schema: Schema) {
       for (const [key, setting] of Object.entries(schema)) checkSetting(key, setting);
       setRegistered(settingsSchemas, name, schema, registration);
       return Object.fromEntries(
         Object.entries(schema).map(([key, setting]) => [key, settingValue(setting, config[key])]),
-      ) as ReturnType<ExtensionAPI["settings"]>;
+      ) as SettingsValues<Schema>;
     },
     log: (message) => log(`[${name}] ${message}`),
   };
@@ -342,6 +366,7 @@ function withinLoadTimeout(work: Promise<void>): Promise<void> {
 async function beforeCleanup({ prompt, app }: CleanupRequest) {
   const ctx = context(app);
   for (const handler of handlers.get("beforeCleanup") ?? []) {
+    if (Date.now() >= requestScope.getStore()!.deadline) break;
     try {
       const result = (await handler.run({ prompt }, ctx)) as BeforeCleanupResult;
       if (result && typeof result.prompt === "string") prompt = result.prompt;
@@ -355,10 +380,11 @@ async function beforeCleanup({ prompt, app }: CleanupRequest) {
 async function beforeInsert({ text, raw, app }: InsertRequest) {
   const ctx = context(app);
   for (const handler of handlers.get("beforeInsert") ?? []) {
+    if (Date.now() >= requestScope.getStore()!.deadline) break;
     try {
       const result = (await handler.run({ text, raw }, ctx)) as BeforeInsertResult;
-      if (result && "handled" in result) return { text: "" };
-      if (result && typeof result.text === "string") text = result.text;
+      if (result && "handled" in result && result.handled === true) return { text: "" };
+      if (result && "text" in result && typeof result.text === "string") text = result.text;
     } catch (error) {
       log(`${handler.extension} beforeInsert failed: ${describe(error)}`);
     }
@@ -392,7 +418,8 @@ async function transcribe({ model, path, seconds, app }: TranscribeRequest) {
     { path, seconds },
     context(app),
   );
-  return { text: String(result.text) };
+  if (!result || typeof result.text !== "string") throw new Error("Speech model must return string text");
+  return { text: result.text };
 }
 
 async function clean({ model, text, prompt, app }: CleanRequest) {
@@ -400,7 +427,8 @@ async function clean({ model, text, prompt, app }: CleanRequest) {
     { text, prompt },
     context(app),
   );
-  return { text: String(result.text) };
+  if (!result || typeof result.text !== "string") throw new Error("Cleanup model must return string text");
+  return { text: result.text };
 }
 
 async function cleanupStep({ step, text, app }: StepRequest) {
@@ -442,7 +470,11 @@ function parseRequest(line: string): Request | undefined {
   }
   const id = "id" in value && typeof value.id === "number" ? value.id : undefined;
   const params = "params" in value ? value.params : {};
-  return { id, method: value.method, params: params as never };
+  if (!("deadline" in value) || typeof value.deadline !== "number" || !Number.isFinite(value.deadline)) {
+    log("Invalid request: deadline must be a finite number");
+    return;
+  }
+  return { id, method: value.method, params: params as never, deadline: value.deadline };
 }
 
 await load();
@@ -475,8 +507,16 @@ for await (const line of createInterface({ input: process.stdin })) {
     send({ id: request.id, error: `Unknown method ${request.method}` });
     continue;
   }
-  method(request.params)
-    .then((result) => send({ id: request.id, result }))
-    .catch((error) => send({ id: request.id, error: describe(error) }));
+  const scope: RequestScope = { id: request.id, deadline: request.deadline, active: true };
+  requestScope.run(scope, async () => {
+    try {
+      if (Date.now() >= scope.deadline) throw new Error("Request expired");
+      send({ id: request.id, result: await method(request.params) });
+    } catch (error) {
+      send({ id: request.id, error: describe(error) });
+    } finally {
+      scope.active = false;
+    }
+  });
 }
 process.exit(0);

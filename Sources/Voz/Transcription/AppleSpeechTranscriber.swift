@@ -1,7 +1,6 @@
 @preconcurrency import AVFoundation
 import Foundation
 import Speech
-import VozCore
 
 enum AppleSpeechError: Error {
     case localeUnsupported(String)

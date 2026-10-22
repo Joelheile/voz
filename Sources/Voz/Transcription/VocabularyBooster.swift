@@ -1,6 +1,5 @@
 import FluidAudio
 import Foundation
-import VozCore
 
 actor VocabularyBooster {
     static let minimumSimilarity: Float = 0.6

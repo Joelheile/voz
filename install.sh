@@ -68,9 +68,8 @@ main() {
         grep -o '"browser_download_url": *"[^"]*\.zip"' | head -1 | cut -d'"' -f4)
     [[ -n "$url" ]] || fail "No Voz release found at github.com/$REPO/releases."
 
-    local work
     work=$(mktemp -d)
-    trap "rm -rf '$work'" EXIT
+    trap 'rm -rf "$work"' EXIT
 
     step "Downloading Voz" download "$url" "$work"
     step "Installing Voz" install_app "$work"

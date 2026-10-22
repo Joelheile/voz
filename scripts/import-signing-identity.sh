@@ -12,8 +12,14 @@ trap 'rm -f "$P12_FILE"' EXIT
 if [[ ! -e "$KEYCHAIN" ]]; then
     security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
     security set-keychain-settings -lut 21600 "$KEYCHAIN"
-    existing=$(security list-keychains -d user | tr -d '"')
-    security list-keychains -d user -s "$KEYCHAIN" $existing
+    keychains=$(security list-keychains -d user)
+    existing=()
+    while read -r keychain; do
+        keychain=${keychain#\"}
+        keychain=${keychain%\"}
+        [[ -n "$keychain" ]] && existing+=("$keychain")
+    done <<< "$keychains"
+    security list-keychains -d user -s "$KEYCHAIN" "${existing[@]}"
 fi
 security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
 

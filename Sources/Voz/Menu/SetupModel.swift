@@ -1,7 +1,6 @@
 import AVFoundation
 import Combine
 import Foundation
-import VozCore
 
 enum SetupStep: Int, CaseIterable {
     case access
