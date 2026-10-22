@@ -68,9 +68,9 @@ enum LaunchAgent {
 
     private static var jobRunsVoz: Bool {
         guard let pid = jobPID, let executable = Bundle.main.executablePath else { return false }
-        var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN) * 4)
+        var buffer = [UInt8](repeating: 0, count: Int(MAXPATHLEN) * 4)
         guard proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 else { return false }
-        return String(cString: buffer) == executable
+        return String(decoding: buffer.prefix(while: { $0 != 0 }), as: UTF8.self) == executable
     }
 
     private static var jobPID: Int32? {
