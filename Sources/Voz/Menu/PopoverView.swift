@@ -65,7 +65,7 @@ struct PopoverView: View {
 
 private struct HomePage: View {
     private static let visibleRows = 5
-    private static let rowHeight: CGFloat = 38
+    private static let rowHeight: CGFloat = 40
 
     @ObservedObject var model: PopoverModel
     @ObservedObject var history: HistoryModel
@@ -73,46 +73,50 @@ private struct HomePage: View {
     @ObservedObject var catalog: ExtensionCatalog
     @ObservedObject var extensions: ExtensionsModel
     @FocusState private var searchFocused: Bool
+    @State private var selectedID: UUID?
 
+    private var records: [TranscriptRecord] { history.records }
     private var isSearching: Bool { !history.query.isEmpty }
-    private var showsSearch: Bool { isSearching || history.records.count > Self.visibleRows }
-    private var records: [TranscriptRecord] {
-        isSearching ? history.records : Array(history.records.prefix(Self.visibleRows))
+    private var showsSearch: Bool { isSearching || !records.isEmpty }
+
+    private var needsAttention: Bool {
+        switch model.status {
+        case .loadingModel, .modelFailed, .permissionNeeded: true
+        default: false
+        }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        ScrollViewReader { proxy in
             VStack(alignment: .leading, spacing: 12) {
-                header
-                statusDetail
+                if needsAttention {
+                    notice
+                    RowDivider().padding(.horizontal, -Theme.Spacing.item)
+                }
+                if showsSearch {
+                    search(proxy: proxy)
+                    RowDivider().padding(.horizontal, -Theme.Spacing.item)
+                }
+                transcripts
+                if !catalog.actions.isEmpty { actions }
+                RowDivider().padding(.horizontal, -Theme.Spacing.item)
+                footer
             }
-            if showsSearch {
-                SearchField(text: $history.query, prompt: "Search transcripts", focused: $searchFocused)
-                    .onSubmit(copyFirstResult)
-            }
-            transcripts
-            if !catalog.actions.isEmpty { actions }
-            footer
         }
         .onAppear { searchFocused = showsSearch }
+        .onChange(of: history.query) { selectedID = nil }
     }
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 7) {
-                if model.status == .recording { RecordingMark().transition(.opacity) }
-                Text(model.status.title)
-                    .font(.display(17))
-                    .foregroundStyle(Theme.ink)
-            }
+    private var notice: some View {
+        VStack(alignment: .leading, spacing: 10) {
             if !model.hint.isEmpty {
                 Text(model.hint)
                     .font(.meta)
                     .lineSpacing(2)
                     .foregroundStyle(Theme.inkSecondary)
-                    .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            statusDetail
         }
     }
 
@@ -134,29 +138,93 @@ private struct HomePage: View {
         }
     }
 
+    private func search(proxy: ScrollViewProxy) -> some View {
+        HStack(spacing: 12) {
+            Icon(.search, size: 15)
+                .foregroundStyle(Theme.inkTertiary)
+                .frame(width: 20)
+            TextField("Search", text: $history.query)
+                .textFieldStyle(.plain)
+                .font(.ui(14))
+                .foregroundStyle(Theme.ink)
+                .focused($searchFocused)
+                .focusEffectDisabled()
+        }
+        .frame(height: 24)
+        .onSubmit(copySelection)
+        .onKeyPress(.downArrow) { moveSelection(by: 1, proxy: proxy) }
+        .onKeyPress(.upArrow) { moveSelection(by: -1, proxy: proxy) }
+        .onKeyPress(.escape) {
+            guard isSearching else { return .ignored }
+            history.query = ""
+            return .handled
+        }
+    }
+
     @ViewBuilder
     private var transcripts: some View {
         if records.isEmpty {
-            Text(isSearching ? "No matching transcripts" : "Your transcripts appear here.")
-                .font(.ui(13))
-                .foregroundStyle(Theme.inkTertiary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            emptyState
         } else {
-            CappedScrollView(maxHeight: CGFloat(Self.visibleRows) * Self.rowHeight) {
-                VStack(spacing: 0) {
-                    ForEach(records) { record in
-                        TranscriptRow(
-                            record: record,
-                            height: Self.rowHeight,
-                            copied: model.copiedID == record.id,
-                            copy: { model.copy(record) },
-                            delete: { history.delete(record) }
-                        )
+            TimelineView(.everyMinute) { context in
+                CappedScrollView(maxHeight: CGFloat(Self.visibleRows) * Self.rowHeight) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(records.enumerated()), id: \.element.id) { index, record in
+                            if let heading = heading(at: index, now: context.date) {
+                                DayHeading(text: heading)
+                            }
+                            row(for: record, now: context.date)
+                        }
                     }
+                    .animation(isSearching ? nil : Theme.Motion.reorder, value: records.map(\.id))
                 }
             }
             .padding(.horizontal, -8)
         }
+    }
+
+    private var emptyState: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if isSearching {
+                Text("No matching transcripts")
+                    .foregroundStyle(Theme.inkTertiary)
+            } else {
+                if !needsAttention, !model.hint.isEmpty {
+                    Text(model.hint).foregroundStyle(Theme.ink)
+                }
+                Text("Your transcripts appear here.")
+                    .foregroundStyle(Theme.inkTertiary)
+            }
+        }
+        .font(.ui(13))
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func heading(at index: Int, now: Date) -> String? {
+        guard !isSearching, let heading = RecentTime.heading(for: records[index].createdAt, now: now) else { return nil }
+        guard index > 0 else { return heading }
+        return RecentTime.heading(for: records[index - 1].createdAt, now: now) == heading ? nil : heading
+    }
+
+    private func row(for record: TranscriptRecord, now: Date) -> some View {
+        TranscriptRow(
+            record: record,
+            query: history.query,
+            time: RecentTime.label(for: record.createdAt, now: now),
+            height: Self.rowHeight,
+            selected: selectedID == record.id,
+            copied: model.copiedID == record.id,
+            copy: { model.copy(record) },
+            delete: { history.delete(record) },
+            hover: { hovering in
+                if hovering {
+                    selectedID = record.id
+                } else if selectedID == record.id {
+                    selectedID = nil
+                }
+            }
+        )
+        .id(record.id)
     }
 
     private var actions: some View {
@@ -171,19 +239,42 @@ private struct HomePage: View {
 
     private var footer: some View {
         HStack(spacing: 2) {
-            Spacer(minLength: 0)
-            IconButton(symbol: "chart.bar", help: "Insights") { model.page = .insights }
-            IconButton(symbol: "puzzlepiece.extension", help: extensionsHelp) { model.page = .extensions }
+            footerStatus
+            Spacer(minLength: 8)
+            IconButton(icon: .chartNoAxesColumn, help: "Insights") { model.page = .insights }
+            IconButton(icon: .puzzle, help: extensionsHelp) { model.page = .extensions }
                 .overlay(alignment: .topTrailing) {
                     if extensions.updateCount > 0 {
                         Circle().fill(Color.accentColor).frame(width: 6, height: 6).offset(x: -6, y: 6)
                     }
                 }
-            IconButton(symbol: "gearshape", help: "Settings") { model.page = .settings }
+            IconButton(icon: .settings, help: "Settings") { model.page = .settings }
                 .keyboardShortcut(",", modifiers: .command)
-            IconButton(symbol: "power", help: "Quit Voz", action: model.actions.quit)
+            IconButton(icon: .power, help: "Quit Voz", action: model.actions.quit)
         }
         .padding(.trailing, -8)
+    }
+
+    @ViewBuilder
+    private var footerStatus: some View {
+        HStack(spacing: 8) {
+            if model.status == .recording { RecordingMark().transition(.opacity) }
+            if model.status == .ready, isSearching {
+                Text(resultCount).font(.display(13)).foregroundStyle(Theme.ink)
+                if !records.isEmpty { KeyChip(text: "↵ copy") }
+            } else {
+                Text(model.status.title).font(.display(13)).foregroundStyle(Theme.ink)
+                if model.status == .ready { KeyChip(text: DictationHint.key(settings.hotkey)).help(model.hint) }
+            }
+        }
+    }
+
+    private var resultCount: String {
+        switch records.count {
+        case 0: "No results"
+        case 1: "1 result"
+        case let count: "\(count) results"
+        }
     }
 
     private var extensionsHelp: String {
@@ -194,24 +285,64 @@ private struct HomePage: View {
         }
     }
 
-    private func copyFirstResult() {
-        guard let first = records.first else { return }
-        model.copy(first)
+    private func moveSelection(by step: Int, proxy: ScrollViewProxy) -> KeyPress.Result {
+        guard !records.isEmpty else { return .ignored }
+        let current = records.firstIndex { $0.id == selectedID }
+        let next = current.map { min(max($0 + step, 0), records.count - 1) } ?? (step > 0 ? 0 : records.count - 1)
+        selectedID = records[next].id
+        proxy.scrollTo(records[next].id)
+        return .handled
+    }
+
+    private func copySelection() {
+        guard let record = records.first(where: { $0.id == selectedID }) ?? records.first else { return }
+        model.copy(record)
+    }
+}
+
+private struct DayHeading: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.display(11))
+            .foregroundStyle(Theme.inkTertiary)
+            .padding(.horizontal, 8)
+            .padding(.top, 10)
+            .padding(.bottom, 4)
+    }
+}
+
+private struct KeyChip: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.ui(11, weight: .medium))
+            .foregroundStyle(Theme.inkSecondary)
+            .padding(.horizontal, 6)
+            .frame(height: 18)
+            .background(Theme.canvas, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 5, style: .continuous).strokeBorder(Theme.hairline))
     }
 }
 
 private struct TranscriptRow: View {
     let record: TranscriptRecord
+    let query: String
+    let time: String
     let height: CGFloat
+    let selected: Bool
     let copied: Bool
     let copy: () -> Void
     let delete: () -> Void
-    @State private var hovering = false
+    let hover: (Bool) -> Void
 
     var body: some View {
         Button(action: copy) {
             HStack(spacing: 10) {
-                Text(record.finalText.replacingOccurrences(of: "\n", with: " "))
+                AppIcon(bundleID: record.appBundleID, size: 24)
+                Text(text)
                     .font(.ui(13))
                     .foregroundStyle(Theme.ink)
                     .lineLimit(1)
@@ -219,39 +350,49 @@ private struct TranscriptRow: View {
                 Spacer(minLength: 8)
                 trailing
             }
-            .padding(.horizontal, 8)
+            .padding(.leading, 6)
+            .padding(.trailing, 10)
             .frame(height: height)
-            .background(hovering ? Theme.selected.opacity(0.7) : .clear, in: RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous))
+            .background(selected ? Theme.selected : .clear, in: RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous))
             .contentShape(Rectangle())
         }
-        .buttonStyle(.pressable(0.98))
+        .buttonStyle(.pressable(0.99))
         .help(record.finalText)
         .contextMenu {
             Button("Copy", action: copy)
             Button("Delete", role: .destructive, action: delete)
         }
-        .onHover { hovering = $0 }
-        .animation(Theme.Motion.hover, value: hovering)
+        .onHover(perform: hover)
         .animation(Theme.Motion.hover, value: copied)
+    }
+
+    private var text: AttributedString {
+        let snippet = TranscriptSnippet.text(record.finalText, around: query)
+        var attributed = AttributedString(snippet)
+        if snippet.hasPrefix("… "), let ellipsisEnd = attributed.index(attributed.startIndex, offsetByCharacters: 2) as AttributedString.Index? {
+            attributed[attributed.startIndex..<ellipsisEnd].foregroundColor = Theme.inkTertiary
+        }
+        for range in TranscriptSnippet.ranges(of: query, in: snippet) {
+            guard let lower = AttributedString.Index(range.lowerBound, within: attributed),
+                  let upper = AttributedString.Index(range.upperBound, within: attributed) else { continue }
+            attributed[lower..<upper].foregroundColor = Theme.accent
+            attributed[lower..<upper].font = .ui(13, weight: .semibold)
+        }
+        return attributed
     }
 
     @ViewBuilder
     private var trailing: some View {
         if copied {
-            Label("Copied", systemImage: "checkmark")
-                .font(.ui(12, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
-                .transition(.opacity)
-        } else if hovering {
-            Image(systemName: "doc.on.doc")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(Theme.inkSecondary)
-                .transition(.opacity)
+            Text("Copied")
+                .font(.display(11))
+                .foregroundStyle(Theme.accent)
+                .transition(.blurReplace)
         } else {
-            Text(record.createdAt, format: .relative(presentation: .numeric, unitsStyle: .narrow))
-                .font(.meta)
+            Text(time)
+                .font(.display(11))
                 .foregroundStyle(Theme.inkTertiary)
-                .transition(.opacity)
+                .transition(.blurReplace)
         }
     }
 }

@@ -239,13 +239,13 @@ enum KeyboardLayout {
 
 enum DictationHint {
     static func idle(hotkey: Hotkey, holdToTalk: Bool) -> String {
-        "\(verb(hotkey: hotkey, holdToTalk: holdToTalk)) \(keyPhrase(hotkey)) to dictate"
+        "\(verb(hotkey: hotkey, holdToTalk: holdToTalk)) \(key(hotkey)) to dictate"
     }
 
     static func recording(hotkey: Hotkey, holdToTalk: Bool) -> String {
         holdToTalk
-            ? "Release \(keyPhrase(hotkey)) to stop"
-            : "\(verb(hotkey: hotkey, holdToTalk: false)) \(keyPhrase(hotkey)) again to stop"
+            ? "Release \(key(hotkey)) to stop"
+            : "\(verb(hotkey: hotkey, holdToTalk: false)) \(key(hotkey)) again to stop"
     }
 
     private static func verb(hotkey: Hotkey, holdToTalk: Bool) -> String {
@@ -253,7 +253,7 @@ enum DictationHint {
         return hotkey.isModifierOnly ? "Tap" : "Press"
     }
 
-    private static func keyPhrase(_ hotkey: Hotkey) -> String {
+    static func key(_ hotkey: Hotkey) -> String {
         let name = hotkey.displayName
         for side in ["Left ", "Right "] where name.hasPrefix(side) {
             return side.lowercased() + name.dropFirst(side.count)

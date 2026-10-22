@@ -78,9 +78,7 @@ private struct TopApps: View {
             SectionLabel(text: "Top apps")
             ForEach(apps, id: \.self) { app in
                 HStack(spacing: 8) {
-                    Image(nsImage: AppIcon.image(for: app.bundleID))
-                        .resizable()
-                        .frame(width: 18, height: 18)
+                    AppIcon(bundleID: app.bundleID, size: 18)
                     Text(app.name)
                         .font(.ui(13))
                         .foregroundStyle(Theme.ink)
@@ -93,15 +91,6 @@ private struct TopApps: View {
                 }
             }
         }
-    }
-}
-
-private enum AppIcon {
-    static func image(for bundleID: String?) -> NSImage {
-        guard let bundleID, let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
-            return NSWorkspace.shared.icon(for: .applicationBundle)
-        }
-        return NSWorkspace.shared.icon(forFile: url.path)
     }
 }
 

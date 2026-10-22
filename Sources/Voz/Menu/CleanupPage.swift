@@ -24,9 +24,9 @@ struct CleanupStepsPage: View {
                 ForEach(settings.cleanupSteps + off, id: \.self) { step in
                     row(step) {
                         if let index = settings.cleanupSteps.firstIndex(of: step) {
-                            IconButton(symbol: "chevron.up", help: "Move up") { move(index, by: -1) }
+                            IconButton(icon: .chevronUp, help: "Move up") { move(index, by: -1) }
                                 .disabled(index == 0)
-                            IconButton(symbol: "chevron.down", help: "Move down") { move(index, by: 1) }
+                            IconButton(icon: .chevronDown, help: "Move down") { move(index, by: 1) }
                                 .disabled(index == settings.cleanupSteps.count - 1)
                         }
                     }

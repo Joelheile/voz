@@ -145,7 +145,7 @@ private final class Fixture {
             "Thanks for the quick turnaround. I'll take another look tomorrow morning.",
         ]
         let apps = [
-            ("Xcode", "com.apple.dt.Xcode"),
+            ("Messages", "com.apple.MobileSMS"),
             ("Slack", "com.tinyspeck.slackmacgap"),
             ("Mail", "com.apple.mail"),
             ("Notes", "com.apple.Notes"),

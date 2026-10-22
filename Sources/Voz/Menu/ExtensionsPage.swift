@@ -58,7 +58,7 @@ struct ExtensionsPage: View {
                     .buttonStyle(.pill(.quiet, height: 26))
                     .disabled(model.working != nil)
             }
-            IconButton(symbol: model.expanded == item.name ? "chevron.up" : "chevron.down", help: "Details") {
+            IconButton(icon: model.expanded == item.name ? .chevronUp : .chevronDown, help: "Details") {
                 model.toggleExpanded(item.name)
             }
             Toggle(item.name, isOn: Binding { model.isEnabled(item.name) } set: { model.setEnabled(item.name, $0) })

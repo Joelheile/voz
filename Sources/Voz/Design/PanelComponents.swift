@@ -6,7 +6,7 @@ struct PageBar: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            IconButton(symbol: "chevron.left", help: "Back", action: back)
+            IconButton(icon: .chevronLeft, help: "Back", action: back)
                 .keyboardShortcut("[", modifiers: .command)
             Text(title)
                 .font(.display(17))
@@ -71,8 +71,7 @@ struct LinkRow: View {
 
     var body: some View {
         ActionRow(title: title, value: value, action: action) { hovering in
-            Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
+            Icon(.chevronRight, size: 13)
                 .foregroundStyle(hovering ? Theme.ink : Theme.inkTertiary)
         }
     }

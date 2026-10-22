@@ -234,10 +234,9 @@ private struct TryStep: View {
     private var result: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             if let tried {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 13))
+                Icon(.circleCheck, size: 15)
                     .foregroundStyle(Color.accentColor)
-                    .transition(.symbolEffect(.drawOn))
+                    .transition(.scale(scale: 0.6).combined(with: .opacity))
                 Text(tried.finalText)
                     .font(.ui(13))
                     .foregroundStyle(Theme.ink)
