@@ -3,6 +3,16 @@
   <channel>
     <title>voz</title>
     <item>
+      <title>voz 0.0.4-beta.100004</title>
+      <link>https://github.com/Joelheile/voz/releases/tag/beta-100004</link>
+      <pubDate>Thu, 22 Oct 2026 13:25:53 GMT</pubDate>
+      <sparkle:version>100004</sparkle:version>
+      <sparkle:shortVersionString>0.0.4-beta.100004</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100004/voz-0.0.4-beta.100004.zip" length="8220170" sparkle:edSignature="vl0qG5ySX927os7/EihMPAQSuvzyRjQWo1i8hGSVy+03xce9R7AJ/Qqg+XKeisvQy8ZpbVZjOwNNnJOYjMdiDg==" type="application/octet-stream" />
+    </item>
+    <item>
       <title>voz 0.0.4-beta.100003</title>
       <link>https://github.com/Joelheile/voz/releases/tag/beta-100003</link>
       <pubDate>Thu, 22 Oct 2026 12:45:18 GMT</pubDate>
@@ -109,16 +119,6 @@
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <sparkle:channel>beta</sparkle:channel>
       <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-59/voz-0.0.2-beta.59.zip" length="6601327" sparkle:edSignature="exHlk1QWHRc4JoPvNH78PhgF7GSZtMIjSKOKFn4gb7lwFhTh6CkjwA/UUJNa02EQEgdTTpE2F98V6LKkLTRcBA==" type="application/octet-stream" />
-    </item>
-    <item>
-      <title>voz 0.0.2-beta.57</title>
-      <link>https://github.com/Joelheile/voz/releases/tag/beta-57</link>
-      <pubDate>Wed, 21 Oct 2026 14:28:26 GMT</pubDate>
-      <sparkle:version>57</sparkle:version>
-      <sparkle:shortVersionString>0.0.2-beta.57</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <sparkle:channel>beta</sparkle:channel>
-      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-57/voz-0.0.2-beta.57.zip" length="6537614" sparkle:edSignature="JbCBHr0WNt9RDDYPQ4Z/GNJ7r/AIsu7Xs0fPA+ziZ9VAPrF53EFtGQU0tI7j/NR4qlrXHqxbQQO9NarEcMHVAg==" type="application/octet-stream" />
     </item>
     <item>
       <title>voz 0.0.2</title>
