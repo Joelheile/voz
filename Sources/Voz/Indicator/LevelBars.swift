@@ -27,7 +27,7 @@ struct LevelBars: View {
 
     private func level(slot: Int, time: Double) -> Float {
         if reduceMotion { return model.levels.latest }
-        return model.levels.level(at: LevelBarsGeometry.sampleTime(slot: slot, time: time))
+        return model.levels.average(in: LevelBarsGeometry.sampleWindow(slot: slot, time: time))
     }
 }
 

@@ -98,8 +98,8 @@ private struct HomePage: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                if model.status == .recording { RecordingMark() }
+            HStack(spacing: 7) {
+                if model.status == .recording { RecordingMark().transition(.opacity) }
                 Text(model.status.title)
                     .font(.display(17))
                     .foregroundStyle(Theme.ink)
@@ -252,15 +252,15 @@ private struct TranscriptRow: View {
 }
 
 private struct RecordingMark: View {
-    @State private var pulsing = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var dimmed = false
 
     var body: some View {
         Circle()
             .fill(Theme.accent)
-            .frame(width: 8, height: 8)
-            .scaleEffect(pulsing ? 1.35 : 1)
-            .opacity(pulsing ? 0.6 : 1)
-            .animation(.easeInOut(duration: 0.7).repeatForever(), value: pulsing)
-            .onAppear { pulsing = true }
+            .frame(width: 6, height: 6)
+            .opacity(dimmed ? 0.35 : 1)
+            .animation(.easeInOut(duration: 1.1).repeatForever(), value: dimmed)
+            .onAppear { dimmed = !reduceMotion }
     }
 }

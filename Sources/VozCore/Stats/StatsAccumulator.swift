@@ -1,85 +1,88 @@
 import Foundation
 
 public struct StatsAccumulator {
-    private static let minimumSecondsForPace = 1.0
-
     private let calendar: Calendar
-    private let today: Date
-    private let week: DateInterval
-    private let seriesStart: Date
-    private var wordsByDay: [Date: Int] = [:]
-    private var wordsByApp: [String: Int] = [:]
-    private var stats = UsageStats()
-    private var allAudioSeconds = 0.0
-    private var paceWords = 0
-    private var paceSeconds = 0.0
+    private let now: Date
+    private var tallies: [StatsPeriod: PeriodTally] = [:]
+    private var firstDate: Date?
 
     public init(now: Date, calendar: Calendar) {
         self.calendar = calendar
-        today = calendar.startOfDay(for: now)
-        week = calendar.dateInterval(of: .weekOfYear, for: now) ?? DateInterval(start: today, duration: 0)
-        seriesStart = calendar.date(byAdding: .day, value: 1 - UsageStats.seriesDays, to: today) ?? today
+        self.now = now
     }
 
     public mutating func add(_ row: StatsRow) {
-        let day = calendar.startOfDay(for: row.createdAt)
-        wordsByDay[day, default: 0] += row.wordCount
-        stats.wordsTotal += row.wordCount
-        stats.fillerWordsRemoved += row.fillerWordsRemoved
-        allAudioSeconds += row.audioSeconds
-        if day == today { stats.wordsToday += row.wordCount }
-        if week.contains(row.createdAt) { stats.wordsThisWeek += row.wordCount }
-        if row.audioSeconds > Self.minimumSecondsForPace {
-            paceWords += row.wordCount
-            paceSeconds += row.audioSeconds
+        for period in StatsPeriod.allCases where row.createdAt >= start(of: period) {
+            tallies[period, default: PeriodTally()].add(row, bucket: bucketStart(for: row.createdAt, in: period))
         }
-        if let appName = row.appName { wordsByApp[appName, default: 0] += row.wordCount }
+        firstDate = min(firstDate ?? row.createdAt, row.createdAt)
     }
 
     public func finish() -> UsageStats {
+        var stats = UsageStats()
+        for period in StatsPeriod.allCases {
+            stats.periods[period] = tallies[period, default: PeriodTally()].finish(buckets: bucketStarts(for: period))
+        }
+        return stats
+    }
+
+    private func start(of period: StatsPeriod) -> Date {
+        let today = calendar.startOfDay(for: now)
+        switch period {
+        case .day: return today
+        case .week: return calendar.date(byAdding: .day, value: -6, to: today) ?? today
+        case .month: return calendar.date(byAdding: .day, value: -29, to: today) ?? today
+        case .all: return .distantPast
+        }
+    }
+
+    private func bucketStarts(for period: StatsPeriod) -> [Date] {
+        let unit = bucketUnit(of: period)
+        let first = period == .all ? bucketStart(for: firstDate ?? now, in: .all) : start(of: period)
+        let count = switch period {
+        case .day: 24
+        case .week: 7
+        case .month: 30
+        case .all: (calendar.dateComponents([.month], from: first, to: bucketStart(for: now, in: .all)).month ?? 0) + 1
+        }
+        return (0..<count).compactMap { calendar.date(byAdding: unit, value: $0, to: first) }
+    }
+
+    private func bucketStart(for date: Date, in period: StatsPeriod) -> Date {
+        calendar.dateInterval(of: bucketUnit(of: period), for: date)?.start ?? date
+    }
+
+    private func bucketUnit(of period: StatsPeriod) -> Calendar.Component {
+        switch period {
+        case .day: .hour
+        case .week, .month: .day
+        case .all: .month
+        }
+    }
+}
+
+private struct PeriodTally {
+    private static let minimumSecondsForPace = 1.0
+
+    private var stats = PeriodStats()
+    private var wordsByBucket: [Date: Int] = [:]
+    private var paceWords = 0
+    private var paceSeconds = 0.0
+
+    mutating func add(_ row: StatsRow, bucket: Date) {
+        stats.words += row.wordCount
+        stats.speakingSeconds += row.audioSeconds
+        stats.fixes += row.fillerWordsRemoved
+        wordsByBucket[bucket, default: 0] += row.wordCount
+        guard row.audioSeconds > Self.minimumSecondsForPace else { return }
+        paceWords += row.wordCount
+        paceSeconds += row.audioSeconds
+    }
+
+    func finish(buckets: [Date]) -> PeriodStats {
         var result = stats
-        if paceSeconds > 0 { result.averageWordsPerMinute = Double(paceWords) / (paceSeconds / 60) }
-        let typingMinutes = Double(stats.wordsTotal) / UsageStats.typingWordsPerMinute
-        result.minutesSaved = max(0, typingMinutes - allAudioSeconds / 60)
-        result.topApps = wordsByApp
-            .map { AppUsage(appName: $0.key, words: $0.value) }
-            .sorted { ($0.words, $1.appName) > ($1.words, $0.appName) }
-            .prefix(UsageStats.topAppCount)
-            .map { $0 }
-        result.currentStreak = currentStreak()
-        result.longestStreak = longestStreak()
-        result.dailyWords = (0..<UsageStats.seriesDays).compactMap { offset in
-            calendar.date(byAdding: .day, value: offset, to: seriesStart).map { DailyWords(day: $0, words: wordsByDay[$0] ?? 0) }
-        }
+        if paceSeconds > 0 { result.wordsPerMinute = Double(paceWords) / (paceSeconds / 60) }
+        result.buckets = buckets.map { WordBucket(start: $0, words: wordsByBucket[$0] ?? 0) }
         return result
-    }
-
-    private func currentStreak() -> Int {
-        guard var day = [today, calendar.date(byAdding: .day, value: -1, to: today)].compactMap({ $0 }).first(where: wordsByDay.keys.contains) else {
-            return 0
-        }
-        var streak = 0
-        while wordsByDay[day] != nil {
-            streak += 1
-            guard let previous = calendar.date(byAdding: .day, value: -1, to: day) else { break }
-            day = previous
-        }
-        return streak
-    }
-
-    private func longestStreak() -> Int {
-        var longest = 0
-        var run = 0
-        var previous: Date?
-        for day in wordsByDay.keys.sorted() {
-            if let previous, calendar.date(byAdding: .day, value: 1, to: previous) == day {
-                run += 1
-            } else {
-                run = 1
-            }
-            longest = max(longest, run)
-            previous = day
-        }
-        return longest
     }
 }

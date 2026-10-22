@@ -21,3 +21,9 @@ func makeTemporaryStorePath() -> String {
 func removeFile(atPath path: String) {
     try? FileManager.default.removeItem(atPath: path)
 }
+
+func utcStats(_ store: HistoryStore, at seconds: Double) throws -> UsageStats {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: "UTC")!
+    return try store.stats(now: Date(timeIntervalSince1970: seconds), calendar: calendar)
+}

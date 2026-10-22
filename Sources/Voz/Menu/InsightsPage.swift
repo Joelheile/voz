@@ -5,13 +5,14 @@ import VozCore
 struct InsightsPage: View {
     @ObservedObject var model: StatsModel
     let back: () -> Void
+    @State private var period = StatsPeriod.week
 
-    private var stats: UsageStats { model.stats }
+    private var stats: PeriodStats { model.stats[period] }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             PageBar(title: "Insights", back: back)
-            if stats.wordsTotal == 0 {
+            if model.stats[.all].words == 0 {
                 Text("Dictate something to see your stats.")
                     .font(.ui(13))
                     .foregroundStyle(Theme.inkSecondary)
@@ -22,112 +23,95 @@ struct InsightsPage: View {
     }
 
     private var content: some View {
-        CappedScrollView(maxHeight: 540) {
-            VStack(alignment: .leading, spacing: 20) {
-                summary
-                DailyChart(days: stats.dailyWords)
-                TopApps(apps: Array(stats.topApps.prefix(5)))
-                Text("Time saved assumes you type 40 words per minute.")
+        VStack(alignment: .leading, spacing: 16) {
+            Picker("Period", selection: $period) {
+                ForEach(StatsPeriod.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            VStack(alignment: .leading, spacing: 2) {
+                Text(stats.words.formatted())
+                    .font(.display(32))
+                    .foregroundStyle(Theme.ink)
+                    .contentTransition(.numericText())
+                Text(stats.words == 1 ? "word" : "words")
                     .font(.meta)
-                    .foregroundStyle(Theme.inkTertiary)
+                    .foregroundStyle(Theme.inkSecondary)
+            }
+            WordsChart(buckets: stats.buckets, period: period)
+            HStack(alignment: .top, spacing: 0) {
+                StatTile(value: stats.wordsPerMinute.map { Int($0.rounded()).formatted() } ?? "–", label: "words per minute")
+                StatTile(value: StatsFormat.duration(stats.speakingSeconds), label: "talking")
+                StatTile(value: stats.fixes.formatted(), label: "fillers removed")
             }
         }
+        .animation(Theme.Motion.section, value: period)
     }
+}
 
-    private var summary: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("\(stats.wordsThisWeek.formatted()) words this week")
+private struct StatTile: View {
+    let value: String
+    let label: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value)
                 .font(.ui(17, weight: .semibold))
                 .monospacedDigit()
                 .foregroundStyle(Theme.ink)
                 .contentTransition(.numericText())
-            Text(details.joined(separator: " "))
-                .font(.ui(13))
-                .lineSpacing(3)
+            Text(label)
+                .font(.meta)
                 .foregroundStyle(Theme.inkSecondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
-    }
-
-    private var details: [String] {
-        var sentences = ["\(stats.wordsToday.formatted()) today, \(stats.wordsTotal.formatted()) in total, about \(StatsFormat.minutes(stats.minutesSaved)) of typing saved."]
-        if let pace = stats.averageWordsPerMinute {
-            sentences.append("You speak at \(Int(pace.rounded())) words per minute.")
-        }
-        if stats.currentStreak > 0 {
-            sentences.append("You're on a \(stats.currentStreak)-day streak. Your best is \(StatsFormat.days(stats.longestStreak)).")
-        }
-        if stats.fillerWordsRemoved > 0 {
-            sentences.append("Voz removed \(stats.fillerWordsRemoved.formatted()) filler words.")
-        }
-        return sentences
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-private struct DailyChart: View {
-    let days: [DailyWords]
+private struct WordsChart: View {
+    let buckets: [WordBucket]
+    let period: StatsPeriod
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SectionLabel(text: "Last 30 days")
-            Chart(days) { day in
-                BarMark(x: .value("Day", day.day, unit: .day), y: .value("Words", day.words))
-                    .foregroundStyle(Theme.accent)
-                    .cornerRadius(2)
+        Chart(buckets) { bucket in
+            BarMark(x: .value("Time", bucket.start, unit: unit), y: .value("Words", bucket.words), width: .ratio(0.6))
+                .foregroundStyle(bucket.words > 0 ? Theme.accent : Theme.hairline)
+                .cornerRadius(2)
+        }
+        .chartXAxis {
+            AxisMarks(values: axisValues) { _ in
+                AxisValueLabel(format: axisFormat)
+                    .font(.ui(11))
+                    .foregroundStyle(Theme.inkTertiary)
             }
-            .chartXAxis {
-                AxisMarks(values: .stride(by: .day, count: 7)) { _ in
-                    AxisValueLabel(format: .dateTime.month(.abbreviated).day())
-                        .font(.ui(11))
-                        .foregroundStyle(Theme.inkTertiary)
-                }
-            }
-            .chartYAxis(.hidden)
-            .frame(height: 90)
+        }
+        .chartYAxis(.hidden)
+        .frame(height: 96)
+    }
+
+    private var unit: Calendar.Component {
+        switch period {
+        case .day: .hour
+        case .week, .month: .day
+        case .all: .month
         }
     }
-}
 
-private struct TopApps: View {
-    let apps: [AppUsage]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SectionLabel(text: "Top apps")
-            if apps.isEmpty {
-                Text("Apps you dictate into appear here.")
-                    .font(.meta)
-                    .foregroundStyle(Theme.inkSecondary)
-            }
-            ForEach(apps, id: \.appName) { app in
-                HStack(spacing: 10) {
-                    Text(app.appName)
-                        .font(.ui(13, weight: .medium))
-                        .foregroundStyle(Theme.ink)
-                        .frame(width: 90, alignment: .leading)
-                        .lineLimit(1)
-                    UsageBar(fraction: Double(app.words) / Double(max(apps.first?.words ?? 1, 1)))
-                    Text(app.words.formatted())
-                        .font(.ui(12))
-                        .monospacedDigit()
-                        .foregroundStyle(Theme.inkSecondary)
-                        .frame(width: 44, alignment: .trailing)
-                }
-            }
+    private var axisValues: AxisMarkValues {
+        switch period {
+        case .day: .stride(by: .hour, count: 6)
+        case .week: .stride(by: .day)
+        case .month: .stride(by: .day, count: 7)
+        case .all: .automatic(desiredCount: 4)
         }
     }
-}
 
-private struct UsageBar: View {
-    let fraction: Double
-
-    var body: some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .leading) {
-                Capsule().fill(Theme.hairline)
-                Capsule().fill(Theme.accent).frame(width: max(6, proxy.size.width * fraction))
-            }
+    private var axisFormat: Date.FormatStyle {
+        switch period {
+        case .day: .dateTime.hour()
+        case .week: .dateTime.weekday(.abbreviated)
+        case .month: .dateTime.month(.abbreviated).day()
+        case .all: .dateTime.month(.abbreviated)
         }
-        .frame(height: 6)
     }
 }

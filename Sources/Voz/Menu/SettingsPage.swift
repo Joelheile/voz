@@ -11,9 +11,17 @@ struct SettingsPage: View {
     @State private var microphone = Permissions.microphoneStatus
     @State private var accessibility = Permissions.accessibilityGranted
     @State private var inputMonitoring = Permissions.inputMonitoringGranted
+    @State private var systemAudio = Permissions.systemAudioGranted
+    @State private var tab = Tab.dictation
+
+    private enum Tab: String, CaseIterable {
+        case dictation = "Dictation"
+        case output = "Output"
+        case general = "General"
+    }
 
     private var allGranted: Bool {
-        microphone == .authorized && accessibility && inputMonitoring
+        microphone == .authorized && accessibility && inputMonitoring && (systemAudio || !settings.muteWhileRecording)
     }
 
     init(model: PopoverModel, settings: AppSettings, status: ModelStatus, vocabulary: VocabularyModel, catalog: ExtensionCatalog) {
@@ -28,12 +36,19 @@ struct SettingsPage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             PageBar(title: "Settings", back: model.goBack)
+            Picker("Section", selection: $tab) {
+                ForEach(Tab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
             CappedScrollView(maxHeight: 520) {
                 VStack(alignment: .leading, spacing: 16) {
-                    dictation
-                    output
                     if !allGranted { permissions }
-                    general
+                    switch tab {
+                    case .dictation: dictation
+                    case .output: output
+                    case .general: general
+                    }
                 }
             }
         }
@@ -44,13 +59,14 @@ struct SettingsPage: View {
                 microphone = Permissions.microphoneStatus
                 accessibility = Permissions.accessibilityGranted
                 inputMonitoring = Permissions.inputMonitoringGranted
+                systemAudio = Permissions.systemAudioGranted
                 try? await Task.sleep(for: .seconds(1))
             }
         }
     }
 
     private var dictation: some View {
-        PanelGroup(title: "Dictation") {
+        PanelGroup {
             PanelRow(title: "Shortcut", detail: capture.warning) {
                 Button(capture.isListening ? capture.preview?.displayName ?? "Press keys…" : settings.hotkey.displayName) {
                     capture.isListening ? capture.cancel() : capture.begin()
@@ -85,7 +101,7 @@ struct SettingsPage: View {
     }
 
     private var output: some View {
-        PanelGroup(title: "Output") {
+        PanelGroup {
             PanelRow(title: "Insert into app", detail: "Types at your cursor") {
                 Toggle("Insert into app", isOn: $settings.insertIntoApp).labelsHidden()
             }
@@ -117,11 +133,16 @@ struct SettingsPage: View {
                 Permissions.requestInputMonitoring()
                 Permissions.openSettings(.inputMonitoring)
             }
+            if settings.muteWhileRecording {
+                PermissionRow(title: "System Audio", granted: systemAudio) {
+                    Task { await Permissions.requestSystemAudio() }
+                }
+            }
         }
     }
 
     private var general: some View {
-        PanelGroup(title: "General") {
+        PanelGroup {
             PanelRow(title: "Launch at login") {
                 Toggle("Launch at login", isOn: $settings.launchAtLogin).labelsHidden()
             }

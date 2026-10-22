@@ -103,7 +103,7 @@ public final class HistoryStore: Sendable {
     private static func stats(in database: Database, now: Date, calendar: Calendar) throws -> UsageStats {
         var accumulator = StatsAccumulator(now: now, calendar: calendar)
         let rows = try TranscriptRecord
-            .select(Column("createdAt"), Column("wordCount"), Column("audioSeconds"), Column("appName"), Column("fillerWordsRemoved"))
+            .select(Column("createdAt"), Column("wordCount"), Column("audioSeconds"), Column("fillerWordsRemoved"))
             .asRequest(of: StatsRow.self)
             .fetchCursor(database)
         while let row = try rows.next() { accumulator.add(row) }

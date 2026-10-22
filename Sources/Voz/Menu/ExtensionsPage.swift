@@ -388,11 +388,13 @@ struct ExtensionsPage: View {
 
     private var yourOwn: some View {
         PanelGroup(title: "Your own") {
-            PanelRow(title: "Build one", detail: model.commandInstalled ? "Run voz new in Terminal" : nil) {
-                if model.commandInstalled {
-                    Button("Folder", action: model.openExtensionsFolder).buttonStyle(.pill(.quiet, height: 26))
-                } else {
-                    Button("Add voz to Terminal", action: model.installCommand).buttonStyle(.pill(.quiet, height: 26))
+            if model.commandInstalled {
+                PanelRow(title: "New extension", detail: "Run voz new in Terminal") {
+                    Button("Open folder", action: model.openExtensionsFolder).buttonStyle(.pill(.quiet, height: 26))
+                }
+            } else {
+                PanelRow(title: "New extension", detail: "Adds the voz command to Terminal") {
+                    Button("Install", action: model.installCommand).buttonStyle(.pill(.quiet, height: 26))
                 }
             }
         }

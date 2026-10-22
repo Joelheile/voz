@@ -1,5 +1,5 @@
 public struct LevelHistory: Sendable {
-    public static let capacity = 128
+    public static let capacity = 256
 
     private struct Sample: Sendable {
         let time: Double
@@ -28,5 +28,11 @@ public struct LevelHistory: Sendable {
         let newer = samples[after]
         let fraction = Float((time - older.time) / (newer.time - older.time))
         return older.level + (newer.level - older.level) * fraction
+    }
+
+    public func average(in window: ClosedRange<Double>) -> Float {
+        let levels = samples.filter { window.contains($0.time) }.map(\.level)
+        guard !levels.isEmpty else { return level(at: window.upperBound) }
+        return levels.reduce(0, +) / Float(levels.count)
     }
 }
