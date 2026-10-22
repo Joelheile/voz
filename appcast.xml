@@ -3,6 +3,17 @@
   <channel>
     <title>voz</title>
     <item>
+      <title>voz 0.0.4-beta.100008</title>
+      <description>&lt;ul&gt;&lt;li&gt;Simplify the extension API: read settings with voz.settings, log with console.log, and return { text: &amp;quot;&amp;quot; } to insert nothing&lt;/li&gt;&lt;/ul&gt;</description>
+      <link>https://github.com/Joelheile/voz/releases/tag/beta-100008</link>
+      <pubDate>Thu, 22 Oct 2026 22:42:36 GMT</pubDate>
+      <sparkle:version>100008</sparkle:version>
+      <sparkle:shortVersionString>0.0.4-beta.100008</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100008/voz-0.0.4-beta.100008.zip" length="8233132" sparkle:edSignature="3UmHX3CgQUgICUR5de3OblOV8bkW7/1jXWQAjDpXmNkKaAKCvbhIcBzljJ3F6R7WZSho7uiaPUSjY10gAM8zDA==" type="application/octet-stream" />
+    </item>
+    <item>
       <title>voz 0.0.4-beta.100007</title>
       <description>&lt;ul&gt;&lt;li&gt;Maintenance release&lt;/li&gt;&lt;/ul&gt;</description>
       <link>https://github.com/Joelheile/voz/releases/tag/beta-100007</link>
@@ -102,16 +113,6 @@
       <sparkle:shortVersionString>0.0.4</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <enclosure url="https://github.com/Joelheile/voz/releases/download/v0.0.4/voz-0.0.4.zip" length="6712990" sparkle:edSignature="L2yoyWjsZjNagQnjVckT5lr6/wJUl5hbJgd7Z9pUwp05CJZnDnBrdB5HzRbJ3l9x6/MQXLLhXfuoxORihds7CA==" type="application/octet-stream" />
-    </item>
-    <item>
-      <title>voz 0.0.3-beta.73</title>
-      <link>https://github.com/Joelheile/voz/releases/tag/beta-73</link>
-      <pubDate>Thu, 22 Oct 2026 09:20:04 GMT</pubDate>
-      <sparkle:version>73</sparkle:version>
-      <sparkle:shortVersionString>0.0.3-beta.73</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <sparkle:channel>beta</sparkle:channel>
-      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-73/voz-0.0.3-beta.73.zip" length="6712987" sparkle:edSignature="D+6ieHRfxzpsQ6v6JQaxqbaIu2yOT60Wi35pSc4ynpCNbfBvpUOxp+PUGjEHdk/YjSoVyhGxKawZ0/G+QzrMAw==" type="application/octet-stream" />
     </item>
     <item>
       <title>voz 0.0.3</title>
