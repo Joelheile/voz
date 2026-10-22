@@ -3,6 +3,17 @@
   <channel>
     <title>voz</title>
     <item>
+      <title>voz 0.0.4-beta.100007</title>
+      <description>&lt;ul&gt;&lt;li&gt;Maintenance release&lt;/li&gt;&lt;/ul&gt;</description>
+      <link>https://github.com/Joelheile/voz/releases/tag/beta-100007</link>
+      <pubDate>Thu, 22 Oct 2026 15:48:09 GMT</pubDate>
+      <sparkle:version>100007</sparkle:version>
+      <sparkle:shortVersionString>0.0.4-beta.100007</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100007/voz-0.0.4-beta.100007.zip" length="8222397" sparkle:edSignature="JAcDCc4kjryCAOhRjsOfY0F2wHEd0kf6z2itwc/jGmumJL1v0PxFcEtmQT/pW1SEUhI2Djd0HPbE3sQazSpHCQ==" type="application/octet-stream" />
+    </item>
+    <item>
       <title>voz 0.0.4-beta.100006</title>
       <description>&lt;ul&gt;&lt;li&gt;See your top apps, with their icons, in Insights&lt;/li&gt;&lt;li&gt;Updates install only while your Mac is idle&lt;/li&gt;&lt;li&gt;Setup runs again after a fresh install&lt;/li&gt;&lt;li&gt;See the time left while a speech model downloads&lt;/li&gt;&lt;li&gt;Calmer settings and a red dot while you record&lt;/li&gt;&lt;li&gt;Smoother transcript navigation and consistent menu icons&lt;/li&gt;&lt;li&gt;Moving Voz to the Trash quits it and removes its login item&lt;/li&gt;&lt;li&gt;Slow extensions and cleanup can no longer stall dictation or startup&lt;/li&gt;&lt;li&gt;Voz tells you when microphone access is denied&lt;/li&gt;&lt;li&gt;The app includes the licenses of its dependencies&lt;/li&gt;&lt;/ul&gt;</description>
       <link>https://github.com/Joelheile/voz/releases/tag/beta-100006</link>
@@ -110,16 +121,6 @@
       <sparkle:shortVersionString>0.0.3</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <enclosure url="https://github.com/Joelheile/voz/releases/download/v0.0.3/voz-0.0.3.zip" length="6707022" sparkle:edSignature="0znS2emnPJwfFe740ym3mC1SQoUDYBYk2728//Tfop+pObHSb+kiX/oEqKfFPhekay2SJYWXMoQVWAp8UrH5AQ==" type="application/octet-stream" />
-    </item>
-    <item>
-      <title>voz 0.0.2-beta.67</title>
-      <link>https://github.com/Joelheile/voz/releases/tag/beta-67</link>
-      <pubDate>Wed, 21 Oct 2026 23:09:11 GMT</pubDate>
-      <sparkle:version>67</sparkle:version>
-      <sparkle:shortVersionString>0.0.2-beta.67</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <sparkle:channel>beta</sparkle:channel>
-      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-67/voz-0.0.2-beta.67.zip" length="6707031" sparkle:edSignature="Y76Umm3s3mAe0nEGYat+FBS5oCtwr60m7qGvPjpXKCftRumeA/z7hcOp2merhijQyybuhut1uqhLUIS63Fw9CA==" type="application/octet-stream" />
     </item>
     <item>
       <title>voz 0.0.2</title>
