@@ -1,6 +1,5 @@
 import AppKit
 import SwiftUI
-import VozCore
 
 @MainActor
 final class IndicatorController {
@@ -169,5 +168,102 @@ final class IndicatorController {
         hosting.sizingOptions = []
         panel.contentView = hosting
         panel.setFrame(layout.panelFrame, display: true)
+    }
+}
+
+final class IndicatorPanel: NSPanel {
+    init() {
+        super.init(
+            contentRect: .zero,
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        isOpaque = false
+        backgroundColor = .clear
+        hasShadow = false
+        isFloatingPanel = true
+        ignoresMouseEvents = true
+        hidesOnDeactivate = false
+        isReleasedWhenClosed = false
+        level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 3)
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
+        animationBehavior = .none
+    }
+
+    override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
+}
+
+enum ScreenResolver {
+    @MainActor
+    static func targetScreen() -> NSScreen? {
+        screenOfFrontmostWindow() ?? screenUnderMouse() ?? NSScreen.main ?? NSScreen.screens.first
+    }
+
+    @MainActor
+    static func metrics(for screen: NSScreen) -> ScreenMetrics {
+        ScreenMetrics(
+            frame: screen.frame,
+            safeAreaTop: screen.safeAreaInsets.top,
+            leftAreaWidth: screen.auxiliaryTopLeftArea?.width,
+            rightAreaWidth: screen.auxiliaryTopRightArea?.width,
+            visibleMaxY: screen.visibleFrame.maxY
+        )
+    }
+
+    @MainActor
+    private static func screenOfFrontmostWindow() -> NSScreen? {
+        guard
+            let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier,
+            let primaryHeight = NSScreen.screens.first?.frame.height,
+            let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]
+        else { return nil }
+        for window in windows {
+            guard
+                window[kCGWindowOwnerPID as String] as? pid_t == pid,
+                window[kCGWindowLayer as String] as? Int == 0,
+                let boundsDictionary = window[kCGWindowBounds as String] as? NSDictionary,
+                let bounds = CGRect(dictionaryRepresentation: boundsDictionary)
+            else { continue }
+            let cocoaFrame = CGRect(x: bounds.minX, y: primaryHeight - bounds.maxY, width: bounds.width, height: bounds.height)
+            let screens = NSScreen.screens
+            if let index = ScreenChoice.index(containing: cocoaFrame, in: screens.map(\.frame)) {
+                return screens[index]
+            }
+        }
+        return nil
+    }
+
+    @MainActor
+    private static func screenUnderMouse() -> NSScreen? {
+        let location = NSEvent.mouseLocation
+        return NSScreen.screens.first { NSMouseInRect(location, $0.frame, false) }
+    }
+}
+
+@MainActor
+enum IndicatorDemo {
+    static let launchArgument = "--demo-indicator"
+
+    static func run(on indicator: IndicatorController) async {
+        try? await Task.sleep(for: .milliseconds(500))
+        let start = Date.now
+        indicator.levelSource = {
+            let seconds = Date.now.timeIntervalSince(start)
+            let envelope = 0.5 + 0.5 * sin(seconds * 2.3)
+            let syllables = abs(sin(seconds * 9.5))
+            return Float(min(1, envelope * syllables * 1.1))
+        }
+        indicator.showRecording()
+        try? await Task.sleep(for: .seconds(3.5))
+        indicator.showTranscribing()
+        try? await Task.sleep(for: .seconds(2))
+        indicator.showOutcome(.done)
+        try? await Task.sleep(for: .seconds(1.8))
+        indicator.showRecording()
+        try? await Task.sleep(for: .seconds(1.2))
+        indicator.showOutcome(.failed)
+        try? await Task.sleep(for: .seconds(1.8))
     }
 }

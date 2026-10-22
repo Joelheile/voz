@@ -1,5 +1,4 @@
 import SwiftUI
-import VozCore
 
 struct ModelOption: Hashable {
     let id: String

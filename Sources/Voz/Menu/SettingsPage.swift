@@ -1,5 +1,4 @@
 import SwiftUI
-import VozCore
 
 struct SettingsPage: View {
     @ObservedObject var model: PopoverModel

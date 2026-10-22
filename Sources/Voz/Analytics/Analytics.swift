@@ -1,6 +1,5 @@
 import Foundation
 import PostHog
-import VozCore
 
 @MainActor
 final class Analytics {
@@ -104,5 +103,42 @@ final class Analytics {
         case let .flag(flag): flag
         case let .text(text): text
         }
+    }
+}
+
+struct InstallID {
+    static let usage = "installId"
+    static let versionPing = "versionPingId"
+
+    let value: UUID
+    let isNew: Bool
+
+    init(key: String, defaults: UserDefaults = .standard) {
+        if let stored = defaults.string(forKey: key).flatMap(UUID.init) {
+            value = stored
+            isNew = false
+        } else {
+            value = UUID()
+            isNew = true
+            defaults.set(value.uuidString, forKey: key)
+        }
+    }
+}
+
+enum SystemContext {
+    static let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+
+    static let properties: [String: String] = [
+        "app_version": appVersion,
+        "os_version": ProcessInfo.processInfo.operatingSystemVersionString,
+        "chip": chip,
+    ]
+
+    private static var chip: String {
+        var size = 0
+        guard sysctlbyname("machdep.cpu.brand_string", nil, &size, nil, 0) == 0 else { return "unknown" }
+        var buffer = [UInt8](repeating: 0, count: size)
+        guard sysctlbyname("machdep.cpu.brand_string", &buffer, &size, nil, 0) == 0 else { return "unknown" }
+        return String(decoding: buffer.prefix { $0 != 0 }, as: UTF8.self)
     }
 }

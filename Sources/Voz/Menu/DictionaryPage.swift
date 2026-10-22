@@ -1,5 +1,4 @@
 import SwiftUI
-import VozCore
 
 struct DictionaryPage: View {
     @ObservedObject var model: VocabularyModel

@@ -1,5 +1,4 @@
 import Foundation
-import VozCore
 
 struct CleanedText: Equatable {
     let text: String

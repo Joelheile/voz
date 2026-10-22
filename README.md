@@ -84,8 +84,11 @@ You need the Command Line Tools, not Xcode:
 
 ```
 scripts/test.sh          # run the tests
+scripts/run.sh           # build a debug app and launch it
 scripts/make-app.sh      # build and sign build/voz.app
 ```
+
+The app is one Swift package target, `Sources/Voz`, with a folder per feature. `AGENTS.md` has the code map.
 
 Pushes to `main` publish a beta and `vX.Y.Z` tags publish a stable release. Keep the signing identity and Sparkle key unchanged and build numbers increasing. To pull a bad update, remove it from `appcast.xml`, then publish a fix.
 

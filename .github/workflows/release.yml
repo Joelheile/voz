@@ -1,11 +1,12 @@
 name: Release
 
 on:
-  workflow_call:
-    inputs:
-      channel:
-        type: string
-        required: true
+  push:
+    branches: [main]
+    tags: ["v*"]
+    paths-ignore:
+      - appcast.xml
+      - "**.md"
 
 permissions:
   contents: write
@@ -22,7 +23,7 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
       KEYCHAIN_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}-keychain
       GH_TOKEN: ${{ github.token }}
-      CHANNEL: ${{ inputs.channel }}
+      CHANNEL: ${{ github.ref_type == 'tag' && 'stable' || 'beta' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -126,7 +127,7 @@ jobs:
           git push origin HEAD:main
 
       - name: Prune old beta releases
-        if: inputs.channel == 'beta'
+        if: github.ref_type != 'tag'
         run: |
           gh release list --limit 100 --json tagName,isPrerelease \
             --jq '[.[] | select(.isPrerelease and (.tagName | startswith("beta-")))] | .[10:] | .[].tagName' |

@@ -1,6 +1,5 @@
 import AppKit
 import SwiftUI
-import VozCore
 
 @MainActor
 enum DesignRender {

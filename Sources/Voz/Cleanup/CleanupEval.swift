@@ -1,5 +1,4 @@
 import Foundation
-import VozCore
 
 struct CleanupEvalCase: Decodable {
     let id: Int

@@ -16,7 +16,7 @@ case "$CONFIGURATION" in
 esac
 BUILD_FLAGS=(-c "$CONFIGURATION")
 if [[ "$CONFIGURATION" == release ]]; then
-    BUILD_FLAGS+=(-Xswiftc -Osize)
+    BUILD_FLAGS+=(-Xswiftc -Osize -Xswiftc -enable-testing)
 fi
 
 swift build --build-tests "${BUILD_FLAGS[@]}"

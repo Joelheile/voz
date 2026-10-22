@@ -1,5 +1,5 @@
+import Observation
 import SwiftUI
-import VozCore
 
 enum IndicatorMotion {
     static let open = Animation.spring(duration: 0.22, bounce: 0.15)
@@ -182,5 +182,66 @@ struct IndicatorView: View {
         revealed(anchor: anchor, delay: delay, content: content)
         .frame(width: IndicatorLayout.sideWidth - notchShape.topRadius)
         .frame(width: IndicatorLayout.sideWidth, alignment: alignment)
+    }
+}
+
+enum IndicatorState: Equatable {
+    case recording
+    case transcribing
+    case done
+    case discarded
+    case failed
+}
+
+@MainActor
+@Observable
+final class IndicatorModel {
+    var state = IndicatorState.recording
+    var isExpanded = false
+    var shakeCount = 0
+    var recordingStart = Date.now
+    var recordingEnd: Date?
+    @ObservationIgnored var levels = LevelHistory()
+}
+
+struct IndicatorLeading: View {
+    let model: IndicatorModel
+
+    var body: some View {
+        Text(
+            timerInterval: model.recordingStart...model.recordingStart.addingTimeInterval(3600),
+            pauseTime: model.recordingEnd,
+            countsDown: false,
+            showsHours: false
+        )
+        .font(.ui(12, weight: .medium))
+        .monospacedDigit()
+        .foregroundStyle(.primary.opacity(model.state == .recording ? 0.9 : 0.4))
+        .animation(.easeOut(duration: 0.2), value: model.state)
+    }
+}
+
+struct IndicatorTrailing: View {
+    let model: IndicatorModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        ZStack {
+            switch model.state {
+            case .recording, .discarded:
+                LevelBars(model: model).transition(swap)
+            case .transcribing:
+                ProgressDots().transition(swap)
+            case .done:
+                ResultSymbol(name: "checkmark", color: .primary, effect: .drawOn).transition(swap)
+            case .failed:
+                ResultSymbol(name: "exclamationmark", color: .orange, effect: .bounce).transition(swap)
+            }
+        }
+        .animation(reduceMotion ? IndicatorMotion.reducedMotion : IndicatorMotion.stateSwap, value: model.state)
+    }
+
+    private var swap: AnyTransition {
+        reduceMotion ? .opacity : AnyTransition(.blurReplace)
     }
 }

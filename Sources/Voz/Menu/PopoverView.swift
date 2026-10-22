@@ -1,5 +1,4 @@
 import SwiftUI
-import VozCore
 
 struct PopoverSources {
     let settings: AppSettings

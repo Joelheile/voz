@@ -1,5 +1,4 @@
 import SwiftUI
-import VozCore
 
 struct SetupPage: View {
     @ObservedObject var model: SetupModel

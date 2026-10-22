@@ -1,0 +1,289 @@
+import Foundation
+
+struct HostApp: Codable, Equatable, Sendable {
+    let bundleID: String?
+    let name: String?
+}
+
+struct HostManifest: Decodable, Equatable, Sendable {
+    let extensions: [String]
+    let events: [String]
+    let commands: [ExtensionCommand]
+    let speechModels: [HostComponent]
+    let cleanupModels: [HostComponent]
+    let cleanupSteps: [HostComponent]
+    let actions: [ExtensionAction]
+    let settings: [ExtensionSettings]
+    let errors: [LoadError]
+
+    func subscribes(to hook: HostHook) -> Bool {
+        events.contains(hook.rawValue)
+    }
+}
+
+struct HostComponent: Decodable, Equatable, Hashable, Sendable {
+    let id: String
+    let name: String
+}
+
+struct ExtensionCommand: Decodable, Equatable, Hashable, Sendable {
+    let `extension`: String
+    let phrase: String
+}
+
+struct ExtensionAction: Decodable, Equatable, Hashable, Sendable {
+    let id: String
+    let name: String
+    let hotkey: String?
+    let `extension`: String
+}
+
+struct ExtensionSettings: Decodable, Equatable, Sendable {
+    let `extension`: String
+    let fields: [SettingField]
+}
+
+struct SettingField: Decodable, Equatable, Sendable {
+    enum Kind: String, Decodable, Sendable {
+        case string, number, boolean
+    }
+
+    let key: String
+    let type: Kind
+    let title: String
+    let description: String?
+    let `default`: SettingValue
+    let options: [String]?
+    let secret: Bool?
+    let required: Bool?
+
+    func needsValue(in config: [String: SettingValue]) -> Bool {
+        required == true && value(in: config) == .string("")
+    }
+
+    func value(in config: [String: SettingValue]) -> SettingValue {
+        guard let value = config[key], value.kind == type else { return self.default }
+        if case .string(let string) = value, let options, !options.contains(string) { return self.default }
+        return value
+    }
+}
+
+enum SettingValue: Codable, Equatable, Sendable {
+    case string(String)
+    case number(Double)
+    case boolean(Bool)
+
+    var kind: SettingField.Kind {
+        switch self {
+        case .string: .string
+        case .number: .number
+        case .boolean: .boolean
+        }
+    }
+
+    var text: String {
+        switch self {
+        case .string(let value): value
+        case .number(let value): value == value.rounded() && abs(value) < 1e15 ? String(Int(value)) : String(value)
+        case .boolean(let value): String(value)
+        }
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let value = try? container.decode(Bool.self) {
+            self = .boolean(value)
+        } else if let value = try? container.decode(Double.self) {
+            self = .number(value)
+        } else {
+            self = .string(try container.decode(String.self))
+        }
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .string(let value): try container.encode(value)
+        case .number(let value): try container.encode(value)
+        case .boolean(let value): try container.encode(value)
+        }
+    }
+}
+
+enum HostHook: String, Sendable {
+    case beforeInsert
+    case beforeCleanup
+    case recording
+    case afterInsert
+}
+
+struct LoadError: Decodable, Equatable, Sendable {
+    let `extension`: String
+    let message: String
+}
+
+enum HostEvent: Encodable, Sendable {
+    case recording(path: String, seconds: Double)
+    case afterInsert(text: String, raw: String)
+
+    var hook: HostHook {
+        switch self {
+        case .recording: .recording
+        case .afterInsert: .afterInsert
+        }
+    }
+
+    private enum Keys: String, CodingKey { case path, seconds, text, raw }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: Keys.self)
+        switch self {
+        case .recording(let path, let seconds):
+            try container.encode(path, forKey: .path)
+            try container.encode(seconds, forKey: .seconds)
+        case .afterInsert(let text, let raw):
+            try container.encode(text, forKey: .text)
+            try container.encode(raw, forKey: .raw)
+        }
+    }
+}
+
+enum HostAction: Equatable, Sendable {
+    case insert(String)
+    case press(String)
+    case notify(String)
+}
+
+struct HostLaunchArguments: Encodable {
+    let home: String
+    let settings: String
+    let extensionsDirectory: String
+    let packages: [String]
+}
+
+struct HostRequest<Params: Encodable>: Encodable {
+    let id: Int
+    let method: String
+    let params: Params
+}
+
+struct InsertParams: Encodable {
+    let text: String
+    let raw: String
+    let app: HostApp
+}
+
+struct PromptParams: Codable {
+    let prompt: String
+}
+
+struct CleanupParams: Encodable {
+    let prompt: String
+    let app: HostApp
+}
+
+struct TranscribeParams: Encodable {
+    let model: String
+    let path: String
+    let seconds: Double
+    let app: HostApp
+}
+
+struct CleanParams: Encodable {
+    let model: String
+    let text: String
+    let prompt: String
+    let app: HostApp
+}
+
+struct StepParams: Encodable {
+    let step: String
+    let text: String
+    let app: HostApp
+}
+
+struct ActionParams: Encodable {
+    let action: String
+    let app: HostApp
+}
+
+struct CommandParams: Encodable {
+    let phrase: String
+    let text: String
+    let app: HostApp
+}
+
+struct HostEnvelope: Decodable {
+    let id: Int?
+    let method: String?
+}
+
+struct HostNotification<Params: Decodable>: Decodable {
+    let params: Params
+}
+
+struct HostResponse<Result: Decodable>: Decodable {
+    let result: Result?
+    let error: String?
+}
+
+struct TextParams: Decodable {
+    let text: String
+}
+
+struct PressParams: Decodable {
+    let key: String
+}
+
+struct TextResult: Decodable {
+    let text: String
+}
+
+struct EmptyParams: Codable {}
+
+struct EmitParams: Encodable {
+    let event: String
+    let payload: HostEvent
+    let app: HostApp
+}
+
+struct CommandResult: Decodable {
+    let handled: Bool
+}
+
+struct VoiceCommandMatch: Equatable, Sendable {
+    let phrase: String
+    let leadingText: String
+}
+
+enum VoiceCommands {
+    static func match(_ text: String, phrases: [String]) -> VoiceCommandMatch? {
+        let words = wordRanges(in: text)
+        let candidates = phrases
+            .map { (phrase: $0, words: WordTokens.alphanumeric($0)) }
+            .filter { !$0.words.isEmpty && $0.words.count <= words.count }
+            .sorted { $0.words.count > $1.words.count }
+        for candidate in candidates {
+            let tail = words.suffix(candidate.words.count)
+            guard tail.map({ text[$0].lowercased() }) == candidate.words, let first = tail.first else { continue }
+            let leading = text[..<first.lowerBound].trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: ",;:")))
+            return VoiceCommandMatch(phrase: candidate.phrase, leadingText: leading)
+        }
+        return nil
+    }
+
+    private static func wordRanges(in text: String) -> [Range<String.Index>] {
+        var ranges: [Range<String.Index>] = []
+        var start: String.Index?
+        for index in text.indices {
+            let isWordCharacter = text[index].isLetter || text[index].isNumber
+            if isWordCharacter, start == nil { start = index }
+            if !isWordCharacter, let wordStart = start {
+                ranges.append(wordStart..<index)
+                start = nil
+            }
+        }
+        if let start { ranges.append(start..<text.endIndex) }
+        return ranges
+    }
+}

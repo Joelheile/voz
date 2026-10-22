@@ -16,22 +16,18 @@ let package = Package(
         .package(url: "https://github.com/sparkle-project/Sparkle.git", from: "2.10.0"),
     ],
     targets: [
-        .target(
-            name: "VozCore",
-            dependencies: [.product(name: "GRDB", package: "GRDB.swift")]
-        ),
         .executableTarget(
             name: "Voz",
             dependencies: [
-                "VozCore",
                 .product(name: "FluidAudio", package: "FluidAudio"),
+                .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "PostHog", package: "posthog-ios"),
                 .product(name: "Sparkle", package: "Sparkle"),
             ]
         ),
         .testTarget(
-            name: "VozCoreTests",
-            dependencies: ["VozCore"],
+            name: "VozTests",
+            dependencies: ["Voz"],
             swiftSettings: [.unsafeFlags(["-F", testingFrameworkPath])],
             linkerSettings: [.unsafeFlags(["-F", testingFrameworkPath, "-Xlinker", "-rpath", "-Xlinker", testingFrameworkPath])]
         ),

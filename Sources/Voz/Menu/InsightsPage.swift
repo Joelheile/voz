@@ -1,7 +1,7 @@
 import Charts
+import Combine
 import SwiftUI
 import UniformTypeIdentifiers
-import VozCore
 
 struct InsightsPage: View {
     @ObservedObject var model: StatsModel
@@ -150,5 +150,33 @@ private struct WordsChart: View {
         case .month: .dateTime.month(.abbreviated).day()
         case .all: .dateTime.month(.abbreviated)
         }
+    }
+}
+
+@MainActor
+final class StatsModel: ObservableObject {
+    @Published private(set) var stats = UsageStats()
+
+    private var subscription: AnyCancellable?
+
+    init(store: HistoryStore) {
+        subscription = store.observeStats().receive(on: DispatchQueue.main).sink(
+            receiveCompletion: { completion in
+                if case let .failure(error) = completion {
+                    Log.app.error("Stats observation failed: \(error.localizedDescription, privacy: .private)")
+                }
+            },
+            receiveValue: { [weak self] in self?.stats = $0 }
+        )
+    }
+}
+
+enum StatsFormat {
+    static func duration(_ seconds: Double) -> String {
+        let total = Int(seconds.rounded())
+        guard total >= 60 else { return "\(total)s" }
+        let minutes = total / 60
+        guard minutes >= 60 else { return "\(minutes)m" }
+        return "\(minutes / 60)h \(minutes % 60)m"
     }
 }
