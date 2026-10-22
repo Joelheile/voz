@@ -2,6 +2,7 @@ public enum PermissionName: String, Sendable {
     case microphone
     case accessibility
     case inputMonitoring = "input_monitoring"
+    case systemAudio = "system_audio"
 }
 
 public enum DictationStage: String, Sendable {

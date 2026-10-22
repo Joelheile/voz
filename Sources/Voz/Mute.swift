@@ -1,94 +1,83 @@
 import CoreAudio
 import Foundation
 
-@MainActor
-final class OutputMuter {
-    private static let mutedByVozKey = "mutedByVoz"
-
-    private let defaults = UserDefaults.standard
-
-    func restoreLeftoverMute() {
-        guard defaults.bool(forKey: Self.mutedByVozKey) else { return }
-        Log.app.notice("Found mute left by a previous run, unmuting")
-        guard let device = defaultOutputDevice() else { return }
-        if setMuted(false, on: device) {
-            defaults.removeObject(forKey: Self.mutedByVozKey)
-        }
-    }
+final class OutputMuter: @unchecked Sendable {
+    private let queue = DispatchQueue(label: "com.joelheile.voz.mute")
+    private var tap = AudioObjectID(kAudioObjectUnknown)
+    private var device = AudioObjectID(kAudioObjectUnknown)
+    private var ioProc: AudioDeviceIOProcID?
 
     func mute() {
-        guard let device = defaultOutputDevice() else { return }
-        guard let wasMuted = isMuted(device) else {
-            Log.app.warning("Default output device has no mute control, skipping mute")
-            return
-        }
-        guard !wasMuted else { return }
-        defaults.set(true, forKey: Self.mutedByVozKey)
-        if !setMuted(true, on: device) {
-            defaults.removeObject(forKey: Self.mutedByVozKey)
+        queue.async { self.startMuting() }
+    }
+
+    func unmute() {
+        queue.async { self.stopMuting() }
+    }
+
+    private func startMuting() {
+        guard tap == kAudioObjectUnknown else { return }
+        let started = ContinuousClock.now
+        do {
+            try startMutingTap()
+            Log.app.notice("Muted other apps in \((ContinuousClock.now - started).wholeMilliseconds) ms")
+        } catch {
+            Log.app.error("Mute failed: \(error.localizedDescription, privacy: .public)")
+            stopMuting()
         }
     }
 
-    func unmuteIfMutedByVoz() {
-        guard defaults.bool(forKey: Self.mutedByVozKey) else { return }
-        guard let device = defaultOutputDevice() else { return }
-        if setMuted(false, on: device) {
-            defaults.removeObject(forKey: Self.mutedByVozKey)
-        } else {
-            Log.app.error("Unmute did not read back, keeping mutedByVoz flag")
+    private func stopMuting() {
+        if let ioProc {
+            AudioDeviceStop(device, ioProc)
+            AudioDeviceDestroyIOProcID(device, ioProc)
         }
+        ioProc = nil
+        if device != kAudioObjectUnknown { AudioHardwareDestroyAggregateDevice(device) }
+        device = AudioObjectID(kAudioObjectUnknown)
+        if tap != kAudioObjectUnknown { AudioHardwareDestroyProcessTap(tap) }
+        tap = AudioObjectID(kAudioObjectUnknown)
     }
 
-    private func defaultOutputDevice() -> AudioDeviceID? {
+    private func startMutingTap() throws {
+        let description = CATapDescription(stereoGlobalTapButExcludeProcesses: Self.ownProcessObject.map { [$0] } ?? [])
+        description.muteBehavior = .muted
+        description.isPrivate = true
+        try check(AudioHardwareCreateProcessTap(description, &tap), "create tap")
+        let aggregate: [String: Any] = [
+            kAudioAggregateDeviceNameKey: "Voz mute",
+            kAudioAggregateDeviceUIDKey: UUID().uuidString,
+            kAudioAggregateDeviceIsPrivateKey: true,
+            kAudioAggregateDeviceTapAutoStartKey: true,
+            kAudioAggregateDeviceTapListKey: [[kAudioSubTapUIDKey: description.uuid.uuidString]],
+        ]
+        try check(AudioHardwareCreateAggregateDevice(aggregate as CFDictionary, &device), "create aggregate device")
+        try check(AudioDeviceCreateIOProcIDWithBlock(&ioProc, device, nil) { _, _, _, _, _ in }, "create IO proc")
+        try check(AudioDeviceStart(device, ioProc), "start IO")
+    }
+
+    private func check(_ status: OSStatus, _ step: String) throws {
+        guard status == noErr else { throw MuteError(step: step, status: status) }
+    }
+
+    private static var ownProcessObject: AudioObjectID? {
         var address = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mSelector: kAudioHardwarePropertyTranslatePIDToProcessObject,
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
-        var device = AudioDeviceID(kAudioObjectUnknown)
-        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
-        let status = AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &device)
-        guard status == noErr, device != kAudioObjectUnknown else {
-            Log.app.error("Default output device lookup failed: \(status)")
-            return nil
-        }
-        return device
+        var pid = getpid()
+        var object = AudioObjectID(kAudioObjectUnknown)
+        var size = UInt32(MemoryLayout<AudioObjectID>.size)
+        let status = AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, UInt32(MemoryLayout<pid_t>.size), &pid, &size, &object)
+        guard status == noErr, object != kAudioObjectUnknown else { return nil }
+        return object
     }
+}
 
-    private var muteAddress: AudioObjectPropertyAddress {
-        AudioObjectPropertyAddress(
-            mSelector: kAudioDevicePropertyMute,
-            mScope: kAudioDevicePropertyScopeOutput,
-            mElement: kAudioObjectPropertyElementMain
-        )
-    }
+private struct MuteError: LocalizedError {
+    let step: String
+    let status: OSStatus
 
-    private func isMuted(_ device: AudioDeviceID) -> Bool? {
-        var address = muteAddress
-        guard AudioObjectHasProperty(device, &address) else { return nil }
-        var value: UInt32 = 0
-        var size = UInt32(MemoryLayout<UInt32>.size)
-        let status = AudioObjectGetPropertyData(device, &address, 0, nil, &size, &value)
-        guard status == noErr else {
-            Log.app.error("Mute read failed: \(status)")
-            return nil
-        }
-        return value != 0
-    }
-
-    private func setMuted(_ muted: Bool, on device: AudioDeviceID) -> Bool {
-        var address = muteAddress
-        var value: UInt32 = muted ? 1 : 0
-        let status = AudioObjectSetPropertyData(device, &address, 0, nil, UInt32(MemoryLayout<UInt32>.size), &value)
-        guard status == noErr else {
-            Log.app.error("Mute write failed: \(status)")
-            return false
-        }
-        let readBack = isMuted(device)
-        guard readBack == muted else {
-            Log.app.error("Mute read back \(String(describing: readBack)), expected \(muted)")
-            return false
-        }
-        return true
-    }
+    var errorDescription: String? { "\(step) returned \(status)" }
 }

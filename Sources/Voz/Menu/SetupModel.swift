@@ -26,6 +26,7 @@ final class SetupModel: ObservableObject {
     @Published private(set) var microphoneStatus = Permissions.microphoneStatus
     @Published private(set) var accessibilityGranted = Permissions.accessibilityGranted
     @Published private(set) var inputMonitoringGranted = Permissions.inputMonitoringGranted
+    @Published private(set) var systemAudioGranted = Permissions.systemAudioGranted
 
     private let analytics: Analytics
     private let prepareModel: () -> Void
@@ -43,6 +44,7 @@ final class SetupModel: ObservableObject {
         microphoneStatus = Permissions.microphoneStatus
         accessibilityGranted = Permissions.accessibilityGranted
         inputMonitoringGranted = Permissions.inputMonitoringGranted
+        systemAudioGranted = Permissions.systemAudioGranted
     }
 
     func requestMicrophone() {
@@ -65,11 +67,19 @@ final class SetupModel: ObservableObject {
         Permissions.openSettings(.inputMonitoring)
     }
 
+    func requestSystemAudio() {
+        Task {
+            await Permissions.requestSystemAudio()
+            refreshPermissions()
+        }
+    }
+
     func reportCompletion() {
         refreshPermissions()
         analytics.capture(.permissionResult(permission: .microphone, granted: microphoneGranted))
         analytics.capture(.permissionResult(permission: .accessibility, granted: accessibilityGranted))
         analytics.capture(.permissionResult(permission: .inputMonitoring, granted: inputMonitoringGranted))
+        analytics.capture(.permissionResult(permission: .systemAudio, granted: systemAudioGranted))
         analytics.capture(.setupCompleted(allPermissionsGranted: allGranted, triedDictation: triedDictation))
     }
 

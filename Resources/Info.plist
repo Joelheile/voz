@@ -49,5 +49,7 @@
     <integer>86400</integer>
     <key>NSMicrophoneUsageDescription</key>
     <string>Voz records your voice while you dictate and transcribes it on this Mac.</string>
+    <key>NSAudioCaptureUsageDescription</key>
+    <string>Voz silences other apps while you dictate. It does not record or keep their audio.</string>
 </dict>
 </plist>

@@ -62,10 +62,6 @@ final class Dictation {
         recorder.prepare()
     }
 
-    func recoverFromPreviousRun() {
-        muter.restoreLeftoverMute()
-    }
-
     func handle(_ action: HotkeyAction) {
         switch (action, phase) {
         case (.toggle, .idle): start(trigger: .tap)
@@ -129,7 +125,7 @@ final class Dictation {
     private func stopAndTranscribe() {
         let released = ContinuousClock.now
         let samples = recorder.stop()
-        muter.unmuteIfMutedByVoz()
+        muter.unmute()
         if settings.soundCues { SoundCues.play(.stop) }
         guard let session = streaming else {
             Log.app.error("Recording stopped without a streaming session")

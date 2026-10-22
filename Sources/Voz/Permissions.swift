@@ -27,9 +27,19 @@ enum Permissions {
         CGRequestListenEventAccess()
     }
 
+    static var systemAudioGranted: Bool { SystemAudioAccess.preflight() == 0 }
+
+    static func requestSystemAudio() async {
+        guard !systemAudioGranted else { return }
+        let granted = await SystemAudioAccess.request()
+        Log.app.notice("System audio access granted: \(granted)")
+        if !granted { openSettings(.systemAudio) }
+    }
+
     enum PrivacyPane: String {
         case microphone = "Privacy_Microphone"
         case inputMonitoring = "Privacy_ListenEvent"
+        case systemAudio = "Privacy_ScreenCapture"
     }
 
     static func openSettings(_ pane: PrivacyPane) {

@@ -129,6 +129,7 @@ private struct AccessStep: View {
                 PermissionRow(title: "Microphone", detail: "To hear your voice", granted: model.microphoneGranted, fix: model.requestMicrophone)
                 PermissionRow(title: "Accessibility", detail: "To type at your cursor", granted: model.accessibilityGranted, fix: model.requestAccessibility)
                 PermissionRow(title: "Input Monitoring", detail: "To catch your shortcut", granted: model.inputMonitoringGranted, fix: model.requestInputMonitoring)
+                PermissionRow(title: "System Audio", detail: "To mute music while you talk", granted: model.systemAudioGranted, fix: model.requestSystemAudio)
             }
             .controlSize(.small)
         }

@@ -45,7 +45,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var updater = Updater(settings: settings, isBusy: { [weak self] in self?.dictation.phase != .idle })
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        dictation.recoverFromPreviousRun()
         extensions.start()
         let statusItemController = StatusItemController(
             dictation: dictation,
