@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 @testable import Voz
 
 func makeRecord(_ text: String, at seconds: Double = 0) -> TranscriptRecord {
@@ -136,4 +137,30 @@ struct PingPayload: Decodable {
         case distinctID = "distinct_id"
     }
     let properties: Properties
+}
+
+private enum StatsTestError: Error { case updateTimedOut }
+
+@MainActor
+func waitForStats(_ model: StatsModel, until matches: (UsageStats) -> Bool) async throws {
+    let deadline = ContinuousClock.now + .seconds(3)
+    while !matches(model.stats) {
+        guard ContinuousClock.now < deadline else { throw StatsTestError.updateTimedOut }
+        try await Task.sleep(for: .milliseconds(10))
+    }
+}
+
+func settleStats() async throws {
+    try await Task.sleep(for: .milliseconds(100))
+}
+
+final class StatsTestClock: Sendable {
+    private let date = Mutex(Calendar.current.startOfDay(for: Date()).addingTimeInterval(43_200))
+    var timestamp: Double { now().timeIntervalSince1970 }
+    func now() -> Date { date.withLock { $0 } }
+    func nextDay() { date.withLock { $0 = Calendar.current.date(byAdding: .day, value: 1, to: $0)! } }
+}
+
+func notifyStatsDayChanged() {
+    NotificationCenter.default.post(name: .NSCalendarDayChanged, object: nil)
 }

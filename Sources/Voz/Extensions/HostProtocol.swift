@@ -1,8 +1,14 @@
-import Foundation
+import AppKit
 
 struct HostApp: Codable, Equatable, Sendable {
     let bundleID: String?
     let name: String?
+
+    @MainActor
+    static var current: HostApp {
+        let app = NSWorkspace.shared.frontmostApplication
+        return HostApp(bundleID: app?.bundleIdentifier, name: app?.localizedName)
+    }
 }
 
 struct HostManifest: Decodable, Equatable, Sendable {
