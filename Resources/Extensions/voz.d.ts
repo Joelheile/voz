@@ -1,6 +1,6 @@
 export type App = { bundleID?: string; name?: string };
 
-export type Paths = { home: string; data: string };
+export type Paths = { data: string };
 
 export type Context = {
   app: App;
@@ -12,7 +12,7 @@ export type Context = {
 export type BeforeCleanupEvent = { prompt: string };
 export type BeforeCleanupResult = { prompt: string } | void;
 export type BeforeInsertEvent = { text: string; raw: string };
-export type BeforeInsertResult = { text: string } | { handled: true } | void;
+export type BeforeInsertResult = { text: string } | void;
 export type CommandEvent = { text: string };
 export type RecordingEvent = { path: string; seconds: number };
 export type AfterInsertEvent = { text: string; raw: string };
@@ -63,16 +63,9 @@ export type SettingsValues<Schema extends SettingsSchema> = {
 
 type Awaitable<T> = T | Promise<T>;
 
-export type EventBus = {
-  on<T>(name: string, handler: (data: T) => void): void;
-  emit<T>(name: string, data: T): void;
-};
-
 export type ExtensionAPI = {
   name: string;
-  config: Record<string, string | number | boolean>;
   paths: Paths;
-  events: EventBus;
   on(
     event: "beforeCleanup",
     handler: (
@@ -104,7 +97,6 @@ export type ExtensionAPI = {
   registerCleanupStep(step: CleanupStep): void;
   registerAction(action: Action): void;
   settings<Schema extends SettingsSchema>(schema: Schema): SettingsValues<Schema>;
-  log(message: string): void;
 };
 
 export type Extension = (voz: ExtensionAPI) => Awaitable<void>;

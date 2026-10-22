@@ -22,7 +22,7 @@ struct ExtensionHostTests {
     @Test func textHandlersChainInLoadOrderWithAppAndConfig() async throws {
         try writeFile(#"{"config":{"b-tag":{"suffix":" #voz"}}}"#, named: "settings.json", in: home.root)
         try extensionFile("a-upper.ts", #"export default (voz) => { voz.on("beforeInsert", (e) => ({ text: e.text.toUpperCase() })); voz.on("beforeCleanup", (e, ctx) => ctx.app.name === "Slack" ? { prompt: e.prompt + " Casual." } : undefined) }"#)
-        try extensionFile("b-tag.ts", #"export default (voz) => { voz.on("beforeInsert", (e, ctx) => ({ text: `${e.text} [${ctx.app.name}]${voz.config.suffix}` })); voz.on("beforeCleanup", (e) => ({ prompt: e.prompt + " Short." })) }"#)
+        try extensionFile("b-tag.ts", #"export default (voz) => { const { suffix } = voz.settings({ suffix: { type: "string", title: "Suffix", default: "" } }); voz.on("beforeInsert", (e, ctx) => ({ text: `${e.text} [${ctx.app.name}]${suffix}` })); voz.on("beforeCleanup", (e) => ({ prompt: e.prompt + " Short." })) }"#)
         let host = makeHost()
         let manifest = try await host.start()
         #expect(manifest.extensions == ["a-upper", "b-tag"])
@@ -32,8 +32,8 @@ struct ExtensionHostTests {
         await host.stop()
     }
 
-    @Test func handledStopsTheChainAndCommandsSendActions() async throws {
-        try extensionFile("a-route.ts", #"export default (voz) => voz.on("beforeInsert", (e, ctx) => { ctx.insert("elsewhere"); return { handled: true } })"#)
+    @Test func emptyTextStopsTheChainAndCommandsSendActions() async throws {
+        try extensionFile("a-route.ts", #"export default (voz) => voz.on("beforeInsert", (e, ctx) => { ctx.insert("elsewhere"); return { text: "" } })"#)
         try extensionFile("b-never.ts", #"export default (voz) => voz.on("beforeInsert", () => ({ text: "should not run" }))"#)
         try extensionFile("c-send.ts", #"export default (voz) => voz.registerCommand("send it", async (e, ctx) => { ctx.insert(`[${e.text}]`); ctx.press("cmd+return"); ctx.notify("sent") })"#)
         let actions = RecordedActions()

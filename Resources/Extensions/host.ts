@@ -5,7 +5,6 @@ import {
   readFileSync,
   statSync,
 } from "node:fs";
-import { EventEmitter } from "node:events";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { basename, extname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
@@ -68,9 +67,10 @@ type LoadError = { extension: string; message: string };
 type Request = { id?: number; method: string; params: never; deadline: number };
 type RequestScope = { id?: number; deadline: number; active: boolean };
 const requestScope = new AsyncLocalStorage<RequestScope>();
+type Config = Record<string, string | number | boolean>;
 type SettingsFile = {
   disabled?: string[];
-  config?: Record<string, ExtensionAPI["config"]>;
+  config?: Record<string, Config>;
 };
 type PackageManifest = {
   name?: string;
@@ -135,7 +135,6 @@ const actions = new Map<string, Action & { extension: string }>();
 const settingsSchemas = new Map<string, SettingsSchema>();
 const loaded: string[] = [];
 const errors: LoadError[] = [];
-const bus = new EventEmitter();
 
 Bun.plugin({
   name: "voz",
@@ -261,20 +260,12 @@ function isDisabled(name: string, disabled: string[]) {
   return disabled.some((off) => name === off || name.startsWith(`${off}/`));
 }
 
-function api(name: string, config: ExtensionAPI["config"], registration: Registration): ExtensionAPI {
+function api(name: string, config: Config, registration: Registration): ExtensionAPI {
   const data = join(launch.home, "data", name);
   mkdirSync(data, { recursive: true });
   return {
     name,
-    config,
-    paths: { home: launch.home, data },
-    events: {
-      on: (event, handler) => {
-        registration.track(() => bus.off(event, handler));
-        bus.on(event, handler);
-      },
-      emit: (event, payload) => bus.emit(event, payload),
-    },
+    paths: { data },
     on<Event extends EventName>(
       event: Event,
       handler: (payload: HookPayload[Event], ctx: Context) => Awaitable<HandlerResult>,
@@ -313,7 +304,6 @@ function api(name: string, config: ExtensionAPI["config"], registration: Registr
         Object.entries(schema).map(([key, setting]) => [key, settingValue(setting, config[key])]),
       ) as SettingsValues<Schema>;
     },
-    log: (message) => log(`[${name}] ${message}`),
   };
 }
 
@@ -338,7 +328,7 @@ async function load() {
   }
 }
 
-async function loadEntry(entry: Entry, config: ExtensionAPI["config"] = {}, registration: Registration) {
+async function loadEntry(entry: Entry, config: Config = {}, registration: Registration) {
   if (!entry.path)
     throw new Error(
       "No entry. Add voz.extensions to package.json, an extensions folder or an index.ts",
@@ -383,8 +373,8 @@ async function beforeInsert({ text, raw, app }: InsertRequest) {
     if (Date.now() >= requestScope.getStore()!.deadline) break;
     try {
       const result = (await handler.run({ text, raw }, ctx)) as BeforeInsertResult;
-      if (result && "handled" in result && result.handled === true) return { text: "" };
-      if (result && "text" in result && typeof result.text === "string") text = result.text;
+      if (result && typeof result.text === "string") text = result.text;
+      if (!text) break;
     } catch (error) {
       log(`${handler.extension} beforeInsert failed: ${describe(error)}`);
     }
