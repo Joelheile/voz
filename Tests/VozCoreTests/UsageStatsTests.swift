@@ -38,6 +38,25 @@ import VozCore
         #expect(stats[.all].buckets.map(\.words) == [2, 0, 0, 6])
     }
 
+    @Test func topAppsRankAppsByWordsWithinEachPeriod() throws {
+        let store = try HistoryStore()
+        try store.insert(makeRecord("one two", at: Self.now - 7_200))
+        var slack = makeRecord("three four five", at: Self.now - 3 * Self.day)
+        slack.appBundleID = "com.tinyspeck.slackmacgap"
+        slack.appName = "Slack"
+        try store.insert(slack)
+        var unknown = makeRecord("six seven eight nine", at: Self.now - 3_600)
+        unknown.appBundleID = nil
+        unknown.appName = nil
+        try store.insert(unknown)
+
+        let stats = try utcStats(store, at: Self.now)
+
+        #expect(stats[.day].topApps == [AppUsage(bundleID: "com.apple.Notes", name: "Notes", words: 2)])
+        #expect(stats[.week].topApps.map(\.name) == ["Slack", "Notes"])
+        #expect(stats[.week].topApps.map(\.words) == [3, 2])
+    }
+
     @Test func emptyHistoryHasNoPace() throws {
         let stats = try utcStats(HistoryStore(), at: Self.now)
         #expect(stats[.all].words == 0)

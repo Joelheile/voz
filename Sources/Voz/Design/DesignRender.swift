@@ -145,7 +145,13 @@ private final class Fixture {
             "Can you check whether the new hotkey capture still works with the right option key?",
             "Thanks for the quick turnaround. I'll take another look tomorrow morning.",
         ]
-        let apps = ["Xcode", "Slack", "Mail", "Notes", "Safari"]
+        let apps = [
+            ("Xcode", "com.apple.dt.Xcode"),
+            ("Slack", "com.tinyspeck.slackmacgap"),
+            ("Mail", "com.apple.mail"),
+            ("Notes", "com.apple.Notes"),
+            ("Safari", "com.apple.Safari"),
+        ]
         let now = Date()
         var result: [TranscriptRecord] = []
         let recent: [TimeInterval] = [120, 3_600, 3 * 3_600]
@@ -162,7 +168,7 @@ private final class Fixture {
         return result
     }
 
-    private static func record(text: String, at date: Date, app: String) -> TranscriptRecord {
+    private static func record(text: String, at date: Date, app: (name: String, bundleID: String)) -> TranscriptRecord {
         TranscriptRecord(
             createdAt: date,
             rawText: text,
@@ -170,8 +176,8 @@ private final class Fixture {
             sttMs: 180,
             totalMs: 420,
             model: SpeechModel.parakeetUltra.rawValue,
-            appBundleID: nil,
-            appName: app,
+            appBundleID: app.bundleID,
+            appName: app.name,
             fillerWordsRemoved: text.count % 4
         )
     }
