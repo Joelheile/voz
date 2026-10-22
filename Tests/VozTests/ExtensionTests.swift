@@ -236,3 +236,9 @@ struct ExtensionHostTests {
         #expect(try home.packageSources() == ["npm:voz-jira"])
     }
 }
+
+@Test func administratorScriptQuotesAnyAppPath() {
+    let script = CommandLineTool.administratorScript(linking: #"/Users/a "b" 'c'\d/voz.app/Contents/MacOS/voz"#)
+    #expect(compilesAsAppleScript(script))
+    #expect(script.contains(#"'/Users/a \"b\" '\\''c'\\''\\d/voz.app/Contents/MacOS/voz'"#))
+}

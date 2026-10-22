@@ -23,8 +23,13 @@ enum Permissions {
 
     static var inputMonitoringGranted: Bool { CGPreflightListenEventAccess() }
 
+    static func requestAccessibility() {
+        PermissionTile.show(.accessibility) { accessibilityGranted }
+    }
+
     static func requestInputMonitoring() {
         CGRequestListenEventAccess()
+        PermissionTile.show(.inputMonitoring) { inputMonitoringGranted }
     }
 
     static var systemAudioGranted: Bool { SystemAudioAccess.preflight() == 0 }
@@ -38,6 +43,7 @@ enum Permissions {
 
     enum PrivacyPane: String {
         case microphone = "Privacy_Microphone"
+        case accessibility = "Privacy_Accessibility"
         case inputMonitoring = "Privacy_ListenEvent"
         case systemAudio = "Privacy_ScreenCapture"
     }

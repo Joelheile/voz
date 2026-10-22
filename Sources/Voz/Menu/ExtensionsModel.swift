@@ -194,6 +194,8 @@ final class ExtensionsModel: ObservableObject {
         do {
             try CommandLineTool.install()
             message = nil
+        } catch CommandLineToolError.cancelled {
+            message = nil
         } catch {
             message = "\(error)"
         }

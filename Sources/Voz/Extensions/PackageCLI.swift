@@ -196,12 +196,14 @@ enum PackageCLI {
 
 enum CommandLineToolError: Error, CustomStringConvertible {
     case occupied(String)
-    case notWritable(String)
+    case cancelled
+    case failed(String)
 
     var description: String {
         switch self {
         case .occupied(let path): "\(path) already exists and is not a voz link. Remove it, then try again."
-        case .notWritable(let command): "Run this in Terminal: \(command)"
+        case .cancelled: "Voz did not add the voz command."
+        case .failed(let reason): "Could not add the voz command: \(reason)"
         }
     }
 }
@@ -223,8 +225,23 @@ enum CommandLineTool {
             if replacesOldVoz { try files.removeItem(at: link) }
             try files.createSymbolicLink(atPath: link.path, withDestinationPath: executable)
         } catch {
-            throw CommandLineToolError.notWritable("sudo mkdir -p /usr/local/bin && sudo ln -sf \(shellQuoted(executable)) \(link.path)")
+            try installAsAdministrator()
         }
+    }
+
+    private static func installAsAdministrator() throws {
+        var error: NSDictionary?
+        NSAppleScript(source: administratorScript(linking: executable))?.executeAndReturnError(&error)
+        guard let error else { return }
+        let userCancelled = error[NSAppleScript.errorNumber] as? Int == -128
+        if userCancelled { throw CommandLineToolError.cancelled }
+        throw CommandLineToolError.failed(error[NSAppleScript.errorMessage] as? String ?? "\(error)")
+    }
+
+    static func administratorScript(linking executable: String) -> String {
+        let command = "mkdir -p /usr/local/bin && ln -sf \(shellQuoted(executable)) \(link.path)"
+        let quoted = "\"" + command.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\""
+        return "do shell script \(quoted) with prompt \"Voz needs your password to add the voz command to Terminal.\" with administrator privileges"
     }
 
     private static func shellQuoted(_ path: String) -> String {
