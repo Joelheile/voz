@@ -4,6 +4,7 @@ import ServiceManagement
 enum LaunchAgent {
     static let label = "com.joelheile.voz.relaunch"
     static let installedPath = "/Applications/voz.app"
+    private static let startAttempts = 3
 
     private static var service: SMAppService { SMAppService.agent(plistName: "\(label).plist") }
 
@@ -35,6 +36,17 @@ enum LaunchAgent {
     static func handOver() async -> Bool {
         guard isInstalledCopy, !launchedByLaunchd else { return false }
         removeLegacyLoginItem()
+        for attempt in 1...startAttempts {
+            if await startJob() { return true }
+            Log.app.error("Launch agent did not start voz, attempt \(attempt)")
+            unregisterIfRegistered()
+            try? await Task.sleep(for: .seconds(1))
+        }
+        Log.app.error("Launch agent failed, staying unmanaged")
+        return false
+    }
+
+    private static func startJob() async -> Bool {
         do {
             if service.status != .notRegistered, service.status != .notFound {
                 try await service.unregister()
@@ -46,14 +58,20 @@ enum LaunchAgent {
         }
         Log.app.notice("Launch agent registered, status \(service.status.rawValue)")
         for _ in 0..<20 {
-            if isJobRunning { return true }
+            if jobRunsVoz { return true }
             try? await Task.sleep(for: .milliseconds(200))
         }
-        Log.app.error("Launch agent did not start, staying unmanaged")
         return false
     }
 
-    private static var isJobRunning: Bool {
+    private static var jobRunsVoz: Bool {
+        guard let pid = jobPID, let executable = Bundle.main.executablePath else { return false }
+        var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN) * 4)
+        guard proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 else { return false }
+        return String(cString: buffer) == executable
+    }
+
+    private static var jobPID: Int32? {
         let process = Process()
         let output = Pipe()
         process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
@@ -64,11 +82,12 @@ enum LaunchAgent {
             try process.run()
         } catch {
             Log.app.error("launchctl print failed: \(error.localizedDescription, privacy: .private)")
-            return false
+            return nil
         }
         let text = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
         process.waitUntilExit()
-        return text.contains("\tpid = ")
+        let line = text.split(separator: "\n").first { $0.hasPrefix("\tpid = ") }
+        return line.flatMap { Int32($0.dropFirst("\tpid = ".count)) }
     }
 
     private static func removeLegacyLoginItem() {

@@ -67,7 +67,7 @@ final class StatusItemController: NSObject {
     private var outsideClickMonitor: Any?
     private var permissionPoll: Timer?
     private var closedAt = Date.distantPast
-    private var pendingSize: CGSize?
+    private var contentSize: CGSize = .zero
 
     init(
         dictation: Dictation,
@@ -101,10 +101,7 @@ final class StatusItemController: NSObject {
                 self?.closePanel()
                 finishSetup()
             },
-            resize: { [weak self] size in
-                guard let self, self.panel.isVisible else { return }
-                self.resize(to: size)
-            },
+            resize: { [weak self] in self?.resize(to: $0) },
             quit: quit
         )
         if let button = statusItem.button {
@@ -220,7 +217,7 @@ final class StatusItemController: NSObject {
         refresh()
         if !model.needsSetup { analytics.capture(.historyOpened) }
         hosting.layoutSubtreeIfNeeded()
-        layoutPanel(size: hosting.fittingSize)
+        layoutPanel(size: contentSize)
         panel.alphaValue = 0
         panel.makeKeyAndOrderFront(nil)
         NSAnimationContext.runAnimationGroup { context in
@@ -254,10 +251,11 @@ final class StatusItemController: NSObject {
     }
 
     private func resize(to size: CGSize) {
-        pendingSize = size
+        contentSize = size
+        guard panel.isVisible else { return }
         guard size.height < panel.frame.height else { return layoutPanel(size: size) }
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.shrinkDelay) { [weak self] in
-            guard let self, self.panel.isVisible, self.pendingSize == size else { return }
+            guard let self, self.panel.isVisible, self.contentSize == size else { return }
             self.layoutPanel(size: size)
         }
     }
