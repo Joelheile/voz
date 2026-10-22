@@ -55,7 +55,12 @@ jobs:
             version=$base-beta.$build
             tag=beta-$build
           fi
-          { echo "VERSION=$version"; echo "BUILD=$build"; echo "TAG=$tag"; } >> "$GITHUB_ENV"
+          { echo "VERSION=$version"; echo "BUILD=$build"; echo "TAG=$tag"; echo "NOTES=$RUNNER_TEMP/notes.md"; } >> "$GITHUB_ENV"
+
+      - name: Write release notes
+        run: |
+          scripts/release-notes.sh "$CHANNEL" > "$NOTES"
+          cat "$NOTES"
 
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         id: bun
@@ -104,15 +109,15 @@ jobs:
           [[ -n "$SPARKLE_PRIVATE_KEY" ]] || { echo "SPARKLE_PRIVATE_KEY is not set" >&2; exit 1; }
           git fetch origin main
           git worktree add -B appcast "$RUNNER_TEMP/appcast" origin/main
-          scripts/package-release.sh "$VERSION" "$BUILD" "$CHANNEL" "$TAG" "$RUNNER_TEMP/appcast/appcast.xml"
+          scripts/package-release.sh "$VERSION" "$BUILD" "$CHANNEL" "$TAG" "$NOTES" "$RUNNER_TEMP/appcast/appcast.xml"
 
       - name: Create GitHub release
         run: |
           archive=build/voz-$VERSION.zip
           if [[ "$CHANNEL" == stable ]]; then
-            gh release create "$TAG" "$archive" --title "voz $VERSION" --generate-notes --verify-tag
+            gh release create "$TAG" "$archive" --title "voz $VERSION" --notes-file "$NOTES" --verify-tag
           else
-            gh release create "$TAG" "$archive" --title "voz $VERSION" --notes "Automated beta build of $GITHUB_SHA." \
+            gh release create "$TAG" "$archive" --title "voz $VERSION" --notes-file "$NOTES" \
               --target "$GITHUB_SHA" --prerelease
           fi
 

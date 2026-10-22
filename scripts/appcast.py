@@ -1,3 +1,4 @@
+import html
 import sys
 import xml.etree.ElementTree as ET
 from email.utils import formatdate
@@ -25,9 +26,16 @@ def load(path):
         return rss
 
 
-def build_item(version, build, channel, url, signature, length, release_page):
+def notes_html(path):
+    with open(path) as notes:
+        bullets = [line.removeprefix("- ").strip() for line in notes if line.strip()]
+    return "<ul>" + "".join(f"<li>{html.escape(bullet)}</li>" for bullet in bullets) + "</ul>"
+
+
+def build_item(version, build, channel, url, signature, length, release_page, notes):
     item = ET.Element("item")
     ET.SubElement(item, "title").text = f"voz {version}"
+    ET.SubElement(item, "description").text = notes_html(notes)
     ET.SubElement(item, "link").text = release_page
     ET.SubElement(item, "pubDate").text = formatdate(usegmt=True)
     ET.SubElement(item, qualified("version")).text = build
@@ -44,11 +52,11 @@ def build_item(version, build, channel, url, signature, length, release_page):
     return item
 
 
-def main(path, version, build, channel, url, signature, length, release_page):
+def main(path, version, build, channel, url, signature, length, release_page, notes):
     rss = load(path)
     channel_element = rss.find("channel")
     items = [i for i in channel_element.findall("item") if i.findtext(qualified("version")) != build]
-    items.insert(0, build_item(version, build, channel, url, signature, length, release_page))
+    items.insert(0, build_item(version, build, channel, url, signature, length, release_page, notes))
     for item in channel_element.findall("item"):
         channel_element.remove(item)
     kept = {}
