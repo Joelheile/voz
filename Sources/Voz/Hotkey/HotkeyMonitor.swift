@@ -120,10 +120,6 @@ final class HotkeyMonitor {
         Log.app.notice("Event tap recreated: \(started)")
     }
 
-    func startHealthChecks() {
-        checkHealth()
-    }
-
     func checkHealth() {
         defer { scheduleNextHealthCheck() }
         guard Permissions.accessibilityGranted else {
