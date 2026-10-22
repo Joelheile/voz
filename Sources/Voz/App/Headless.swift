@@ -1,5 +1,6 @@
 import FluidAudio
 import Foundation
+import Synchronization
 
 @MainActor
 enum Headless {
@@ -171,15 +172,14 @@ enum Headless {
     }
 }
 
-final class FirstSample: @unchecked Sendable {
-    private let lock = NSLock()
-    private var instant: ContinuousClock.Instant?
+final class FirstSample: Sendable {
+    private let instant = Mutex<ContinuousClock.Instant?>(nil)
 
     func mark() {
-        lock.withLock { if instant == nil { instant = .now } }
+        instant.withLock { if $0 == nil { $0 = .now } }
     }
 
     func elapsed(since begin: ContinuousClock.Instant, clock: ContinuousClock) -> Duration? {
-        lock.withLock { instant.map { $0 - begin } }
+        instant.withLock { $0.map { $0 - begin } }
     }
 }

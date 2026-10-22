@@ -175,18 +175,11 @@ enum AppMover {
 final class SingleInstance {
     private var descriptor: Int32 = -1
 
-    func claim(waiting: Duration) -> Bool {
-        let path: String
-        do {
-            path = try AppStorage.directory().appendingPathComponent("instance.lock").path
-        } catch {
-            Log.app.error("Instance lock unavailable: \(error.localizedDescription, privacy: .public)")
-            return true
-        }
+    func claim(waiting: Duration) throws -> Bool {
+        let path = try AppStorage.directory().appendingPathComponent("instance.lock").path
         descriptor = open(path, O_CREAT | O_RDWR, 0o600)
         guard descriptor >= 0 else {
-            Log.app.error("Instance lock unavailable, errno \(errno)")
-            return true
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
         }
         let deadline = ContinuousClock.now + waiting
         while flock(descriptor, LOCK_EX | LOCK_NB) != 0 {

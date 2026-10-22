@@ -165,6 +165,7 @@ struct HostRequest<Params: Encodable>: Encodable {
     let id: Int
     let method: String
     let params: Params
+    let deadline: Double
 }
 
 struct InsertParams: Encodable {
@@ -216,6 +217,7 @@ struct CommandParams: Encodable {
 struct HostEnvelope: Decodable {
     let id: Int?
     let method: String?
+    let requestID: Int?
 }
 
 struct HostNotification<Params: Decodable>: Decodable {

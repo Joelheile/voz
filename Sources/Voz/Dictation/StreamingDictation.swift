@@ -77,6 +77,7 @@ final class StreamingDictation {
 
     func cancel() {
         closed = true
+        prompt.cancel()
         for segment in segments {
             segment.transcription.cancel()
             segment.cleanup?.cancel()
@@ -102,6 +103,8 @@ final class StreamingDictation {
             results.append(result)
         }
         if let last = segments.last?.cleanup { await wait(for: last, until: deadline) }
+        for segment in segments { segment.cleanup?.cancel() }
+        prompt.cancel()
         let cleanupWait = ContinuousClock.now - transcribedAt
 
         let raws = results.map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -116,7 +119,7 @@ final class StreamingDictation {
         var timedOut = false
         var cleanedInTime = 0
         for (segment, raw) in zip(segments, raws) {
-            let rules = cleanupEnabled ? cleaner.ruleText(raw, steps: steps, vocabulary: vocabulary) : FillerPassResult(text: raw, removed: 0)
+            let rules = cleanupEnabled ? CleanupStep.applyRules(steps, to: raw, vocabulary: vocabulary) : FillerPassResult(text: raw, removed: 0)
             fallbacks.append(rules.text)
             cleanedTexts.append(segment.cleaned?.text)
             guard !raw.isEmpty else { continue }
@@ -178,11 +181,15 @@ final class StreamingDictation {
     }
 
     private func wait(for task: Task<Void, Never>, until deadline: ContinuousClock.Instant) async {
-        await withTaskGroup(of: Void.self) { group in
-            group.addTask { await task.value }
-            group.addTask { try? await Task.sleep(until: deadline, clock: .continuous) }
-            await group.next()
-            group.cancelAll()
+        guard deadline > .now else { return }
+        do {
+            try await withTimeout(deadline - .now, onTimeout: CleanupError.timedOut) {
+                await task.value
+            }
+        } catch CleanupError.timedOut {
+            task.cancel()
+        } catch {
+            Log.app.error("Waiting for cleanup failed: \(error.localizedDescription, privacy: .private)")
         }
     }
 }

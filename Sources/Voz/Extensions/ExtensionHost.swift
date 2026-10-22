@@ -22,6 +22,8 @@ actor ExtensionHost {
     private var input: FileHandle?
     private var buffer = Data()
     private var nextID = 0
+    private let writes = DispatchQueue(label: "com.joelheile.voz.extension-input")
+    private var queuedBytes = 0
     private var pending: [Int: CheckedContinuation<Data?, Never>] = [:]
     private var readyWaiter: CheckedContinuation<HostManifest, any Error>?
     private(set) var manifest: HostManifest?
@@ -115,8 +117,14 @@ actor ExtensionHost {
     }
 
     func stop() {
-        process?.terminationHandler = nil
-        process?.terminate()
+        if let process {
+            process.terminationHandler = nil
+            if process.isRunning { process.terminate() }
+            Task {
+                try? await Task.sleep(for: .milliseconds(250))
+                if process.isRunning { kill(process.processIdentifier, SIGKILL) }
+            }
+        }
         process = nil
         input = nil
         failAll()
@@ -133,23 +141,40 @@ actor ExtensionHost {
     }
 
     private func request<Params: Encodable>(_ method: String, _ params: Params, timeout: Duration) async -> Data? {
-        guard let input, let line = try? JSONEncoder().encode(HostRequest(id: nextID + 1, method: method, params: params)) else { return nil }
+        guard timeout > .zero, let input else { return nil }
+        let deadline = Date().timeIntervalSince1970 * 1000 + Double(timeout.wholeMilliseconds)
+        guard let encoded = try? JSONEncoder().encode(HostRequest(id: nextID + 1, method: method, params: params, deadline: deadline)) else { return nil }
+        let line = encoded + Data("\n".utf8)
+        guard queuedBytes + line.count <= 8 * 1024 * 1024 else {
+            onLog("Extension host input limit exceeded for \(method)")
+            return nil
+        }
+        queuedBytes += line.count
         nextID += 1
         let id = nextID
         return await withCheckedContinuation { continuation in
             pending[id] = continuation
-            do {
-                try input.write(contentsOf: line + Data("\n".utf8))
-            } catch {
-                onLog("Extension host write failed: \(error.localizedDescription)")
-                resolve(id, with: nil)
-                return
+            writes.async { [weak self] in
+                do {
+                    try input.write(contentsOf: line)
+                    Task { await self?.wrote(line.count, id: id, error: nil) }
+                } catch {
+                    let message = error.localizedDescription
+                    Task { await self?.wrote(line.count, id: id, error: message) }
+                }
             }
             Task { [weak self] in
                 try? await Task.sleep(for: timeout)
                 await self?.expire(id, method: method)
             }
         }
+    }
+
+    private func wrote(_ count: Int, id: Int, error: String?) {
+        queuedBytes -= count
+        guard let error else { return }
+        onLog("Extension host write failed: \(error)")
+        resolve(id, with: nil)
     }
 
     private func decodeResult<Result: Decodable>(_ type: Result.Type, from data: Data?) -> Result? {
@@ -182,6 +207,7 @@ actor ExtensionHost {
             resolve(id, with: line)
             return
         }
+        if let requestID = envelope.requestID, pending[requestID] == nil { return }
         switch envelope.method {
         case "ready": ready(line)
         case "insert": decodeNotification(TextParams.self, line).map { onAction(.insert($0.text)) }

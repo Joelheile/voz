@@ -44,10 +44,6 @@ final class TextCleaner {
         model.prewarm(instructions: CleanupInstructions.text(prompt: prompt, vocabulary: vocabulary))
     }
 
-    func ruleText(_ raw: String, steps: [String], vocabulary: [String]) -> FillerPassResult {
-        CleanupStep.applyRules(steps, to: raw, vocabulary: vocabulary)
-    }
-
     func clean(
         _ raw: String,
         prompt: String,
@@ -69,7 +65,7 @@ final class TextCleaner {
                 text = modelResults.map(\.text).joined()
                 removed += modelResults.reduce(0) { $0 + $1.removed }
             case .some:
-                let rules = ruleText(text, steps: [step], vocabulary: vocabulary)
+                let rules = CleanupStep.applyRules([step], to: text, vocabulary: vocabulary)
                 text = rules.text
                 removed += rules.removed
             case nil:

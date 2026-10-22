@@ -2,32 +2,30 @@
 import AudioToolbox
 import Synchronization
 
-final class SampleBuffer: @unchecked Sendable {
-    private let lock = NSLock()
-    private var samples: [Float] = []
-    private var onSamples: (@Sendable ([Float]) -> Void)?
+final class SampleBuffer: Sendable {
+    private struct State {
+        var samples: [Float] = []
+        var onSamples: (@Sendable ([Float]) -> Void)?
+    }
+
+    private let state = Mutex(State())
 
     func begin(onSamples: (@Sendable ([Float]) -> Void)?) {
-        lock.withLock {
-            samples = []
-            self.onSamples = onSamples
-        }
+        state.withLock { $0 = State(onSamples: onSamples) }
     }
 
     func append(_ chunk: [Float]) {
-        let onSamples = lock.withLock {
-            samples.append(contentsOf: chunk)
-            return self.onSamples
+        let onSamples = state.withLock { state in
+            state.samples.append(contentsOf: chunk)
+            return state.onSamples
         }
         onSamples?(chunk)
     }
 
     func end() -> [Float] {
-        lock.withLock {
-            onSamples = nil
-            let taken = samples
-            samples = []
-            return taken
+        state.withLock { state in
+            defer { state = State() }
+            return state.samples
         }
     }
 }

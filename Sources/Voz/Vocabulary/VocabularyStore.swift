@@ -59,8 +59,7 @@ final class VocabularyStore: Sendable {
         guard !trimmed.isEmpty else { return }
         try queue.write { database in
             let exists = try VocabularyWord.filter(Column("word") == trimmed).fetchCount(database) > 0
-            guard !exists else { return }
-            try VocabularyWord(word: trimmed, source: source).insert(database)
+            if !exists { try VocabularyWord(word: trimmed, source: source).insert(database) }
             _ = try VocabularySuggestion.deleteOne(database, key: trimmed)
         }
     }
@@ -82,7 +81,6 @@ final class VocabularyStore: Sendable {
 
     func accept(_ suggestion: VocabularySuggestion) throws {
         try add(suggestion.word, source: .learned)
-        try dismiss(suggestion)
     }
 
     func dismiss(_ suggestion: VocabularySuggestion) throws {

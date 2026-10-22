@@ -81,6 +81,53 @@ struct ExtensionHostTests {
         await host.stop()
     }
 
+    @Test func expiredHandlersCannotSendActionsOrRunLaterHandlers() async throws {
+        try extensionFile("a-late.ts", #"export default voz => voz.on("beforeInsert", async (event, ctx) => { await Bun.sleep(200); ctx.insert("late"); ctx.press("return"); ctx.notify("late"); return { text: "late" } })"#)
+        try extensionFile("b-later.ts", #"export default voz => voz.on("beforeInsert", (event, ctx) => { ctx.insert("later handler"); return { text: event.text } })"#)
+        let actions = RecordedActions()
+        let host = makeHost(actions: actions)
+        _ = try await host.start()
+        #expect(await host.beforeInsert(text: "keep", raw: "keep", app: app, timeout: .milliseconds(50)) == "keep")
+        try await Task.sleep(for: .milliseconds(350))
+        #expect(await host.ping(timeout: .seconds(1)))
+        #expect(actions.all.isEmpty)
+        await host.stop()
+    }
+
+    @Test func malformedModelResultsUseFailureFallback() async throws {
+        try extensionFile("bad.ts", #"export default voz => { voz.registerSpeechModel({ id: "bad", name: "Bad", transcribe: () => ({}) }); voz.registerCleanupModel({ id: "bad", name: "Bad", clean: () => ({ text: 42 }) }); voz.on("beforeInsert", () => ({ handled: false, text: "kept" })); }"#)
+        let host = makeHost()
+        _ = try await host.start()
+        #expect(await host.transcribe(model: "bad/bad", path: "/tmp/test.wav", seconds: 1, app: app, timeout: .seconds(1)) == nil)
+        #expect(await host.clean(model: "bad/bad", text: "hello", prompt: "", app: app, timeout: .seconds(1)) == nil)
+        #expect(await host.beforeInsert(text: "hello", raw: "hello", app: app, timeout: .seconds(1)) == "kept")
+        await host.stop()
+    }
+
+    @Test func blockedInputStillTimesOut() async throws {
+        try extensionFile("spin.ts", #"export default voz => voz.registerCommand("spin", () => { while (true) {} })"#)
+        let host = makeHost()
+        _ = try await host.start()
+        _ = await host.runCommand(phrase: "spin", text: "", app: app, timeout: .milliseconds(50))
+        let started = ContinuousClock.now
+        let largeText = String(repeating: "long transcript ", count: 100_000)
+        #expect(await host.beforeCleanup(prompt: largeText, app: app, timeout: .milliseconds(100)) == largeText)
+        #expect(await !host.ping(timeout: .milliseconds(100)))
+        // Sending a request larger than pipe capacity must not block the host actor.
+        #expect(await !host.runCommand(phrase: "spin", text: largeText, app: app, timeout: .milliseconds(100)))
+        #expect(ContinuousClock.now - started < .seconds(2))
+        await host.stop()
+    }
+
+    @Test func stopKillsHostsThatIgnoreTermination() async throws {
+        try extensionFile("stubborn.ts", #"import { writeFileSync } from "node:fs"; export default voz => { writeFileSync(voz.paths.data + "/pid", String(process.pid)); process.on("SIGTERM", () => {}); setInterval(() => {}, 1000); }"#)
+        let host = makeHost()
+        _ = try await host.start()
+        let pid = try #require(fileContents(home.root.appendingPathComponent("data/stubborn/pid")).flatMap { Int32($0) })
+        await host.stop()
+        #expect(try await processIsGone(pid))
+    }
+
     @Test func registeredModelsAndStepsAreNamespacedAndRun() async throws {
         try extensionFile("whisper.ts", #"export default (voz) => voz.registerSpeechModel({ id: "base", name: "Whisper", transcribe: (e, ctx) => ({ text: `${e.path} ${e.seconds} ${ctx.app.name}` }) })"#)
         try extensionFile("llm.ts", #"export default (voz) => { voz.registerCleanupModel({ id: "fast", name: "Fast LLM", clean: (e) => ({ text: `${e.text.toUpperCase()} (${e.prompt})` }) }); voz.registerCleanupStep({ id: "jira", name: "Jira keys", run: (e) => ({ text: e.text.replace(/jira (\d+)/, "JIRA-$1") }) }); voz.registerCleanupStep({ id: "keep", name: "Keeps text", run: () => {} }); voz.registerCleanupStep({ id: "boom", name: "Throws", run: () => { throw new Error("boom") } }) }"#)

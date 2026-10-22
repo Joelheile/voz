@@ -126,7 +126,6 @@ struct PackageListing: Codable, Equatable, Identifiable, Sendable {
     static func decodeSearch(_ data: Data) throws -> [PackageListing] {
         try JSONDecoder().decode(SearchResult.self, from: data).objects
             .map(PackageListing.init)
-            .ordered(by: .popular)
     }
 
     static func decodePackument(_ data: Data) throws -> PackageListing {

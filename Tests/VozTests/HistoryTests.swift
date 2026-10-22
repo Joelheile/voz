@@ -2,6 +2,16 @@ import Testing
 @testable import Voz
 
 @Suite struct HistoryStoreTests {
+    @Test func acceptingVocabularySuggestionAddsWordAndRemovesSuggestion() throws {
+        let vocabulary = try HistoryStore().vocabulary
+        try vocabulary.suggest("Voz")
+        let suggestion = try #require(vocabulary.snapshot().suggestions.first)
+        try vocabulary.accept(suggestion)
+        try vocabulary.accept(suggestion)
+        #expect(try vocabulary.words() == ["Voz"])
+        #expect(try vocabulary.snapshot().suggestions.isEmpty)
+    }
+
     @Test func searchMatchesFinalTextCaseInsensitivelyAndLiterally() throws {
         let store = try HistoryStore()
         var cleaned = makeRecord("um hello there", at: 1)

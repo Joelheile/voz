@@ -22,7 +22,18 @@ if arguments.contains(IndicatorDemo.launchArgument) {
 }
 
 let instance = SingleInstance()
-guard instance.claim(waiting: LaunchAgent.launchedByLaunchd ? .seconds(5) : .zero) else {
+let claimed: Bool
+do {
+    claimed = try instance.claim(waiting: LaunchAgent.launchedByLaunchd ? .seconds(5) : .zero)
+} catch {
+    Log.app.error("Could not acquire instance lock: \(error.localizedDescription, privacy: .public)")
+    let alert = NSAlert()
+    alert.messageText = "Voz could not start"
+    alert.informativeText = "Could not acquire the app lock. \(error.localizedDescription)"
+    alert.runModal()
+    exit(1)
+}
+guard claimed else {
     Log.app.notice("Another voz is running, exiting")
     if !LaunchAgent.launchedByLaunchd { OpenRequest.send() }
     exit(0)
