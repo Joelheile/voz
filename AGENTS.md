@@ -33,6 +33,7 @@ One SwiftPM executable target, `Sources/Voz`, grouped by feature. `Tests/VozTest
 
 - Do not change the signing identity, Sparkle key, bundle identifier or appcast URL. Changes break permissions or updates.
 - Pushes to `main` publish a beta. Tags `vX.Y.Z` publish a stable release. Both run `.github/workflows/release.yml`. Build numbers must keep increasing.
+- Changes reach `main` only through a pull request that passes CI. Agents open the pull request. Only the maintainer merges it.
 - `install.sh` and `appcast.xml` stay at the repo root. The landing page and shipped apps link to them.
 - Keep `disable-library-validation` until every release is notarized with a Developer ID.
 
