@@ -136,11 +136,6 @@ enum DiscardReason: String, Sendable {
     case emptyTranscript = "empty_transcript"
 }
 
-enum DictationTrigger: String, Sendable {
-    case tap
-    case hold
-}
-
 enum DeliveryOutput: String, Sendable {
     case paste
     case clipboard

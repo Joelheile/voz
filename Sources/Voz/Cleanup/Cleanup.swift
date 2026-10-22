@@ -78,12 +78,6 @@ enum CleanupBudget {
     }
 }
 
-extension Duration {
-    var wholeMilliseconds: Int {
-        Int(components.seconds * 1000 + components.attoseconds / 1_000_000_000_000_000)
-    }
-}
-
 enum CleanupOutput {
     private static let quotePairs: [(Character, Character)] = [("\"", "\""), ("\u{201C}", "\u{201D}"), ("\u{201E}", "\u{201C}"), ("\u{00AB}", "\u{00BB}")]
 
