@@ -1,5 +1,6 @@
 import Charts
 import SwiftUI
+import UniformTypeIdentifiers
 import VozCore
 
 struct InsightsPage: View {
@@ -44,6 +45,7 @@ struct InsightsPage: View {
                 StatTile(value: StatsFormat.duration(stats.speakingSeconds), label: "talking")
                 StatTile(value: stats.fixes.formatted(), label: "fillers removed")
             }
+            if !stats.topApps.isEmpty { TopApps(apps: stats.topApps) }
         }
         .animation(Theme.Motion.section, value: period)
     }
@@ -65,6 +67,41 @@ private struct StatTile: View {
                 .foregroundStyle(Theme.inkSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct TopApps: View {
+    let apps: [AppUsage]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionLabel(text: "Top apps")
+            ForEach(apps, id: \.self) { app in
+                HStack(spacing: 8) {
+                    Image(nsImage: AppIcon.image(for: app.bundleID))
+                        .resizable()
+                        .frame(width: 18, height: 18)
+                    Text(app.name)
+                        .font(.ui(13))
+                        .foregroundStyle(Theme.ink)
+                        .lineLimit(1)
+                    Spacer(minLength: 8)
+                    Text(app.words.formatted())
+                        .font(.meta)
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.inkSecondary)
+                }
+            }
+        }
+    }
+}
+
+private enum AppIcon {
+    static func image(for bundleID: String?) -> NSImage {
+        guard let bundleID, let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
+            return NSWorkspace.shared.icon(for: .applicationBundle)
+        }
+        return NSWorkspace.shared.icon(forFile: url.path)
     }
 }
 

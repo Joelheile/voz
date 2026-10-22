@@ -19,12 +19,25 @@ public struct WordBucket: Equatable, Sendable, Identifiable {
     }
 }
 
+public struct AppUsage: Hashable, Sendable {
+    public let bundleID: String?
+    public let name: String
+    public let words: Int
+
+    public init(bundleID: String?, name: String, words: Int) {
+        self.bundleID = bundleID
+        self.name = name
+        self.words = words
+    }
+}
+
 public struct PeriodStats: Equatable, Sendable {
     public var words = 0
     public var speakingSeconds = 0.0
     public var fixes = 0
     public var wordsPerMinute: Double?
     public var buckets: [WordBucket] = []
+    public var topApps: [AppUsage] = []
 
     public init() {}
 }
@@ -44,4 +57,6 @@ public struct StatsRow: Decodable, FetchableRecord, Sendable {
     public let wordCount: Int
     public let audioSeconds: Double
     public let fillerWordsRemoved: Int
+    public let appBundleID: String?
+    public let appName: String?
 }

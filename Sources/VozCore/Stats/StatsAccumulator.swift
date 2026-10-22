@@ -63,9 +63,11 @@ public struct StatsAccumulator {
 
 private struct PeriodTally {
     private static let minimumSecondsForPace = 1.0
+    private static let topAppCount = 5
 
     private var stats = PeriodStats()
     private var wordsByBucket: [Date: Int] = [:]
+    private var apps: [String: AppUsage] = [:]
     private var paceWords = 0
     private var paceSeconds = 0.0
 
@@ -74,6 +76,7 @@ private struct PeriodTally {
         stats.speakingSeconds += row.audioSeconds
         stats.fixes += row.fillerWordsRemoved
         wordsByBucket[bucket, default: 0] += row.wordCount
+        addApp(of: row)
         guard row.audioSeconds > Self.minimumSecondsForPace else { return }
         paceWords += row.wordCount
         paceSeconds += row.audioSeconds
@@ -83,6 +86,13 @@ private struct PeriodTally {
         var result = stats
         if paceSeconds > 0 { result.wordsPerMinute = Double(paceWords) / (paceSeconds / 60) }
         result.buckets = buckets.map { WordBucket(start: $0, words: wordsByBucket[$0] ?? 0) }
+        result.topApps = Array(apps.values.sorted { ($0.words, $1.name) > ($1.words, $0.name) }.prefix(Self.topAppCount))
         return result
+    }
+
+    private mutating func addApp(of row: StatsRow) {
+        guard let key = row.appBundleID ?? row.appName else { return }
+        let words = (apps[key]?.words ?? 0) + row.wordCount
+        apps[key] = AppUsage(bundleID: row.appBundleID, name: row.appName ?? key, words: words)
     }
 }
