@@ -17,7 +17,7 @@ The full types are in `~/.voz/node_modules/voz/index.d.ts`. Read them before you
 ## What runs when
 
 1. `beforeCleanup`: before the on-device model cleans up the text. Return `{ prompt }` to change the cleanup prompt, for example per app with `ctx.app.bundleID`. Append to `event.prompt` instead of replacing it, unless the user asks for a new prompt
-2. `beforeInsert`: before Voz types the text. Return `{ text }` to change it, `{ handled: true }` to type nothing, or nothing to keep it
+2. `beforeInsert`: before Voz types the text. Return `{ text }` to change it, `{ text: "" }` to type nothing, or nothing to keep it
 3. `afterInsert`: after Voz typed the text. Voz does not wait for it
 4. `recording`: a 16 kHz mono WAV of the dictation. Voz does not wait for it
 5. `registerCommand(phrase, handler)`: runs when a dictation ends with `phrase`. Voz types the words before it first
@@ -39,7 +39,7 @@ Registering a model or step only makes it available. The user picks it in Settin
 - Write files to `voz.paths.data`, never next to the extension, or Voz reloads it on every write
 - A package declares the API it targets with `"voz": { "apiVersion": 1 }` in `package.json`
 - The user turns extensions on or off in the Extensions page. Don't build your own on/off switch
-- Log with `voz.log` or `console.log`
+- Log with `console.log`
 - Use Bun and Node APIs (`fetch`, `Bun.spawn`, `node:fs`). Files in `~/.voz/extensions` can't import npm packages. If you need one, make a folder with a `package.json` and an `index.ts`, then run `voz install ./that-folder`
 - Never read or send transcripts anywhere the user didn't ask for
 

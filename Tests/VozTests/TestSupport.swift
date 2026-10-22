@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import Synchronization
 @testable import Voz
 
@@ -180,4 +180,35 @@ func listDate(day: Int, hour: Int, minute: Int = 0, year: Int = 2026) -> Date {
 
 func listDate(secondsBeforeNow seconds: Double) -> Date {
     listNow.addingTimeInterval(-seconds)
+}
+
+@MainActor
+func editActionsHandled(byPanelFor keys: [(String, NSEvent.ModifierFlags)]) -> [String] {
+    final class Recorder: NSView {
+        var actions: [String] = []
+        override var acceptsFirstResponder: Bool { true }
+        @objc func cut(_ sender: Any?) { actions.append("cut") }
+        @objc func copy(_ sender: Any?) { actions.append("copy") }
+        @objc func paste(_ sender: Any?) { actions.append("paste") }
+        @objc override func selectAll(_ sender: Any?) { actions.append("selectAll") }
+        @objc func undo(_ sender: Any?) { actions.append("undo") }
+        @objc func redo(_ sender: Any?) { actions.append("redo") }
+    }
+    let panel = PopoverPanel()
+    let recorder = Recorder()
+    panel.contentView = recorder
+    panel.makeFirstResponder(recorder)
+    for (key, modifiers) in keys {
+        let event = NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: modifiers, timestamp: 0, windowNumber: panel.windowNumber,
+            context: nil, characters: key, charactersIgnoringModifiers: key, isARepeat: false, keyCode: 0
+        )!
+        _ = panel.performKeyEquivalent(with: event)
+    }
+    return recorder.actions
+}
+
+func compilesAsAppleScript(_ source: String) -> Bool {
+    var error: NSDictionary?
+    return NSAppleScript(source: source)?.compileAndReturnError(&error) == true
 }

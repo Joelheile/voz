@@ -31,6 +31,24 @@ final class PopoverPanel: NSPanel {
         onCancel()
     }
 
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if let action = Self.editAction(for: event), firstResponder?.tryToPerform(action, with: self) == true { return true }
+        return super.performKeyEquivalent(with: event)
+    }
+
+    private static func editAction(for event: NSEvent) -> Selector? {
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting(.capsLock)
+        return switch (modifiers, event.charactersIgnoringModifiers?.lowercased()) {
+        case (.command, "x"): #selector(NSText.cut(_:))
+        case (.command, "c"): #selector(NSText.copy(_:))
+        case (.command, "v"): #selector(NSText.paste(_:))
+        case (.command, "a"): #selector(NSText.selectAll(_:))
+        case (.command, "z"): Selector(("undo:"))
+        case ([.command, .shift], "z"): Selector(("redo:"))
+        default: nil
+        }
+    }
+
     override func resignKey() {
         super.resignKey()
         onResignKey()
@@ -177,6 +195,7 @@ final class StatusItemController: NSObject {
 
     private func hint(for status: PopoverStatus) -> String {
         switch status {
+        case .ready where iconIsBehindNotch: "\(DictationHint.idle(hotkey: settings.hotkey, holdToTalk: settings.holdToTalk)). \(MenuBarNotch.hint)"
         case .ready: DictationHint.idle(hotkey: settings.hotkey, holdToTalk: settings.holdToTalk)
         case .recording: history.records.isEmpty ? DictationHint.recording(hotkey: settings.hotkey, holdToTalk: settings.holdToTalk) : ""
         case .transcribing: "Turning your speech into text"
@@ -186,11 +205,16 @@ final class StatusItemController: NSObject {
         }
     }
 
+    private var iconIsBehindNotch: Bool {
+        guard let window = statusItem.button?.window, let screen = window.screen else { return false }
+        return MenuBarNotch.hides(window.frame, on: screen)
+    }
+
     private func fix(_ fix: PermissionFix) {
         switch fix {
         case .microphone: Task { await Permissions.requestMicrophone() }
         case .microphoneBlocked: Permissions.openSettings(.microphone)
-        case .accessibility: Permissions.promptForAccessibility()
+        case .accessibility: Permissions.requestAccessibility()
         }
     }
 

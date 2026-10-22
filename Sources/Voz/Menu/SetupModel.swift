@@ -58,12 +58,11 @@ final class SetupModel: ObservableObject {
     }
 
     func requestAccessibility() {
-        Permissions.promptForAccessibility()
+        Permissions.requestAccessibility()
     }
 
     func requestInputMonitoring() {
         Permissions.requestInputMonitoring()
-        Permissions.openSettings(.inputMonitoring)
     }
 
     func requestSystemAudio() {

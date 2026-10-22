@@ -1,13 +1,11 @@
 import { defineExtension } from "voz";
 
-const reserved = new Set(["trigger", "searchURL"]);
-
 export default defineExtension((voz) => {
   const { trigger, searchURL } = voz.settings({
     trigger: { type: "string", title: "Trigger word", description: "Start a dictation with it to run it", default: "computer" },
     searchURL: { type: "string", title: "Search URL", default: "https://www.google.com/search?q=" },
   });
-  const pattern = new RegExp(`^${trigger.toLowerCase()},?\\s+(open|search for|run)\\s+(.+?)[.!?]*$`, "i");
+  const pattern = new RegExp(`^${trigger.toLowerCase()},?\\s+(open|search for)\\s+(.+?)[.!?]*$`, "i");
 
   const spawn = (command: string[], ctx: { notify(text: string): void }, failure: string) =>
     Bun.spawn(command).exited.then((code) => code !== 0 && ctx.notify(failure));
@@ -23,18 +21,7 @@ export default defineExtension((voz) => {
       case "search for":
         spawn(["open", searchURL + encodeURIComponent(target)], ctx, "Search failed");
         break;
-      case "run": {
-        const name = target.toLowerCase();
-        const command = voz.config[name];
-        if (reserved.has(name) || typeof command !== "string") {
-          ctx.notify(`No command named ${target}`);
-          break;
-        }
-        spawn(["/bin/zsh", "-lc", command], ctx, `${target} failed`);
-        ctx.notify(`Running ${target}`);
-        break;
-      }
     }
-    return { handled: true };
+    return { text: "" };
   });
 });

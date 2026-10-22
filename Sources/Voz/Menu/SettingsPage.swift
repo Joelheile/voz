@@ -127,13 +127,10 @@ struct SettingsPage: View {
                 }
             }
             if !accessibility {
-                allowRow("Accessibility") { Permissions.promptForAccessibility() }
+                allowRow("Accessibility") { Permissions.requestAccessibility() }
             }
             if !inputMonitoring {
-                allowRow("Input Monitoring") {
-                    Permissions.requestInputMonitoring()
-                    Permissions.openSettings(.inputMonitoring)
-                }
+                allowRow("Input Monitoring") { Permissions.requestInputMonitoring() }
             }
             if settings.muteWhileRecording && !systemAudio {
                 allowRow("System Audio") {
