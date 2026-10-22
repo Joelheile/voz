@@ -27,6 +27,7 @@ One SwiftPM executable target, `Sources/Voz`, grouped by feature. `Tests/VozTest
 - `scripts/test.sh release`: the optimized configuration CI uses.
 - `scripts/make-app.sh [--debug] [version] [build]`: build and verify the signed app.
 - `scripts/run.sh`: build a debug app and launch it.
+- `scripts/install-local.sh [--debug] [version] [build]`: build the signed app and replace /Applications/voz.app.
 
 ## Release hazards
 
