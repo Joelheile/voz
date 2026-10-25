@@ -72,7 +72,7 @@ Extensions run with your permissions, so only install ones you trust. If one is 
 
 ## Privacy
 
-Built-in dictation processes audio and transcripts on your Mac. Extensions can send data to external services, so review what you install. Voz sends a version ping on install and update, which you can turn off. Usage analytics are off unless you opt in, and they never contain what you said.
+Built-in dictation processes audio and transcripts on your Mac. Extensions can send data to external services, so review what you install. Voz sends a version ping on install and update, which you can turn off. Usage analytics are off unless you opt in, and they never contain what you said. When you opt in, voz also reports crashes and freezes with a stack trace.
 
 To mute other apps while you dictate, Voz asks for System Audio Recording access. It silences their sound and does not save their audio.
 

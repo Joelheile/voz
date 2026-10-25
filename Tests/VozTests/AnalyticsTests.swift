@@ -14,6 +14,11 @@ struct UsageSessionTests {
         #expect(event.failure?.stage == "transcription")
         #expect(event.failure?.code == "transcription_failed")
         #expect(AnalyticsEvent.appLaunched.failure == nil)
+        #expect(AnalyticsEvent.appHang.name == "app_hang")
+        #expect(AnalyticsEvent.appHang.failure?.stage == "main_thread")
+        #expect(AnalyticsEvent.appHang.failure?.code == "app_hang")
+        let interrupted = AnalyticsEvent.dictationFailed(stage: .recording, errorCode: .recorderInterrupted)
+        #expect(interrupted.failure?.code == "recorder_interrupted")
         #expect(AnalyticsEvent.appSession(seconds: 60, state: .heartbeat).properties == ["seconds": .integer(60), "state": .text("heartbeat")])
     }
 

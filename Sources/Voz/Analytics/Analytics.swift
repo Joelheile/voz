@@ -7,7 +7,10 @@ final class Analytics {
     nonisolated static let host = "https://eu.i.posthog.com"
 
     private let installID: UUID
-    private let context = SystemContext.properties
+    private let watchdog = HangWatchdog(seconds: 5) {
+        Analytics.send(.appHang)
+        PostHogSDK.shared.flush()
+    }
     private var sessionStarted: SuspendingClock.Instant?
     private var session: UsageSession?
     private var heartbeat: Timer?
@@ -25,6 +28,7 @@ final class Analytics {
         if enabled {
             setUpIfNeeded()
             PostHogSDK.shared.optIn()
+            watchdog.start()
             sessionStarted = .now
             session = UsageSession(startedAt: 0)
             capture(.appSession(seconds: 0, state: .started))
@@ -32,6 +36,7 @@ final class Analytics {
                 Task { @MainActor in self?.checkpoint(.heartbeat) }
             }
         } else if isSetUp {
+            watchdog.stop()
             heartbeat?.invalidate()
             heartbeat = nil
             session = nil
@@ -42,8 +47,12 @@ final class Analytics {
 
     func capture(_ event: AnalyticsEvent) {
         guard isEnabled else { return }
-        var properties = event.properties.mapValues(Self.plainValue)
-        properties.merge(context) { eventValue, _ in eventValue }
+        Self.send(event)
+    }
+
+    private nonisolated static func send(_ event: AnalyticsEvent) {
+        var properties = event.properties.mapValues(plainValue)
+        properties.merge(SystemContext.properties) { eventValue, _ in eventValue }
         PostHogSDK.shared.capture(event.name, properties: properties)
         if let failure = event.failure {
             PostHogSDK.shared.capture("$exception", properties: [
@@ -83,7 +92,7 @@ final class Analytics {
         let config = PostHogConfig(projectToken: Self.projectToken, host: Self.host)
         config.captureApplicationLifecycleEvents = false
         config.captureScreenViews = false
-        config.errorTrackingConfig.autoCapture = false
+        config.errorTrackingConfig.autoCapture = true
         config.errorTrackingConfig.exceptionSteps.enabled = false
         config.preloadFeatureFlags = false
         config.sendFeatureFlagEvent = false
@@ -96,7 +105,7 @@ final class Analytics {
         isSetUp = true
     }
 
-    private static func plainValue(_ value: AnalyticsValue) -> Any {
+    private nonisolated static func plainValue(_ value: AnalyticsValue) -> Any {
         switch value {
         case let .integer(number): number
         case let .number(number): number

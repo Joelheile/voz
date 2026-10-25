@@ -102,6 +102,19 @@ jobs:
             --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
           xcrun stapler staple build/voz.app
 
+      - name: Upload debug symbols
+        env:
+          POSTHOG_CLI_API_KEY: ${{ secrets.POSTHOG_CLI_API_KEY }}
+          POSTHOG_CLI_PROJECT_ID: "307358"
+          POSTHOG_CLI_HOST: https://eu.posthog.com
+        run: |
+          if [[ -z "$POSTHOG_CLI_API_KEY" ]]; then
+            echo "::warning::POSTHOG_CLI_API_KEY is not set. Crash reports for $VERSION stay unsymbolicated."
+            exit 0
+          fi
+          npx --yes @posthog/cli@0.18.12 dsym upload --directory build \
+            --release-name com.joelheile.voz --release-version "$VERSION" --build "$BUILD"
+
       - name: Package and sign update
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}

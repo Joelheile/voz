@@ -43,7 +43,10 @@ final class Dictation {
         self.pipeline = pipeline
         self.settings = settings
         self.analytics = analytics
-        recorder.onInterrupted = { [weak self] in self?.stopIfRecording() }
+        recorder.onInterrupted = { [weak self] in
+            analytics.capture(.dictationFailed(stage: .recording, errorCode: .recorderInterrupted))
+            self?.stopIfRecording()
+        }
     }
 
     func prepareRecorder() {
