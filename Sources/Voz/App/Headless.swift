@@ -4,13 +4,22 @@ import Synchronization
 
 @MainActor
 enum Headless {
-    private nonisolated static let flags = ["--transcribe", "--clean", "--eval", "--simulate-dictation", "--render-design", "--measure-recorder"]
+    private nonisolated static let flags = ["--transcribe", "--benchmark-speech", "--clean", "--eval", "--simulate-dictation", "--render-design", "--measure-recorder"]
 
     nonisolated static func handles(_ arguments: [String]) -> Bool {
         flags.contains(where: arguments.contains)
     }
 
     static func run(_ arguments: [String]) async -> Int32 {
+        if let path = value(of: "--benchmark-speech", in: arguments) {
+            guard let repeats = Int(value(of: "--repeat", in: arguments) ?? "10"),
+                  (2...1000).contains(repeats),
+                  let model = SpeechModel(rawValue: value(of: "--model", in: arguments) ?? SpeechModel.parakeetUltra.rawValue) else {
+                printError("Speech benchmark requires a known model and 2...1000 repeats")
+                return 64
+            }
+            return await SpeechBenchmark.run(path: path, model: model, repeats: repeats, vocabulary: vocabulary(in: arguments))
+        }
         if let text = value(of: "--clean", in: arguments) {
             return await clean(text, vocabulary: vocabulary(in: arguments))
         }
@@ -43,7 +52,7 @@ enum Headless {
             return await simulateDictation(URL(fileURLWithPath: path), arguments: arguments)
         }
         let models = SpeechModel.allCases.map(\.rawValue).joined(separator: "|")
-        printError("usage: voz --transcribe <audio file> [--model \(models)] [--vocab a,b]\n       voz --clean <text> [--vocab a,b]\n       voz --eval <cases.json> [--repeat n] [--budget-ms n]\n       voz --simulate-dictation <audio file> [--model \(models)] [--speed n] [--no-cleanup]\n       voz --measure-recorder <seconds>\n       voz --render-design <directory>")
+        printError("usage: voz --transcribe <audio file> [--model \(models)] [--vocab a,b]\n       voz --benchmark-speech <audio file> [--model \(models)] [--repeat 2...1000] [--vocab a,b]\n       voz --clean <text> [--vocab a,b]\n       voz --eval <cases.json> [--repeat n] [--budget-ms n]\n       voz --simulate-dictation <audio file> [--model \(models)] [--speed n] [--no-cleanup]\n       voz --measure-recorder <seconds>\n       voz --render-design <directory>")
         return 64
     }
 
@@ -54,8 +63,8 @@ enum Headless {
         let engine = SpeechEngine(parakeet: transcriber)
         let loadStart = Date()
         do {
+            try await engine.prepare(model)
             if model != .appleSpeech {
-                try await transcriber.prepare(model)
                 try await transcriber.prepareVocabulary(words)
             }
             let loadSeconds = Date().timeIntervalSince(loadStart)
@@ -80,15 +89,15 @@ enum Headless {
         }
         let cleanupEnabled = !arguments.contains("--no-cleanup")
         let transcriber = Transcriber()
+        let engine = SpeechEngine(parakeet: transcriber)
         let cleaner = TextCleaner()
         do {
-            try await transcriber.prepare(model)
+            try await engine.prepare(model)
             try await transcriber.prepareVocabulary([])
             let samples = try AudioConverter().resampleAudioFile(url)
             cleaner.prewarm(prompt: CleanupPrompt.standard, vocabulary: [])
             try? await Task.sleep(for: .seconds(1))
             _ = await cleaner.clean("Warm up the cleanup model before we start timing anything.", prompt: CleanupPrompt.standard, vocabulary: [])
-            let engine = SpeechEngine(parakeet: transcriber)
             let session = StreamingDictation(
                 transcribe: { try await engine.transcribe($0, model: model, vocabulary: []) },
                 cleaner: cleaner,

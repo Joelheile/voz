@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var transcriber = Transcriber { [modelStatus] mode, state in
         DispatchQueue.main.async { MainActor.assumeIsolated { modelStatus.update(mode, state) } }
     }
+    private lazy var speechEngine = SpeechEngine(parakeet: transcriber)
     private lazy var output = TextOutput(settings: settings)
     private let cleaner = TextCleaner()
     private let toast = ToastController()
@@ -18,7 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var vocabularyWords: [String] = []
     private lazy var dictation = Dictation(
         pipeline: DictationPipeline(
-            engine: SpeechEngine(parakeet: transcriber),
+            engine: speechEngine,
             cleaner: cleaner,
             settings: settings,
             history: history,
@@ -253,7 +254,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task {
             let started = Date()
             do {
-                try await transcriber.prepare(model)
+                try await speechEngine.prepare(model)
                 await transcriber.removeUnusedModels(keeping: model)
                 let seconds = Date().timeIntervalSince(started)
                 Log.app.notice("Model \(model.rawValue) ready in \(seconds, format: .fixed(precision: 1))s")
