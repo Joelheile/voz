@@ -85,10 +85,10 @@ final class VersionPingQueue {
 enum VersionPinger {
     private static let endpoint = URL(string: "\(Analytics.host)/i/v0/e/")!
 
-    static func sendPending(_ ping: VersionPing?, launch: LaunchVersion, enabled: Bool) {
+    static func sendPending(_ ping: VersionPing?, launch: LaunchVersion) {
         do {
             let queue = try VersionPingQueue()
-            guard enabled, UpdateChannel(version: launch.current) != .dev else { return try queue.clear() }
+            guard UpdateChannel(version: launch.current) != .dev else { return try queue.clear() }
             if let ping {
                 let pingID = InstallID(key: InstallID.versionPing).value
                 try queue.enqueue(ping, version: launch.current, previous: launch.updatedFrom, pingID: pingID, projectToken: Analytics.projectToken)
@@ -96,10 +96,6 @@ enum VersionPinger {
             Task {
                 do {
                     for body in queue.pending {
-                        guard UserDefaults.standard.bool(forKey: "versionPingEnabled") else {
-                            try queue.clear()
-                            return
-                        }
                         if try await send(body) { try queue.acknowledge(body) }
                     }
                 } catch {
@@ -113,7 +109,6 @@ enum VersionPinger {
 
     private static func send(_ body: Data) async throws -> Bool {
         for attempt in 1...3 {
-            guard UserDefaults.standard.bool(forKey: "versionPingEnabled") else { return false }
             var request = URLRequest(url: endpoint)
             request.httpMethod = "POST"
             request.timeoutInterval = 15

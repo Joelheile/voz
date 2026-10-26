@@ -154,9 +154,6 @@ struct SettingsPage: View {
             PanelRow(title: "Share usage stats", detail: "Counts and timings, never text or audio") {
                 Toggle("Share usage stats", isOn: $settings.analyticsEnabled).labelsHidden()
             }
-            PanelRow(title: "Send version", detail: "On install and update") {
-                Toggle("Send version", isOn: $settings.versionPingEnabled).labelsHidden()
-            }
         }
     }
 

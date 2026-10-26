@@ -109,7 +109,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             analytics.capture(.updateInstalled(from: previous, to: launch.current, channel: UpdateChannel(version: launch.current)))
         }
         let ping: VersionPing? = installID.isNew ? .install : launch.updatedFrom.map { _ in .update }
-        VersionPinger.sendPending(ping, launch: launch, enabled: settings.versionPingEnabled)
+        VersionPinger.sendPending(ping, launch: launch)
         updater.start()
         analytics.capture(.appLaunched)
         manageLaunchAgent()

@@ -13,7 +13,6 @@ private enum SettingsKey {
     static let cleanupEnabled = "cleanupEnabled"
     static let analyticsEnabled = "analyticsEnabled"
     static let receiveBetaUpdates = "receiveBetaUpdates"
-    static let versionPingEnabled = "versionPingEnabled"
     static let cleanupPrompt = "cleanupPrompt"
 }
 
@@ -64,9 +63,6 @@ final class AppSettings: ObservableObject {
     @Published var receiveBetaUpdates: Bool {
         didSet { defaults.set(receiveBetaUpdates, forKey: SettingsKey.receiveBetaUpdates) }
     }
-    @Published var versionPingEnabled: Bool {
-        didSet { defaults.set(versionPingEnabled, forKey: SettingsKey.versionPingEnabled) }
-    }
     @Published var cleanupPrompt: String {
         didSet {
             if cleanupPrompt == CleanupPrompt.standard {
@@ -102,7 +98,6 @@ final class AppSettings: ObservableObject {
             SettingsKey.cleanupEnabled: true,
             SettingsKey.analyticsEnabled: false,
             SettingsKey.receiveBetaUpdates: false,
-            SettingsKey.versionPingEnabled: true,
         ])
         hotkey = defaults.data(forKey: SettingsKey.hotkey)
             .flatMap { try? JSONDecoder().decode(Hotkey.self, from: $0) } ?? .rightCommand
@@ -116,7 +111,6 @@ final class AppSettings: ObservableObject {
         cleanupEnabled = defaults.bool(forKey: SettingsKey.cleanupEnabled)
         analyticsEnabled = defaults.bool(forKey: SettingsKey.analyticsEnabled)
         receiveBetaUpdates = defaults.bool(forKey: SettingsKey.receiveBetaUpdates)
-        versionPingEnabled = defaults.bool(forKey: SettingsKey.versionPingEnabled)
         cleanupPrompt = defaults.string(forKey: SettingsKey.cleanupPrompt) ?? CleanupPrompt.standard
         let choices = PipelineChoices.standard
         speechModel = choices.speechModel
