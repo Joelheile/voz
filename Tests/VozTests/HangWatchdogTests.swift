@@ -2,7 +2,7 @@ import Synchronization
 import Testing
 @testable import Voz
 
-@MainActor
+@MainActor @Suite(.serialized)
 struct HangWatchdogTests {
     @Test func reportsABlockedMainThreadOnce() async throws {
         let hangs = Atomic<Int>(0)

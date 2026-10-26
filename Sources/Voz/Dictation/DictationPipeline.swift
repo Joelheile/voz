@@ -59,6 +59,7 @@ final class DictationPipeline {
             let started = ContinuousClock.now
             guard let text = await extensions.transcribe(samples, model: selected, app: app) else {
                 Log.extensions.error("Speech model \(selected, privacy: .public) failed, using \(local.rawValue, privacy: .public)")
+                Analytics.report(.speechExtensionFailed)
                 return try await engine.transcribe(samples, model: local, vocabulary: vocabulary)
             }
             let elapsed = Double((ContinuousClock.now - started).wholeMilliseconds) / 1000
@@ -138,6 +139,7 @@ final class DictationPipeline {
             try await history.insert(record)
         } catch {
             Log.app.error("History save failed: \(error.localizedDescription, privacy: .private)")
+            Analytics.report(.historySaveFailed)
         }
         return record
     }

@@ -154,6 +154,7 @@ final class ExtensionService {
             try await launch()
         } catch {
             Log.extensions.error("Extensions failed to start: \(String(describing: error), privacy: .public)")
+            Analytics.report(.extensionsStartFailed)
             toast.show("Could not start extensions")
             catalog.fail("Extensions could not start: \(error)")
         }
@@ -337,6 +338,7 @@ final class ExtensionService {
         if ContinuousClock.now - started > Self.healthyUptime { restarts = 0 }
         guard restarts < Self.maxRestarts else {
             Log.extensions.error("Extension host keeps exiting, last status \(status), extensions stay off until the next change")
+            Analytics.report(.extensionHostCrashLoop)
             catalog.fail("Extensions keep crashing, so Voz turned them off. Voz tries again when you change an extension.")
             return
         }

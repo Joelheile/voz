@@ -4,6 +4,17 @@ enum VersionPing: String, Sendable, Encodable {
     case install
     case update
 
+    /// A version change is an update even when the ping ID is new, so installs that never pinged before do not count as new.
+    init?(pingIDIsNew: Bool, updatedFrom: String?) {
+        if updatedFrom != nil {
+            self = .update
+        } else if pingIDIsNew {
+            self = .install
+        } else {
+            return nil
+        }
+    }
+
     func body(version: String, previous: String?, pingID: UUID, projectToken: String) throws -> Data {
         let payload = Payload(
             uuid: UUID().uuidString,
@@ -84,19 +95,24 @@ final class VersionPingQueue {
 @MainActor
 enum VersionPinger {
     private static let endpoint = URL(string: "\(Analytics.host)/i/v0/e/")!
+    private static let retryInterval: Duration = .seconds(600)
 
-    static func sendPending(_ ping: VersionPing?, launch: LaunchVersion) {
+    static func sendPending(launch: LaunchVersion) {
         do {
             let queue = try VersionPingQueue()
-            guard UpdateChannel(version: launch.current) != .dev else { return try queue.clear() }
-            if let ping {
-                let pingID = InstallID(key: InstallID.versionPing).value
-                try queue.enqueue(ping, version: launch.current, previous: launch.updatedFrom, pingID: pingID, projectToken: Analytics.projectToken)
+            guard SystemContext.isOfficialBuild, UpdateChannel(version: launch.current) != .dev else { return try queue.clear() }
+            let pingID = InstallID(key: InstallID.versionPing)
+            if let ping = VersionPing(pingIDIsNew: pingID.isNew, updatedFrom: launch.updatedFrom) {
+                try queue.enqueue(ping, version: launch.current, previous: launch.updatedFrom, pingID: pingID.value, projectToken: Analytics.projectToken)
             }
             Task {
                 do {
-                    for body in queue.pending {
-                        if try await send(body) { try queue.acknowledge(body) }
+                    while true {
+                        for body in queue.pending where try await send(body) {
+                            try queue.acknowledge(body)
+                        }
+                        if queue.pending.isEmpty { return }
+                        try await Task.sleep(for: retryInterval)
                     }
                 } catch {
                     Log.app.error("Version ping retry stopped: \(error.localizedDescription, privacy: .public)")

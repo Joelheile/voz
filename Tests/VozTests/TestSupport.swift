@@ -107,6 +107,11 @@ func makeVersionPingQueue() -> () throws -> VersionPingQueue {
     return { try VersionPingQueue(defaults: defaults) }
 }
 
+func recordLaunches(_ versions: [String]) -> [LaunchVersion] {
+    let defaults = UserDefaults(suiteName: UUID().uuidString)!
+    return versions.map { LaunchVersion.record($0, in: defaults) }
+}
+
 func makePingID() -> (UUID, String) {
     let id = UUID()
     return (id, id.uuidString)

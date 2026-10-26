@@ -45,6 +45,7 @@ enum LaunchAgent {
             try? await Task.sleep(for: .seconds(1))
         }
         Log.app.error("Launch agent failed, staying unmanaged")
+        Analytics.report(.launchAgentFailed)
         return false
     }
 

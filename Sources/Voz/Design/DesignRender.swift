@@ -86,7 +86,7 @@ private final class Fixture {
     let status = ModelStatus()
     let history: HistoryStore
     let sources: PopoverSources
-    let analytics = Analytics(enabled: false, installID: UUID())
+    let analytics = Analytics(usage: false, errors: false, installID: UUID())
     let records: [TranscriptRecord]
 
     init() throws {

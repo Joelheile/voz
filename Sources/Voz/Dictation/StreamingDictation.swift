@@ -157,6 +157,7 @@ final class StreamingDictation {
                 return try await transcribe(audio)
             } catch {
                 Log.app.error("Segment transcription failed: \(error.localizedDescription, privacy: .private)")
+                Analytics.report(.segmentTranscriptionFailed)
                 return nil
             }
         }

@@ -13,13 +13,31 @@ struct UsageSessionTests {
         let event = AnalyticsEvent.dictationFailed(stage: .transcription, errorCode: .transcriptionFailed)
         #expect(event.failure?.stage == "transcription")
         #expect(event.failure?.code == "transcription_failed")
-        #expect(AnalyticsEvent.appLaunched.failure == nil)
-        #expect(AnalyticsEvent.appHang.name == "app_hang")
-        #expect(AnalyticsEvent.appHang.failure?.stage == "main_thread")
-        #expect(AnalyticsEvent.appHang.failure?.code == "app_hang")
+        #expect(AnalyticsEvent.appLaunched(byLaunchAgent: false).failure == nil)
+        #expect(AppError.appHang.stage == "main_thread")
+        #expect(AppError.appHang.rawValue == "app_hang")
+        #expect(AppError.accessibilityDenied.stage == "delivery")
         let interrupted = AnalyticsEvent.dictationFailed(stage: .recording, errorCode: .recorderInterrupted)
         #expect(interrupted.failure?.code == "recorder_interrupted")
         #expect(AnalyticsEvent.appSession(seconds: 60, state: .heartbeat).properties == ["seconds": .integer(60), "state": .text("heartbeat")])
+    }
+
+    @Test func errorReportsAndUsageFollowTheirOwnSetting() {
+        #expect(Analytics.allows("$exception", usage: false, errors: true))
+        #expect(!Analytics.allows("dictation_completed", usage: false, errors: true))
+        #expect(!Analytics.allows("$exception", usage: true, errors: false))
+        #expect(Analytics.allows("dictation_completed", usage: true, errors: false))
+    }
+
+    @Test func crashReportsCarryTheVersionThatCrashed() {
+        let crash = Analytics.stampingAppVersion(["$app_version": "0.0.4"])
+        #expect(crash["app_version"] as? String == "0.0.4")
+        let usage = Analytics.stampingAppVersion(["app_version": "0.0.5", "$app_version": "0.0.4"])
+        #expect(usage["app_version"] as? String == "0.0.5")
+    }
+
+    @Test func launchesSayWhetherTheLaunchAgentStartedVoz() {
+        #expect(AnalyticsEvent.appLaunched(byLaunchAgent: true).properties == ["by_launch_agent": .flag(true)])
     }
 
     @Test func extensionEventsNameOnlyPublicNpmPackages() {
@@ -70,6 +88,21 @@ struct VersionPingQueueTests {
         #expect(try restore().pending.count == 1)
         try restored.clear()
         #expect(try restore().pending.isEmpty)
+    }
+}
+
+struct VersionPingKindTests {
+    @Test func firstOfficialLaunchIsAnInstallAndAVersionChangeIsAnUpdate() {
+        #expect(VersionPing(pingIDIsNew: true, updatedFrom: nil) == .install)
+        #expect(VersionPing(pingIDIsNew: false, updatedFrom: "0.0.4") == .update)
+        #expect(VersionPing(pingIDIsNew: true, updatedFrom: "0.0.4") == .update)
+        #expect(VersionPing(pingIDIsNew: false, updatedFrom: nil) == nil)
+    }
+
+    @Test func devBuildsDoNotMakeTheNextOfficialLaunchLookLikeAnUpdate() {
+        let launches = recordLaunches(["0.0.5", "0.0.0-dev", "0.0.5"])
+        #expect(launches.map(\.updatedFrom) == [nil, nil, nil])
+        #expect(recordLaunches(["0.0.4", "0.0.0-dev", "0.0.5"]).last?.updatedFrom == "0.0.4")
     }
 }
 

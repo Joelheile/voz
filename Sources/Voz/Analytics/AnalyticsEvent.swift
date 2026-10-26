@@ -2,8 +2,7 @@ enum AnalyticsEvent: Equatable, Sendable {
     case appOpened
     case appSession(seconds: Int, state: SessionState)
     case modelFailed(model: SpeechModel)
-    case appLaunched
-    case appHang
+    case appLaunched(byLaunchAgent: Bool)
     case permissionResult(permission: PermissionName, granted: Bool)
     case dictationCompleted(DictationMetrics)
     case dictationFailed(stage: DictationStage, errorCode: DictationErrorCode)
@@ -25,7 +24,6 @@ enum AnalyticsEvent: Equatable, Sendable {
         case .appSession: "app_session"
         case .modelFailed: "model_failed"
         case .appLaunched: "app_launched"
-        case .appHang: "app_hang"
         case .permissionResult: "permission_result"
         case .dictationCompleted: "dictation_completed"
         case .dictationFailed: "dictation_failed"
@@ -57,7 +55,9 @@ enum AnalyticsEvent: Equatable, Sendable {
             ["seconds": .integer(seconds), "state": .text(state.rawValue)]
         case let .modelFailed(model):
             ["model": .text(model.rawValue)]
-        case .appLaunched, .appHang, .appOpened, .historyOpened, .statsOpened:
+        case let .appLaunched(byLaunchAgent):
+            ["by_launch_agent": .flag(byLaunchAgent)]
+        case .appOpened, .historyOpened, .statsOpened:
             [:]
         case let .modelDownload(model, seconds, success, bytes):
             ["model": .text(model.rawValue), "seconds": .integer(seconds), "success": .flag(success), "bytes": .integer(bytes)]
@@ -82,7 +82,6 @@ enum AnalyticsEvent: Equatable, Sendable {
         switch self {
         case let .dictationFailed(stage, errorCode): (stage.rawValue, errorCode.rawValue)
         case .modelFailed: ("model_loading", "model_load_failed")
-        case .appHang: ("main_thread", "app_hang")
         case .modelDownload(_, _, false, _): ("model_download", "model_download_failed")
         case let .extensionFailed(change, _, failure): ("extension_\(change.rawValue)", failure.rawValue)
         default: nil
@@ -112,6 +111,34 @@ enum AnalyticsEvent: Equatable, Sendable {
             "trigger": .text(metrics.trigger.rawValue),
             "output": .text(metrics.output.rawValue),
         ]
+    }
+}
+
+/// Failures that have no usage event of their own. Codes are fixed strings, never error messages, which can contain paths or text.
+enum AppError: String, Sendable {
+    case appHang = "app_hang"
+    case muteFailed = "mute_failed"
+    case segmentTranscriptionFailed = "segment_transcription_failed"
+    case speechExtensionFailed = "speech_extension_failed"
+    case cleanupFailed = "cleanup_failed"
+    case accessibilityDenied = "accessibility_denied"
+    case noPasteKey = "no_paste_key"
+    case historySaveFailed = "history_save_failed"
+    case extensionsStartFailed = "extensions_start_failed"
+    case extensionHostCrashLoop = "extension_host_crash_loop"
+    case launchAgentFailed = "launch_agent_failed"
+
+    var stage: String {
+        switch self {
+        case .appHang: "main_thread"
+        case .muteFailed: "recording"
+        case .segmentTranscriptionFailed, .speechExtensionFailed: "transcription"
+        case .cleanupFailed: "cleanup"
+        case .accessibilityDenied, .noPasteKey: "delivery"
+        case .historySaveFailed: "history"
+        case .extensionsStartFailed, .extensionHostCrashLoop: "extensions"
+        case .launchAgentFailed: "launch"
+        }
     }
 }
 
