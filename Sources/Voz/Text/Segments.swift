@@ -54,6 +54,11 @@ enum SentenceChunks {
         return chunks.map { $0.joined() }
     }
 
+    static func splitLastSentence(_ text: String) -> (before: String, last: String) {
+        let sentences = sentences(in: text)
+        return (sentences.dropLast().joined().joined(), sentences.last?.joined() ?? "")
+    }
+
     private static func sentences(in text: String) -> [[String]] {
         var sentences: [[String]] = []
         var current: [String] = []

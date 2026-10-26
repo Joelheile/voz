@@ -75,7 +75,7 @@ final class DictationPipeline {
                 analytics.capture(.dictationDiscarded(reason: .emptyTranscript))
                 return .discarded
             }
-            Log.app.notice("Transcribed \(transcript.audioSeconds, format: .fixed(precision: 1))s with \(transcript.model): \(transcript.segmentCount) segments, \(transcript.cleanedInTime) cleaned in time, tail STT \(transcript.sttMs) ms, cleanup wait \(transcript.cleaned.milliseconds) ms")
+            Log.app.notice("Transcribed \(transcript.audioSeconds, format: .fixed(precision: 1))s with \(transcript.model): \(transcript.segmentCount) segments, \(transcript.cleanedInTime) of \(transcript.unitCount) sentence groups cleaned in time, tail STT \(transcript.sttMs) ms, cleanup wait \(transcript.cleaned.milliseconds) ms")
             let delivery = await extensions.prepare(transcript.cleaned.text, raw: transcript.raw, app: recording.app)
             let insertStarted = ContinuousClock.now
             if !delivery.text.isEmpty {

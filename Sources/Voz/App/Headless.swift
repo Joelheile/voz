@@ -112,7 +112,7 @@ enum Headless {
             let latency = (clock.now - released).wholeMilliseconds
             print("raw: \(transcript.raw)")
             print("final: \(transcript.cleaned.text)")
-            print("audio_s=\(Int(transcript.audioSeconds)) release_to_text_ms=\(latency) segments=\(transcript.segmentCount) cleaned_in_time=\(transcript.cleanedInTime) tail_stt_ms=\(transcript.sttMs) cleanup_wait_ms=\(transcript.cleaned.milliseconds) timed_out=\(transcript.cleaned.timedOut)")
+            print("audio_s=\(Int(transcript.audioSeconds)) release_to_text_ms=\(latency) segments=\(transcript.segmentCount) units=\(transcript.unitCount) cleaned_in_time=\(transcript.cleanedInTime) tail_stt_ms=\(transcript.sttMs) cleanup_wait_ms=\(transcript.cleaned.milliseconds) timed_out=\(transcript.cleaned.timedOut)")
             return 0
         } catch {
             printError("simulation failed: \(error)")
