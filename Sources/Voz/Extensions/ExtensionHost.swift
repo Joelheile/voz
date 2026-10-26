@@ -18,6 +18,7 @@ actor ExtensionHost {
     private let onAction: @Sendable (HostAction) -> Void
     private let onLog: @Sendable (String) -> Void
     private let onExit: @Sendable (Int32) -> Void
+    private let generate: @Sendable (GenerateParams) async throws -> String
     private var process: Process?
     private var input: FileHandle?
     private var buffer = Data()
@@ -32,12 +33,14 @@ actor ExtensionHost {
         launch: Launch,
         onAction: @escaping @Sendable (HostAction) -> Void,
         onLog: @escaping @Sendable (String) -> Void,
-        onExit: @escaping @Sendable (Int32) -> Void
+        onExit: @escaping @Sendable (Int32) -> Void,
+        generate: @escaping @Sendable (GenerateParams) async throws -> String = ExtensionModel.generate
     ) {
         self.launch = launch
         self.onAction = onAction
         self.onLog = onLog
         self.onExit = onExit
+        self.generate = generate
     }
 
     func start(timeout: Duration = .seconds(30)) async throws -> HostManifest {
@@ -98,8 +101,8 @@ actor ExtensionHost {
         return decodeResult(PromptParams.self, from: data)?.prompt ?? prompt
     }
 
-    func runCommand(phrase: String, text: String, app: HostApp, timeout: Duration) async -> Bool {
-        let data = await request("command", CommandParams(phrase: phrase, text: text, app: app), timeout: timeout)
+    func runCommand(_ command: VoiceCommandMatch, app: HostApp, timeout: Duration) async -> Bool {
+        let data = await request("command", CommandParams(phrase: command.phrase, at: command.at, text: command.text, app: app), timeout: timeout)
         return decodeResult(CommandResult.self, from: data)?.handled ?? false
     }
 
@@ -214,7 +217,38 @@ actor ExtensionHost {
         case "press": decodeNotification(PressParams.self, line).map { onAction(.press($0.key)) }
         case "notify": decodeNotification(TextParams.self, line).map { onAction(.notify($0.text)) }
         case "log": decodeNotification(TextParams.self, line).map { onLog($0.text) }
+        case "generate": decodeNotification(GenerateParams.self, line).map(answer)
         default: onLog("Extension host sent unknown method \(envelope.method ?? "nil")")
+        }
+    }
+
+    private func answer(_ params: GenerateParams) {
+        Task { [generate] in
+            let reply: GeneratedParams
+            do {
+                reply = GeneratedParams(call: params.call, json: try await generate(params), error: nil)
+            } catch {
+                reply = GeneratedParams(call: params.call, json: nil, error: error.localizedDescription)
+            }
+            post(HostReply(method: "generated", params: reply, deadline: params.deadline))
+        }
+    }
+
+    private func post<Params: Encodable>(_ reply: HostReply<Params>) {
+        guard let input else { return }
+        let line: Data
+        do {
+            line = try JSONEncoder().encode(reply) + Data("\n".utf8)
+        } catch {
+            onLog("Extension host reply failed to encode: \(error)")
+            return
+        }
+        writes.async { [onLog] in
+            do {
+                try input.write(contentsOf: line)
+            } catch {
+                onLog("Extension host write failed: \(error.localizedDescription)")
+            }
         }
     }
 

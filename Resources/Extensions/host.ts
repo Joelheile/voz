@@ -20,10 +20,14 @@ import type {
   CleanupModel,
   CleanupStep,
   CommandEvent,
+  CommandOptions,
   Context,
+  GenerateRequest,
+  Generated,
   Extension,
   ExtensionAPI,
   RecordingEvent,
+  Schema,
   Setting,
   SettingsValues,
   SettingsSchema,
@@ -48,15 +52,26 @@ type Handler = {
   extension: string;
   run: (event: object, ctx: Context) => HandlerResult | Promise<HandlerResult>;
 };
+type CommandPosition = NonNullable<CommandOptions["at"]>;
 type Command = {
   extension: string;
   phrase: string;
+  at: CommandPosition;
   run: (event: CommandEvent, ctx: Context) => void | Promise<void>;
 };
 type CleanupRequest = BeforeCleanupEvent & { app: App };
 type InsertRequest = BeforeInsertEvent & { app: App };
 type EmitRequest = { event: EventName; payload: object; app: App };
-type CommandRequest = CommandEvent & { phrase: string; app: App };
+type CommandRequest = CommandEvent & { phrase: string; at: CommandPosition; app: App };
+type WireSchema = {
+  type: Schema["type"];
+  description?: string;
+  enum?: readonly string[];
+  items?: WireSchema;
+  properties?: { name: string; schema: WireSchema; optional: boolean }[];
+};
+type Generation = { resolve: (value: object) => void; reject: (error: Error) => void };
+type GeneratedReply = { call: number; json?: string; error?: string };
 type TranscribeRequest = { model: string; path: string; seconds: number; app: App };
 type CleanRequest = { model: string; text: string; prompt: string; app: App };
 type StepRequest = { step: string; text: string; app: App };
@@ -99,7 +114,7 @@ class Registration {
   }
 }
 
-const apiVersion = 1;
+const apiVersion = 2;
 const loadTimeout = 3000;
 const write = process.stdout.write.bind(process.stdout);
 const send = (message: object) => write(JSON.stringify(message) + "\n");
@@ -132,6 +147,8 @@ const speechModels = new Map<string, SpeechModel>();
 const cleanupModels = new Map<string, CleanupModel>();
 const cleanupSteps = new Map<string, CleanupStep>();
 const actions = new Map<string, Action & { extension: string }>();
+const generations = new Map<number, Generation>();
+let lastCall = 0;
 const settingsSchemas = new Map<string, SettingsSchema>();
 const loaded: string[] = [];
 const errors: LoadError[] = [];
@@ -148,16 +165,76 @@ Bun.plugin({
 
 function context(app: App): Context {
   const scope = requestScope.getStore();
+  const isLive = () => scope?.active === true && Date.now() < scope.deadline;
   const action = (method: string, params: { text: string } | { key: string }) => {
-    if (!scope?.active || Date.now() >= scope.deadline) return;
-    send({ method, params, requestID: scope.id });
+    if (!isLive()) return;
+    send({ method, params, requestID: scope!.id });
   };
   return {
     app,
     insert: (text) => action("insert", { text }),
     press: (key) => action("press", { key }),
     notify: (text) => action("notify", { text }),
+    generate: (request) => {
+      if (!isLive()) return Promise.reject(new Error("generate only works while a handler runs"));
+      return generate(request, scope!);
+    },
   };
+}
+
+function wireSchema(schema: Schema): WireSchema {
+  const { type, description } = schema;
+  switch (schema.type) {
+    case "object": {
+      const required = schema.required ?? [];
+      return {
+        type,
+        description,
+        properties: Object.entries(schema.properties).map(([name, property]) => ({
+          name,
+          schema: wireSchema(property),
+          optional: !required.includes(name),
+        })),
+      };
+    }
+    case "array":
+      return { type, description, items: wireSchema(schema.items) };
+    case "string":
+      return { type, description, enum: schema.enum };
+    case "number":
+    case "integer":
+    case "boolean":
+      return { type, description };
+    default:
+      throw new Error(`Unsupported schema type "${type}"`);
+  }
+}
+
+function generate<S extends Schema>(request: GenerateRequest<S>, scope: RequestScope) {
+  const call = ++lastCall;
+  const params = { call, prompt: request.prompt, instructions: request.instructions, schema: wireSchema(request.schema), deadline: scope.deadline };
+  return new Promise<Generated<S>>((resolve, reject) => {
+    const timer = setTimeout(() => settle({ call, error: "The on-device model ran out of time" }), scope.deadline - Date.now());
+    generations.set(call, {
+      resolve: (value) => {
+        clearTimeout(timer);
+        resolve(value as Generated<S>);
+      },
+      reject: (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    });
+    send({ method: "generate", params, requestID: scope.id });
+  });
+}
+
+function settle({ call, json, error }: GeneratedReply) {
+  const generation = generations.get(call);
+  if (!generation) return;
+  generations.delete(call);
+  if (json === undefined) generation.reject(new Error(error ?? "The on-device model failed"));
+  else generation.resolve(JSON.parse(json));
 }
 
 function register<T extends Component>(
@@ -283,12 +360,14 @@ function api(name: string, config: Config, registration: Registration): Extensio
       });
       handlers.set(event, [...(handlers.get(event) ?? []), registered]);
     },
-    registerCommand(phrase, handler) {
-      const key = phrase.trim().toLowerCase();
+    registerCommand(phrase, handler, options) {
+      const at = options?.at ?? "end";
+      if (at !== "start" && at !== "end") throw new Error(`Command "${phrase}" needs at: "start" or "end"`);
+      const key = commandKey(phrase, at);
       const existing = commands.get(key);
       if (existing)
         log(`${name} replaces command "${phrase}" from ${existing.extension}`);
-      setRegistered(commands, key, { extension: name, phrase, run: handler }, registration);
+      setRegistered(commands, key, { extension: name, phrase, at, run: handler }, registration);
     },
     registerSpeechModel: (model) =>
       register(speechModels, "speech model", name, model, registration),
@@ -396,8 +475,12 @@ async function emit({ event, payload, app }: EmitRequest) {
   return {};
 }
 
-async function command({ phrase, text, app }: CommandRequest) {
-  const match = commands.get(phrase.trim().toLowerCase());
+function commandKey(phrase: string, at: CommandPosition) {
+  return `${at}:${phrase.trim().toLowerCase()}`;
+}
+
+async function command({ phrase, at, text, app }: CommandRequest) {
+  const match = commands.get(commandKey(phrase, at));
   if (!match) return { handled: false };
   await match.run({ text }, context(app));
   return { handled: true };
@@ -473,7 +556,7 @@ send({
   params: {
     extensions: loaded,
     events: [...handlers.keys()],
-    commands: [...commands.values()].map(({ extension, phrase }) => ({ extension, phrase })),
+    commands: [...commands.values()].map(({ extension, phrase, at }) => ({ extension, phrase, at })),
     speechModels: components(speechModels),
     cleanupModels: components(cleanupModels),
     cleanupSteps: components(cleanupSteps),
@@ -490,6 +573,10 @@ for await (const line of createInterface({ input: process.stdin })) {
   if (!line.trim()) continue;
   const request = parseRequest(line);
   if (!request) continue;
+  if (request.method === "generated") {
+    settle(request.params);
+    continue;
+  }
   const method = Object.hasOwn(methods, request.method)
     ? methods[request.method as keyof typeof methods]
     : undefined;

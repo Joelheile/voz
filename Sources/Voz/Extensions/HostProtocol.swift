@@ -32,9 +32,14 @@ struct HostComponent: Decodable, Equatable, Hashable, Sendable {
     let name: String
 }
 
+enum CommandPosition: String, Codable, Sendable {
+    case start, end
+}
+
 struct ExtensionCommand: Decodable, Equatable, Hashable, Sendable {
     let `extension`: String
     let phrase: String
+    let at: CommandPosition
 }
 
 struct ExtensionAction: Decodable, Equatable, Hashable, Sendable {
@@ -174,6 +179,18 @@ struct HostRequest<Params: Encodable>: Encodable {
     let deadline: Double
 }
 
+struct HostReply<Params: Encodable>: Encodable {
+    let method: String
+    let params: Params
+    let deadline: Double
+}
+
+struct GeneratedParams: Encodable {
+    let call: Int
+    let json: String?
+    let error: String?
+}
+
 struct InsertParams: Encodable {
     let text: String
     let raw: String
@@ -216,6 +233,7 @@ struct ActionParams: Encodable {
 
 struct CommandParams: Encodable {
     let phrase: String
+    let at: CommandPosition
     let text: String
     let app: HostApp
 }
@@ -261,21 +279,24 @@ struct CommandResult: Decodable {
 
 struct VoiceCommandMatch: Equatable, Sendable {
     let phrase: String
-    let leadingText: String
+    let at: CommandPosition
+    let text: String
 }
 
 enum VoiceCommands {
-    static func match(_ text: String, phrases: [String]) -> VoiceCommandMatch? {
+    private static let separators = CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: ",;:"))
+
+    static func match(_ text: String, commands: [ExtensionCommand]) -> VoiceCommandMatch? {
         let words = wordRanges(in: text)
-        let candidates = phrases
-            .map { (phrase: $0, words: WordTokens.alphanumeric($0)) }
+        let candidates = commands
+            .map { (command: $0, words: WordTokens.alphanumeric($0.phrase)) }
             .filter { !$0.words.isEmpty && $0.words.count <= words.count }
-            .sorted { $0.words.count > $1.words.count }
+            .sorted { ($0.command.at == .start ? 1 : 0, $0.words.count) > ($1.command.at == .start ? 1 : 0, $1.words.count) }
         for candidate in candidates {
-            let tail = words.suffix(candidate.words.count)
-            guard tail.map({ text[$0].lowercased() }) == candidate.words, let first = tail.first else { continue }
-            let leading = text[..<first.lowerBound].trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: ",;:")))
-            return VoiceCommandMatch(phrase: candidate.phrase, leadingText: leading)
+            let spoken = candidate.command.at == .start ? words.prefix(candidate.words.count) : words.suffix(candidate.words.count)
+            guard spoken.map({ text[$0].lowercased() }) == candidate.words, let first = spoken.first, let last = spoken.last else { continue }
+            let rest = candidate.command.at == .start ? text[last.upperBound...] : text[..<first.lowerBound]
+            return VoiceCommandMatch(phrase: candidate.command.phrase, at: candidate.command.at, text: rest.trimmingCharacters(in: separators))
         }
         return nil
     }
