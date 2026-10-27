@@ -187,6 +187,8 @@ function wireSchema(schema: Schema): WireSchema {
   switch (schema.type) {
     case "object": {
       const required = schema.required ?? [];
+      const unknown = required.find((name) => !Object.hasOwn(schema.properties, name));
+      if (unknown !== undefined) throw new Error(`Required property "${unknown}" is not in properties`);
       return {
         type,
         description,
@@ -212,8 +214,8 @@ function wireSchema(schema: Schema): WireSchema {
 
 function generate<S extends Schema>(request: GenerateRequest<S>, scope: RequestScope) {
   const call = ++lastCall;
-  const params = { call, prompt: request.prompt, instructions: request.instructions, schema: wireSchema(request.schema), deadline: scope.deadline };
   return new Promise<Generated<S>>((resolve, reject) => {
+    const params = { call, prompt: request.prompt, instructions: request.instructions, schema: wireSchema(request.schema), deadline: scope.deadline };
     const timer = setTimeout(() => settle({ call, error: "The on-device model ran out of time" }), scope.deadline - Date.now());
     generations.set(call, {
       resolve: (value) => {

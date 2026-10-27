@@ -97,6 +97,16 @@ struct ExtensionHostTests {
         await host.stop()
     }
 
+    @Test func generateRejectsRequiredNamesThatAreNotProperties() async throws {
+        try extensionFile("extract.ts", #"export default (voz) => voz.registerCommand("todo", async (e, ctx) => { try { await ctx.generate({ prompt: e.text, schema: { type: "object", properties: { title: { type: "string" } }, required: ["titel"] } }) } catch (error) { ctx.notify(error.message) } }, { at: "start" })"#)
+        let actions = RecordedActions()
+        let host = makeHost(actions: actions)
+        _ = try await host.start()
+        #expect(await host.runCommand(VoiceCommandMatch(phrase: "todo", at: .start, text: "x"), app: app, timeout: .seconds(2)))
+        #expect(actions.all == [.notify(#"Required property "titel" is not in properties"#)])
+        await host.stop()
+    }
+
     @Test func brokenOrHangingExtensionsAreReportedAndOthersStillLoad() async throws {
         try extensionFile("broken.ts", "export default (voz) => { syntax error here")
         try extensionFile("partial.ts", #"export default (voz) => { voz.on("beforeInsert", () => ({ text: "leaked" })); throw new Error("boom") }"#)
