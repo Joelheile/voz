@@ -21,23 +21,36 @@ func withTimeout<Value: Sendable>(
     onTimeout: any Error,
     operation: @escaping @Sendable () async throws -> Value
 ) async throws -> Value {
-    try await withCheckedThrowingContinuation { continuation in
-        let gate = SingleResume(continuation)
-        let work = Task {
-            do {
-                gate.resume(with: .success(try await operation()))
-            } catch {
-                gate.resume(with: .failure(error))
+    let cancel = OSAllocatedUnfairLock<(@Sendable () -> Void)?>(initialState: nil)
+    return try await withTaskCancellationHandler {
+        try await withCheckedThrowingContinuation { continuation in
+            let gate = SingleResume(continuation)
+            let work = Task {
+                do {
+                    gate.resume(with: .success(try await operation()))
+                } catch {
+                    gate.resume(with: .failure(error))
+                }
             }
-        }
-        Task {
-            do {
-                try await Task.sleep(for: timeout)
-            } catch {
-                return
+            let timer = Task {
+                do {
+                    try await Task.sleep(for: timeout)
+                } catch {
+                    return
+                }
+                gate.resume(with: .failure(onTimeout))
+                work.cancel()
             }
-            gate.resume(with: .failure(onTimeout))
-            work.cancel()
+            cancel.withLock {
+                $0 = {
+                    gate.resume(with: .failure(CancellationError()))
+                    work.cancel()
+                    timer.cancel()
+                }
+            }
+            if Task.isCancelled { cancel.withLock { $0 }?() }
         }
+    } onCancel: {
+        cancel.withLock { $0 }?()
     }
 }

@@ -8,10 +8,13 @@ enum CleanupError: Error {
 
 @MainActor
 final class LanguageModelCleaner {
+    static let maximumTranscriptEntries = 30
+
     private let model = SystemLanguageModel(guardrails: .permissiveContentTransformations)
     private let examples: [CleanupExample]
     private var instructions = ""
-    private var warmSession: LanguageModelSession?
+    private var session: LanguageModelSession?
+    private var running: Task<String, Error>?
 
     init(examples: [CleanupExample]) {
         self.examples = examples
@@ -26,32 +29,57 @@ final class LanguageModelCleaner {
 
     func prewarm(instructions: String) {
         guard availabilityDescription == nil else { return }
-        if warmSession != nil, instructions == self.instructions { return }
+        if running != nil { return }
+        if let session, instructions == self.instructions, isReusable(session) { return }
         self.instructions = instructions
-        startWarmSession()
+        startSession()
     }
 
     func clean(_ text: String, instructions: String, wordCount: Int, timeout: Duration) async throws -> String {
         if let reason = availabilityDescription { throw CleanupError.modelUnavailable(reason) }
         if instructions != self.instructions {
             self.instructions = instructions
-            warmSession = nil
+            session = nil
         }
-        let session = warmSession ?? makeSession()
-        warmSession = nil
         let options = GenerationOptions(
             sampling: .greedy,
             maximumResponseTokens: CleanupBudget.maxResponseTokens(forWords: wordCount)
         )
         return try await withTimeout(timeout, onTimeout: CleanupError.timedOut) {
-            try await session.respond(to: CleanupInstructions.transcriptPrompt(for: text), options: options).content
+            try await self.respond(to: text, options: options)
         }
     }
 
-    private func startWarmSession() {
+    private func respond(to text: String, options: GenerationOptions) async throws -> String {
+        while let current = running {
+            _ = await current.result
+            if running == current { running = nil }
+        }
+        try Task.checkCancellation()
+        let session = self.session.flatMap { isReusable($0) ? $0 : nil } ?? makeSession()
+        self.session = session
+        let response = Task {
+            try await session.respond(to: CleanupInstructions.transcriptPrompt(for: text), options: options).content
+        }
+        running = response
+        defer { if running == response { running = nil } }
+        return try await withTaskCancellationHandler {
+            try await response.value
+        } onCancel: {
+            response.cancel()
+        }
+    }
+
+    private func startSession() {
         let session = makeSession()
         session.prewarm(promptPrefix: Prompt(CleanupInstructions.promptPrefix))
-        warmSession = session
+        self.session = session
+    }
+
+    private func isReusable(_ session: LanguageModelSession) -> Bool {
+        guard !session.isResponding, session.transcript.count < Self.maximumTranscriptEntries, let last = session.transcript.last else { return false }
+        if case .response = last { return true }
+        return false
     }
 
     private func makeSession() -> LanguageModelSession {

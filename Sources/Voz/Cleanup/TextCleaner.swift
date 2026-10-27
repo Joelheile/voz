@@ -84,6 +84,9 @@ final class TextCleaner {
     }
 
     private func modelPass(_ text: String, prompt: String, vocabulary: [String], casing: [String], model extensionModel: CleanupExtensions.Model?, deadline: ContinuousClock.Instant) async -> [ChunkResult] {
+        if prompt == CleanupPrompt.standard, !CleanupWork.needsModel(text) {
+            return [ChunkResult(text: text, removed: 0, timedOut: false, rejection: nil)]
+        }
         let instructions = CleanupInstructions.text(prompt: prompt, vocabulary: vocabulary)
         if let extensionModel {
             return [await cleanChunk(text, casing: casing, deadline: deadline) { chunk, _, timeout in
@@ -134,6 +137,8 @@ final class TextCleaner {
                 timedOut: false,
                 rejection: nil
             )
+        } catch is CancellationError {
+            return unchanged
         } catch CleanupError.timedOut {
             Log.app.notice("Cleanup chunk timed out, using rule-pass text")
             return ChunkResult(text: chunk, removed: 0, timedOut: true, rejection: nil)

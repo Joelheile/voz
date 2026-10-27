@@ -35,6 +35,17 @@ private final class CleanupUnit {
     }
 }
 
+@MainActor
+private final class Speculation {
+    let raw: String
+    let result: Task<CleanedText, Never>
+
+    init(raw: String, result: Task<CleanedText, Never>) {
+        self.raw = raw
+        self.result = result
+    }
+}
+
 typealias SegmentTranscriber = @MainActor ([Float]) async throws -> TranscriptionResult
 
 @MainActor
@@ -55,6 +66,7 @@ final class StreamingDictation {
     private var units: [CleanupUnit] = []
     private var openText = ""
     private var collectedSegments = 0
+    private var speculation: Speculation?
     private var releaseDeadline: ContinuousClock.Instant?
     private var closed = false
 
@@ -98,6 +110,7 @@ final class StreamingDictation {
             segment.collection?.cancel()
         }
         segments = []
+        speculation?.result.cancel()
     }
 
     func finish(samples: [Float], released: ContinuousClock.Instant) async throws -> StreamedTranscript? {
@@ -121,11 +134,16 @@ final class StreamingDictation {
         let rest = Task {
             await previous?.value
             guard let unit = closeOpenText() else { return }
-            await cleanUp(unit)
+            if let speculation, speculation.raw == unit.raw {
+                unit.cleaned = await speculation.result.value
+            } else {
+                await cleanUp(unit)
+            }
         }
         await wait(for: rest, until: deadline)
         rest.cancel()
         for segment in segments { segment.collection?.cancel() }
+        speculation?.result.cancel()
         prompt.cancel()
         let cleanupWait = ContinuousClock.now - transcribedAt
 
@@ -190,14 +208,15 @@ final class StreamingDictation {
         segment.collection = Task {
             await previous?.value
             guard let result = await transcription.value else { return }
-            guard let unit = collect(result.text) else { return }
-            await cleanUp(unit)
+            if let unit = collect(result.text) { await cleanUp(unit) }
+            speculate()
         }
         return segment
     }
 
     private func collect(_ text: String) -> CleanupUnit? {
         collectedSegments += 1
+        defer { dropStaleSpeculation() }
         let split = SentenceChunks.splitLastSentence(text)
         guard !split.before.isEmpty else {
             openText = SegmentJoiner.join([openText, text])
@@ -207,6 +226,18 @@ final class StreamingDictation {
         let settled = SegmentJoiner.join([openText, split.before])
         openText = split.last.trimmingCharacters(in: .whitespacesAndNewlines)
         return addUnit(settled)
+    }
+
+    private func dropStaleSpeculation() {
+        guard let speculation, speculation.raw != openText else { return }
+        speculation.result.cancel()
+        self.speculation = nil
+    }
+
+    private func speculate() {
+        guard speculation == nil, !openText.isEmpty, !Task.isCancelled else { return }
+        let raw = openText
+        speculation = Speculation(raw: raw, result: Task { await clean(raw) })
     }
 
     private func closeOpenText() -> CleanupUnit? {

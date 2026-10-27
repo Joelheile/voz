@@ -45,8 +45,30 @@ import Testing
         stream.feed(first)
         stream.feed(second)
         let result = try #require(await stream.finish(samples: first + second, released: .now))
-        #expect(modelInputs.texts.first == "So I think we should. move the call to monday")
+        #expect(modelInputs.texts.last == "So I think we should. move the call to monday")
         #expect(result.cleaned.text == "So I think we should. move the call to monday")
+    }
+
+    @Test func releaseAfterAPauseReusesTheCleanupStartedDuringThePause() async throws {
+        let speech = [Float](repeating: 0.5, count: Int(RecordingFilter.sampleRate * 2.5))
+        let pause = [Float](repeating: 0, count: Int(RecordingFilter.sampleRate * 0.7))
+        let modelInputs = ModelInputs()
+        let extensions = CleanupExtensions(model: { text, _, _ in
+            modelInputs.texts.append(text)
+            return text.split(separator: " ").filter { $0 != "like" }.joined(separator: " ")
+        }) { _, text, _ in text }
+        let stream = StreamingDictation(
+            transcribe: { _ in TranscriptionResult(text: "so like we should ship it", audioSeconds: 1, processingSeconds: 0, model: "test") },
+            cleaner: TextCleaner(), vocabulary: [], prompt: Task { "" }, cleanupEnabled: true,
+            steps: ["model"], extensions: extensions
+        )
+        stream.feed(speech + pause)
+        for _ in 0..<200 where modelInputs.texts.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(modelInputs.texts.count == 1)
+        let result = try #require(await stream.finish(samples: speech + pause, released: .now))
+        #expect(modelInputs.texts == ["so like we should ship it"])
+        #expect(result.cleaned.text == "so we should ship it")
+        #expect(result.cleanedInTime == 1)
     }
 }
 
