@@ -22,8 +22,10 @@ final class TextOutput {
         let canPaste = pastes && accessibilityGranted && pasteKeyCode != nil
         if pastes && !accessibilityGranted {
             Log.app.error("Accessibility not granted, text \(copies ? "copied but not pasted" : "not delivered", privacy: .public)")
+            Analytics.report(.accessibilityDenied)
         } else if pastes && pasteKeyCode == nil {
             Log.app.error("No key produces v on the current keyboard layout, text \(copies ? "copied but not pasted" : "not delivered", privacy: .public)")
+            Analytics.report(.noPasteKey)
         }
         guard copies || canPaste else { return }
         let pasteboard = NSPasteboard.general

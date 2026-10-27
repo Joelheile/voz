@@ -139,6 +139,7 @@ final class TextCleaner {
             return ChunkResult(text: chunk, removed: 0, timedOut: true, rejection: nil)
         } catch {
             Log.app.error("Cleanup chunk failed, using rule-pass text: \(error.localizedDescription, privacy: .private)")
+            Analytics.report(.cleanupFailed)
             return unchanged
         }
     }

@@ -6,7 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let settings = AppSettings()
     private let modelStatus = ModelStatus()
     private let installID = InstallID(key: InstallID.usage)
-    private lazy var analytics = Analytics(enabled: settings.analyticsEnabled, installID: installID.value)
+    private lazy var analytics = Analytics(usage: settings.analyticsEnabled, errors: settings.errorReportsEnabled, installID: installID.value)
     private let history = AppDelegate.openHistory()
     private lazy var transcriber = Transcriber { [modelStatus] mode, state in
         DispatchQueue.main.async { MainActor.assumeIsolated { modelStatus.update(mode, state) } }
@@ -108,10 +108,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let previous = launch.updatedFrom {
             analytics.capture(.updateInstalled(from: previous, to: launch.current, channel: UpdateChannel(version: launch.current)))
         }
-        let ping: VersionPing? = installID.isNew ? .install : launch.updatedFrom.map { _ in .update }
-        VersionPinger.sendPending(ping, launch: launch, enabled: settings.versionPingEnabled)
+        VersionPinger.sendPending(launch: launch)
         updater.start()
-        analytics.capture(.appLaunched)
+        analytics.capture(.appLaunched(byLaunchAgent: LaunchAgent.launchedByLaunchd))
         manageLaunchAgent()
     }
 
@@ -154,7 +153,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard settings.analyticsEnabled else { return .terminateNow }
+        guard analytics.isEnabled else { return .terminateNow }
         analytics.finishSession()
         analytics.flush()
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
@@ -185,9 +184,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .dropFirst()
             .sink { [weak self] _ in self?.manageLaunchAgent() }
             .store(in: &cancellables)
-        settings.$analyticsEnabled
+        settings.$analyticsEnabled.combineLatest(settings.$errorReportsEnabled)
             .dropFirst()
-            .sink { [weak self] enabled in self?.analytics.setEnabled(enabled) }
+            .sink { [weak self] usage, errors in self?.analytics.setConsent(usage: usage, errors: errors) }
             .store(in: &cancellables)
         settings.$speechModel
             .map { SpeechModel(rawValue: $0) ?? .parakeetUltra }
