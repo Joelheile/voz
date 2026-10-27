@@ -38,7 +38,7 @@ Registering a model or step only makes it available. The user picks it in Settin
 - Give feedback with `ctx.notify("Sent to Linear")`. It shows a short message under the menu bar
 - Anything the user may want to change is a setting. Declare it with `voz.settings({ key: { type, title, default } })`. `type` is `string`, `number` or `boolean`. A string can have `options` for a picker, `secret: true` for a token, or `required: true` when the extension can't work without it. Never ask the user to edit `settings.json`
 - Write files to `voz.paths.data`, never next to the extension, or Voz reloads it on every write
-- A package declares the API it targets with `"voz": { "apiVersion": 1 }` in `package.json`
+- A package declares the oldest API it needs with `"voz": { "apiVersion": 1 }` in `package.json`. Set it to `2` only when the package calls `ctx.generate` or uses `{ at: "start" }`
 - The user turns extensions on or off in the Extensions page. Don't build your own on/off switch
 - Log with `console.log`
 - Use Bun and Node APIs (`fetch`, `Bun.spawn`, `node:fs`). Files in `~/.voz/extensions` can't import npm packages. If you need one, make a folder with a `package.json` and an `index.ts`, then run `voz install ./that-folder`
