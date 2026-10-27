@@ -4,16 +4,22 @@
 
 **Simple like Wispr Flow. Extensible like pi.**
 
+Tap right Command and talk. Voz types clean text into any app.<br>
+Missing a feature? Tell your coding agent and it writes the extension.<br>
+Free and open source. Your audio never leaves your Mac.
+
+[![License: MIT](https://img.shields.io/github/license/Joelheile/voz)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/Joelheile/voz)](https://github.com/Joelheile/voz/releases/latest)
+![macOS 26, Apple Silicon](https://img.shields.io/badge/macOS_26-Apple_Silicon-black)
+[![GitHub stars](https://img.shields.io/github/stars/Joelheile/voz)](https://github.com/Joelheile/voz/stargazers)
+
 [Website](https://voz.joels.tech), [Extensions](https://voz.joels.tech/extensions/)
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset=".github/images/ready-dark.png">
-  <img src=".github/images/ready-light.png" width="380" alt="The Voz menu bar panel with recent transcripts">
-</picture>
+<a href="https://voz.joels.tech"><img src=".github/images/demo.webp" width="720" alt="The Voz launch film: Voz beside Wispr Flow, dictation cleaned in real time, and a coding agent writing a missing feature as an extension."></a>
+
+[Watch it with sound](https://voz.joels.tech)
 
 </div>
-
-Tap right Command and talk. Voz types clean text into any app. It is free, open source and works offline.
 
 ## Install
 
@@ -25,13 +31,25 @@ curl -fsSL https://voz.joels.tech/install | bash
 
 Current builds use a project signing certificate and are not notarized by Apple.
 
+If Voz saves you some typing, [star the repo](https://github.com/Joelheile/voz) so more developers find it.
+
 ## Why I built Voz
+
+- Paying monthly to talk
+- A hundred settings
+- Waiting months on your PR
 
 I paid for Wispr Flow until paying a subscription to talk to my own computer started to annoy me. The open source apps I tried felt bloated. Hex came closest. I liked it, but every change I wanted meant a pull request and a long wait.
 
-So I built Voz the way pi works. The core records, transcribes, cleans up and types, and I keep it fast. Anything else is an extension you write for yourself.
+So I built Voz the way pi works. The core records, transcribes, cleans up and types, and I keep it fast. Anything else is an extension you write for yourself. If it helps someone else, publish it and they can install it from the menu bar.
 
-## Use
+## How Voz fixes it
+
+- **Free and open source.** MIT licensed, no account, no weekly word limit.
+- **A tiny, fast core.** Record, transcribe, clean up, insert. Nothing else runs on your words.
+- **Extensions, not settings.** Build what you need, share it with others, and the core stays small.
+
+## You talk 150 words a minute, you type 40
 
 Tap right Command, talk, tap again. You say:
 
@@ -41,11 +59,24 @@ Voz types this at your cursor:
 
 > Tell Kaitlyn the deck is ready.
 
-Recent transcripts live in the menu bar. Click one to copy it.
+Voz cuts the "um"s and fixes punctuation. It all runs on your Mac, so it works offline.
 
-## Extensions
+## A tiny core that stays fast
 
-Voz has no settings page for every wish. You write an extension instead: a TypeScript file in `~/.voz/extensions`.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/images/ready-dark.png">
+  <img src=".github/images/ready-light.png" width="380" alt="The Voz menu bar panel with recent transcripts">
+</picture>
+
+Voz records, transcribes, cleans up and types. It saves your history on your Mac. That is all the core does.
+
+- Lives in the menu bar
+- Click a transcript to copy it, search finds the rest
+- Extensions plug in between the steps. Add none and Voz runs nothing extra
+
+## Build the extensions you need, share them with everyone
+
+Instead of a setting for each wish, Voz has extensions: small TypeScript files in `~/.voz/extensions` that can use your apps, files, terminal and the network.
 
 ```ts
 import { defineExtension } from "voz";
@@ -55,20 +86,30 @@ export default defineExtension((voz) => {
 });
 ```
 
-Now "let's ship it, send it" types "Let's ship it" and presses Return.
+Now "let's ship it, send it" types "Let's ship it" and presses Return. Some other ideas:
 
-Ideas:
-
-- Turn rambling into a clear prompt for a coding agent
-- Write mail with your own greeting and sign-off
+- Turn rambling into a clear prompt for your coding agent
+- Write mail in your style, with your greeting and sign-off
 - File a Linear issue from what you said
 - Run a script with a voice command
 
-You don't need to learn the API first. Open a coding agent in `~/.voz` and say what you want. It reads the guide Voz keeps there and writes the extension. The full API is in [EXTENSIONS.md](EXTENSIONS.md).
-
-Publish to npm with the `voz-package` keyword and anyone can install it from the menu bar.
-
 Extensions run with your permissions, so only install ones you trust. If one is slow or crashes, dictation keeps working.
+
+## Build extensions at the speed of thought
+
+You don't need to learn the API first. Tell a coding agent in `~/.voz` what you want. It reads the guide Voz keeps there and writes the extension. Voz loads it when you save. The full API is in [EXTENSIONS.md](EXTENSIONS.md).
+
+Publish it to npm with the `voz-package` keyword and it shows up in Extensions for everyone. A few are already there:
+
+| Extension | What it does |
+| --- | --- |
+| [voz-meeting](https://www.npmjs.com/package/voz-meeting) | Records and transcribes meetings, your microphone plus system audio, on your Mac |
+| [voz-autocorrect](https://www.npmjs.com/package/voz-autocorrect) | Fixes words Voz keeps mishearing and learns from your corrections |
+| [voz-smart-spacing](https://www.npmjs.com/package/voz-smart-spacing) | Adds the missing space when you dictate right after existing text |
+
+Install one from the menu bar, or run `voz install voz-meeting`. [Browse extensions](https://voz.joels.tech/extensions/) or [build your first one](https://voz.joels.tech/build-extension/).
+
+If you build something with Voz, star the repo. Stars are how other developers find it.
 
 ## Privacy
 
@@ -80,7 +121,7 @@ Found a vulnerability? Open a [private advisory](https://github.com/Joelheile/vo
 
 ## Contributing
 
-The core stays small. Pull requests that make it faster or more reliable, add languages or add extension points are welcome. Everything else ships as an extension. If the API can't do what you need, open an issue.
+The core stays small. Pull requests that make it faster or more reliable, add languages or add extension points are welcome. Everything else ships as an extension. If the API can't do what you need, or something is missing, [open an issue](https://github.com/Joelheile/voz/issues/new).
 
 You need the Command Line Tools, not Xcode:
 
