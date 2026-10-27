@@ -22,7 +22,7 @@ enum CleanupGuard {
         ["please", "provide"], ["entschuldigung"], ["ich", "kann"],
     ]
     private static let outputLabels = ["output:", "cleaned:"]
-    private static let fillerAndCorrectionWords: Set<String> = [
+    static let fillerAndCorrectionWords: Set<String> = [
         "um", "uh", "uhm", "umm", "erm", "ähm", "äh", "öhm", "like", "halt", "also", "sozusagen", "quasi",
         "no", "nein", "nee", "wait", "warte", "sorry", "mean",
     ]
@@ -33,7 +33,7 @@ enum CleanupGuard {
     ]
     private static let clockFractions: Set<String> = ["halb", "viertel", "dreiviertel"]
 
-    private static let spokenSymbolWords: Set<String> = ["dot", "at", "slash", "underscore", "dash", "colon"]
+    static let spokenSymbolWords: Set<String> = ["dot", "at", "slash", "underscore", "dash", "colon"]
 
     static func rejection(raw: String, cleaned: String) -> CleanupRejection? {
         let rawWords = WordTokens.alphanumeric(raw)
@@ -89,5 +89,24 @@ enum CleanupGuard {
         let lowered = cleaned.lowercased()
         let rawLowered = raw.lowercased()
         return outputLabels.contains { lowered.hasPrefix($0) && !rawLowered.hasPrefix($0) }
+    }
+}
+
+enum CleanupWork {
+    private static let cues: Set<String> = ["actually", "eigentlich", "meine", "scratch"]
+    private static let sentenceEnders: Set<Character> = [".", "!", "?"]
+
+    static func needsModel(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let first = trimmed.first, let last = trimmed.last else { return false }
+        let isFinishedSentence = first.isUppercase && sentenceEnders.contains(last)
+        let words = WordTokens.alphanumeric(trimmed)
+        let hasCue = words.contains { word in
+            CleanupGuard.fillerAndCorrectionWords.contains(word) || CleanupGuard.spokenSymbolWords.contains(word)
+                || NumberWords.isNumber(word) || cues.contains(word)
+        }
+        let hasRepeat = zip(words, words.dropFirst()).contains { $0 == $1 }
+        let hasYouKnow = zip(words, words.dropFirst()).contains { $0 == "you" && $1 == "know" }
+        return !isFinishedSentence || hasCue || hasRepeat || hasYouKnow
     }
 }
