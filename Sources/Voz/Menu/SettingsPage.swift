@@ -74,6 +74,9 @@ struct SettingsPage: View {
                     .frame(width: 120)
             }
             LinkRow(title: "Speech model", value: speechModelName) { model.page = .speechModel }
+            PanelRow(title: "Live preview", detail: "Shows draft text below the indicator after pauses") {
+                Toggle("Live preview", isOn: $settings.livePreviewEnabled).labelsHidden()
+            }
             LinkRow(title: "Dictionary", value: vocabulary.snapshot.words.count.formatted()) { model.page = .dictionary }
         }
         PanelGroup {

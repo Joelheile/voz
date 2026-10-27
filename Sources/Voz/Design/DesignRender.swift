@@ -22,6 +22,13 @@ enum DesignRender {
                 try write(fixture.popover(page: page), to: outputDirectory, name: "popover-\(title)-\(suffix)", appearance: appearance)
             }
             try write(PermissionTileView(close: {}), to: outputDirectory, name: "permission-tile-\(suffix)", appearance: appearance)
+            for (title, text) in [
+                ("short", "Let's move the review to Thursday afternoon."),
+                ("long", String(repeating: "Keep the latest words visible as the recording gets longer. ", count: 15)),
+                ("multilingual", "Morgen besprechen wir Voz und die nächsten Schritte. 然后继续讨论我们的计划。")
+            ] {
+                try write(TranscriptPreview(text: text), to: outputDirectory, name: "live-preview-\(title)-\(suffix)", appearance: appearance)
+            }
             for step in SetupStep.allCases {
                 fixture.sources.setup.step = step
                 try write(fixture.popover(needsSetup: true), to: outputDirectory, name: "popover-setup-\(step)-\(suffix)", appearance: appearance)

@@ -11,6 +11,7 @@ final class IndicatorController {
 
     private let model = IndicatorModel()
     private let panel = IndicatorPanel()
+    private let previewPanel = IndicatorPanel()
     private var layout: IndicatorLayout?
     private var lifecycle: Task<Void, Never>?
     private var observers: [NSObjectProtocol] = []
@@ -32,6 +33,7 @@ final class IndicatorController {
 
     func showRecording() {
         lifecycle?.cancel()
+        clearPreview()
         if !panel.isVisible { present() }
         model.levels.reset()
         startSampling()
@@ -73,6 +75,7 @@ final class IndicatorController {
     }
 
     func attach(to dictation: Dictation) {
+        dictation.onPreview = { [weak self] text in self?.showPreview(text) }
         dictation.onOutcome = { [weak self] outcome in
             switch outcome {
             case .done: self?.showOutcome(.done)
@@ -98,6 +101,22 @@ final class IndicatorController {
         guard panel.isVisible else { return }
         lifecycle?.cancel()
         collapseAndHide()
+    }
+
+    func showPreview(_ text: String) {
+        guard panel.isVisible, model.state == .recording || model.state == .transcribing, let layout else { return }
+        guard !text.isEmpty else { return clearPreview() }
+        let hosting = NSHostingView(rootView: TranscriptPreview(text: text))
+        let size = hosting.fittingSize
+        hosting.frame = NSRect(origin: .zero, size: size)
+        previewPanel.contentView = hosting
+        previewPanel.setFrame(layout.previewFrame(size: size), display: true)
+        previewPanel.orderFrontRegardless()
+    }
+
+    private func clearPreview() {
+        previewPanel.orderOut(nil)
+        previewPanel.contentView = nil
     }
 
     private func startSampling() {
@@ -135,6 +154,7 @@ final class IndicatorController {
 
     private func collapseAndHide() {
         stopTimer()
+        clearPreview()
         model.isExpanded = false
         lifecycle = Task { [weak self] in
             try? await Task.sleep(for: Self.closeDuration)
@@ -168,6 +188,9 @@ final class IndicatorController {
         hosting.sizingOptions = []
         panel.contentView = hosting
         panel.setFrame(layout.panelFrame, display: true)
+        if let content = previewPanel.contentView {
+            previewPanel.setFrame(layout.previewFrame(size: content.frame.size), display: true)
+        }
     }
 }
 
@@ -256,7 +279,11 @@ enum IndicatorDemo {
             return Float(min(1, envelope * syllables * 1.1))
         }
         indicator.showRecording()
-        try? await Task.sleep(for: .seconds(3.5))
+        try? await Task.sleep(for: .seconds(1))
+        indicator.showPreview("This is a live preview of your dictation.")
+        try? await Task.sleep(for: .seconds(1))
+        indicator.showPreview("This is a live preview of your dictation. Keep speaking and the latest words appear here, without moving your cursor or changing the app you are typing into.")
+        try? await Task.sleep(for: .seconds(1.5))
         indicator.showTranscribing()
         try? await Task.sleep(for: .seconds(2))
         indicator.showOutcome(.done)

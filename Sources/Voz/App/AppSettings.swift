@@ -8,6 +8,7 @@ private enum SettingsKey {
     static let copyToClipboard = "copyToClipboard"
     static let insertIntoApp = "insertIntoApp"
     static let soundCues = "soundCues"
+    static let livePreviewEnabled = "livePreviewEnabled"
     static let launchAtLogin = "launchAtLogin"
     static let onboardingCompleted = "onboardingCompleted"
     static let cleanupEnabled = "cleanupEnabled"
@@ -48,6 +49,9 @@ final class AppSettings: ObservableObject {
     @Published private(set) var pipelineError: String?
     @Published var soundCues: Bool {
         didSet { defaults.set(soundCues, forKey: SettingsKey.soundCues) }
+    }
+    @Published var livePreviewEnabled: Bool {
+        didSet { defaults.set(livePreviewEnabled, forKey: SettingsKey.livePreviewEnabled) }
     }
     @Published var launchAtLogin: Bool {
         didSet { defaults.set(launchAtLogin, forKey: SettingsKey.launchAtLogin) }
@@ -97,6 +101,7 @@ final class AppSettings: ObservableObject {
             SettingsKey.copyToClipboard: true,
             SettingsKey.insertIntoApp: true,
             SettingsKey.soundCues: false,
+            SettingsKey.livePreviewEnabled: false,
             SettingsKey.launchAtLogin: true,
             SettingsKey.onboardingCompleted: false,
             SettingsKey.cleanupEnabled: true,
@@ -111,6 +116,7 @@ final class AppSettings: ObservableObject {
         copyToClipboard = defaults.bool(forKey: SettingsKey.copyToClipboard)
         insertIntoApp = defaults.bool(forKey: SettingsKey.insertIntoApp)
         soundCues = defaults.bool(forKey: SettingsKey.soundCues)
+        livePreviewEnabled = defaults.bool(forKey: SettingsKey.livePreviewEnabled)
         launchAtLogin = defaults.bool(forKey: SettingsKey.launchAtLogin)
         onboardingCompleted = defaults.bool(forKey: SettingsKey.onboardingCompleted)
         cleanupEnabled = defaults.bool(forKey: SettingsKey.cleanupEnabled)

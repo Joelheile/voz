@@ -57,6 +57,8 @@ final class StreamingDictation {
     private var collectedSegments = 0
     private var releaseDeadline: ContinuousClock.Instant?
     private var closed = false
+    private var previewSegments: [String?] = []
+    var onPreview: ((String) -> Void)?
 
     init(
         transcribe: @escaping SegmentTranscriber,
@@ -92,6 +94,7 @@ final class StreamingDictation {
 
     func cancel() {
         closed = true
+        onPreview = nil
         prompt.cancel()
         for segment in segments {
             segment.transcription.cancel()
@@ -131,7 +134,10 @@ final class StreamingDictation {
 
         let raws = results.map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
         guard raws.contains(where: { !$0.isEmpty }) else { return nil }
-        return assemble(raws: raws, results: results, tailResult: tailResult, samples: samples, cleanupWait: cleanupWait)
+        let transcript = assemble(raws: raws, results: results, tailResult: tailResult, samples: samples, cleanupWait: cleanupWait)
+        onPreview?(transcript.cleaned.text)
+        onPreview = nil
+        return transcript
     }
 
     private func assemble(raws: [String], results: [TranscriptionResult], tailResult: TranscriptionResult?, samples: [Float], cleanupWait: Duration) -> StreamedTranscript {
@@ -176,9 +182,17 @@ final class StreamingDictation {
 
     private func makeSegment(_ audio: [Float]) -> Segment {
         let transcribe = transcribe
+        let index = previewSegments.count
+        previewSegments.append(nil)
         let transcription = Task { () -> TranscriptionResult? in
             do {
-                return try await transcribe(audio)
+                let result = try await transcribe(audio)
+                guard !Task.isCancelled else { return nil }
+                previewSegments[index] = result.text
+                let available = previewSegments.prefix { $0 != nil }.compactMap { $0 }
+                let text = SegmentJoiner.join(available)
+                if !text.isEmpty { onPreview?(text) }
+                return result
             } catch {
                 Log.app.error("Segment transcription failed: \(error.localizedDescription, privacy: .private)")
                 Analytics.report(.segmentTranscriptionFailed)

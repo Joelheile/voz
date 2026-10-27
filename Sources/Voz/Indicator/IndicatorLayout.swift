@@ -39,6 +39,11 @@ struct IndicatorLayout: Equatable, Sendable {
     let panelFrame: CGRect
     let collapsedWidth: CGFloat
 
+    func previewFrame(size: CGSize) -> CGRect {
+        let indicatorBottom = panelFrame.minY + (style == .floating ? Self.shadowMargin : 0)
+        return CGRect(x: panelFrame.midX - size.width / 2, y: indicatorBottom - Self.pillGap - size.height, width: size.width, height: size.height)
+    }
+
     static func make(screen: ScreenMetrics) -> IndicatorLayout {
         guard let notch = screen.notchSize else { return floating(screen: screen) }
         let size = CGSize(width: notch.width + 2 * sideWidth, height: notch.height)
