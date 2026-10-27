@@ -11,7 +11,6 @@ final class IndicatorController {
 
     private let model = IndicatorModel()
     private let panel = IndicatorPanel()
-    private let previewPanel = IndicatorPanel()
     private var layout: IndicatorLayout?
     private var lifecycle: Task<Void, Never>?
     private var observers: [NSObjectProtocol] = []
@@ -104,19 +103,13 @@ final class IndicatorController {
     }
 
     func showPreview(_ text: String) {
-        guard panel.isVisible, model.state == .recording || model.state == .transcribing, let layout else { return }
+        guard panel.isVisible, model.state == .recording || model.state == .transcribing else { return }
         guard !text.isEmpty else { return clearPreview() }
-        let hosting = NSHostingView(rootView: TranscriptPreview(text: text))
-        let size = hosting.fittingSize
-        hosting.frame = NSRect(origin: .zero, size: size)
-        previewPanel.contentView = hosting
-        previewPanel.setFrame(layout.previewFrame(size: size), display: true)
-        previewPanel.orderFrontRegardless()
+        model.preview = text
     }
 
     private func clearPreview() {
-        previewPanel.orderOut(nil)
-        previewPanel.contentView = nil
+        model.preview = ""
     }
 
     private func startSampling() {
@@ -135,11 +128,20 @@ final class IndicatorController {
         let level = smoother.update(target: levelSource(), elapsedSeconds: now - lastSampleTime)
         lastSampleTime = now
         model.levels.append(level, at: now)
+        panel.ignoresMouseEvents = !isMouseOverPreview
+    }
+
+    private var isMouseOverPreview: Bool {
+        guard !model.preview.isEmpty else { return false }
+        let frame = model.previewFrame
+        let onScreen = CGRect(x: panel.frame.minX + frame.minX, y: panel.frame.maxY - frame.maxY, width: frame.width, height: frame.height)
+        return onScreen.contains(NSEvent.mouseLocation)
     }
 
     private func stopTimer() {
         sampler?.invalidate()
         sampler = nil
+        panel.ignoresMouseEvents = true
         if model.recordingEnd == nil { model.recordingEnd = .now }
     }
 
@@ -154,11 +156,11 @@ final class IndicatorController {
 
     private func collapseAndHide() {
         stopTimer()
-        clearPreview()
         model.isExpanded = false
         lifecycle = Task { [weak self] in
             try? await Task.sleep(for: Self.closeDuration)
             guard !Task.isCancelled, let self else { return }
+            self.clearPreview()
             self.panel.orderOut(nil)
             self.panel.contentView = nil
         }
@@ -187,10 +189,7 @@ final class IndicatorController {
         let hosting = NSHostingView(rootView: IndicatorView(model: model, layout: layout))
         hosting.sizingOptions = []
         panel.contentView = hosting
-        panel.setFrame(layout.panelFrame, display: true)
-        if let content = previewPanel.contentView {
-            previewPanel.setFrame(layout.previewFrame(size: content.frame.size), display: true)
-        }
+        panel.setFrame(layout.windowFrame, display: true)
     }
 }
 
@@ -279,11 +278,12 @@ enum IndicatorDemo {
             return Float(min(1, envelope * syllables * 1.1))
         }
         indicator.showRecording()
+        let words = "This is a live preview of your dictation. Keep speaking and the latest words appear here, without moving your cursor or changing the app you are typing into.".split(separator: " ")
+        for count in 1...words.count {
+            try? await Task.sleep(for: .milliseconds(140))
+            indicator.showPreview(words.prefix(count).joined(separator: " "))
+        }
         try? await Task.sleep(for: .seconds(1))
-        indicator.showPreview("This is a live preview of your dictation.")
-        try? await Task.sleep(for: .seconds(1))
-        indicator.showPreview("This is a live preview of your dictation. Keep speaking and the latest words appear here, without moving your cursor or changing the app you are typing into.")
-        try? await Task.sleep(for: .seconds(1.5))
         indicator.showTranscribing()
         try? await Task.sleep(for: .seconds(2))
         indicator.showOutcome(.done)

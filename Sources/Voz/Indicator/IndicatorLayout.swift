@@ -39,9 +39,17 @@ struct IndicatorLayout: Equatable, Sendable {
     let panelFrame: CGRect
     let collapsedWidth: CGFloat
 
-    func previewFrame(size: CGSize) -> CGRect {
-        let indicatorBottom = panelFrame.minY + (style == .floating ? Self.shadowMargin : 0)
-        return CGRect(x: panelFrame.midX - size.width / 2, y: indicatorBottom - Self.pillGap - size.height, width: size.width, height: size.height)
+    static let previewWidth: CGFloat = 320
+    static let previewHeight: CGFloat = 120
+
+    var windowFrame: CGRect {
+        let width = max(panelFrame.width, Self.previewWidth + 2 * Self.shadowMargin)
+        return CGRect(
+            x: panelFrame.midX - width / 2,
+            y: panelFrame.minY - Self.previewHeight,
+            width: width,
+            height: panelFrame.height + Self.previewHeight
+        )
     }
 
     static func make(screen: ScreenMetrics) -> IndicatorLayout {

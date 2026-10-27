@@ -51,6 +51,8 @@ typealias SegmentTranscriber = @MainActor ([Float]) async throws -> Transcriptio
 @MainActor
 final class StreamingDictation {
     static let maximumOpenWords = 25
+    static let interimPause = Duration.milliseconds(250)
+    static let minimumInterimSamples = Int(RecordingFilter.sampleRate * 0.5)
 
     private let transcribe: SegmentTranscriber
     private let cleaner: TextCleaner
@@ -70,6 +72,9 @@ final class StreamingDictation {
     private var releaseDeadline: ContinuousClock.Instant?
     private var closed = false
     private var previewSegments: [String?] = []
+    private var interim: Task<Void, Never>?
+    private var interimText = ""
+    private var interimIndex = 0
     var onPreview: ((String) -> Void)?
 
     init(
@@ -102,11 +107,34 @@ final class StreamingDictation {
             segments.append(makeSegment(audio))
             Log.app.notice("Committed segment \(self.segments.count) at \(Double(cut) / RecordingFilter.sampleRate, format: .fixed(precision: 1))s")
         }
+        previewOpenAudio()
+    }
+
+    private func previewOpenAudio() {
+        guard onPreview != nil, interim == nil, pendingAudio.count >= Self.minimumInterimSamples, !previewSegments.contains(nil) else { return }
+        let audio = pendingAudio
+        let index = previewSegments.count
+        let transcribe = transcribe
+        interim = Task {
+            defer { interim = nil }
+            guard let result = try? await transcribe(audio), !Task.isCancelled, !closed else { return }
+            interimText = result.text
+            interimIndex = index
+            publishPreview()
+            try? await Task.sleep(for: Self.interimPause)
+        }
+    }
+
+    private func publishPreview() {
+        let available = previewSegments.prefix { $0 != nil }.compactMap { $0 }
+        let text = SegmentJoiner.join(available + (available.count == interimIndex ? [interimText] : []))
+        if !text.isEmpty { onPreview?(text) }
     }
 
     func cancel() {
         closed = true
         onPreview = nil
+        interim?.cancel()
         prompt.cancel()
         for segment in segments {
             segment.transcription.cancel()
@@ -118,6 +146,7 @@ final class StreamingDictation {
 
     func finish(samples: [Float], released: ContinuousClock.Instant) async throws -> StreamedTranscript? {
         closed = true
+        interim?.cancel()
         let deadline = released + CleanupBudget.total
         releaseDeadline = deadline
         let tailStart = min(committedSamples, samples.count)
@@ -207,9 +236,7 @@ final class StreamingDictation {
                 let result = try await transcribe(audio)
                 guard !Task.isCancelled else { return nil }
                 previewSegments[index] = result.text
-                let available = previewSegments.prefix { $0 != nil }.compactMap { $0 }
-                let text = SegmentJoiner.join(available)
-                if !text.isEmpty { onPreview?(text) }
+                publishPreview()
                 return result
             } catch {
                 Log.app.error("Segment transcription failed: \(error.localizedDescription, privacy: .private)")

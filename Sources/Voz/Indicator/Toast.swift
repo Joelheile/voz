@@ -67,7 +67,7 @@ private struct ToastView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
             .frame(maxWidth: maxWidth)
-            .hudCapsule()
+            .hud(Capsule())
             .scaleEffect(reduceMotion || model.isShown ? 1 : 0.9, anchor: .top)
             .opacity(model.isShown ? 1 : 0)
             .animation(reduceMotion ? IndicatorMotion.reducedMotion : IndicatorMotion.open, value: model.isShown)

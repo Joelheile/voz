@@ -22,12 +22,19 @@ enum DesignRender {
                 try write(fixture.popover(page: page), to: outputDirectory, name: "popover-\(title)-\(suffix)", appearance: appearance)
             }
             try write(PermissionTileView(close: {}), to: outputDirectory, name: "permission-tile-\(suffix)", appearance: appearance)
-            for (title, text) in [
-                ("short", "Let's move the review to Thursday afternoon."),
-                ("long", String(repeating: "Keep the latest words visible as the recording gets longer. ", count: 15)),
-                ("multilingual", "Morgen besprechen wir Voz und die nächsten Schritte. 然后继续讨论我们的计划。")
-            ] {
-                try write(TranscriptPreview(text: text), to: outputDirectory, name: "live-preview-\(title)-\(suffix)", appearance: appearance)
+            for (title, settled, latest) in previewTexts {
+                for (style, hasNotch) in [("notch", true), ("floating", false)] {
+                    let model = IndicatorModel()
+                    model.isExpanded = true
+                    model.preview = settled + latest
+                    try write(
+                        IndicatorView(model: model, layout: previewLayout(hasNotch: hasNotch))
+                            .environment(\.colorScheme, hasNotch || name == .darkAqua ? .dark : .light),
+                        to: outputDirectory,
+                        name: "live-preview-\(style)-\(title)-\(suffix)",
+                        appearance: appearance
+                    )
+                }
             }
             for step in SetupStep.allCases {
                 fixture.sources.setup.step = step
@@ -44,6 +51,22 @@ enum DesignRender {
         ("permission", .permissionNeeded(.accessibility), PermissionFix.accessibility.detail),
         ("failed", .modelFailed("Download failed. Check your connection"), "Download failed. Check your connection"),
     ]
+
+    private static let previewTexts = [
+        ("short", "", "Let's move the review to Thursday afternoon."),
+        ("long", String(repeating: "Keep the latest words visible as the recording gets longer. ", count: 6), "These are the words you just said."),
+        ("multilingual", "Morgen besprechen wir Voz und die nächsten Schritte. ", "然后继续讨论我们的计划。"),
+    ]
+
+    private static func previewLayout(hasNotch: Bool) -> IndicatorLayout {
+        IndicatorLayout.make(screen: ScreenMetrics(
+            frame: CGRect(x: 0, y: 0, width: 1512, height: 982),
+            safeAreaTop: hasNotch ? 32 : 0,
+            leftAreaWidth: hasNotch ? 662 : nil,
+            rightAreaWidth: hasNotch ? 662 : nil,
+            visibleMaxY: 958
+        ))
+    }
 
     private static let pages: [(String, PopoverPage)] = [
         ("settings", .settings),

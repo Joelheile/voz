@@ -70,6 +70,38 @@ import Testing
         #expect(previews.last == "Ship it")
     }
 
+    @Test func previewsWordsWhileSpeakingBeforeAnyPause() async throws {
+        var previews: [String] = []
+        let stream = StreamingDictation(
+            transcribe: { _ in TranscriptionResult(text: "Still talking", audioSeconds: 1, processingSeconds: 0, model: "test") },
+            cleaner: TextCleaner(), vocabulary: [], prompt: Task { "" }, cleanupEnabled: false
+        )
+        stream.onPreview = { previews.append($0) }
+        defer { stream.cancel() }
+        stream.feed([Float](repeating: 0.5, count: Int(RecordingFilter.sampleRate * 1)))
+        for _ in 0..<100 where previews.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(previews == ["Still talking"])
+    }
+
+    @Test func committedSegmentReplacesTheInterimWordsItCovers() async throws {
+        var previews: [String] = []
+        var calls = 0
+        let stream = StreamingDictation(
+            transcribe: { _ in
+                calls += 1
+                return TranscriptionResult(text: calls == 1 ? "First draft" : "First sentence.", audioSeconds: 1, processingSeconds: 0, model: "test")
+            },
+            cleaner: TextCleaner(), vocabulary: [], prompt: Task { "" }, cleanupEnabled: false
+        )
+        stream.onPreview = { previews.append($0) }
+        defer { stream.cancel() }
+        stream.feed([Float](repeating: 0.5, count: Int(RecordingFilter.sampleRate * 1)))
+        for _ in 0..<100 where previews.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
+        stream.feed(speechWithPause())
+        for _ in 0..<100 where previews.last != "First sentence." { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(previews == ["First draft", "First sentence."])
+    }
+
     private func speechWithPause() -> [Float] {
         [Float](repeating: 0.5, count: Int(RecordingFilter.sampleRate * 2.5))
             + [Float](repeating: 0, count: Int(RecordingFilter.sampleRate * 0.7))
