@@ -11,6 +11,6 @@ struct Icon: View {
     }
 
     var body: some View {
-        LucideIcon(name, size: size, strokeWidth: 1.75, absoluteStrokeWidth: true)
+        LucideIcon(name, size: size, strokeWidth: 1.25, absoluteStrokeWidth: true)
     }
 }

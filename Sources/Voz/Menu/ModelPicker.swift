@@ -59,7 +59,7 @@ struct ModelPicker: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
                 Text("\(selected.name), \(selected.detail)")
-                    .font(.ui(11.5))
+                    .font(.meta)
                     .foregroundStyle(Theme.inkSecondary)
                     .lineLimit(1)
                     .contentTransition(.interpolate)
@@ -70,8 +70,8 @@ struct ModelPicker: View {
                 .rotationEffect(.degrees(expanded ? 180 : 0))
                 .animation(.spring(duration: 0.3, bounce: 0.2), value: expanded)
         }
-        .frame(minHeight: 40)
-        .padding(.vertical, 4)
+        .frame(minHeight: Theme.Size.row)
+        .padding(.vertical, 6)
         .contentShape(Rectangle())
     }
 }
@@ -89,7 +89,7 @@ struct ModelOptionRow: View {
                 ZStack {
                     if selected {
                         Icon(.check, size: 13)
-                            .foregroundStyle(Color.accentColor)
+                            .foregroundStyle(Theme.accent)
                             .transition(.scale(scale: 0.6).combined(with: .opacity))
                     }
                 }
@@ -99,7 +99,7 @@ struct ModelOptionRow: View {
                     .foregroundStyle(Theme.ink)
                 Spacer(minLength: 0)
                 Text(option.detail)
-                    .font(.ui(11.5))
+                    .font(.meta)
                     .monospacedDigit()
                     .foregroundStyle(selected ? Theme.inkSecondary : Theme.inkTertiary)
             }

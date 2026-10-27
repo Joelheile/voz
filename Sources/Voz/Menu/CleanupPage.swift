@@ -16,10 +16,7 @@ struct CleanupStepsPage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             PageBar(title: "Cleanup steps", back: back)
-            Text("Voz runs these steps in order on each dictation. Extensions can add steps.")
-                .font(.meta)
-                .foregroundStyle(Theme.inkSecondary)
-                .fixedSize(horizontal: false, vertical: true)
+            PageNote(text: "Voz runs these steps in order on each dictation. Extensions can add steps.")
             PanelGroup {
                 ForEach(settings.cleanupSteps + off, id: \.self) { step in
                     row(step) {
@@ -36,7 +33,7 @@ struct CleanupStepsPage: View {
             HStack {
                 Spacer(minLength: 0)
                 Button("Reset to default") { settings.cleanupSteps = CleanupStep.standard }
-                    .buttonStyle(.pill(.quiet, height: 28))
+                    .buttonStyle(.pill(.quiet, .small))
                     .disabled(settings.cleanupSteps == CleanupStep.standard)
             }
         }
@@ -46,7 +43,7 @@ struct CleanupStepsPage: View {
         PanelRow(title: name(of: step), detail: detail(of: step)) {
             HStack(spacing: 4) {
                 controls()
-                Toggle(name(of: step), isOn: enabled(step)).labelsHidden()
+                Toggle(name(of: step), isOn: settings.cleanupStepEnabled(step)).labelsHidden()
             }
         }
     }
@@ -60,18 +57,20 @@ struct CleanupStepsPage: View {
         return catalog.cleanupSteps.contains { $0.id == step } ? "Extension" : "Extension not loaded"
     }
 
-    private func enabled(_ step: String) -> Binding<Bool> {
-        Binding {
-            settings.cleanupSteps.contains(step)
-        } set: { on in
-            settings.cleanupSteps = on ? settings.cleanupSteps + [step] : settings.cleanupSteps.filter { $0 != step }
-        }
-    }
-
     private func move(_ index: Int, by offset: Int) {
         var steps = settings.cleanupSteps
         steps.swapAt(index, index + offset)
         settings.cleanupSteps = steps
+    }
+}
+
+extension AppSettings {
+    func cleanupStepEnabled(_ step: String) -> Binding<Bool> {
+        Binding {
+            self.cleanupSteps.contains(step)
+        } set: { on in
+            self.cleanupSteps = on ? self.cleanupSteps + [step] : self.cleanupSteps.filter { $0 != step }
+        }
     }
 }
 
@@ -82,11 +81,7 @@ struct CleanupPromptPage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             PageBar(title: "Cleanup prompt", back: back)
-            Text("Voz cleans up each dictation with this prompt, on your Mac. Your dictionary words go at the end.")
-                .font(.meta)
-                .lineSpacing(2)
-                .foregroundStyle(Theme.inkSecondary)
-                .fixedSize(horizontal: false, vertical: true)
+            PageNote(text: "Voz cleans up each dictation with this prompt, on your Mac. Your dictionary words go at the end.")
             TextEditor(text: $settings.cleanupPrompt)
                 .font(.ui(12))
                 .foregroundStyle(Theme.ink)
@@ -98,7 +93,7 @@ struct CleanupPromptPage: View {
             HStack {
                 Spacer(minLength: 0)
                 Button("Reset to default") { settings.cleanupPrompt = CleanupPrompt.standard }
-                    .buttonStyle(.pill(.quiet, height: 28))
+                    .buttonStyle(.pill(.quiet, .small))
                     .disabled(settings.cleanupPrompt == CleanupPrompt.standard)
             }
         }

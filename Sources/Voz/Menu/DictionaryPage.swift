@@ -8,9 +8,7 @@ struct DictionaryPage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             PageBar(title: "Dictionary", back: back)
-            Text("Names and terms Voz spells the way you enter them.")
-                .font(.meta)
-                .foregroundStyle(Theme.inkSecondary)
+            PageNote(text: "Names and terms Voz spells the way you enter them.")
             addRow
             CappedScrollView(maxHeight: 380) {
                 VStack(alignment: .leading, spacing: 16) {
@@ -29,13 +27,10 @@ struct DictionaryPage: View {
                 .font(.ui(13))
                 .foregroundStyle(Theme.ink)
                 .focused($draftFocused)
-                .padding(.horizontal, 12)
-                .frame(height: 32)
-                .background(Theme.canvas, in: Capsule())
-                .overlay(Capsule().strokeBorder(Theme.hairline))
+                .fieldBackground()
                 .onSubmit(model.addDraft)
             Button("Add", action: model.addDraft)
-                .buttonStyle(.pill(.ink, height: 32))
+                .buttonStyle(.pill(.ink, .regular))
                 .disabled(model.draft.trimmingCharacters(in: .whitespaces).isEmpty)
         }
     }
@@ -46,7 +41,7 @@ struct DictionaryPage: View {
                 PanelRow(title: suggestion.word) {
                     HStack(spacing: 2) {
                         Button("Add") { model.accept(suggestion) }
-                            .buttonStyle(.pill(.quiet, height: 26))
+                            .buttonStyle(.pill(.quiet, .small))
                         IconButton(icon: .x, help: "Dismiss") { model.dismiss(suggestion) }
                     }
                 }

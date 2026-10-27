@@ -120,7 +120,7 @@ private struct SpeechModelCard: View {
             .overlay(alignment: .topTrailing) {
                 if selected {
                     Icon(.circleCheck, size: 15)
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(Theme.accent)
                         .padding(8)
                         .transition(.scale(scale: 0.6).combined(with: .opacity))
                 }
@@ -145,7 +145,7 @@ private struct SpeechModelCard: View {
                 .strokeBorder(Theme.hairline)
             if selected {
                 shape
-                    .strokeBorder(Color.accentColor, lineWidth: 1.5)
+                    .strokeBorder(Theme.accent, lineWidth: 1.5)
                     .matchedGeometryEffect(id: "selection", in: highlight)
             }
         }

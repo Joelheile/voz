@@ -21,13 +21,12 @@ struct PopoverView: View {
     var body: some View {
         page
             .id(model.needsSetup ? nil : model.page)
-            .transition(.opacity)
             .padding(Theme.Spacing.item)
             .frame(width: Self.width)
             .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous).strokeBorder(Theme.hairline))
             .toggleStyle(.switch)
-            .animation(Theme.Motion.section, value: model.page)
+            .tint(Theme.accent)
             .fixedSize(horizontal: false, vertical: true)
             .compositingGroup()
             .shadow(color: .black.opacity(0.16), radius: 18, y: 8)
@@ -51,7 +50,7 @@ struct PopoverView: View {
             case .insights:
                 InsightsPage(model: sources.stats, back: model.goBack)
             case .extensions:
-                ExtensionsPage(model: sources.extensions, catalog: sources.catalog, back: model.goBack)
+                ExtensionsPage(model: sources.extensions, catalog: sources.catalog, settings: sources.settings, back: model.goBack)
             case .cleanupPrompt:
                 CleanupPromptPage(settings: sources.settings, back: model.goBack)
             case .cleanupSteps:
@@ -89,17 +88,10 @@ private struct HomePage: View {
     var body: some View {
         ScrollViewReader { proxy in
             VStack(alignment: .leading, spacing: 12) {
-                if needsAttention {
-                    notice
-                    RowDivider().padding(.horizontal, -Theme.Spacing.item)
-                }
-                if showsSearch {
-                    search(proxy: proxy)
-                    RowDivider().padding(.horizontal, -Theme.Spacing.item)
-                }
+                header(proxy: proxy)
+                if needsAttention { notice }
                 transcripts
                 if !catalog.actions.isEmpty { actions }
-                RowDivider().padding(.horizontal, -Theme.Spacing.item)
                 footer
             }
         }
@@ -129,28 +121,50 @@ private struct HomePage: View {
             IndeterminateBar()
         case let .permissionNeeded(fix):
             Button(fix.buttonTitle) { model.actions.fixPermission(fix) }
-                .buttonStyle(.pill(.accent, height: 32))
+                .buttonStyle(.pill(.accent, .regular))
         case .modelFailed:
             Button("Try again", action: model.actions.retryModel)
-                .buttonStyle(.pill(.accent, height: 32))
+                .buttonStyle(.pill(.accent, .regular))
         default:
             EmptyView()
         }
     }
 
+    private func header(proxy: ScrollViewProxy) -> some View {
+        HStack(spacing: 10) {
+            if showsSearch {
+                search(proxy: proxy)
+            } else {
+                Text("Voz").font(.wordmark(17)).foregroundStyle(Theme.ink)
+                Spacer(minLength: 0)
+            }
+            status
+        }
+        .animation(Theme.Motion.section, value: model.status)
+    }
+
     private func search(proxy: ScrollViewProxy) -> some View {
-        HStack(spacing: 12) {
-            Icon(.search, size: 15)
+        HStack(spacing: 8) {
+            Icon(.search, size: 14)
                 .foregroundStyle(Theme.inkTertiary)
-                .frame(width: 20)
-            TextField("Search", text: $history.query)
+            TextField("Search transcripts", text: $history.query)
                 .textFieldStyle(.plain)
-                .font(.ui(14))
+                .font(.ui(13))
                 .foregroundStyle(Theme.ink)
                 .focused($searchFocused)
                 .focusEffectDisabled()
+            if isSearching {
+                Text(resultCount)
+                    .font(.meta)
+                    .foregroundStyle(Theme.inkTertiary)
+                    .fixedSize()
+                    .transition(.opacity)
+            }
         }
-        .frame(height: 24)
+        .padding(.horizontal, 12)
+        .frame(height: 34)
+        .background(Theme.selected, in: RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous))
+        .animation(Theme.Motion.hover, value: isSearching)
         .onSubmit(copySelection)
         .onKeyPress(.downArrow) { moveSelection(by: 1, proxy: proxy) }
         .onKeyPress(.upArrow) { moveSelection(by: -1, proxy: proxy) }
@@ -168,7 +182,7 @@ private struct HomePage: View {
         } else {
             TimelineView(.everyMinute) { context in
                 CappedScrollView(maxHeight: CGFloat(Self.visibleRows) * Self.rowHeight) {
-                    VStack(alignment: .leading, spacing: 0) {
+                    LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(Array(records.enumerated()), id: \.element.id) { index, record in
                             if let heading = heading(at: index, now: context.date) {
                                 DayHeading(text: heading)
@@ -239,13 +253,13 @@ private struct HomePage: View {
 
     private var footer: some View {
         HStack(spacing: 2) {
-            footerStatus
+            KeyChip(text: DictationHint.key(settings.hotkey)).help(model.hint)
             Spacer(minLength: 8)
             IconButton(icon: .chartNoAxesColumn, help: "Insights") { model.page = .insights }
             IconButton(icon: .puzzle, help: extensionsHelp) { model.page = .extensions }
                 .overlay(alignment: .topTrailing) {
                     if extensions.updateCount > 0 {
-                        Circle().fill(Color.accentColor).frame(width: 6, height: 6).offset(x: -6, y: 6)
+                        Circle().fill(Theme.accent).frame(width: 6, height: 6).offset(x: -6, y: 6)
                     }
                 }
             IconButton(icon: .settings, help: "Settings") { model.page = .settings }
@@ -256,16 +270,21 @@ private struct HomePage: View {
     }
 
     @ViewBuilder
-    private var footerStatus: some View {
-        HStack(spacing: 8) {
-            if model.status == .recording { RecordingMark().transition(.opacity) }
-            if model.status == .ready, isSearching {
-                Text(resultCount).font(.display(13)).foregroundStyle(Theme.ink)
-                if !records.isEmpty { KeyChip(text: "↵ copy") }
-            } else {
-                Text(model.status.title).font(.display(13)).foregroundStyle(Theme.ink)
-                if model.status == .ready { KeyChip(text: DictationHint.key(settings.hotkey)).help(model.hint) }
+    private var status: some View {
+        switch model.status {
+        case .ready:
+            EmptyView()
+        case .recording:
+            HStack(spacing: 6) {
+                RecordingMark()
+                Text("Recording").font(.ui(12, weight: .medium)).foregroundStyle(Theme.recording)
             }
+            .padding(.horizontal, 10)
+            .frame(height: 24)
+            .background(Theme.recording.opacity(0.12), in: Capsule())
+            .transition(.opacity.combined(with: .scale(scale: 0.9)))
+        default:
+            Text(model.status.title).font(.meta).foregroundStyle(Theme.inkSecondary)
         }
     }
 
@@ -318,12 +337,11 @@ private struct KeyChip: View {
 
     var body: some View {
         Text(text)
-            .font(.ui(11, weight: .medium))
+            .font(.ui(12, weight: .medium))
             .foregroundStyle(Theme.inkSecondary)
-            .padding(.horizontal, 6)
-            .frame(height: 18)
-            .background(Theme.canvas, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 5, style: .continuous).strokeBorder(Theme.hairline))
+            .padding(.horizontal, 10)
+            .frame(height: 24)
+            .overlay(Capsule().strokeBorder(Theme.hairline))
     }
 }
 

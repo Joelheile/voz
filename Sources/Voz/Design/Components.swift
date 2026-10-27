@@ -19,7 +19,7 @@ enum PillKind {
     var fill: Color {
         switch self {
         case .ink: Theme.ink
-        case .accent: .accentColor
+        case .accent: Theme.accent
         case .quiet: Theme.selected
         }
     }
@@ -33,17 +33,29 @@ enum PillKind {
     }
 }
 
+enum PillSize {
+    case small
+    case regular
+
+    var height: CGFloat {
+        switch self {
+        case .small: 28
+        case .regular: 34
+        }
+    }
+}
+
 struct PillButtonStyle: ButtonStyle {
     var kind: PillKind = .ink
-    var height: CGFloat = 36
+    var size: PillSize = .regular
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.ui(13, weight: .medium))
+            .font(.ui(size == .small ? 12 : 13, weight: .medium))
             .foregroundStyle(kind.text)
-            .padding(.horizontal, height * 0.55)
-            .frame(height: height)
+            .padding(.horizontal, size.height * 0.5)
+            .frame(height: size.height)
             .background(kind.fill, in: Capsule())
             .opacity(isEnabled ? 1 : 0.4)
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
@@ -52,8 +64,8 @@ struct PillButtonStyle: ButtonStyle {
 }
 
 extension ButtonStyle where Self == PillButtonStyle {
-    static func pill(_ kind: PillKind = .ink, height: CGFloat = 36) -> PillButtonStyle {
-        PillButtonStyle(kind: kind, height: height)
+    static func pill(_ kind: PillKind = .ink, _ size: PillSize = .regular) -> PillButtonStyle {
+        PillButtonStyle(kind: kind, size: size)
     }
 }
 
@@ -81,7 +93,7 @@ struct IconButton: View {
 
     var body: some View {
         Button(action: action) {
-            Icon(icon, size: 15)
+            Icon(icon, size: 14)
                 .foregroundStyle(hovering ? Theme.ink : Theme.inkSecondary)
                 .frame(width: 30, height: 30)
                 .background(hovering ? Theme.selected : .clear, in: RoundedRectangle(cornerRadius: Theme.Radius.control))
@@ -91,6 +103,15 @@ struct IconButton: View {
         .help(help)
         .onHover { hovering = $0 }
         .animation(Theme.Motion.hover, value: hovering)
+    }
+}
+
+extension View {
+    func fieldBackground(_ size: PillSize = .regular) -> some View {
+        padding(.horizontal, 12)
+            .frame(height: size.height)
+            .background(Theme.canvas, in: Capsule())
+            .overlay(Capsule().strokeBorder(Theme.hairline))
     }
 }
 
@@ -109,10 +130,8 @@ struct SearchField: View {
                 .foregroundStyle(Theme.ink)
                 .focused(focused)
         }
-        .padding(.horizontal, 12)
-        .frame(maxWidth: .infinity, minHeight: 32, maxHeight: 32)
-        .background(Theme.canvas, in: Capsule())
-        .overlay(Capsule().strokeBorder(Theme.hairline))
+        .frame(maxWidth: .infinity)
+        .fieldBackground()
     }
 }
 

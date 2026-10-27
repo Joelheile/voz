@@ -50,7 +50,6 @@ final class ExtensionsModel: ObservableObject {
     @Published private(set) var working: (name: String, stage: Stage)?
     @Published private(set) var removed: PackageSource?
     @Published private(set) var message: String?
-    @Published private(set) var commandInstalled = CommandLineTool.isInstalled
 
     var installedRows: [InstalledExtension] {
         installed.filter { matches($0.name, summary(for: $0.source)) }
@@ -190,16 +189,29 @@ final class ExtensionsModel: ObservableObject {
         }
     }
 
-    func installCommand() {
+    func createExtension() {
         do {
             try CommandLineTool.install()
+            try openNewExtensionPrompt()
             message = nil
         } catch CommandLineToolError.cancelled {
             message = nil
         } catch {
             message = "\(error)"
         }
-        commandInstalled = CommandLineTool.isInstalled
+    }
+
+    private func openNewExtensionPrompt() throws {
+        let script = FileManager.default.temporaryDirectory.appendingPathComponent("voz-new.command")
+        try """
+        #!/bin/zsh
+        cd ~
+        read "name?Name your extension: "
+        \(CommandLineTool.link.path) new "$name" && cd "$name"
+        exec $SHELL -l
+        """.write(to: script, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
+        NSWorkspace.shared.open([script], withApplicationAt: URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"), configuration: NSWorkspace.OpenConfiguration())
     }
 
     func matches(_ fields: String?...) -> Bool {

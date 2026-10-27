@@ -10,18 +10,22 @@ enum Theme {
     static let inkTertiary = Color(light: 0x7B7870, dark: 0x7F7C75)
     static let hairline = Color(light: 0x141414, dark: 0xFFFFFF, lightAlpha: 0.08, darkAlpha: 0.09)
     static let selected = Color(light: 0xE9E6DF, dark: 0xFFFFFF, lightAlpha: 1, darkAlpha: 0.09)
-    static let accent = Color(light: 0x5163F9, dark: 0x6475FA)
-    static let recording = Color(nsColor: .systemRed)
+    static let accent = Color(light: 0x0057FF, dark: 0x2E6BFF)
+    static let recording = Color(light: 0xFF3B30, dark: 0xFF453A)
     static let onInk = Color(light: 0xFFFFFF, dark: 0x141414)
 
     enum Radius {
         static let control: CGFloat = 8
-        static let row: CGFloat = 10
-        static let panel: CGFloat = 16
+        static let row: CGFloat = 12
+        static let panel: CGFloat = 22
     }
 
     enum Spacing {
         static let item: CGFloat = 16
+    }
+
+    enum Size {
+        static let row: CGFloat = 36
     }
 
     enum Motion {
@@ -57,6 +61,10 @@ extension Color {
 
 extension Font {
     static func display(_ size: CGFloat) -> Font {
+        .custom("Geist-Medium", size: size)
+    }
+
+    static func wordmark(_ size: CGFloat) -> Font {
         .custom("GeistPixel-Square", size: size)
     }
 

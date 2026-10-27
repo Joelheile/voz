@@ -40,10 +40,14 @@ final class SetupModel: ObservableObject {
     var allGranted: Bool { microphoneGranted && accessibilityGranted && inputMonitoringGranted }
 
     func refreshPermissions() {
-        microphoneStatus = Permissions.microphoneStatus
-        accessibilityGranted = Permissions.accessibilityGranted
-        inputMonitoringGranted = Permissions.inputMonitoringGranted
-        systemAudioGranted = Permissions.systemAudioGranted
+        Task { apply(await PermissionSnapshot.read()) }
+    }
+
+    func apply(_ access: PermissionSnapshot) {
+        if microphoneStatus != access.microphone { microphoneStatus = access.microphone }
+        if accessibilityGranted != access.accessibility { accessibilityGranted = access.accessibility }
+        if inputMonitoringGranted != access.inputMonitoring { inputMonitoringGranted = access.inputMonitoring }
+        if systemAudioGranted != access.systemAudio { systemAudioGranted = access.systemAudio }
     }
 
     func requestMicrophone() {
