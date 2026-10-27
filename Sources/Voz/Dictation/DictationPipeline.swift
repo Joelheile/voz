@@ -84,7 +84,7 @@ final class DictationPipeline {
             }
             let insertMs = (ContinuousClock.now - insertStarted).wholeMilliseconds
             if !delivery.text.isEmpty { extensions.inserted(delivery.text, raw: transcript.raw, app: recording.app) }
-            if let command = delivery.command { extensions.run(command, text: delivery.text, app: recording.app) }
+            if let command = delivery.command { extensions.run(command, app: recording.app) }
             let record = await save(transcript, finalText: delivery.text.isEmpty ? transcript.cleaned.text : delivery.text, app: recording.app, released: released)
             report(record, model: transcript.model, insertMs: insertMs, trigger: recording.trigger)
             return .done

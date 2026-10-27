@@ -3,7 +3,7 @@ import Foundation
 
 struct ExtensionDelivery {
     let text: String
-    let command: String?
+    let command: VoiceCommandMatch?
 }
 
 @MainActor
@@ -201,11 +201,13 @@ final class ExtensionService {
 
     func prepare(_ text: String, raw: String, app: HostApp) async -> ExtensionDelivery {
         guard let host, let manifest else { return ExtensionDelivery(text: text, command: nil) }
-        let match = VoiceCommands.match(text, phrases: manifest.commands.map(\.phrase))
-        let dictated = match?.leadingText ?? text
-        guard manifest.subscribes(to: .beforeInsert), !dictated.isEmpty else { return ExtensionDelivery(text: dictated, command: match?.phrase) }
-        let transformed = await host.beforeInsert(text: dictated, raw: raw, app: app, timeout: Self.insertTimeout)
-        return ExtensionDelivery(text: transformed, command: match?.phrase)
+        let match = VoiceCommands.match(text, commands: manifest.commands)
+        if let match, match.at == .start { return ExtensionDelivery(text: "", command: match) }
+        var delivered = match?.text ?? text
+        if manifest.subscribes(to: .beforeInsert), !delivered.isEmpty {
+            delivered = await host.beforeInsert(text: delivered, raw: raw, app: app, timeout: Self.insertTimeout)
+        }
+        return ExtensionDelivery(text: delivered, command: match.map { VoiceCommandMatch(phrase: $0.phrase, at: $0.at, text: delivered) })
     }
 
     func recorded(_ samples: [Float], app: HostApp) {
@@ -236,12 +238,12 @@ final class ExtensionService {
         Task { await host.emit(.afterInsert(text: text, raw: raw), app: app, timeout: Self.eventTimeout) }
     }
 
-    func run(_ command: String, text: String, app: HostApp) {
+    func run(_ command: VoiceCommandMatch, app: HostApp) {
         guard let host else { return }
         Task {
-            let handled = await host.runCommand(phrase: command, text: text, app: app, timeout: Self.commandTimeout)
+            let handled = await host.runCommand(command, app: app, timeout: Self.commandTimeout)
             if !handled {
-                Log.extensions.error("Voice command was not handled: \(command, privacy: .public)")
+                Log.extensions.error("Voice command was not handled: \(command.phrase, privacy: .public)")
                 toast.show("Voice command failed")
             }
         }

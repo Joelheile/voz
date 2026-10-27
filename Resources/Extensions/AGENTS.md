@@ -20,7 +20,7 @@ The full types are in `~/.voz/node_modules/voz/index.d.ts`. Read them before you
 2. `beforeInsert`: before Voz types the text. Return `{ text }` to change it, `{ text: "" }` to type nothing, or nothing to keep it
 3. `afterInsert`: after Voz typed the text. Voz does not wait for it
 4. `recording`: a 16 kHz mono WAV of the dictation. Voz does not wait for it
-5. `registerCommand(phrase, handler)`: runs when a dictation ends with `phrase`. Voz types the words before it first
+5. `registerCommand(phrase, handler)`: runs when a dictation ends with `phrase`. Voz types the words before it first. With a third argument `{ at: "start" }`, it runs when a dictation starts with `phrase`, types nothing and passes the words after it
 6. `registerSpeechModel({ id, name, transcribe })`: a speech model. `transcribe` gets a WAV `path` and returns `{ text }`
 7. `registerCleanupModel({ id, name, clean })`: replaces the on-device cleanup model. `clean` gets `text` and `prompt` and returns `{ text }`
 8. `registerCleanupStep({ id, name, run })`: a cleanup step. `run` gets `text` and returns `{ text }`
@@ -34,6 +34,7 @@ Registering a model or step only makes it available. The user picks it in Settin
 - `beforeCleanup` and `beforeInsert` share a 300 ms budget with every other extension. No network calls or model calls there. Do slow work in a command or in `afterInsert`
 - A cleanup step has 300 ms, cut short if the cleanup budget runs out. A speech model has 2 seconds per part. A cleanup model has what is left of 1.5 seconds after the user stops talking. Prefer local, fast models. On failure or timeout Voz falls back to its built-in models
 - The default export has 3 seconds to finish. Register handlers there and do nothing slow
+- `ctx.generate({ prompt, instructions, schema })` returns JSON from Apple's on-device model that fits a JSON schema (`object`, `array`, `string` with `enum`, `number`, `integer`, `boolean`). Use it in commands to turn speech into fields. Pass today's date and valid names in the prompt. It takes 1 to 3 seconds and needs `"voz": { "apiVersion": 2 }`
 - Give feedback with `ctx.notify("Sent to Linear")`. It shows a short message under the menu bar
 - Anything the user may want to change is a setting. Declare it with `voz.settings({ key: { type, title, default } })`. `type` is `string`, `number` or `boolean`. A string can have `options` for a picker, `secret: true` for a token, or `required: true` when the extension can't work without it. Never ask the user to edit `settings.json`
 - Write files to `voz.paths.data`, never next to the extension, or Voz reloads it on every write
