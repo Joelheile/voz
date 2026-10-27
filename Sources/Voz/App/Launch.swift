@@ -42,7 +42,7 @@ enum LaunchAgent {
             if await startJob() { return true }
             Log.app.error("Launch agent did not start voz, attempt \(attempt)")
             unregisterIfRegistered()
-            try? await Task.sleep(for: .seconds(1))
+            try? await Task.sleep(for: .milliseconds(200))
         }
         Log.app.error("Launch agent failed, staying unmanaged")
         Analytics.report(.launchAgentFailed)
@@ -61,20 +61,34 @@ enum LaunchAgent {
         }
         Log.app.notice("Launch agent registered, status \(service.status.rawValue)")
         for _ in 0..<20 {
-            if jobRunsVoz { return true }
-            try? await Task.sleep(for: .milliseconds(200))
+            switch jobState {
+            case .running: return true
+            case .failed: return false
+            case .starting: try? await Task.sleep(for: .milliseconds(200))
+            }
         }
         return false
     }
 
-    private static var jobRunsVoz: Bool {
-        guard let pid = jobPID, let executable = Bundle.main.executablePath else { return false }
-        var buffer = [UInt8](repeating: 0, count: Int(MAXPATHLEN) * 4)
-        guard proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 else { return false }
-        return String(decoding: buffer.prefix(while: { $0 != 0 }), as: UTF8.self) == executable
+    private enum JobState {
+        case failed
+        case starting
+        case running
     }
 
-    private static var jobPID: Int32? {
+    private static var jobState: JobState {
+        guard let description = launchctlPrint() else { return .failed }
+        let lines = description.split(separator: "\n")
+        let exited = lines.contains { $0.hasPrefix("\tlast exit code = ") && !$0.hasSuffix("(never exited)") }
+        guard !exited else { return .failed }
+        let line = lines.first { $0.hasPrefix("\tpid = ") }
+        guard let pid = line.flatMap({ Int32($0.dropFirst("\tpid = ".count)) }), let executable = Bundle.main.executablePath else { return .starting }
+        var buffer = [UInt8](repeating: 0, count: Int(MAXPATHLEN) * 4)
+        guard proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 else { return .starting }
+        return String(decoding: buffer.prefix(while: { $0 != 0 }), as: UTF8.self) == executable ? .running : .starting
+    }
+
+    private static func launchctlPrint() -> String? {
         let process = Process()
         let output = Pipe()
         process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
@@ -89,8 +103,7 @@ enum LaunchAgent {
         }
         let text = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
         process.waitUntilExit()
-        let line = text.split(separator: "\n").first { $0.hasPrefix("\tpid = ") }
-        return line.flatMap { Int32($0.dropFirst("\tpid = ".count)) }
+        return process.terminationStatus == 0 ? text : nil
     }
 
     private static func removeLegacyLoginItem() {
