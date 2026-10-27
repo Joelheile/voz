@@ -8,6 +8,7 @@ enum IndicatorMotion {
     static let stateSwap = Animation.snappy(duration: 0.25)
     static let contentEnter = Animation.spring(duration: 0.22, bounce: 0.1)
     static let contentExit = Animation.easeOut(duration: 0.1)
+    static let previewUpdate = Animation.smooth(duration: 0.14)
     static let leadingDelay = 0.06
     static let trailingDelay = 0.0
     static let enterBlur: CGFloat = 8
@@ -75,7 +76,7 @@ struct IndicatorView: View {
 
     var body: some View {
         indicator
-            .frame(width: layout.panelFrame.width, height: layout.panelFrame.height, alignment: .top)
+            .frame(width: layout.windowFrame.width, height: layout.windowFrame.height, alignment: .top)
             .keyframeAnimator(initialValue: 0.0, trigger: model.shakeCount) { view, offset in
                 view.offset(x: offset)
             } keyframes: { _ in
@@ -103,44 +104,85 @@ struct IndicatorView: View {
         reduceMotion || model.isExpanded ? layout.panelFrame.width : layout.collapsedWidth
     }
 
+    private var showsPreview: Bool { model.isExpanded && !model.preview.isEmpty }
+
     private var notchShape: NotchShape {
         NotchShape(
             topRadius: 6,
-            bottomRadius: model.isExpanded ? 14 : 10
+            bottomRadius: showsPreview ? 20 : model.isExpanded ? 14 : 10
         )
+    }
+
+    private var preview: some View {
+        TranscriptPreview(text: model.preview)
+            .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { model.previewFrame = $0 }
     }
 
     private var notch: some View {
         ZStack(alignment: .top) {
-            notchShape
-                .fill(.black)
-                .frame(width: notchWidth, height: layout.panelFrame.height)
-            HStack(spacing: 0) {
-                wing(alignment: .trailing, anchor: .trailing, delay: IndicatorMotion.leadingDelay) {
-                    IndicatorLeading(model: model)
+            VStack(spacing: 0) {
+                HStack(spacing: 0) {
+                    wing(alignment: .trailing, anchor: .trailing, delay: IndicatorMotion.leadingDelay) {
+                        IndicatorLeading(model: model)
+                    }
+                    Spacer(minLength: layout.collapsedWidth)
+                    wing(alignment: .leading, anchor: .leading, delay: IndicatorMotion.trailingDelay) {
+                        IndicatorTrailing(model: model)
+                    }
                 }
-                Spacer(minLength: layout.collapsedWidth)
-                wing(alignment: .leading, anchor: .leading, delay: IndicatorMotion.trailingDelay) {
-                    IndicatorTrailing(model: model)
+                .frame(height: layout.panelFrame.height)
+                if showsPreview {
+                    preview
+                        .padding(.horizontal, notchShape.topRadius + 14)
+                        .padding(.top, 2)
+                        .padding(.bottom, 14)
+                        .transition(transition(anchor: .top, delay: 0))
                 }
             }
-            .frame(width: layout.panelFrame.width, height: layout.panelFrame.height)
-            .mask { notchShape.frame(width: notchWidth, height: layout.panelFrame.height) }
+            .frame(width: layout.panelFrame.width)
+            .background {
+                notchShape.fill(.black).frame(width: notchWidth)
+            }
+            .mask { notchShape.frame(width: notchWidth) }
             Rectangle()
                 .fill(.black)
                 .frame(width: max(notchWidth - 2 * notchShape.topRadius, 0), height: 1)
         }
         .opacity(reduceMotion && !model.isExpanded ? 0 : 1)
         .animation(animation, value: model.isExpanded)
+        .animation(previewAnimation, value: model.preview)
+    }
+
+    private var previewAnimation: Animation {
+        reduceMotion ? IndicatorMotion.reducedMotion : IndicatorMotion.previewUpdate
     }
 
     private var pill: some View {
+        VStack(spacing: IndicatorLayout.pillGap) {
+            pillBody
+            if showsPreview {
+                preview
+                    .padding(14)
+                    .frame(width: IndicatorLayout.previewWidth)
+                    .background { floatingSurface(RoundedRectangle(cornerRadius: 16)) }
+                    .transition(reduceMotion ? .opacity.animation(IndicatorMotion.reducedMotion) : .pill)
+            }
+        }
+        .padding(.top, IndicatorLayout.shadowMargin)
+        .animation(previewAnimation, value: model.preview)
+    }
+
+    private func floatingSurface(_ shape: some InsettableShape) -> some View {
+        ZStack {
+            shape.fill(.black).shadow(color: .black.opacity(0.25), radius: 8, y: 3)
+            Color.clear.hud(shape)
+        }
+    }
+
+    private var pillBody: some View {
         ZStack {
             if model.isExpanded {
-                ZStack {
-                    Capsule().fill(.black).shadow(color: .black.opacity(0.25), radius: 8, y: 3)
-                    Color.clear.hudCapsule()
-                }
+                floatingSurface(Capsule())
                 .transition(reduceMotion ? .opacity.animation(IndicatorMotion.reducedMotion) : .pill)
             }
             HStack(spacing: 0) {
@@ -157,7 +199,6 @@ struct IndicatorView: View {
             .padding(.trailing, 8)
         }
         .frame(width: IndicatorLayout.pillSize.width, height: IndicatorLayout.pillSize.height)
-        .frame(maxHeight: .infinity)
         .animation(animation, value: model.isExpanded)
     }
 
@@ -201,6 +242,8 @@ final class IndicatorModel {
     var shakeCount = 0
     var recordingStart = Date.now
     var recordingEnd: Date?
+    var preview = ""
+    @ObservationIgnored var previewFrame = CGRect.zero
     @ObservationIgnored var levels = LevelHistory()
 }
 

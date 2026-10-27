@@ -38,6 +38,7 @@ final class Dictation {
     var onChange: () -> Void = {}
     var onOutcome: (Outcome) -> Void = { _ in }
     var onBusy: () -> Void = {}
+    var onPreview: (String) -> Void = { _ in }
 
     init(pipeline: DictationPipeline, settings: AppSettings, analytics: Analytics) {
         self.pipeline = pipeline
@@ -79,6 +80,9 @@ final class Dictation {
         }
         let app = HostApp.current
         let session = pipeline.makeStreaming(app: app)
+        if settings.livePreviewEnabled {
+            session.onPreview = { [weak self] text in self?.onPreview(text) }
+        }
         recorder.onSamples = { chunk in
             DispatchQueue.main.async { MainActor.assumeIsolated { session.feed(chunk) } }
         }

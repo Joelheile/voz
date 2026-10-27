@@ -118,10 +118,10 @@ struct NotchShape: Shape {
 }
 
 extension View {
-    func hudCapsule() -> some View {
+    func hud(_ shape: some InsettableShape) -> some View {
         background { VisualEffectBackground() }
-        .clipShape(Capsule())
-        .overlay(Capsule().strokeBorder(.primary.opacity(0.1), lineWidth: 0.5))
+        .clipShape(shape)
+        .overlay(shape.strokeBorder(.primary.opacity(0.1), lineWidth: 0.5))
     }
 }
 
