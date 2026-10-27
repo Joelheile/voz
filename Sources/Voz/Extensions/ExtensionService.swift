@@ -31,6 +31,10 @@ final class ExtensionCatalog: ObservableObject {
         commands.filter { Self.belongs($0.extension, to: name) }
     }
 
+    func cleanupSteps(for name: String) -> [HostComponent] {
+        cleanupSteps.filter { Self.belongs($0.id, to: name) }
+    }
+
     func actions(for name: String) -> [ExtensionAction] {
         actions.filter { Self.belongs($0.extension, to: name) }
     }

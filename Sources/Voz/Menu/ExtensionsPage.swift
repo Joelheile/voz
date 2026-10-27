@@ -4,6 +4,7 @@ import SwiftUI
 struct ExtensionsPage: View {
     @ObservedObject var model: ExtensionsModel
     @ObservedObject var catalog: ExtensionCatalog
+    @ObservedObject var settings: AppSettings
     let back: () -> Void
     @FocusState private var searchFocused: Bool
 
@@ -13,7 +14,7 @@ struct ExtensionsPage: View {
             SearchField(text: $model.query, prompt: "Search extensions", focused: $searchFocused)
             if let message = model.message {
                 Text(message)
-                    .font(.ui(12))
+                    .font(.meta)
                     .foregroundStyle(Theme.inkTertiary)
                     .fixedSize(horizontal: false, vertical: true)
                     .textSelection(.enabled)
@@ -41,7 +42,7 @@ struct ExtensionsPage: View {
                 VStack(alignment: .leading, spacing: 0) {
                     PanelRow(title: item.name, detail: detail(for: item)) { installedControls(item) }
                     if model.expanded == item.name {
-                        ExtensionDetails(item: item, model: model, catalog: catalog)
+                        ExtensionDetails(item: item, model: model, catalog: catalog, settings: settings)
                             .transition(.opacity)
                     }
                 }
@@ -55,7 +56,7 @@ struct ExtensionsPage: View {
                 StageLabel(text: stage.label)
             } else if model.latestVersion(for: item) != nil {
                 Button("Update") { Task { await model.update(item) } }
-                    .buttonStyle(.pill(.quiet, height: 26))
+                    .buttonStyle(.pill(.quiet, .small))
                     .disabled(model.working != nil)
             }
             IconButton(icon: model.expanded == item.name ? .chevronUp : .chevronDown, help: "Details") {
@@ -76,6 +77,16 @@ struct ExtensionsPage: View {
         return model.summary(for: item.source) ?? item.source?.description ?? "In your extensions folder"
     }
 
+    private func downloads(_ count: Int) -> some View {
+        HStack(spacing: 3) {
+            Icon(.download, size: 12)
+            Text(count.formatted(.number.notation(.compactName)))
+        }
+        .font(.meta)
+        .foregroundStyle(Theme.inkTertiary)
+        .help("\(count.formatted()) downloads in the last month")
+    }
+
     private func needsSetup(_ name: String) -> Bool {
         catalog.settings(for: name).contains { group in
             let config = model.config(for: group.extension)
@@ -88,7 +99,7 @@ struct ExtensionsPage: View {
             Text("Removed \(source.name)").font(.ui(12)).foregroundStyle(Theme.inkSecondary)
             Spacer(minLength: 0)
             Button("Undo") { Task { await model.undoRemove() } }
-                .buttonStyle(.pill(.quiet, height: 24))
+                .buttonStyle(.pill(.quiet, .small))
         }
         .transition(.opacity)
     }
@@ -106,7 +117,12 @@ struct ExtensionsPage: View {
             PanelGroup(title: "Browse") {
                 ForEach(model.browseRows) { listing in
                     VStack(alignment: .leading, spacing: 0) {
-                        PanelRow(title: listing.name, detail: listing.summary) { control(for: listing) }
+                        PanelRow(title: listing.name, detail: listing.summary) {
+                            HStack(spacing: 10) {
+                                if listing.monthlyDownloads > 0 { downloads(listing.monthlyDownloads) }
+                                control(for: listing)
+                            }
+                        }
                         if model.confirming == listing.name {
                             confirmation(for: listing).transition(.opacity)
                         }
@@ -122,13 +138,10 @@ struct ExtensionsPage: View {
 
     private var yourOwn: some View {
         PanelGroup(title: "Your own") {
-            if model.commandInstalled {
-                PanelRow(title: "New extension", detail: "Run voz new in Terminal") {
-                    Button("Open folder", action: model.openExtensionsFolder).buttonStyle(.pill(.quiet, height: 26))
-                }
-            } else {
-                PanelRow(title: "New extension", detail: "Adds the voz command to Terminal") {
-                    Button("Install", action: model.installCommand).buttonStyle(.pill(.quiet, height: 26))
+            PanelRow(title: "New extension", detail: "Write one in TypeScript") {
+                HStack(spacing: 8) {
+                    IconButton(icon: .folderOpen, help: "Open extensions folder", action: model.openExtensionsFolder)
+                    Button("Create", action: model.createExtension).buttonStyle(.pill(.quiet, .small))
                 }
             }
         }
@@ -141,12 +154,12 @@ struct ExtensionsPage: View {
                 StageLabel(text: stage.label)
             } else if model.confirming == listing.name {
                 Button("Install") { Task { await model.install(listing) } }
-                    .buttonStyle(.pill(.accent, height: 26))
+                    .buttonStyle(.pill(.accent, .small))
                     .keyboardShortcut(.defaultAction)
                     .disabled(model.working != nil)
             } else {
                 Button("Get") { model.confirming = listing.name }
-                    .buttonStyle(.pill(.quiet, height: 26))
+                    .buttonStyle(.pill(.quiet, .small))
                     .disabled(model.working != nil)
             }
         }
@@ -160,7 +173,7 @@ struct ExtensionsPage: View {
             Text("By \(listing.publisher). Can read your transcripts and files.")
             if let page = listing.page { Link("Source", destination: page) }
         }
-        .font(.ui(11.5))
+        .font(.meta)
         .foregroundStyle(Theme.inkTertiary)
         .padding(.bottom, 10)
     }
@@ -182,6 +195,7 @@ private struct ExtensionDetails: View {
     let item: InstalledExtension
     @ObservedObject var model: ExtensionsModel
     @ObservedObject var catalog: ExtensionCatalog
+    @ObservedObject var settings: AppSettings
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -206,7 +220,8 @@ private struct ExtensionDetails: View {
     private var added: some View {
         let commands = catalog.commands(for: item.name)
         let actions = catalog.actions(for: item.name)
-        if !commands.isEmpty || !actions.isEmpty {
+        let steps = catalog.cleanupSteps(for: item.name)
+        if !commands.isEmpty || !actions.isEmpty || !steps.isEmpty {
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(commands, id: \.self) { command in
                     line("Say \u{201C}\(command.phrase)\u{201D}")
@@ -220,6 +235,13 @@ private struct ExtensionDetails: View {
                         }
                     }
                 }
+                ForEach(steps, id: \.self) { step in
+                    HStack {
+                        line("Cleanup step: \(step.name)")
+                        Spacer(minLength: 0)
+                        Toggle(step.name, isOn: settings.cleanupStepEnabled(step.id)).labelsHidden()
+                    }
+                }
             }
         }
     }
@@ -227,15 +249,15 @@ private struct ExtensionDetails: View {
     private func errorView(_ error: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(error)
-                .font(.ui(11.5))
-                .foregroundStyle(.red)
+                .font(.meta)
+                .foregroundStyle(Theme.recording)
                 .fixedSize(horizontal: false, vertical: true)
                 .textSelection(.enabled)
             Button("Copy error") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString("\(item.name) failed to load in Voz: \(error)", forType: .string)
             }
-            .buttonStyle(.pill(.quiet, height: 24))
+            .buttonStyle(.pill(.quiet, .small))
         }
     }
 
@@ -245,7 +267,7 @@ private struct ExtensionDetails: View {
             Spacer(minLength: 0)
             if item.source != nil {
                 Button("Remove") { Task { await model.remove(item) } }
-                    .buttonStyle(.pill(.quiet, height: 24))
+                    .buttonStyle(.pill(.quiet, .small))
                     .disabled(model.working != nil)
             }
         }
@@ -256,7 +278,7 @@ private struct ExtensionDetails: View {
     }
 
     private func note(_ text: String) -> some View {
-        Text(text).font(.ui(11.5)).foregroundStyle(Theme.inkTertiary)
+        Text(text).font(.meta).foregroundStyle(Theme.inkTertiary)
     }
 }
 
@@ -279,7 +301,7 @@ struct ExtensionSettingsForm: View {
 }
 
 private struct SettingControl: View {
-    private static let fieldWidth: CGFloat = 140
+    private static let fieldWidth: CGFloat = 116
 
     let field: SettingField
     let value: SettingValue
@@ -312,16 +334,14 @@ private struct SettingControl: View {
             }
         }
         .textFieldStyle(.plain)
-        .font(.ui(12.5))
+        .font(.meta)
         .foregroundStyle(Theme.ink)
         .focused($focused)
         .onSubmit(commit)
         .onChange(of: focused) { if !focused { commit() } }
         .onAppear { text = value.text }
-        .padding(.horizontal, 10)
-        .frame(width: Self.fieldWidth, height: 26)
-        .background(Theme.canvas, in: Capsule())
-        .overlay(Capsule().strokeBorder(Theme.hairline))
+        .frame(width: Self.fieldWidth)
+        .fieldBackground(.small)
     }
 
     private func commit() {

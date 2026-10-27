@@ -17,6 +17,18 @@ struct PageBar: View {
     }
 }
 
+struct PageNote: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.meta)
+            .lineSpacing(2)
+            .foregroundStyle(Theme.inkSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
 struct PanelGroup<Content: View>: View {
     var title: String?
     @ViewBuilder var content: Content
@@ -59,8 +71,8 @@ struct PanelRow<Control: View>: View {
             Spacer(minLength: 0)
             control
         }
-        .frame(minHeight: 40)
-        .padding(.vertical, 4)
+        .frame(minHeight: Theme.Size.row)
+        .padding(.vertical, 6)
     }
 }
 
@@ -92,8 +104,8 @@ struct ActionRow<Trailing: View>: View {
                 Text(value).font(.meta).foregroundStyle(Theme.inkSecondary)
                 trailing(hovering)
             }
-            .frame(minHeight: 40)
-            .padding(.vertical, 4)
+            .frame(minHeight: Theme.Size.row)
+            .padding(.vertical, 6)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -139,7 +151,6 @@ struct TabBar<Tab: Hashable & RawRepresentable<String>>: View {
                             if tab == selection {
                                 RoundedRectangle(cornerRadius: Theme.Radius.control - 2, style: .continuous)
                                     .fill(Theme.raised)
-                                    .shadow(color: .black.opacity(0.08), radius: 1, y: 1)
                                     .matchedGeometryEffect(id: "pill", in: pill)
                             }
                         }

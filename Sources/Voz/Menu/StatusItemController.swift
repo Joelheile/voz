@@ -64,7 +64,6 @@ final class StatusItemController: NSObject {
     private static let panelGap: CGFloat = 6
     private static let screenMargin: CGFloat = 8
     private static let reopenGuard: TimeInterval = 0.2
-    private static let fade: TimeInterval = 0.12
     private static let anchorRetry: TimeInterval = 0.1
     private static let shrinkDelay: TimeInterval = 0.35
 
@@ -83,7 +82,8 @@ final class StatusItemController: NSObject {
     private let quitApp: () -> Void
     private var cancellables: Set<AnyCancellable> = []
     private var outsideClickMonitor: Any?
-    private var permissionPoll: Timer?
+    private var permissionPoll: Task<Void, Never>?
+    private var permissions: PermissionSnapshot?
     private var closedAt = Date.distantPast
     private var contentSize: CGSize = .zero
 
@@ -131,16 +131,20 @@ final class StatusItemController: NSObject {
         }
         observeSources()
         refresh()
+        Task { await readPermissions() }
+        DispatchQueue.main.async { [hosting] in hosting.layoutSubtreeIfNeeded() }
     }
 
     func refresh() {
         statusItem.button?.image = MenuBarGlyph.image(for: dictation.phase)
         statusItem.button?.setAccessibilityLabel("Voz")
         let status = currentStatus()
-        model.status = status
-        model.hint = hint(for: status)
-        model.needsSetup = !settings.onboardingCompleted
-        if model.needsSetup { setup.refreshPermissions() }
+        let hint = hint(for: status)
+        let needsSetup = !settings.onboardingCompleted
+        if model.status != status { model.status = status }
+        if model.hint != hint { model.hint = hint }
+        if model.needsSetup != needsSetup { model.needsSetup = needsSetup }
+        if model.needsSetup, let permissions { setup.apply(permissions) }
     }
 
     func dictationChanged() {
@@ -176,12 +180,12 @@ final class StatusItemController: NSObject {
         case .transcribing: return .transcribing
         case .idle: break
         }
-        switch Permissions.microphoneStatus {
+        switch permissions?.microphone {
         case .notDetermined: return .permissionNeeded(.microphone)
         case .denied, .restricted: return .permissionNeeded(.microphoneBlocked)
         default: break
         }
-        if !Permissions.accessibilityGranted { return .permissionNeeded(.accessibility) }
+        if permissions?.accessibility == false { return .permissionNeeded(.accessibility) }
         switch modelStatus.state(for: settings.localSpeechModel) {
         case .ready: return .ready
         case .notLoaded: return .loadingModel(detail: "Starting", progress: nil)
@@ -245,20 +249,25 @@ final class StatusItemController: NSObject {
         if !model.needsSetup { analytics.capture(.historyOpened) }
         hosting.layoutSubtreeIfNeeded()
         layoutPanel(size: contentSize)
-        panel.alphaValue = 0
         panel.makeKeyAndOrderFront(nil)
         syncStats(page: model.page)
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = Self.fade
-            panel.animator().alphaValue = 1
-        }
         statusItem.button?.highlight(true)
         outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
             MainActor.assumeIsolated { self?.dismissUnlessPinned() }
         }
-        permissionPoll = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.refresh() }
+        permissionPoll = Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.readPermissions()
+                try? await Task.sleep(for: .seconds(1))
+            }
         }
+    }
+
+    private func readPermissions() async {
+        let latest = await PermissionSnapshot.read()
+        guard latest != permissions else { return }
+        permissions = latest
+        refresh()
     }
 
     private func syncStats(page: PopoverPage) {
@@ -274,7 +283,7 @@ final class StatusItemController: NSObject {
         statusItem.button?.highlight(false)
         if let outsideClickMonitor { NSEvent.removeMonitor(outsideClickMonitor) }
         outsideClickMonitor = nil
-        permissionPoll?.invalidate()
+        permissionPoll?.cancel()
         permissionPoll = nil
         history.query = ""
     }

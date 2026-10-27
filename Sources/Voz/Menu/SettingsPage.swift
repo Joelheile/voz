@@ -7,20 +7,11 @@ struct SettingsPage: View {
     @ObservedObject var vocabulary: VocabularyModel
     @ObservedObject var catalog: ExtensionCatalog
     @StateObject private var capture: HotkeyCapture
-    @State private var microphone = Permissions.microphoneStatus
-    @State private var accessibility = Permissions.accessibilityGranted
-    @State private var inputMonitoring = Permissions.inputMonitoringGranted
-    @State private var systemAudio = Permissions.systemAudioGranted
-    @State private var tab = Tab.dictation
-
-    private enum Tab: String, CaseIterable {
-        case dictation = "Dictation"
-        case output = "Output"
-        case general = "General"
-    }
+    @State private var access: PermissionSnapshot?
 
     private var allGranted: Bool {
-        microphone == .authorized && accessibility && inputMonitoring && (systemAudio || !settings.muteWhileRecording)
+        guard let access else { return true }
+        return access.microphone == .authorized && access.accessibility && access.inputMonitoring && (access.systemAudio || !settings.muteWhileRecording)
     }
 
     init(model: PopoverModel, settings: AppSettings, status: ModelStatus, vocabulary: VocabularyModel, catalog: ExtensionCatalog) {
@@ -35,15 +26,12 @@ struct SettingsPage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             PageBar(title: "Settings", back: model.goBack)
-            TabBar(tabs: Tab.allCases, selection: $tab)
             CappedScrollView(maxHeight: 520) {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 16) {
                     if !allGranted { permissions }
-                    switch tab {
-                    case .dictation: dictation
-                    case .output: output
-                    case .general: general
-                    }
+                    dictation
+                    cleanup
+                    general
                 }
             }
         }
@@ -51,10 +39,8 @@ struct SettingsPage: View {
         .onDisappear { capture.cancel() }
         .task {
             while !Task.isCancelled {
-                microphone = Permissions.microphoneStatus
-                accessibility = Permissions.accessibilityGranted
-                inputMonitoring = Permissions.inputMonitoringGranted
-                systemAudio = Permissions.systemAudioGranted
+                let latest = await PermissionSnapshot.read()
+                if latest != access { access = latest }
                 try? await Task.sleep(for: .seconds(1))
             }
         }
@@ -62,55 +48,23 @@ struct SettingsPage: View {
 
     @ViewBuilder
     private var dictation: some View {
-        PanelGroup {
+        PanelGroup(title: "Dictation") {
             PanelRow(title: "Shortcut", detail: capture.warning) {
                 Button(capture.isListening ? capture.preview?.displayName ?? "Press keys…" : settings.hotkey.displayName) {
                     capture.isListening ? capture.cancel() : capture.begin()
                 }
-                .buttonStyle(.pill(capture.isListening ? .accent : .quiet, height: 26))
+                .buttonStyle(.pill(capture.isListening ? .accent : .quiet, .small))
             }
             PanelRow(title: "Mode") {
-                TabBar(tabs: TalkMode.allCases, selection: talkMode)
+                TabBar(tabs: TalkMode.allCases, selection: settings.talkMode)
                     .frame(width: 120)
             }
             LinkRow(title: "Speech model", value: speechModelName) { model.page = .speechModel }
-            PanelRow(title: "Live preview", detail: "Shows draft text below the indicator after pauses") {
+            PanelRow(title: "Live preview", detail: "Draft text under the indicator") {
                 Toggle("Live preview", isOn: $settings.livePreviewEnabled).labelsHidden()
             }
-            LinkRow(title: "Dictionary", value: vocabulary.snapshot.words.count.formatted()) { model.page = .dictionary }
         }
-        PanelGroup {
-            PanelRow(title: "Clean up text", detail: "Removes filler words, fixes punctuation") {
-                Toggle("Clean up text", isOn: $settings.cleanupEnabled).labelsHidden()
-            }
-            if settings.cleanupEnabled {
-                if !catalog.cleanupModels.isEmpty || settings.cleanupModel != CleanupModelID.apple {
-                    ModelPicker(title: "Cleanup model", selection: $settings.cleanupModel, options: [ModelOption(id: CleanupModelID.apple, name: "Apple", detail: "On device")] + ModelOption.extensions(catalog.cleanupModels))
-                }
-                LinkRow(title: "Steps", value: settings.cleanupSteps == CleanupStep.standard ? "Default" : "Edited") { model.page = .cleanupSteps }
-                LinkRow(title: "Prompt", value: settings.cleanupPrompt == CleanupPrompt.standard ? "Default" : "Edited") { model.page = .cleanupPrompt }
-            }
-            if let error = settings.pipelineError {
-                PanelRow(title: "Could not read settings.json", detail: error) { EmptyView() }
-            }
-        }
-    }
-
-    private enum TalkMode: String, CaseIterable {
-        case tap = "Tap"
-        case hold = "Hold"
-    }
-
-    private var talkMode: Binding<TalkMode> {
-        Binding { settings.holdToTalk ? .hold : .tap } set: { settings.holdToTalk = $0 == .hold }
-    }
-
-    private var speechModelName: String {
-        SpeechModel(rawValue: settings.speechModel)?.name ?? catalog.speechModels.first { $0.id == settings.speechModel }?.name ?? settings.speechModel
-    }
-
-    private var output: some View {
-        PanelGroup {
+        PanelGroup(title: "Output") {
             toggle("Type at cursor", isOn: $settings.insertIntoApp)
             toggle("Copy to clipboard", isOn: $settings.copyToClipboard)
             toggle("Mute other apps", isOn: $settings.muteWhileRecording)
@@ -118,24 +72,62 @@ struct SettingsPage: View {
         }
     }
 
+    @ViewBuilder
+    private var cleanup: some View {
+        PanelGroup(title: "Cleanup") {
+            PanelRow(title: "Clean up text", detail: "Removes filler words, fixes punctuation") {
+                Toggle("Clean up text", isOn: $settings.cleanupEnabled).labelsHidden()
+            }
+            if settings.cleanupEnabled {
+                if !catalog.cleanupModels.isEmpty || settings.cleanupModel != CleanupModelID.apple {
+                    ModelPicker(title: "Model", selection: $settings.cleanupModel, options: [ModelOption(id: CleanupModelID.apple, name: "Apple", detail: "On device")] + ModelOption.extensions(catalog.cleanupModels))
+                }
+                LinkRow(title: "Steps", value: edited(stepsEdited)) { model.page = .cleanupSteps }
+                LinkRow(title: "Prompt", value: edited(settings.cleanupPrompt != CleanupPrompt.standard)) { model.page = .cleanupPrompt }
+            }
+            LinkRow(title: "Dictionary", value: vocabulary.snapshot.words.count.formatted()) { model.page = .dictionary }
+            if let error = settings.pipelineError {
+                PanelRow(title: "Could not read settings.json", detail: error) { EmptyView() }
+            }
+        }
+        .animation(Theme.Motion.section, value: settings.cleanupEnabled)
+    }
+
+    private func edited(_ isEdited: Bool) -> String {
+        isEdited ? "Edited" : "Default"
+    }
+
+    private var stepsEdited: Bool {
+        settings.cleanupSteps != CleanupStep.standard
+    }
+
+    private var speechModelName: String {
+        SpeechModel(rawValue: settings.speechModel)?.name ?? catalog.speechModels.first { $0.id == settings.speechModel }?.name ?? settings.speechModel
+    }
+
+    @ViewBuilder
     private var permissions: some View {
+        if let access { permissions(access) }
+    }
+
+    private func permissions(_ access: PermissionSnapshot) -> some View {
         PanelGroup(title: "Needs access") {
-            if microphone != .authorized {
+            if access.microphone != .authorized {
                 allowRow("Microphone") {
-                    if microphone == .notDetermined {
+                    if access.microphone == .notDetermined {
                         Task { await Permissions.requestMicrophone() }
                     } else {
                         Permissions.openSettings(.microphone)
                     }
                 }
             }
-            if !accessibility {
+            if !access.accessibility {
                 allowRow("Accessibility") { Permissions.requestAccessibility() }
             }
-            if !inputMonitoring {
+            if !access.inputMonitoring {
                 allowRow("Input Monitoring") { Permissions.requestInputMonitoring() }
             }
-            if settings.muteWhileRecording && !systemAudio {
+            if settings.muteWhileRecording && !access.systemAudio {
                 allowRow("System Audio") {
                     Task { await Permissions.requestSystemAudio() }
                 }
@@ -145,12 +137,12 @@ struct SettingsPage: View {
 
     @ViewBuilder
     private var general: some View {
-        PanelGroup {
+        PanelGroup(title: "App") {
             toggle("Launch at login", isOn: $settings.launchAtLogin)
             toggle("Beta updates", isOn: $settings.receiveBetaUpdates)
             PanelRow(title: "Version \(Self.version)") {
                 Button("Check for updates", action: model.actions.checkForUpdates)
-                    .buttonStyle(.pill(.quiet, height: 26))
+                    .buttonStyle(.pill(.quiet, .small))
             }
         }
         PanelGroup(title: "Privacy") {
@@ -165,7 +157,7 @@ struct SettingsPage: View {
 
     private func allowRow(_ title: String, fix: @escaping () -> Void) -> some View {
         PanelRow(title: title) {
-            Button("Allow", action: fix).buttonStyle(.pill(.accent, height: 26))
+            Button("Allow", action: fix).buttonStyle(.pill(.accent, .small))
         }
     }
 
@@ -180,6 +172,17 @@ struct SettingsPage: View {
     }
 }
 
+enum TalkMode: String, CaseIterable {
+    case tap = "Tap"
+    case hold = "Hold"
+}
+
+extension AppSettings {
+    var talkMode: Binding<TalkMode> {
+        Binding { self.holdToTalk ? .hold : .tap } set: { self.holdToTalk = $0 == .hold }
+    }
+}
+
 struct PermissionRow: View {
     let title: String
     var detail: String?
@@ -190,12 +193,12 @@ struct PermissionRow: View {
         PanelRow(title: title, detail: detail) {
             if granted {
                 Icon(.circleCheck, size: 16)
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(Theme.accent)
                     .help("Allowed")
                     .transition(.scale(scale: 0.6).combined(with: .opacity))
             } else {
                 Button("Allow", action: fix)
-                    .buttonStyle(.pill(.accent, height: 26))
+                    .buttonStyle(.pill(.accent, .small))
                     .transition(.scale(scale: 0.9).combined(with: .opacity))
             }
         }

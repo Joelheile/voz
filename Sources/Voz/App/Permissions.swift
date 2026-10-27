@@ -58,13 +58,28 @@ enum Permissions {
     }
 }
 
-@MainActor
+struct PermissionSnapshot: Equatable {
+    let microphone: AVAuthorizationStatus
+    let accessibility: Bool
+    let inputMonitoring: Bool
+    let systemAudio: Bool
+
+    @concurrent static func read() async -> PermissionSnapshot {
+        PermissionSnapshot(
+            microphone: AVCaptureDevice.authorizationStatus(for: .audio),
+            accessibility: AXIsProcessTrusted(),
+            inputMonitoring: CGPreflightListenEventAccess(),
+            systemAudio: SystemAudioAccess.preflight() == 0
+        )
+    }
+}
+
 enum SystemAudioAccess {
     private typealias Preflight = @convention(c) (CFString, CFDictionary?) -> Int
     private typealias Request = @convention(c) (CFString, CFDictionary?, @escaping (Bool) -> Void) -> Void
 
     private static let service = "kTCCServiceAudioCapture"
-    private static let framework = dlopen("/System/Library/PrivateFrameworks/TCC.framework/Versions/A/TCC", RTLD_NOW)
+    nonisolated(unsafe) private static let framework = dlopen("/System/Library/PrivateFrameworks/TCC.framework/Versions/A/TCC", RTLD_NOW)
 
     static func preflight() -> Int? {
         guard let symbol = symbol("TCCAccessPreflight") else { return nil }

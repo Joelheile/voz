@@ -51,7 +51,7 @@ struct SetupPage: View {
             }
             Spacer(minLength: 0)
             Button(primaryTitle, action: advance)
-                .buttonStyle(.pill(primaryKind, height: 32))
+                .buttonStyle(.pill(primaryKind, .regular))
                 .contentTransition(.interpolate)
                 .keyboardShortcut(.defaultAction)
         }
@@ -188,15 +188,9 @@ private struct TryStep: View {
                     Button(capture.isListening ? "Cancel" : "Change shortcut") {
                         capture.isListening ? capture.cancel() : capture.begin()
                     }
-                    .buttonStyle(.pill(.quiet, height: 28))
-                    Picker("Mode", selection: $settings.holdToTalk) {
-                        Text("Tap").tag(false)
-                        Text("Hold").tag(true)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .fixedSize()
-                    .controlSize(.small)
+                    .buttonStyle(.pill(.quiet, .small))
+                    TabBar(tabs: TalkMode.allCases, selection: settings.talkMode)
+                        .frame(width: 120)
                 }
                 if let warning = capture.warning {
                     Text(warning)
@@ -235,7 +229,7 @@ private struct TryStep: View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             if let tried {
                 Icon(.circleCheck, size: 15)
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(Theme.accent)
                     .transition(.scale(scale: 0.6).combined(with: .opacity))
                 Text(tried.finalText)
                     .font(.ui(13))
@@ -250,7 +244,7 @@ private struct TryStep: View {
                 if case .modelFailed = status {
                     Spacer(minLength: 0)
                     Button("Try again", action: retryModel)
-                        .buttonStyle(.pill(.quiet, height: 24))
+                        .buttonStyle(.pill(.quiet, .small))
                 }
             }
         }
@@ -275,7 +269,7 @@ private struct KeyCap: View {
             .background(Theme.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(listening ? Color.accentColor : Theme.hairline, lineWidth: listening ? 1.5 : 1)
+                    .strokeBorder(listening ? Theme.accent : Theme.hairline, lineWidth: listening ? 1.5 : 1)
             )
             .shadow(color: .black.opacity(pressed ? 0 : 0.08), radius: 0, y: pressed ? 0 : 2)
             .scaleEffect(pressed ? 0.96 : 1)
