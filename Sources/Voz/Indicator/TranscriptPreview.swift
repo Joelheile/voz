@@ -41,7 +41,8 @@ struct TranscriptPreview: View {
 
     private var styledText: Text {
         let lastWordStart = text.lastIndex(where: \.isWhitespace).map(text.index(after:)) ?? text.startIndex
-        return Text(text[..<lastWordStart]).foregroundStyle(.primary.opacity(0.7))
-            + Text(text[lastWordStart...]).foregroundStyle(.primary)
+        let settled = Text(text[..<lastWordStart]).foregroundStyle(.primary.opacity(0.7))
+        let latest = Text(text[lastWordStart...]).foregroundStyle(.primary)
+        return Text("\(settled)\(latest)")
     }
 }
