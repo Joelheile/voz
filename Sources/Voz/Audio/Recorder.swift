@@ -31,17 +31,22 @@ final class SampleBuffer: Sendable {
 }
 
 final class Resampler: @unchecked Sendable {
-    private let converter: AVAudioConverter
+    private var converter: AVAudioConverter?
     private let targetFormat: AVAudioFormat
     private var output: AVAudioPCMBuffer?
 
-    init?(from inputFormat: AVAudioFormat, to targetFormat: AVAudioFormat) {
-        guard let converter = AVAudioConverter(from: inputFormat, to: targetFormat) else { return nil }
-        self.converter = converter
+    init(to targetFormat: AVAudioFormat) {
         self.targetFormat = targetFormat
     }
 
     func convert(_ input: AVAudioPCMBuffer) -> [Float]? {
+        if converter?.inputFormat != input.format {
+            converter = AVAudioConverter(from: input.format, to: targetFormat)
+        }
+        guard let converter else {
+            Log.app.error("No converter from \(input.format.description, privacy: .public)")
+            return nil
+        }
         let ratio = targetFormat.sampleRate / input.format.sampleRate
         let capacity = AVAudioFrameCount(Double(input.frameLength) * ratio) + 32
         if output.map({ $0.frameCapacity < capacity }) ?? true {
@@ -93,12 +98,15 @@ final class Recorder {
     var onInterrupted: (@MainActor () -> Void)?
 
     init() {
+        // The engine posts this on its own queue and waits for observers. Releasing an engine also waits
+        // for that queue, so observing on the main queue deadlocks. Hop to the main actor without waiting.
         configurationObserver = NotificationCenter.default.addObserver(
             forName: .AVAudioEngineConfigurationChange,
             object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.configurationChanged() }
+            queue: nil
+        ) { [weak self] notification in
+            let engine = (notification.object as AnyObject?).map(ObjectIdentifier.init)
+            Task { @MainActor in self?.configurationChanged(engine: engine) }
         }
     }
 
@@ -133,7 +141,8 @@ final class Recorder {
         return buffer.end()
     }
 
-    private func configurationChanged() {
+    private func configurationChanged(engine: ObjectIdentifier?) {
+        guard let capture, ObjectIdentifier(capture.engine) == engine else { return }
         if isRecording {
             rebuildWhileRecording()
         } else {
@@ -158,17 +167,20 @@ final class Recorder {
         selectBuiltInMicIfDefaultIsBluetooth(engine)
         let input = engine.inputNode
         let inputFormat = input.outputFormat(forBus: 0)
-        guard let resampler = Resampler(from: inputFormat, to: Self.targetFormat) else {
-            throw RecorderError.converterUnavailable
+        guard inputFormat.channelCount > 0, inputFormat.sampleRate > 0 else {
+            throw RecorderError.inputUnavailable
         }
+        let resampler = Resampler(to: Self.targetFormat)
         let buffer = buffer
-        input.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { @Sendable pcm, _ in
+        // A nil format follows the hardware. Passing a format read moments earlier raises an uncatchable
+        // exception when the device changes in between.
+        input.installTap(onBus: 0, bufferSize: 1024, format: nil) { @Sendable pcm, _ in
             guard let converted = resampler.convert(pcm) else { return }
             buffer.append(converted)
         }
         let meter = Self.makeMeter(storingInto: level)
         engine.attach(meter)
-        engine.connect(input, to: meter, format: inputFormat)
+        engine.connect(input, to: meter, format: nil)
         engine.prepare()
         return Capture(engine: engine, device: device, format: inputFormat)
     }
@@ -213,7 +225,7 @@ final class Recorder {
 }
 
 enum RecorderError: Error {
-    case converterUnavailable
+    case inputUnavailable
 }
 
 final class LiveLevel: Sendable {

@@ -1,3 +1,4 @@
+import AVFoundation
 import AppKit
 import Synchronization
 @testable import Voz
@@ -211,4 +212,18 @@ func editActionsHandled(byPanelFor keys: [(String, NSEvent.ModifierFlags)]) -> [
 func compilesAsAppleScript(_ source: String) -> Bool {
     var error: NSDictionary?
     return NSAppleScript(source: source)?.compileAndReturnError(&error) == true
+}
+
+@MainActor
+func audioConfigurationChangeReturnsWhileMainThreadIsBlocked() -> Bool {
+    let posted = DispatchSemaphore(value: 0)
+    DispatchQueue.global().async {
+        NotificationCenter.default.post(name: .AVAudioEngineConfigurationChange, object: nil)
+        posted.signal()
+    }
+    return posted.wait(timeout: .now() + 1) == .success
+}
+
+func blockCurrentThread(seconds: Double) {
+    Thread.sleep(forTimeInterval: seconds)
 }

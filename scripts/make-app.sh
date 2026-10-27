@@ -40,6 +40,8 @@ rm -rf "$SPARKLE/XPCServices" "$SPARKLE/Headers" "$SPARKLE/PrivateHeaders" "$SPA
 find "$SPARKLE/Resources" -maxdepth 1 -name '*.lproj' ! -name 'Base.lproj' ! -name 'de.lproj' -exec rm -rf {} +
 rm -f "$APP/Contents/Frameworks/Sparkle.framework"/{XPCServices,Headers,PrivateHeaders,Modules}
 if [[ "$CONFIGURATION" == "release" ]]; then
+    rm -rf build/voz.dSYM
+    dsymutil "$APP/Contents/MacOS/voz" -o build/voz.dSYM
     strip -x "$APP/Contents/MacOS/voz"
 fi
 install_name_tool -add_rpath @executable_path/../Frameworks "$APP/Contents/MacOS/voz"
