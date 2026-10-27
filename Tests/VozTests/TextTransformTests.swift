@@ -55,6 +55,70 @@ import Testing
     }
 }
 
+@Suite struct CleanupWorkTests {
+    @Test func finishedSentencesWithNothingToFixSkipTheModel() {
+        #expect(!CleanupWork.needsModel("I think context is even more expensive."))
+        #expect(!CleanupWork.needsModel("Was genau würdest du entfernen?"))
+        #expect(CleanupWork.needsModel("So like we should ship."))
+        #expect(CleanupWork.needsModel("Send it to Tom, sorry, Tim."))
+        #expect(CleanupWork.needsModel("It costs twenty euros."))
+        #expect(CleanupWork.needsModel("The the plan is ready."))
+        #expect(CleanupWork.needsModel("Mail me at joel dot com."))
+        #expect(CleanupWork.needsModel("I think we should"))
+        #expect(CleanupWork.needsModel("and then we ship."))
+    }
+
+    @MainActor @Test func onlyTheStandardPromptSkipsTheModel() async {
+        let calls = CallCount()
+        let extensions = CleanupExtensions(model: { text, _, _ in
+            calls.count += 1
+            return text
+        }) { _, text, _ in text }
+        let cleaner = TextCleaner()
+        let clean = "I think context is even more expensive."
+        _ = await cleaner.clean(clean, prompt: CleanupPrompt.standard, vocabulary: [], steps: ["model"], extensions: extensions)
+        #expect(calls.count == 0)
+        _ = await cleaner.clean(clean, prompt: "Rewrite as a formal email.", vocabulary: [], steps: ["model"], extensions: extensions)
+        #expect(calls.count == 1)
+    }
+}
+
+@MainActor private final class CallCount {
+    var count = 0
+}
+
+@Suite struct TimeoutTests {
+    @Test func cancellingTheCallerStopsTheOperation() async {
+        let seen = CancellationSeen()
+        let call = Task {
+            try await withTimeout(.seconds(5), onTimeout: CleanupError.timedOut) {
+                do {
+                    try await Task.sleep(for: .seconds(5))
+                } catch {
+                    await seen.mark()
+                }
+                return 0
+            }
+        }
+        try? await Task.sleep(for: .milliseconds(50))
+        let started = ContinuousClock.now
+        call.cancel()
+        let result = await call.result
+        #expect(ContinuousClock.now - started < .seconds(1))
+        #expect(throws: CancellationError.self) { try result.get() }
+        for _ in 0..<100 where !(await seen.cancelled) { try? await Task.sleep(for: .milliseconds(5)) }
+        #expect(await seen.cancelled)
+    }
+}
+
+private actor CancellationSeen {
+    var cancelled = false
+
+    func mark() {
+        cancelled = true
+    }
+}
+
 @Suite struct CleanupGuardTests {
     @Test func rejectsDroppedNegationsAndChangedTimes() {
         #expect(CleanupGuard.rejection(raw: "I think we should not ship until both are done", cleaned: "I think we should wait until both are done.") == .changedMeaning)
