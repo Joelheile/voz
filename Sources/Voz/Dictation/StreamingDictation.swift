@@ -7,6 +7,7 @@ struct StreamedTranscript {
     let model: String
     let audioSeconds: Double
     let segmentCount: Int
+    let unitCount: Int
     let cleanedInTime: Int
 }
 
@@ -17,11 +18,20 @@ enum StreamingError: Error {
 @MainActor
 private final class Segment {
     let transcription: Task<TranscriptionResult?, Never>
-    var cleanup: Task<Void, Never>?
-    var cleaned: CleanedText?
+    var collection: Task<Void, Never>?
 
     init(transcription: Task<TranscriptionResult?, Never>) {
         self.transcription = transcription
+    }
+}
+
+@MainActor
+private final class CleanupUnit {
+    let raw: String
+    var cleaned: CleanedText?
+
+    init(raw: String) {
+        self.raw = raw
     }
 }
 
@@ -29,6 +39,8 @@ typealias SegmentTranscriber = @MainActor ([Float]) async throws -> Transcriptio
 
 @MainActor
 final class StreamingDictation {
+    static let maximumOpenWords = 25
+
     private let transcribe: SegmentTranscriber
     private let cleaner: TextCleaner
     private let vocabulary: [String]
@@ -40,6 +52,9 @@ final class StreamingDictation {
     private var pendingAudio: [Float] = []
     private var committedSamples = 0
     private var segments: [Segment] = []
+    private var units: [CleanupUnit] = []
+    private var openText = ""
+    private var collectedSegments = 0
     private var releaseDeadline: ContinuousClock.Instant?
     private var closed = false
 
@@ -80,7 +95,7 @@ final class StreamingDictation {
         prompt.cancel()
         for segment in segments {
             segment.transcription.cancel()
-            segment.cleanup?.cancel()
+            segment.collection?.cancel()
         }
         segments = []
     }
@@ -102,8 +117,15 @@ final class StreamingDictation {
             guard let result = await segment.transcription.value else { throw StreamingError.segmentTranscriptionFailed }
             results.append(result)
         }
-        if let last = segments.last?.cleanup { await wait(for: last, until: deadline) }
-        for segment in segments { segment.cleanup?.cancel() }
+        let previous = segments.last?.collection
+        let rest = Task {
+            await previous?.value
+            guard let unit = closeOpenText() else { return }
+            await cleanUp(unit)
+        }
+        await wait(for: rest, until: deadline)
+        rest.cancel()
+        for segment in segments { segment.collection?.cancel() }
         prompt.cancel()
         let cleanupWait = ContinuousClock.now - transcribedAt
 
@@ -113,17 +135,18 @@ final class StreamingDictation {
     }
 
     private func assemble(raws: [String], results: [TranscriptionResult], tailResult: TranscriptionResult?, samples: [Float], cleanupWait: Duration) -> StreamedTranscript {
+        let uncollected = SegmentJoiner.join([openText] + raws.dropFirst(collectedSegments))
+        let pieces = units + (uncollected.isEmpty ? [] : [CleanupUnit(raw: uncollected)])
         var cleanedTexts: [String?] = []
         var fallbacks: [String] = []
         var fillersRemoved = 0
         var timedOut = false
         var cleanedInTime = 0
-        for (segment, raw) in zip(segments, raws) {
-            let rules = cleanupEnabled ? CleanupStep.applyRules(steps, to: raw, vocabulary: vocabulary) : RulePassResult(text: raw, removed: 0)
+        for piece in pieces {
+            let rules = cleanupEnabled ? CleanupStep.applyRules(steps, to: piece.raw, vocabulary: vocabulary) : RulePassResult(text: piece.raw, removed: 0)
             fallbacks.append(rules.text)
-            cleanedTexts.append(segment.cleaned?.text)
-            guard !raw.isEmpty else { continue }
-            if let cleaned = segment.cleaned {
+            cleanedTexts.append(piece.cleaned?.text)
+            if let cleaned = piece.cleaned {
                 cleanedInTime += 1
                 fillersRemoved += cleaned.fillerWordsRemoved
                 timedOut = timedOut || cleaned.timedOut
@@ -137,7 +160,7 @@ final class StreamingDictation {
             fillerWordsRemoved: fillersRemoved,
             milliseconds: cleanupWait.wholeMilliseconds,
             timedOut: timedOut,
-            rejection: segments.compactMap { $0.cleaned?.rejection }.first
+            rejection: pieces.compactMap { $0.cleaned?.rejection }.first
         )
         return StreamedTranscript(
             raw: SegmentJoiner.join(raws),
@@ -146,6 +169,7 @@ final class StreamingDictation {
             model: results[results.count - 1].model,
             audioSeconds: Double(samples.count) / RecordingFilter.sampleRate,
             segmentCount: raws.filter { !$0.isEmpty }.count,
+            unitCount: pieces.count,
             cleanedInTime: cleanedInTime
         )
     }
@@ -162,15 +186,44 @@ final class StreamingDictation {
             }
         }
         let segment = Segment(transcription: transcription)
-        let previous = segments.last?.cleanup
-        segment.cleanup = Task {
+        let previous = segments.last?.collection
+        segment.collection = Task {
             await previous?.value
             guard let result = await transcription.value else { return }
-            let raw = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !raw.isEmpty, !Task.isCancelled else { return }
-            segment.cleaned = await clean(raw)
+            guard let unit = collect(result.text) else { return }
+            await cleanUp(unit)
         }
         return segment
+    }
+
+    private func collect(_ text: String) -> CleanupUnit? {
+        collectedSegments += 1
+        let split = SentenceChunks.splitLastSentence(text)
+        guard !split.before.isEmpty else {
+            openText = SegmentJoiner.join([openText, text])
+            let isLong = openText.split(whereSeparator: \.isWhitespace).count >= Self.maximumOpenWords
+            return isLong ? closeOpenText() : nil
+        }
+        let settled = SegmentJoiner.join([openText, split.before])
+        openText = split.last.trimmingCharacters(in: .whitespacesAndNewlines)
+        return addUnit(settled)
+    }
+
+    private func closeOpenText() -> CleanupUnit? {
+        guard !openText.isEmpty else { return nil }
+        defer { openText = "" }
+        return addUnit(openText)
+    }
+
+    private func addUnit(_ raw: String) -> CleanupUnit {
+        let unit = CleanupUnit(raw: raw)
+        units.append(unit)
+        return unit
+    }
+
+    private func cleanUp(_ unit: CleanupUnit) async {
+        guard !Task.isCancelled else { return }
+        unit.cleaned = await clean(unit.raw)
     }
 
     private func clean(_ raw: String) async -> CleanedText {

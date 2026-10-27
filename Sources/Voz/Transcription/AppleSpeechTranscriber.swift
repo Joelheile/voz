@@ -2,28 +2,43 @@
 import Foundation
 import Speech
 
-enum AppleSpeechError: Error {
+enum AppleSpeechError: Error, Equatable {
+    case emptyAudio
     case localeUnsupported(String)
     case audioFormatUnavailable
     case conversionFailed
 }
 
 actor AppleSpeechTranscriber {
+    private struct Session {
+        let localeIdentifier: String
+        let transcriber: SpeechTranscriber
+        let analyzer: SpeechAnalyzer
+        let format: AVAudioFormat
+    }
+
+    private var prepared: Session?
+
+    func prepare(locale: Locale) async throws {
+        if prepared?.localeIdentifier == locale.identifier { return }
+        let session = try await makeSession(locale: locale)
+        try await session.analyzer.prepareToAnalyze(in: session.format)
+        prepared = session
+    }
+
     func transcribe(_ samples: [Float], locale: Locale, vocabulary: [String]) async throws -> TranscriptionResult {
-        let started = Date()
-        guard let supported = await SpeechTranscriber.supportedLocale(equivalentTo: locale) else {
-            throw AppleSpeechError.localeUnsupported(locale.identifier)
+        guard !samples.isEmpty else { throw AppleSpeechError.emptyAudio }
+        let started = ContinuousClock.now
+        let session: Session
+        if let prepared, prepared.localeIdentifier == locale.identifier {
+            session = prepared
+            self.prepared = nil
+        } else {
+            session = try await makeSession(locale: locale)
         }
-        let transcriber = SpeechTranscriber(locale: supported, preset: .transcription)
-        if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
-            Log.app.notice("Installing Apple speech assets for \(supported.identifier)")
-            try await request.downloadAndInstall()
-        }
-        guard let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber]) else {
-            throw AppleSpeechError.audioFormatUnavailable
-        }
-        let buffer = try Self.buffer(from: samples, format: format)
-        let analyzer = SpeechAnalyzer(modules: [transcriber])
+        let transcriber = session.transcriber
+        let analyzer = session.analyzer
+        let buffer = try Self.buffer(from: samples, format: session.format)
         if !vocabulary.isEmpty {
             let context = AnalysisContext()
             context.contextualStrings[.general] = vocabulary
@@ -39,9 +54,25 @@ actor AppleSpeechTranscriber {
         return TranscriptionResult(
             text: text,
             audioSeconds: Double(samples.count) / RecordingFilter.sampleRate,
-            processingSeconds: Date().timeIntervalSince(started),
+            processingSeconds: Double((ContinuousClock.now - started).wholeMilliseconds) / 1000,
             model: SpeechModel.appleSpeech.rawValue
         )
+    }
+
+    private func makeSession(locale: Locale) async throws -> Session {
+        guard let supported = await SpeechTranscriber.supportedLocale(equivalentTo: locale) else {
+            throw AppleSpeechError.localeUnsupported(locale.identifier)
+        }
+        let transcriber = SpeechTranscriber(locale: supported, preset: .transcription)
+        if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
+            Log.app.notice("Installing Apple speech assets for \(supported.identifier)")
+            try await request.downloadAndInstall()
+        }
+        guard let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber]) else {
+            throw AppleSpeechError.audioFormatUnavailable
+        }
+        let analyzer = SpeechAnalyzer(modules: [transcriber], options: .init(priority: .userInitiated, modelRetention: .lingering))
+        return Session(localeIdentifier: locale.identifier, transcriber: transcriber, analyzer: analyzer, format: format)
     }
 
     private static func collect(_ results: some AsyncSequence<SpeechTranscriber.Result, any Error>) async throws -> String {

@@ -162,6 +162,13 @@ final class SpeechEngine: Sendable {
         self.parakeet = parakeet
     }
 
+    func prepare(_ model: SpeechModel) async throws {
+        try await parakeet.prepare(model)
+        if model == .appleSpeech {
+            try await apple.prepare(locale: Self.locale)
+        }
+    }
+
     func transcribe(_ samples: [Float], model: SpeechModel, vocabulary: [String]) async throws -> TranscriptionResult {
         if await parakeet.isReady(model) {
             return try await parakeet.transcribe(samples, model: model, vocabulary: vocabulary)
