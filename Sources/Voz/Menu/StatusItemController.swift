@@ -352,13 +352,18 @@ enum MenuBarGlyph {
             fatalError("MenuBarIcon.png missing from app bundle")
         }
         image.size = NSSize(width: (height * image.size.width / image.size.height).rounded(), height: height)
+        image.isTemplate = true
         return image
     }()
 
-    private static let dimmedIcon = NSImage(size: icon.size, flipped: false) { rect in
-        icon.draw(in: rect, from: .zero, operation: .sourceOver, fraction: transcribingOpacity)
-        return true
-    }
+    private static let dimmedIcon: NSImage = {
+        let image = NSImage(size: icon.size, flipped: false) { rect in
+            icon.draw(in: rect, from: .zero, operation: .sourceOver, fraction: transcribingOpacity)
+            return true
+        }
+        image.isTemplate = true
+        return image
+    }()
 
     static func image(for phase: DictationPhase) -> NSImage {
         phase == .transcribing ? dimmedIcon : icon
