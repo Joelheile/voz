@@ -172,20 +172,19 @@ final class IndicatorController {
             return
         }
         model.isExpanded = false
-        install(IndicatorLayout.make(screen: ScreenResolver.metrics(for: screen)))
+        install(IndicatorLayout.make(visibleFrame: screen.visibleFrame))
         panel.orderFrontRegardless()
     }
 
     private func repositionIfVisible() {
         guard panel.isVisible, let screen = ScreenResolver.targetScreen() else { return }
-        let updated = IndicatorLayout.make(screen: ScreenResolver.metrics(for: screen))
+        let updated = IndicatorLayout.make(visibleFrame: screen.visibleFrame)
         guard updated != layout else { return }
         install(updated)
     }
 
     private func install(_ layout: IndicatorLayout) {
         self.layout = layout
-        panel.appearance = layout.style == .notch ? NSAppearance(named: .darkAqua) : nil
         let hosting = NSHostingView(rootView: IndicatorView(model: model, layout: layout))
         hosting.sizingOptions = []
         panel.contentView = hosting
@@ -221,17 +220,6 @@ enum ScreenResolver {
     @MainActor
     static func targetScreen() -> NSScreen? {
         screenOfFrontmostWindow() ?? screenUnderMouse() ?? NSScreen.main ?? NSScreen.screens.first
-    }
-
-    @MainActor
-    static func metrics(for screen: NSScreen) -> ScreenMetrics {
-        ScreenMetrics(
-            frame: screen.frame,
-            safeAreaTop: screen.safeAreaInsets.top,
-            leftAreaWidth: screen.auxiliaryTopLeftArea?.width,
-            rightAreaWidth: screen.auxiliaryTopRightArea?.width,
-            visibleMaxY: screen.visibleFrame.maxY
-        )
     }
 
     @MainActor

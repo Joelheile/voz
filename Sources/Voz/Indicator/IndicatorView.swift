@@ -17,10 +17,10 @@ enum IndicatorMotion {
     static let hiddenScaleY: CGFloat = 0.85
     static let pillExit = Animation.easeOut(duration: 0.15)
     static let pillHiddenScale: CGFloat = 0.9
-    static let pillHiddenOffset: CGFloat = -6
+    static let pillHiddenOffset: CGFloat = 6
 }
 
-struct NotchContentEffect: ViewModifier {
+struct IndicatorContentEffect: ViewModifier {
     let blur: CGFloat
     let scale: CGSize
     let opacity: Double
@@ -35,10 +35,10 @@ struct NotchContentEffect: ViewModifier {
 }
 
 extension AnyTransition {
-    static func notchContent(anchor: UnitPoint, delay: Double) -> AnyTransition {
-        let visible = NotchContentEffect(blur: 0, scale: CGSize(width: 1, height: 1), opacity: 1, anchor: anchor)
+    static func indicatorContent(anchor: UnitPoint, delay: Double) -> AnyTransition {
+        let visible = IndicatorContentEffect(blur: 0, scale: CGSize(width: 1, height: 1), opacity: 1, anchor: anchor)
         let hidden = { (blur: CGFloat) in
-            NotchContentEffect(
+            IndicatorContentEffect(
                 blur: blur,
                 scale: CGSize(width: IndicatorMotion.hiddenScaleX, height: IndicatorMotion.hiddenScaleY),
                 opacity: 0,
@@ -54,7 +54,7 @@ extension AnyTransition {
     }
 
     static var pill: AnyTransition {
-        let hidden = AnyTransition.scale(scale: IndicatorMotion.pillHiddenScale, anchor: .top)
+        let hidden = AnyTransition.scale(scale: IndicatorMotion.pillHiddenScale, anchor: .bottom)
             .combined(with: .offset(y: IndicatorMotion.pillHiddenOffset))
             .combined(with: .opacity)
         return .asymmetric(
@@ -75,8 +75,8 @@ struct IndicatorView: View {
     }
 
     var body: some View {
-        indicator
-            .frame(width: layout.windowFrame.width, height: layout.windowFrame.height, alignment: .top)
+        pill
+            .frame(width: layout.windowFrame.width, height: layout.windowFrame.height, alignment: .bottom)
             .keyframeAnimator(initialValue: 0.0, trigger: model.shakeCount) { view, offset in
                 view.offset(x: offset)
             } keyframes: { _ in
@@ -89,68 +89,15 @@ struct IndicatorView: View {
             }
     }
 
-    @ViewBuilder private var indicator: some View {
-        switch layout.style {
-        case .notch: notch
-        case .floating: pill
-        }
-    }
-
     private func transition(anchor: UnitPoint, delay: Double) -> AnyTransition {
-        reduceMotion ? .opacity.animation(IndicatorMotion.reducedMotion) : .notchContent(anchor: anchor, delay: delay)
-    }
-
-    private var notchWidth: CGFloat {
-        reduceMotion || model.isExpanded ? layout.panelFrame.width : layout.collapsedWidth
+        reduceMotion ? .opacity.animation(IndicatorMotion.reducedMotion) : .indicatorContent(anchor: anchor, delay: delay)
     }
 
     private var showsPreview: Bool { model.isExpanded && !model.preview.isEmpty }
 
-    private var notchShape: NotchShape {
-        NotchShape(
-            topRadius: 6,
-            bottomRadius: showsPreview ? 20 : model.isExpanded ? 14 : 10
-        )
-    }
-
     private var preview: some View {
         TranscriptPreview(text: model.preview)
             .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { model.previewFrame = $0 }
-    }
-
-    private var notch: some View {
-        ZStack(alignment: .top) {
-            VStack(spacing: 0) {
-                HStack(spacing: 0) {
-                    wing(alignment: .trailing, anchor: .trailing, delay: IndicatorMotion.leadingDelay) {
-                        IndicatorLeading(model: model)
-                    }
-                    Spacer(minLength: layout.collapsedWidth)
-                    wing(alignment: .leading, anchor: .leading, delay: IndicatorMotion.trailingDelay) {
-                        IndicatorTrailing(model: model)
-                    }
-                }
-                .frame(height: layout.panelFrame.height)
-                if showsPreview {
-                    preview
-                        .padding(.horizontal, notchShape.topRadius + 14)
-                        .padding(.top, 2)
-                        .padding(.bottom, 14)
-                        .transition(transition(anchor: .top, delay: 0))
-                }
-            }
-            .frame(width: layout.panelFrame.width)
-            .background {
-                notchShape.fill(.black).frame(width: notchWidth)
-            }
-            .mask { notchShape.frame(width: notchWidth) }
-            Rectangle()
-                .fill(.black)
-                .frame(width: max(notchWidth - 2 * notchShape.topRadius, 0), height: 1)
-        }
-        .opacity(reduceMotion && !model.isExpanded ? 0 : 1)
-        .animation(animation, value: model.isExpanded)
-        .animation(previewAnimation, value: model.preview)
     }
 
     private var previewAnimation: Animation {
@@ -159,7 +106,6 @@ struct IndicatorView: View {
 
     private var pill: some View {
         VStack(spacing: IndicatorLayout.pillGap) {
-            pillBody
             if showsPreview {
                 preview
                     .padding(14)
@@ -167,8 +113,9 @@ struct IndicatorView: View {
                     .background { floatingSurface(RoundedRectangle(cornerRadius: 16)) }
                     .transition(reduceMotion ? .opacity.animation(IndicatorMotion.reducedMotion) : .pill)
             }
+            pillBody
         }
-        .padding(.top, IndicatorLayout.shadowMargin)
+        .padding(.bottom, IndicatorLayout.shadowMargin)
         .animation(previewAnimation, value: model.preview)
     }
 
@@ -212,17 +159,6 @@ struct IndicatorView: View {
                 content().transition(transition(anchor: anchor, delay: delay))
             }
         }
-    }
-
-    private func wing<Content: View>(
-        alignment: Alignment,
-        anchor: UnitPoint,
-        delay: Double,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        revealed(anchor: anchor, delay: delay, content: content)
-        .frame(width: IndicatorLayout.sideWidth - notchShape.topRadius)
-        .frame(width: IndicatorLayout.sideWidth, alignment: alignment)
     }
 }
 

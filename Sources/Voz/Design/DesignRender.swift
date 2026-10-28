@@ -23,18 +23,16 @@ enum DesignRender {
             }
             try write(PermissionTileView(close: {}), to: outputDirectory, name: "permission-tile-\(suffix)", appearance: appearance)
             for (title, settled, latest) in previewTexts {
-                for (style, hasNotch) in [("notch", true), ("floating", false)] {
-                    let model = IndicatorModel()
-                    model.isExpanded = true
-                    model.preview = settled + latest
-                    try write(
-                        IndicatorView(model: model, layout: previewLayout(hasNotch: hasNotch))
-                            .environment(\.colorScheme, hasNotch || name == .darkAqua ? .dark : .light),
-                        to: outputDirectory,
-                        name: "live-preview-\(style)-\(title)-\(suffix)",
-                        appearance: appearance
-                    )
-                }
+                let model = IndicatorModel()
+                model.isExpanded = true
+                model.preview = settled + latest
+                try write(
+                    IndicatorView(model: model, layout: previewLayout)
+                        .environment(\.colorScheme, name == .darkAqua ? .dark : .light),
+                    to: outputDirectory,
+                    name: "live-preview-\(title)-\(suffix)",
+                    appearance: appearance
+                )
             }
             for step in SetupStep.allCases {
                 fixture.sources.setup.step = step
@@ -58,15 +56,7 @@ enum DesignRender {
         ("multilingual", "Morgen besprechen wir Voz und die nächsten Schritte. ", "然后继续讨论我们的计划。"),
     ]
 
-    private static func previewLayout(hasNotch: Bool) -> IndicatorLayout {
-        IndicatorLayout.make(screen: ScreenMetrics(
-            frame: CGRect(x: 0, y: 0, width: 1512, height: 982),
-            safeAreaTop: hasNotch ? 32 : 0,
-            leftAreaWidth: hasNotch ? 662 : nil,
-            rightAreaWidth: hasNotch ? 662 : nil,
-            visibleMaxY: 958
-        ))
-    }
+    private static let previewLayout = IndicatorLayout.make(visibleFrame: CGRect(x: 0, y: 70, width: 1512, height: 888))
 
     private static let pages: [(String, PopoverPage)] = [
         ("settings", .settings),

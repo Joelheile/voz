@@ -2,17 +2,17 @@ import CoreGraphics
 import Testing
 @testable import Voz
 
-@Test(arguments: [true, false])
-func indicatorWindowLeavesRoomForThePreviewBelow(hasNotch: Bool) {
-    let screen = ScreenMetrics(
-        frame: CGRect(x: 1800, y: 200, width: 1800, height: 1169), safeAreaTop: hasNotch ? 38 : 0,
-        leftAreaWidth: hasNotch ? 790 : nil, rightAreaWidth: hasNotch ? 790 : nil, visibleMaxY: 1345
-    )
-    let layout = IndicatorLayout.make(screen: screen)
+@Test(arguments: [
+    CGRect(x: 1800, y: 270, width: 1800, height: 1075),
+    CGRect(x: 0, y: 0, width: 1512, height: 958),
+])
+func indicatorSitsAboveTheDockWithRoomForThePreviewAbove(visibleFrame: CGRect) {
+    let layout = IndicatorLayout.make(visibleFrame: visibleFrame)
     let frame = layout.windowFrame
-    #expect(frame.midX == screen.frame.midX)
-    #expect(frame.maxY == layout.panelFrame.maxY)
+    #expect(frame.midX == visibleFrame.midX)
+    #expect(frame.minY == layout.panelFrame.minY)
+    #expect(frame.minY >= visibleFrame.minY)
     #expect(frame.contains(layout.panelFrame))
     #expect(frame.width >= IndicatorLayout.previewWidth)
-    #expect(screen.frame.contains(frame))
+    #expect(visibleFrame.contains(frame))
 }
