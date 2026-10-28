@@ -24,10 +24,14 @@ func removeFile(atPath path: String) {
     try? FileManager.default.removeItem(atPath: path)
 }
 
-func utcStats(_ store: HistoryStore, at seconds: Double) throws -> UsageStats {
+let utcCalendar: Calendar = {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(identifier: "UTC")!
-    return try store.stats(now: Date(timeIntervalSince1970: seconds), calendar: calendar)
+    return calendar
+}()
+
+func utcStats(_ store: HistoryStore, at seconds: Double) throws -> UsageStats {
+    try store.stats(now: Date(timeIntervalSince1970: seconds), calendar: utcCalendar)
 }
 
 let installedBun = ["BUN_PATH", "HOME"]
