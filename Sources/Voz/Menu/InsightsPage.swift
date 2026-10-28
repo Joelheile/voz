@@ -19,7 +19,7 @@ struct InsightsPage: View {
                     .font(.ui(13))
                     .foregroundStyle(Theme.inkSecondary)
             } else {
-                if StarPrompt.shows(words: model.stats[.all].words, dismissed: settings.starPromptDismissed) {
+                if !settings.starPromptDismissed, model.stats[.all].words >= StarPromptCard.threshold {
                     StarPromptCard(words: model.stats[.all].words) {
                         withAnimation(Theme.Motion.section) { settings.starPromptDismissed = true }
                     }

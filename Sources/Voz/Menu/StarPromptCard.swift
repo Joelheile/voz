@@ -1,16 +1,10 @@
 import AppKit
 import SwiftUI
 
-enum StarPrompt {
-    static let words = 2_000
-    static let repo = URL(string: "https://github.com/Joelheile/voz")!
-
-    static func shows(words: Int, dismissed: Bool) -> Bool {
-        !dismissed && words >= Self.words
-    }
-}
-
 struct StarPromptCard: View {
+    static let threshold = 2_000
+    private static let repo = URL(string: "https://github.com/Joelheile/voz")!
+
     let words: Int
     let dismiss: () -> Void
 
@@ -23,7 +17,7 @@ struct StarPromptCard: View {
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 8) {
                 Button("Star on GitHub") {
-                    NSWorkspace.shared.open(StarPrompt.repo)
+                    NSWorkspace.shared.open(Self.repo)
                     dismiss()
                 }
                 .buttonStyle(.pill(.accent, .small))
