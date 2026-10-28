@@ -17,10 +17,15 @@ final class ExtensionCatalog: ObservableObject {
     @Published fileprivate(set) var actions: [ExtensionAction] = []
     @Published fileprivate(set) var settings: [ExtensionSettings] = []
     @Published fileprivate(set) var hostError: String?
+    @Published fileprivate(set) var activities: [ExtensionActivity] = []
     fileprivate var perform: (ExtensionAction) -> Void = { _ in }
 
     func run(_ action: ExtensionAction) {
         perform(action)
+    }
+
+    func stopAction(for activity: ExtensionActivity) -> ExtensionAction? {
+        activity.stop.flatMap { id in actions.first { $0.id == id } }
     }
 
     func settings(for name: String) -> [ExtensionSettings] {
@@ -63,6 +68,20 @@ final class ExtensionCatalog: ObservableObject {
         hostError = nil
     }
 
+    fileprivate func update(_ activity: ExtensionActivity) {
+        if activity.title == nil {
+            activities.removeAll { $0.extension == activity.extension }
+        } else if let index = activities.firstIndex(where: { $0.extension == activity.extension }) {
+            activities[index] = activity
+        } else {
+            activities.append(activity)
+        }
+    }
+
+    fileprivate func clearActivities() {
+        if !activities.isEmpty { activities = [] }
+    }
+
     fileprivate func fail(_ message: String) {
         show(nil)
         hostError = message
@@ -88,6 +107,7 @@ final class ExtensionService {
     private let output: TextOutput
     private let toast: ToastController
     private let settings: AppSettings
+    private let history: HistoryStore
     let catalog = ExtensionCatalog()
     private var host: ExtensionHost?
     private var manifest: HostManifest?
@@ -105,10 +125,11 @@ final class ExtensionService {
         self?.runAction(action)
     }
 
-    init(output: TextOutput, toast: ToastController, settings: AppSettings) {
+    init(output: TextOutput, toast: ToastController, settings: AppSettings, history: HistoryStore) {
         self.output = output
         self.toast = toast
         self.settings = settings
+        self.history = history
         catalog.perform = { [weak self] action in self?.runAction(action) }
     }
 
@@ -147,6 +168,7 @@ final class ExtensionService {
         generation = UUID()
         watchdog?.cancel()
         hotkeys.unregisterAll()
+        catalog.clearActivities()
         await host?.stop()
         host = nil
         manifest = nil
@@ -333,12 +355,22 @@ final class ExtensionService {
             }
         case .notify(let text):
             toast.show(text)
+        case .activity(let activity):
+            catalog.update(activity)
+        case .transcript(let transcript):
+            let record = TranscriptRecord(rawText: transcript.text, audioSeconds: transcript.seconds ?? 0, sttMs: 0, totalMs: 0, model: transcript.extension, appBundleID: nil, appName: nil, source: transcript.extension)
+            do {
+                try await history.insert(record)
+            } catch {
+                Log.extensions.error("\(transcript.extension, privacy: .public) could not save a transcript: \(error.localizedDescription, privacy: .public)")
+            }
         }
     }
 
     private func hostExited(_ status: Int32) {
         watchdog?.cancel()
         hotkeys.unregisterAll()
+        catalog.clearActivities()
         host = nil
         manifest = nil
         if ContinuousClock.now - started > Self.healthyUptime { restarts = 0 }

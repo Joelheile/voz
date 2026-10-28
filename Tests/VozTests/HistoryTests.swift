@@ -63,6 +63,16 @@ import Testing
         #expect(stats[.all].wordsPerMinute == 105)
     }
 
+    @Test func extensionTranscriptsAreSearchableButNotCounted() throws {
+        let store = try HistoryStore()
+        try store.insert(makeRecord("one two", at: Self.now - 60))
+        var meeting = makeRecord("three four five", at: Self.now - 120)
+        meeting.source = "voz-meeting"
+        try store.insert(meeting)
+        #expect(try store.search("four").map(\.source) == ["voz-meeting"])
+        #expect(try utcStats(store, at: Self.now)[.day].words == 2)
+    }
+
     @Test func bucketsCoverThePeriodAndPlaceWordsInTheirSlot() throws {
         let store = try HistoryStore()
         try store.insert(makeRecord("one two three four", at: Self.now - 7_200))

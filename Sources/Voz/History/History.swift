@@ -63,6 +63,11 @@ final class HistoryStore: Sendable {
                 table.column("createdAt", .datetime).notNull()
             }
         }
+        migrator.registerMigration("v4-transcript-source") { database in
+            try database.alter(table: TranscriptRecord.databaseTableName) { table in
+                table.add(column: "source", .text)
+            }
+        }
         return migrator
     }
 
@@ -103,6 +108,7 @@ final class HistoryStore: Sendable {
     private static func stats(in database: Database, now: Date, calendar: Calendar) throws -> UsageStats {
         var accumulator = StatsAccumulator(now: now, calendar: calendar)
         let rows = try TranscriptRecord
+            .filter(Column("source") == nil)
             .select(Column("createdAt"), Column("wordCount"), Column("audioSeconds"), Column("fillerWordsRemoved"), Column("appBundleID"), Column("appName"))
             .asRequest(of: StatsRow.self)
             .fetchCursor(database)
@@ -135,6 +141,8 @@ struct TranscriptRecord: Codable, FetchableRecord, PersistableRecord, Identifiab
     var fillerWordsRemoved: Int
     var cleanupMs: Int
     var cleanupTimedOut: Bool
+    /// The extension that saved this transcript, such as a meeting recorder. Nil for dictations, which are the only ones that count in stats.
+    var source: String?
 
     init(
         id: UUID = UUID(),
@@ -149,7 +157,8 @@ struct TranscriptRecord: Codable, FetchableRecord, PersistableRecord, Identifiab
         appName: String?,
         fillerWordsRemoved: Int = 0,
         cleanupMs: Int = 0,
-        cleanupTimedOut: Bool = false
+        cleanupTimedOut: Bool = false,
+        source: String? = nil
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -165,5 +174,6 @@ struct TranscriptRecord: Codable, FetchableRecord, PersistableRecord, Identifiab
         self.fillerWordsRemoved = fillerWordsRemoved
         self.cleanupMs = cleanupMs
         self.cleanupTimedOut = cleanupTimedOut
+        self.source = source
     }
 }

@@ -60,6 +60,7 @@ The interview is done when you can state the extension in one sentence that name
 | The audio itself                                                          | `recording`                                                                     |
 | A different speech-to-text or cleanup model                               | [`registerSpeechModel` or `registerCleanupModel`](#models-and-cleanup-steps)    |
 | A button in the Voz panel, or a global hotkey                             | [`registerAction`](#actions)                                                    |
+| Background work the user should see, such as a recording                 | [`showActivity` and `addTranscript`](#activities)                               |
 
 Put network calls and model calls in commands, actions, `afterInsert` or a registered model. `beforeCleanup`, `beforeInsert` and cleanup steps get 300 ms, enough for string work only.
 
@@ -137,6 +138,9 @@ Voz reloads extensions when you save a file in `~/.voz/extensions`, a local pack
 | `voz.registerCleanupStep(step)`                 | Adds a cleanup step you can turn on in the extension's details. `step` has `id`, `name` and `run(event, ctx)`, which returns `{ text }` or nothing to keep the text.                                                                                  |
 | `voz.registerCommand(phrase, handler, options)` | Runs `handler` when a dictation ends with `phrase`. Voz inserts the words before the phrase, then runs the command. With `{ at: "start" }`, it runs when a dictation starts with `phrase`: Voz inserts nothing and passes the words after the phrase. Packages that use `at` set `"voz": { "apiVersion": 2 }`. |
 | `voz.registerAction(action)`                    | Adds a button to the Actions group in the Voz panel. `action` has `id`, `name`, an optional `hotkey` such as `"ctrl+opt+j"`, and `run(ctx)`.                                                                                                          |
+| `voz.showActivity(activity)`                    | Shows that the extension is busy in the background, such as recording a meeting. The menu bar icon gets a red dot and the Voz panel a row. See [Activities](#activities).                                                                           |
+| `voz.hideActivity()`                            | Removes the extension's activity.                                                                                                                                                                                                                     |
+| `voz.addTranscript(transcript)`                 | Saves text to the Voz history, such as a meeting transcript. See [Activities](#activities).                                                                                                                                                           |
 | `voz.settings(schema)`                          | Adds a settings form to the extension's row in the Extensions page, and returns the values. See [Settings](#settings).                                                                                                                                |
 | `voz.name`                                      | The extension name: the file name, or the package name.                                                                                                                                                                                               |
 | `voz.paths`                                     | `data` is `~/.voz/data/<name>`, a folder for the extension's own files.                                                                                                                                                                               |
@@ -248,6 +252,35 @@ voz.registerAction({
 ```
 
 The hotkey uses the same keys as `ctx.press`. If another app holds the hotkey, Voz shows a message and the button still works. An action has 10 seconds, like a command.
+
+## Activities
+
+An activity tells the user that an extension keeps working after an action returns, such as a meeting recorder. While one runs, the menu bar icon shows a red dot and the Voz panel shows a row with the title, the time since `since` and a Stop button for the action in `stop`.
+
+```ts
+voz.registerAction({
+  id: "meeting",
+  name: "Record meeting",
+  run: () => {
+    if (recording) return finish();
+    recording = start();
+    voz.showActivity({ title: "Recording meeting", since: Date.now(), stop: "meeting" });
+  },
+});
+
+async function finish() {
+  voz.hideActivity();
+  const text = await transcribe(recording);
+  voz.addTranscript({ text, seconds: recording.seconds });
+}
+```
+
+- `title` is required. `since` is a time in milliseconds, such as `Date.now()`. `stop` is the `id` of an action of the same extension, registered before the call
+- Each extension has one activity. Calling `showActivity` again replaces it
+- Activities end when Voz reloads extensions. An extension that keeps working across reloads calls `showActivity` again when it loads
+- `addTranscript` saves `{ text, seconds }` to the history, where the user can search and copy it. Transcripts from extensions do not count in Insights
+- Both work outside handlers, so you can call them from timers and background work
+- Older Voz versions don't have them. Check with `if (voz.showActivity)` to keep supporting those
 
 ## Per-app prompts
 

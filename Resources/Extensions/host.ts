@@ -10,6 +10,7 @@ import { basename, extname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import type {
   Action,
+  Activity,
   AfterInsertEvent,
   Awaitable,
   App,
@@ -32,6 +33,7 @@ import type {
   SettingsValues,
   SettingsSchema,
   SpeechModel,
+  Transcript,
 } from "./voz.d.ts";
 
 type Launch = {
@@ -384,6 +386,18 @@ function api(name: string, config: Config, registration: Registration): Extensio
       return Object.fromEntries(
         Object.entries(schema).map(([key, setting]) => [key, settingValue(setting, config[key])]),
       ) as SettingsValues<Schema>;
+    },
+    showActivity({ title, since, stop }: Activity) {
+      if (typeof title !== "string" || !title) throw new Error("An activity needs a title");
+      if (since !== undefined && !Number.isFinite(since)) throw new Error("Activity since must be a time in milliseconds");
+      if (stop !== undefined && !actions.has(`${name}/${stop}`)) throw new Error(`No action "${stop}" to stop the activity`);
+      send({ method: "activity", params: { extension: name, title, since, stop: stop && `${name}/${stop}` } });
+    },
+    hideActivity: () => send({ method: "activity", params: { extension: name } }),
+    addTranscript({ text, seconds }: Transcript) {
+      if (typeof text !== "string" || !text.trim()) throw new Error("A transcript needs text");
+      if (seconds !== undefined && !Number.isFinite(seconds)) throw new Error("Transcript seconds must be a number");
+      send({ method: "transcript", params: { extension: name, text, seconds } });
     },
   };
 }

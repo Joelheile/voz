@@ -15,7 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var output = TextOutput(settings: settings)
     private let cleaner = TextCleaner()
     private let toast = ToastController()
-    private lazy var extensions = ExtensionService(output: output, toast: toast, settings: settings)
+    private lazy var extensions = ExtensionService(output: output, toast: toast, settings: settings, history: history)
     private var vocabularyWords: [String] = []
     private lazy var dictation = Dictation(
         pipeline: DictationPipeline(

@@ -90,6 +90,7 @@ private struct HomePage: View {
             VStack(alignment: .leading, spacing: 12) {
                 header(proxy: proxy)
                 if needsAttention { notice }
+                if !catalog.activities.isEmpty { activities }
                 transcripts
                 if !catalog.actions.isEmpty { actions }
                 footer
@@ -239,6 +240,15 @@ private struct HomePage: View {
             }
         )
         .id(record.id)
+    }
+
+    private var activities: some View {
+        PanelGroup {
+            ForEach(catalog.activities, id: \.extension) { activity in
+                ActivityRow(activity: activity, stop: catalog.stopAction(for: activity).map { action in { catalog.run(action) } })
+            }
+        }
+        .transition(.opacity)
     }
 
     private var actions: some View {
@@ -412,6 +422,34 @@ private struct TranscriptRow: View {
                 .foregroundStyle(Theme.inkTertiary)
                 .transition(.blurReplace)
         }
+    }
+}
+
+private struct ActivityRow: View {
+    let activity: ExtensionActivity
+    let stop: (() -> Void)?
+
+    var body: some View {
+        HStack(spacing: 10) {
+            RecordingMark()
+            Text(activity.title ?? "")
+                .font(.ui(13, weight: .medium))
+                .foregroundStyle(Theme.ink)
+                .lineLimit(1)
+            if let started = activity.started {
+                Text(started, style: .timer)
+                    .font(.meta)
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.inkSecondary)
+            }
+            Spacer(minLength: 8)
+            if let stop {
+                Button("Stop", action: stop)
+                    .buttonStyle(.pill(.quiet, .small))
+            }
+        }
+        .frame(minHeight: Theme.Size.row)
+        .padding(.vertical, 6)
     }
 }
 

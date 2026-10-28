@@ -227,6 +227,23 @@ struct ExtensionHostTests {
         await host.stop()
     }
 
+    @Test func activitiesAndTranscriptsWorkOutsideHandlers() async throws {
+        try extensionFile("meet.ts", #"export default (voz) => { voz.registerAction({ id: "rec", name: "Record", run: () => { setTimeout(() => { voz.hideActivity(); voz.addTranscript({ text: "hello team", seconds: 3 }) }, 50) } }); voz.showActivity({ title: "Recording", since: 1000, stop: "rec" }) }"#)
+        try extensionFile("typo.ts", #"export default (voz) => voz.showActivity({ title: "Busy", stop: "missing" })"#)
+        let actions = RecordedActions()
+        let host = makeHost(actions: actions)
+        let manifest = try await host.start()
+        #expect(manifest.errors.map(\.extension) == ["typo"])
+        #expect(await host.runAction("meet/rec", app: app, timeout: .seconds(2)))
+        for _ in 0..<40 where actions.all.count < 3 { try await Task.sleep(for: .milliseconds(50)) }
+        #expect(actions.all == [
+            .activity(ExtensionActivity(extension: "meet", title: "Recording", since: 1000, stop: "meet/rec")),
+            .activity(ExtensionActivity(extension: "meet", title: nil, since: nil, stop: nil)),
+            .transcript(ExtensionTranscript(extension: "meet", text: "hello team", seconds: 3)),
+        ])
+        await host.stop()
+    }
+
     @Test func newExtensionTemplateLoadsAndRuns() async throws {
         let folder = try ExtensionTemplate.create(named: "voz-hello", in: home.root, from: extensionResources)
         let actions = RecordedActions()

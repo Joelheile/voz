@@ -77,6 +77,7 @@ final class StatusItemController: NSObject {
     private let stats: StatsModel
     private let history: HistoryModel
     private let setup: SetupModel
+    private let catalog: ExtensionCatalog
     private let analytics: Analytics
     private let checkForUpdates: () -> Void
     private let quitApp: () -> Void
@@ -103,6 +104,7 @@ final class StatusItemController: NSObject {
         history = sources.history
         stats = sources.stats
         setup = sources.setup
+        catalog = sources.catalog
         self.analytics = analytics
         self.checkForUpdates = checkForUpdates
         quitApp = quit
@@ -136,8 +138,8 @@ final class StatusItemController: NSObject {
     }
 
     func refresh() {
-        statusItem.button?.image = MenuBarGlyph.image(for: dictation.phase)
-        statusItem.button?.setAccessibilityLabel("Voz")
+        statusItem.button?.image = MenuBarGlyph.image(for: dictation.phase, active: !catalog.activities.isEmpty)
+        statusItem.button?.setAccessibilityLabel((["Voz"] + catalog.activities.compactMap(\.title)).joined(separator: ", "))
         let status = currentStatus()
         let hint = hint(for: status)
         let needsSetup = !settings.onboardingCompleted
@@ -158,9 +160,10 @@ final class StatusItemController: NSObject {
     }
 
     private func observeSources() {
-        Publishers.Merge(
+        Publishers.Merge3(
             settings.objectWillChange.map { _ in () },
-            modelStatus.objectWillChange.map { _ in () }
+            modelStatus.objectWillChange.map { _ in () },
+            catalog.$activities.map { _ in () }
         )
         .receive(on: DispatchQueue.main)
         .sink { [weak self] in self?.refresh() }
@@ -345,6 +348,8 @@ final class StatusItemController: NSObject {
 enum MenuBarGlyph {
     private static let height: CGFloat = 16
     private static let transcribingOpacity: CGFloat = 0.45
+    private static let dotDiameter: CGFloat = 6
+    private static let dotGap: CGFloat = 1.5
 
     private static let icon: NSImage = {
         guard let url = Bundle.main.url(forResource: "MenuBarIcon", withExtension: "png"),
@@ -360,7 +365,29 @@ enum MenuBarGlyph {
         return true
     }
 
-    static func image(for phase: DictationPhase) -> NSImage {
-        phase == .transcribing ? dimmedIcon : icon
+    private static let activeIcon = withDot(icon)
+    private static let activeDimmedIcon = withDot(dimmedIcon)
+
+    /// A red dot in the top right corner while an extension activity, such as a meeting recording, runs.
+    private static func withDot(_ base: NSImage) -> NSImage {
+        NSImage(size: base.size, flipped: false) { rect in
+            base.draw(in: rect)
+            let dot = NSRect(x: rect.maxX - dotDiameter, y: rect.maxY - dotDiameter, width: dotDiameter, height: dotDiameter)
+            NSGraphicsContext.current?.compositingOperation = .clear
+            NSBezierPath(ovalIn: dot.insetBy(dx: -dotGap, dy: -dotGap)).fill()
+            NSGraphicsContext.current?.compositingOperation = .sourceOver
+            NSColor.systemRed.setFill()
+            NSBezierPath(ovalIn: dot).fill()
+            return true
+        }
+    }
+
+    static func image(for phase: DictationPhase, active: Bool = false) -> NSImage {
+        switch (phase == .transcribing, active) {
+        case (false, false): icon
+        case (true, false): dimmedIcon
+        case (false, true): activeIcon
+        case (true, true): activeDimmedIcon
+        }
     }
 }

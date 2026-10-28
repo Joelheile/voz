@@ -26,6 +26,8 @@ The full types are in `~/.voz/node_modules/voz/index.d.ts`. Read them before you
 8. `registerCleanupStep({ id, name, run })`: a cleanup step. `run` gets `text` and returns `{ text }`
 9. `registerAction({ id, name, hotkey, run })`: a button in the Voz panel, with an optional global hotkey such as `"ctrl+opt+j"`. `run` gets `ctx`
 10. `settings(schema)`: a settings form in the Extensions page. Returns the typed values with defaults filled in
+11. `showActivity({ title, since, stop })` and `hideActivity()`: show background work, such as a recording, with a red dot on the menu bar icon and a row in the Voz panel. `stop` is the id of one of your actions, shown as a Stop button
+12. `addTranscript({ text, seconds })`: save text, such as a meeting transcript, to the Voz history
 
 Registering a model or step only makes it available. The user picks it in Settings, or you set `speechModel`, `cleanupModel` or `cleanupSteps` in `~/.voz/settings.json` to `<extension name>/<id>`. `cleanupSteps` is the full ordered list, by default `["fillers", "punctuation", "dictionary", "model"]`
 

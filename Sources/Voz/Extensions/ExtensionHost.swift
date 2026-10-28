@@ -216,6 +216,8 @@ actor ExtensionHost {
         case "insert": decodeNotification(TextParams.self, line).map { onAction(.insert($0.text)) }
         case "press": decodeNotification(PressParams.self, line).map { onAction(.press($0.key)) }
         case "notify": decodeNotification(TextParams.self, line).map { onAction(.notify($0.text)) }
+        case "activity": decodeNotification(ExtensionActivity.self, line).map { onAction(.activity($0)) }
+        case "transcript": decodeNotification(ExtensionTranscript.self, line).map { onAction(.transcript($0)) }
         case "log": decodeNotification(TextParams.self, line).map { onLog($0.text) }
         case "generate": decodeNotification(GenerateParams.self, line).map(answer)
         default: onLog("Extension host sent unknown method \(envelope.method ?? "nil")")

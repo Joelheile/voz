@@ -163,6 +163,24 @@ enum HostAction: Equatable, Sendable {
     case insert(String)
     case press(String)
     case notify(String)
+    case activity(ExtensionActivity)
+    case transcript(ExtensionTranscript)
+}
+
+/// Something an extension does in the background, such as recording a meeting. A nil title hides it.
+struct ExtensionActivity: Decodable, Equatable, Sendable {
+    let `extension`: String
+    let title: String?
+    let since: Double?
+    let stop: String?
+
+    var started: Date? { since.map { Date(timeIntervalSince1970: $0 / 1000) } }
+}
+
+struct ExtensionTranscript: Decodable, Equatable, Sendable {
+    let `extension`: String
+    let text: String
+    let seconds: Double?
 }
 
 struct HostLaunchArguments: Encodable {

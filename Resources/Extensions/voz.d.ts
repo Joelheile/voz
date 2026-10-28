@@ -86,6 +86,14 @@ export type Action = {
   run(ctx: Context): Awaitable<void>;
 };
 
+export type Activity = {
+  title: string;
+  since?: number;
+  stop?: string;
+};
+
+export type Transcript = { text: string; seconds?: number };
+
 type SettingBase = { title: string; description?: string };
 
 export type Setting =
@@ -136,6 +144,9 @@ export type ExtensionAPI = {
   registerCleanupStep(step: CleanupStep): void;
   registerAction(action: Action): void;
   settings<Schema extends SettingsSchema>(schema: Schema): SettingsValues<Schema>;
+  showActivity(activity: Activity): void;
+  hideActivity(): void;
+  addTranscript(transcript: Transcript): void;
 };
 
 export type Extension = (voz: ExtensionAPI) => Awaitable<void>;
