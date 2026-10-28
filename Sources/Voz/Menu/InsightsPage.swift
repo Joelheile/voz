@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct InsightsPage: View {
     @ObservedObject var model: StatsModel
+    @ObservedObject var settings: AppSettings
     let back: () -> Void
     @State private var period = StatsPeriod.week
     @State private var hovered: WordBucket?
@@ -18,6 +19,12 @@ struct InsightsPage: View {
                     .font(.ui(13))
                     .foregroundStyle(Theme.inkSecondary)
             } else {
+                if StarPrompt.shows(words: model.stats[.all].words, dismissed: settings.starPromptDismissed) {
+                    StarPromptCard(words: model.stats[.all].words) {
+                        withAnimation(Theme.Motion.section) { settings.starPromptDismissed = true }
+                    }
+                    .transition(.opacity)
+                }
                 content
             }
         }

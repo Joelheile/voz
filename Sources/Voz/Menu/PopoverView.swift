@@ -48,7 +48,7 @@ struct PopoverView: View {
             case .dictionary:
                 DictionaryPage(model: sources.vocabulary, back: model.goBack)
             case .insights:
-                InsightsPage(model: sources.stats, back: model.goBack)
+                InsightsPage(model: sources.stats, settings: sources.settings, back: model.goBack)
             case .extensions:
                 ExtensionsPage(model: sources.extensions, catalog: sources.catalog, settings: sources.settings, back: model.goBack)
             case .cleanupPrompt:

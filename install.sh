@@ -75,6 +75,7 @@ main() {
     step "Installing Voz" install_app "$work"
     step "Opening Voz" open_and_wait
     echo "Voz is running. Finish setup in the panel under the mouth icon in the menu bar."
+    echo "If Voz saves you some typing, star it: https://github.com/Joelheile/voz"
 }
 
 main

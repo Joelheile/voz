@@ -16,6 +16,7 @@ private enum SettingsKey {
     static let receiveBetaUpdates = "receiveBetaUpdates"
     static let errorReportsEnabled = "errorReportsEnabled"
     static let cleanupPrompt = "cleanupPrompt"
+    static let starPromptDismissed = "starPromptDismissed"
 }
 
 @MainActor
@@ -58,6 +59,9 @@ final class AppSettings: ObservableObject {
     }
     @Published var onboardingCompleted: Bool {
         didSet { defaults.set(onboardingCompleted, forKey: SettingsKey.onboardingCompleted) }
+    }
+    @Published var starPromptDismissed: Bool {
+        didSet { defaults.set(starPromptDismissed, forKey: SettingsKey.starPromptDismissed) }
     }
     @Published var cleanupEnabled: Bool {
         didSet { defaults.set(cleanupEnabled, forKey: SettingsKey.cleanupEnabled) }
@@ -119,6 +123,7 @@ final class AppSettings: ObservableObject {
         livePreviewEnabled = defaults.bool(forKey: SettingsKey.livePreviewEnabled)
         launchAtLogin = defaults.bool(forKey: SettingsKey.launchAtLogin)
         onboardingCompleted = defaults.bool(forKey: SettingsKey.onboardingCompleted)
+        starPromptDismissed = defaults.bool(forKey: SettingsKey.starPromptDismissed)
         cleanupEnabled = defaults.bool(forKey: SettingsKey.cleanupEnabled)
         analyticsEnabled = defaults.bool(forKey: SettingsKey.analyticsEnabled)
         receiveBetaUpdates = defaults.bool(forKey: SettingsKey.receiveBetaUpdates)
