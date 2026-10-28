@@ -3,6 +3,17 @@
   <channel>
     <title>voz</title>
     <item>
+      <title>voz 0.0.5-beta.100022</title>
+      <description>&lt;ul&gt;&lt;li&gt;Track your dictation streak, speaking pace and time saved in Insights&lt;/li&gt;&lt;/ul&gt;</description>
+      <link>https://github.com/Joelheile/voz/releases/tag/beta-100022</link>
+      <pubDate>Wed, 28 Oct 2026 22:43:16 GMT</pubDate>
+      <sparkle:version>100022</sparkle:version>
+      <sparkle:shortVersionString>0.0.5-beta.100022</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100022/voz-0.0.5-beta.100022.zip" length="8321346" sparkle:edSignature="eY1upZSjx/E8d6sbuHkd9WDqFCzYdgsN3tM4LJf7IcMWqg6xgkyWrbSfn6M7599fpW7ctx865KofmSR+GUxMCA==" type="application/octet-stream" />
+    </item>
+    <item>
       <title>voz 0.0.5-beta.100021</title>
       <description>&lt;ul&gt;&lt;li&gt;Extensions get a clear error when ctx.generate lists a required field that does not exist&lt;/li&gt;&lt;/ul&gt;</description>
       <link>https://github.com/Joelheile/voz/releases/tag/beta-100021</link>
@@ -100,17 +111,6 @@
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <sparkle:channel>beta</sparkle:channel>
       <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100013/voz-0.0.5-beta.100013.zip" length="8236221" sparkle:edSignature="/lg9pPVp5KWoWVxCMTuKZlIfSbu4TJdWpA/Z6KePEBkzKYxkpspNIF4tRzh09VCZvj2uotxxucrHSMDivVMbBw==" type="application/octet-stream" />
-    </item>
-    <item>
-      <title>voz 0.0.5-beta.100012</title>
-      <description>&lt;ul&gt;&lt;li&gt;Fix a freeze when the microphone changes, such as when AirPods disconnect&lt;/li&gt;&lt;li&gt;Report crashes and freezes when usage analytics are on&lt;/li&gt;&lt;/ul&gt;</description>
-      <link>https://github.com/Joelheile/voz/releases/tag/beta-100012</link>
-      <pubDate>Tue, 27 Oct 2026 09:50:15 GMT</pubDate>
-      <sparkle:version>100012</sparkle:version>
-      <sparkle:shortVersionString>0.0.5-beta.100012</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <sparkle:channel>beta</sparkle:channel>
-      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100012/voz-0.0.5-beta.100012.zip" length="8234511" sparkle:edSignature="fz6JWpKy5IABz1BsEn9qk2hrxdJjp6uVm4Y+Cu2qhwwChresXonVBoCKszOAm8wcMiBbb0P/AeB8NK6KNDhOCw==" type="application/octet-stream" />
     </item>
     <item>
       <title>voz 0.0.5</title>
