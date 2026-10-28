@@ -63,21 +63,6 @@ import Testing
         #expect(stats[.all].wordsPerMinute == 105)
     }
 
-    @Test func bucketsCoverThePeriodAndPlaceWordsInTheirSlot() throws {
-        let store = try HistoryStore()
-        try store.insert(makeRecord("one two three four", at: Self.now - 7_200))
-        try store.insert(makeRecord("five six", at: Self.now - 3 * Self.day))
-        try store.insert(makeRecord("ten eleven", at: Self.now - 100 * Self.day))
-
-        let stats = try utcStats(store, at: Self.now)
-
-        #expect(stats[.day].buckets.count == 24)
-        #expect(stats[.day].buckets[10].words == 4)
-        #expect(stats[.week].buckets.map(\.words) == [0, 0, 0, 2, 0, 0, 4])
-        #expect(stats[.month].buckets.count == 30)
-        #expect(stats[.all].buckets.map(\.words) == [2, 0, 0, 6])
-    }
-
     @Test func topAppsRankAppsByWordsWithinEachPeriod() throws {
         let store = try HistoryStore()
         try store.insert(makeRecord("one two", at: Self.now - 7_200))
@@ -101,6 +86,54 @@ import Testing
         let stats = try utcStats(HistoryStore(), at: Self.now)
         #expect(stats[.all].words == 0)
         #expect(stats[.all].wordsPerMinute == nil)
-        #expect(stats[.all].buckets.count == 1)
+        #expect(stats.streak == 0)
+    }
+
+    @Test func streakCountsConsecutiveDaysEndingTodayAndKeepsTheLongest() throws {
+        let store = try HistoryStore()
+        for daysAgo in [0, 1, 2, 10, 11, 12, 13] {
+            try store.insert(makeRecord("one", at: Self.now - Double(daysAgo) * Self.day))
+        }
+        try store.insert(makeRecord("two", at: Self.now - 3_600))
+
+        let stats = try utcStats(store, at: Self.now)
+
+        #expect(stats.streak == 3)
+        #expect(stats.longestStreak == 4)
+    }
+
+    @Test func streakSurvivesUntilTheEndOfTodayAndBreaksAfterAMissedDay() throws {
+        let store = try HistoryStore()
+        try store.insert(makeRecord("one", at: Self.now - Self.day))
+        try store.insert(makeRecord("two", at: Self.now - 2 * Self.day))
+        #expect(try utcStats(store, at: Self.now).streak == 2)
+        #expect(try utcStats(store, at: Self.now + Self.day).streak == 0)
+    }
+
+    @Test func daysCoverWholeWeeksEndingToday() throws {
+        let store = try HistoryStore()
+        try store.insert(makeRecord("one two three", at: Self.now - 3_600))
+        try store.insert(makeRecord("four", at: Self.now - 5 * Self.day))
+
+        let stats = try utcStats(store, at: Self.now)
+        let today = Self.now - Self.now.truncatingRemainder(dividingBy: Self.day)
+
+        #expect(stats.days.last?.start.timeIntervalSince1970 == today)
+        #expect(stats.days.last?.words == 3)
+        #expect(stats.days[stats.days.count - 6].words == 1)
+        #expect(stats.days.map(\.words).reduce(0, +) == 4)
+        #expect(stats.days.count > (UsageStats.activityWeeks - 1) * 7)
+        #expect(stats.days.count <= UsageStats.activityWeeks * 7)
+        #expect(utcCalendar.component(.weekday, from: stats.days[0].start) == utcCalendar.firstWeekday)
+    }
+
+    @Test func timeSavedComparesSpeakingWithTypingAtFortyWordsPerMinute() {
+        var stats = PeriodStats()
+        stats.words = 400
+        stats.speakingSeconds = 120
+        #expect(stats.typingSeconds == 600)
+        #expect(stats.savedSeconds == 480)
+        stats.speakingSeconds = 900
+        #expect(stats.savedSeconds == 0)
     }
 }
