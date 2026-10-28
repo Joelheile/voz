@@ -6,6 +6,7 @@ import {
   statSync,
 } from "node:fs";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { EventEmitter } from "node:events";
 import { basename, extname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import type {
@@ -151,6 +152,7 @@ const generations = new Map<number, Generation>();
 let lastCall = 0;
 const settingsSchemas = new Map<string, SettingsSchema>();
 const loaded: string[] = [];
+const bus = new EventEmitter();
 const errors: LoadError[] = [];
 
 Bun.plugin({
@@ -421,7 +423,31 @@ async function loadEntry(entry: Entry, config: Config = {}, registration: Regist
   const module = await import(entry.path);
   if (typeof module.default !== "function")
     throw new Error("default export is not a function");
-  await module.default(api(entry.name, config, registration));
+  const current = api(entry.name, config, registration);
+  await module.default((entry.requires ?? 1) < 2 ? withApi1Removals(current, config, registration) : current);
+}
+
+function withApi1Removals(current: ExtensionAPI, config: Config, registration: Registration) {
+  return {
+    ...current,
+    config,
+    paths: { ...current.paths, home: launch.home },
+    log: (message: string) => log(`[${current.name}] ${message}`),
+    events: {
+      on(event: string, handler: (payload: unknown) => void) {
+        registration.track(() => bus.off(event, handler));
+        bus.on(event, handler);
+      },
+      emit: (event: string, payload: unknown) => bus.emit(event, payload),
+    },
+    on(event: EventName, handler: Handler["run"]) {
+      const handled: Handler["run"] = async (payload, ctx) => {
+        const result = await handler(payload, ctx);
+        return result && "handled" in result && result.handled === true ? { text: "" } : result;
+      };
+      current.on(event as never, (event === "beforeInsert" ? handled : handler) as never);
+    },
+  };
 }
 
 function withinLoadTimeout(work: Promise<void>): Promise<void> {
