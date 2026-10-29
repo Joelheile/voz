@@ -319,6 +319,8 @@ private struct ComparisonBar: View {
 private struct TopApps: View {
     let apps: [AppUsage]
 
+    private static let shortestBar = Theme.Radius.control * 2
+
     private var most: Int { max(apps.map(\.words).max() ?? 1, 1) }
 
     var body: some View {
@@ -340,7 +342,7 @@ private struct TopApps: View {
                         GeometryReader { proxy in
                             RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous)
                                 .fill(Theme.selected)
-                                .frame(width: proxy.size.width * CGFloat(app.words) / CGFloat(most))
+                                .frame(width: max(proxy.size.width * CGFloat(app.words) / CGFloat(most), Self.shortestBar))
                         }
                     }
                     Text(app.words.formatted())
