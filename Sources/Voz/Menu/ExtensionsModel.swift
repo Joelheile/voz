@@ -18,6 +18,15 @@ final class ExtensionsModel: ObservableObject {
 
     private static let search = URL(string: "https://registry.npmjs.org/-/v1/search?text=keywords:voz-package&size=250")!
     private static let undoWindow: Duration = .seconds(5)
+    nonisolated static let claudeCommand = """
+    cd ~ && claude 'I want to build a Voz extension. Voz is a Mac dictation app. An extension is a TypeScript npm package that Voz runs with Bun, and it can change or act on what I dictate.
+
+    1. Read https://raw.githubusercontent.com/Joelheile/voz/main/EXTENSIONS.md first. It is the API reference, and its first table maps ideas to the primitive that fits.
+    2. Interview me with multiple-choice questions until you can say in one sentence what the extension does: what I say, what happens, and what it needs, such as an app, a setting or the on-device model. Write no code before that.
+    3. Run voz new with a name that starts with voz-, then work in the folder it creates. Read voz.d.ts there for the exact types. Copy the style of https://github.com/Joelheile/voz/tree/main/examples.
+    4. Put the logic that decides things in plain functions with bun test tests. Keep index.ts thin. Fix causes: no empty catch blocks or made-up fallback values.
+    5. Done means bun test passes and voz dev . loads it with no errors in its log. Run voz dev in the background, because it keeps running. Show me the commands you ran and their output, then give me one sentence to dictate to try it.'
+    """
     private let home: VozHome
     private let analytics: Analytics
     private let cache: URL?
@@ -52,7 +61,7 @@ final class ExtensionsModel: ObservableObject {
     @Published private(set) var message: String?
 
     var installedRows: [InstalledExtension] {
-        installed.filter { matches($0.name, summary(for: $0.source)) }
+        installed.filter { matches($0.name, summary(for: $0)) }
     }
 
     var browseRows: [PackageListing] {
@@ -64,8 +73,8 @@ final class ExtensionsModel: ObservableObject {
         installed.filter { latestVersion(for: $0) != nil }.count
     }
 
-    func summary(for source: PackageSource?) -> String? {
-        listing(for: source)?.summary
+    func summary(for item: InstalledExtension) -> String? {
+        item.description ?? listing(for: item.source)?.summary
     }
 
     func latestVersion(for item: InstalledExtension) -> String? {
@@ -189,29 +198,20 @@ final class ExtensionsModel: ObservableObject {
         }
     }
 
-    func createExtension() {
+    func copyClaudeCommand() -> Bool {
         do {
             try CommandLineTool.install()
-            try openNewExtensionPrompt()
-            message = nil
         } catch CommandLineToolError.cancelled {
             message = nil
+            return false
         } catch {
             message = "\(error)"
+            return false
         }
-    }
-
-    private func openNewExtensionPrompt() throws {
-        let script = FileManager.default.temporaryDirectory.appendingPathComponent("voz-new.command")
-        try """
-        #!/bin/zsh
-        cd ~
-        read "name?Name your extension: "
-        \(CommandLineTool.link.path) new "$name" && cd "$name"
-        exec $SHELL -l
-        """.write(to: script, atomically: true, encoding: .utf8)
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
-        NSWorkspace.shared.open([script], withApplicationAt: URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"), configuration: NSWorkspace.OpenConfiguration())
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(Self.claudeCommand, forType: .string)
+        message = nil
+        return true
     }
 
     func matches(_ fields: String?...) -> Bool {
