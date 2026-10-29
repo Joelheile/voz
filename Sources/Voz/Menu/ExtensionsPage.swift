@@ -7,6 +7,7 @@ struct ExtensionsPage: View {
     @ObservedObject var settings: AppSettings
     let back: () -> Void
     @FocusState private var searchFocused: Bool
+    @State private var copiedCommand = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -74,7 +75,7 @@ struct ExtensionsPage: View {
         if catalog.error(for: item.name) != nil { return "Could not load" }
         if needsSetup(item.name) { return "Needs setup" }
         if let latest = model.latestVersion(for: item) { return "Version \(latest) is out" }
-        return model.summary(for: item.source) ?? item.source?.description ?? "In your extensions folder"
+        return model.summary(for: item) ?? item.source?.description ?? "In your extensions folder"
     }
 
     private func downloads(_ count: Int) -> some View {
@@ -138,13 +139,35 @@ struct ExtensionsPage: View {
 
     private var yourOwn: some View {
         PanelGroup(title: "Your own") {
-            PanelRow(title: "New extension", detail: "Write one in TypeScript") {
+            PanelRow(title: "New extension", detail: "Built by Claude Code") {
                 HStack(spacing: 8) {
                     IconButton(icon: .folderOpen, help: "Open extensions folder", action: model.openExtensionsFolder)
-                    Button("Create", action: model.createExtension).buttonStyle(.pill(.quiet, .small))
+                    Button {
+                        guard model.copyClaudeCommand() else { return }
+                        copiedCommand = true
+                        Task {
+                            try? await Task.sleep(for: .seconds(2))
+                            copiedCommand = false
+                        }
+                    } label: {
+                        ZStack {
+                            crossfading("Copy prompt", visible: !copiedCommand)
+                            crossfading("Copied", visible: copiedCommand)
+                        }
+                    }
+                    .buttonStyle(.pill(.accent, .small))
+                    .fixedSize()
+                    .help("Paste it into Terminal to start Claude Code")
+                    .animation(Theme.Motion.section, value: copiedCommand)
                 }
             }
         }
+    }
+
+    private func crossfading(_ label: String, visible: Bool) -> some View {
+        Text(label)
+            .opacity(visible ? 1 : 0)
+            .blur(radius: visible ? 0 : 2)
     }
 
     @ViewBuilder

@@ -314,10 +314,27 @@ struct ExtensionHostTests {
         #expect(try home.config(for: "missing") == [:])
         #expect(try home.packageSources() == ["npm:voz-jira"])
     }
+
+    @Test func installedPackagesReadTheirDescription() throws {
+        let home = temporaryHome()
+        let package = home.root.appendingPathComponent("voz-things3")
+        try writeFile(#"{"name":"voz-things3","version":"0.1.0","description":"Say todo to add a to-do"}"#, named: "package.json", in: package)
+        try home.setPackageSources([package.path])
+        #expect(try home.installedExtensions() == [InstalledExtension(name: "voz-things3", source: localSource(package.path), version: "0.1.0", description: "Say todo to add a to-do")])
+    }
 }
 
 @Test func administratorScriptQuotesAnyAppPath() {
     let script = CommandLineTool.administratorScript(linking: #"/Users/a "b" 'c'\d/voz.app/Contents/MacOS/voz"#)
     #expect(compilesAsAppleScript(script))
     #expect(script.contains(#"'/Users/a \"b\" '\\''c'\\''\\d/voz.app/Contents/MacOS/voz'"#))
+}
+
+@Suite struct ClaudeCommandTests {
+    @Test func promptIsOneSingleQuotedShellArgument() {
+        let command = ExtensionsModel.claudeCommand
+        #expect(command.hasPrefix("cd ~ && claude '"))
+        #expect(command.hasSuffix("'"))
+        #expect(command.filter { $0 == "'" }.count == 2)
+    }
 }
