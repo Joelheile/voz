@@ -123,6 +123,8 @@ If you build something with Voz, star the repo. Stars are how other developers f
 
 Built-in dictation processes audio and transcripts on your Mac. Extensions can send data to external services, so review what you install. Voz sends a version ping on install and update. Usage analytics are off unless you opt in, and they never contain what you said. Crash reports are on by default and have their own setting under Privacy. They send crashes, freezes and fixed error codes with a stack trace, never text, audio or app names.
 
+For debugging, Voz keeps a log on your Mac at `~/Library/Logs/Voz/voz-logs.jsonl`, with one line per dictation: timings, model and app names. It includes what you said only when you turn on Include text under Debug log in Settings. It never leaves your Mac unless you copy it.
+
 To mute other apps while you dictate, Voz asks for System Audio Recording access. It silences their sound and does not save their audio.
 
 Found a vulnerability? Open a [private advisory](https://github.com/Joelheile/voz/security/advisories/new), not a public issue.

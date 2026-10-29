@@ -8,6 +8,7 @@ struct SettingsPage: View {
     @ObservedObject var catalog: ExtensionCatalog
     @StateObject private var capture: HotkeyCapture
     @State private var access: PermissionSnapshot?
+    @State private var copiedLog = false
 
     private var allGranted: Bool {
         guard let access else { return true }
@@ -156,6 +157,45 @@ struct SettingsPage: View {
                 Toggle("Send crash reports", isOn: $settings.errorReportsEnabled).labelsHidden()
             }
         }
+        PanelGroup(title: "Debug log") {
+            PanelRow(title: "Include text", detail: "What you said, kept on this Mac") {
+                Toggle("Include text", isOn: $settings.logIncludesText).labelsHidden()
+            }
+            PanelRow(title: "voz-logs.jsonl") {
+                HStack(spacing: 6) {
+                    Button(action: copyLog) {
+                        ZStack {
+                            crossfading("Copy", visible: !copiedLog)
+                            crossfading("Copied", visible: copiedLog)
+                        }
+                    }
+                    .animation(Theme.Motion.section, value: copiedLog)
+                    Button("Show in Finder") {
+                        NSWorkspace.shared.activateFileViewerSelecting([DebugLog.shared.file])
+                    }
+                }
+                .buttonStyle(.pill(.quiet, .small))
+                .fixedSize()
+            }
+        }
+    }
+
+    private static let copiedLogLines = 200
+
+    private func copyLog() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(DebugLog.shared.lastLines(Self.copiedLogLines), forType: .string)
+        copiedLog = true
+        Task {
+            try? await Task.sleep(for: .seconds(1.5))
+            copiedLog = false
+        }
+    }
+
+    private func crossfading(_ label: String, visible: Bool) -> some View {
+        Text(label)
+            .opacity(visible ? 1 : 0)
+            .blur(radius: visible ? 0 : 2)
     }
 
     private func allowRow(_ title: String, fix: @escaping () -> Void) -> some View {

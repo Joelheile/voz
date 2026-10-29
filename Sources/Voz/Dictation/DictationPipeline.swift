@@ -88,6 +88,7 @@ final class DictationPipeline {
         do {
             guard let transcript = try await session.finish(samples: recording.samples, released: released) else {
                 Log.app.notice("Transcription was empty")
+                DebugLog.shared.write("dictation", ["outcome": "empty", "app": recording.app.name ?? ""])
                 analytics.capture(.dictationDiscarded(reason: .emptyTranscript))
                 return .discarded
             }
@@ -103,10 +104,12 @@ final class DictationPipeline {
             if let command = delivery.command { extensions.run(command, app: recording.app) }
             let record = await save(transcript, finalText: delivery.text.isEmpty ? transcript.cleaned.text : delivery.text, app: recording.app, released: released)
             report(record, model: transcript.model, insertMs: insertMs, trigger: recording.trigger)
+            logDebug(record, transcript, insertMs: insertMs)
             learnSpokenWords(in: transcript.raw)
             return .done
         } catch {
             Log.app.error("Transcription failed: \(error.localizedDescription, privacy: .private)")
+            DebugLog.shared.write("dictation", ["outcome": "failed", "error": error.localizedDescription, "app": recording.app.name ?? ""])
             analytics.capture(.dictationFailed(stage: .transcription, errorCode: .transcriptionFailed))
             return .failed
         }
@@ -151,6 +154,27 @@ final class DictationPipeline {
             trigger: trigger,
             output: settings.insertIntoApp && Permissions.accessibilityGranted ? .paste : .clipboard
         )))
+    }
+
+    private func logDebug(_ record: TranscriptRecord, _ transcript: StreamedTranscript, insertMs: Int) {
+        var fields: [String: Any] = [
+            "outcome": "inserted",
+            "app": record.appName ?? "",
+            "model": record.model,
+            "audio_s": record.audioSeconds,
+            "words": record.wordCount,
+            "ms": record.totalMs,
+            "stt_ms": record.sttMs,
+            "cleanup_ms": record.cleanupMs,
+            "cleanup_timed_out": record.cleanupTimedOut,
+            "insert_ms": insertMs,
+            "segments": transcript.segmentCount,
+        ]
+        if settings.logIncludesText {
+            fields["raw"] = record.rawText
+            fields["text"] = record.finalText
+        }
+        DebugLog.shared.write("dictation", fields)
     }
 
     private func save(_ transcript: StreamedTranscript, finalText: String, app: HostApp, released: ContinuousClock.Instant) async -> TranscriptRecord {
