@@ -16,6 +16,13 @@ https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2
 https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml
 https://creativecommons.org/licenses/by/4.0/
 
+Speaker diarization, downloaded when an extension transcribes a file with
+speakers: Nemotron 3 Diarization by NVIDIA Corporation, with Core ML
+conversion by FluidInference. Licensed under the OpenMDW License v1.1.
+https://huggingface.co/nvidia/Nemotron-3-Diarization
+https://huggingface.co/FluidInference/nemotron-3-diarization-coreml
+https://openmdw.ai/license/
+
 Voz downloads these models and does not modify their weights.
 
 Bun: downloaded from the official oven-sh/bun releases when extensions are

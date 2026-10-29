@@ -35,10 +35,11 @@ Registering a model or step only makes it available. The user picks it in Settin
 - A cleanup step has 300 ms, cut short if the cleanup budget runs out. A speech model has 2 seconds per part. A cleanup model has what is left of 1.5 seconds after the user stops talking. Prefer local, fast models. On failure or timeout Voz falls back to its built-in models
 - The default export has 3 seconds to finish. Register handlers there and do nothing slow
 - `ctx.generate({ prompt, instructions, schema })` returns JSON from Apple's on-device model that fits a JSON schema (`object`, `array`, `string` with `enum`, `number`, `integer`, `boolean`). Use it in commands to turn speech into fields. Pass today's date and valid names in the prompt. It takes 1 to 3 seconds and needs `"voz": { "apiVersion": 2 }`
+- `ctx.transcribe(path, { speakers: true })` transcribes an audio or video file with Parakeet and splits it into speaker turns. Use it in `voz.on("audioDrop", ...)`, which runs when the user drops an audio or video file on the notch. It needs `"voz": { "apiVersion": 3 }`
 - Give feedback with `ctx.notify("Sent to Linear")`. It shows a short message under the menu bar
 - Anything the user may want to change is a setting. Declare it with `voz.settings({ key: { type, title, default } })`. `type` is `string`, `number` or `boolean`. A string can have `options` for a picker, `secret: true` for a token, or `required: true` when the extension can't work without it. Never ask the user to edit `settings.json`
 - Write files to `voz.paths.data`, never next to the extension, or Voz reloads it on every write
-- A package declares the oldest API it needs with `"voz": { "apiVersion": 1 }` in `package.json`. Set it to `2` only when the package calls `ctx.generate` or uses `{ at: "start" }`
+- A package declares the oldest API it needs with `"voz": { "apiVersion": 1 }` in `package.json`. Set it to `2` only when the package calls `ctx.generate` or uses `{ at: "start" }`, and to `3` when it calls `ctx.transcribe` or listens to `audioDrop`
 - The user turns extensions on or off in the Extensions page. Don't build your own on/off switch
 - Log with `console.log`
 - Use Bun and Node APIs (`fetch`, `Bun.spawn`, `node:fs`). Files in `~/.voz/extensions` can't import npm packages. If you need one, make a folder with a `package.json` and an `index.ts`, then run `voz install ./that-folder`

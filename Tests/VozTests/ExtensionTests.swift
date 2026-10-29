@@ -14,14 +14,16 @@ struct ExtensionHostTests {
     private func makeHost(
         packages: [String] = [],
         actions: RecordedActions = RecordedActions(),
-        generate: @escaping @Sendable (GenerateParams) async throws -> String = { _ in throw ExtensionModelError.unavailable("not in tests") }
+        generate: @escaping @Sendable (GenerateParams) async throws -> String = { _ in throw ExtensionModelError.unavailable("not in tests") },
+        transcribeFile: @escaping @Sendable (TranscribeFileParams) async throws -> FileTranscript = { _ in throw FileTranscriberError.needsParakeet }
     ) -> ExtensionHost {
         ExtensionHost(
             launch: .init(bun: installedBun!, script: hostScript, home: home, packageDirectories: packages.map(fileURL)),
             onAction: { actions.append($0) },
             onLog: { _ in },
             onExit: { _ in },
-            generate: generate
+            generate: generate,
+            transcribeFile: transcribeFile
         )
     }
 
@@ -104,6 +106,35 @@ struct ExtensionHostTests {
         _ = try await host.start()
         #expect(await host.runCommand(VoiceCommandMatch(phrase: "todo", at: .start, text: "x"), app: app, timeout: .seconds(2)))
         #expect(actions.all == [.notify(#"Required property "titel" is not in properties"#)])
+        await host.stop()
+    }
+
+    @Test func audioDropsTranscribeTheFileWithSpeakers() async throws {
+        try extensionFile("notes.ts", #"export default (voz) => voz.on("audioDrop", async (e, ctx) => { const t = await ctx.transcribe(e.path, { speakers: true }); ctx.notify(`${e.path} ${t.speakers} ${t.turns.map((turn) => `${turn.speaker}:${turn.text}`).join("|")}`) })"#)
+        let actions = RecordedActions()
+        let received = Mutex<TranscribeFileParams?>(nil)
+        let host = makeHost(actions: actions, transcribeFile: { params in
+            received.withLock { $0 = params }
+            return FileTranscript(text: "Hi. Hello.", seconds: 3, speakers: 2, turns: [
+                SpeakerTurn(speaker: 1, start: 0, end: 1, text: "Hi."),
+                SpeakerTurn(speaker: 2, start: 2, end: 3, text: "Hello."),
+            ])
+        })
+        let manifest = try await host.start()
+        #expect(manifest.subscribes(to: .audioDrop))
+        #expect(await host.emit(.audioDrop(path: "/tmp/talk.mp3"), app: app, timeout: .seconds(2)))
+        #expect(actions.all == [.notify("/tmp/talk.mp3 2 1:Hi.|2:Hello.")])
+        #expect(received.withLock { $0 }.map { ($0.path, $0.speakers) } ?? ("", false) == ("/tmp/talk.mp3", true))
+        await host.stop()
+    }
+
+    @Test func fileTranscriptionFailuresRejectInsideTheExtension() async throws {
+        try extensionFile("notes.ts", #"export default (voz) => voz.on("audioDrop", async (e, ctx) => { try { await ctx.transcribe(e.path) } catch (error) { ctx.notify(error.message); throw error } })"#)
+        let actions = RecordedActions()
+        let host = makeHost(actions: actions)
+        _ = try await host.start()
+        #expect(await !host.emit(.audioDrop(path: "/tmp/talk.mp3"), app: app, timeout: .seconds(2)))
+        #expect(actions.all == [.notify("Transcribing files needs a Parakeet speech model. Pick one in Settings")])
         await host.stop()
     }
 
@@ -247,13 +278,13 @@ struct ExtensionHostTests {
         try writeFile(#"{"name":"pack"}"#, named: "package.json", in: pack)
         try writeFile(#"export default (voz) => voz.on("beforeInsert", () => ({ text: "pack ran" }))"#, named: "index.ts", in: pack.appendingPathComponent("extensions/a"))
         let future = home.packages.appendingPathComponent("node_modules/future")
-        try writeFile(#"{"name":"future","voz":{"apiVersion":3}}"#, named: "package.json", in: future)
+        try writeFile(#"{"name":"future","voz":{"apiVersion":4}}"#, named: "package.json", in: future)
         try writeFile("export default () => {}", named: "index.ts", in: future)
         let host = makeHost(packages: [pack.path, future.path])
         let manifest = try await host.start()
         #expect(manifest.extensions == ["on"])
         #expect(manifest.errors.first?.message.contains("Update Voz") == true)
-        #expect(await host.beforeInsert(text: "hi", raw: "hi", app: app, timeout: .seconds(2)) == "hi 2")
+        #expect(await host.beforeInsert(text: "hi", raw: "hi", app: app, timeout: .seconds(2)) == "hi 3")
         await host.stop()
     }
 

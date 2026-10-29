@@ -126,6 +126,7 @@ enum HostHook: String, Sendable {
     case beforeCleanup
     case recording
     case afterInsert
+    case audioDrop
 }
 
 struct LoadError: Decodable, Equatable, Sendable {
@@ -136,11 +137,13 @@ struct LoadError: Decodable, Equatable, Sendable {
 enum HostEvent: Encodable, Sendable {
     case recording(path: String, seconds: Double)
     case afterInsert(text: String, raw: String)
+    case audioDrop(path: String)
 
     var hook: HostHook {
         switch self {
         case .recording: .recording
         case .afterInsert: .afterInsert
+        case .audioDrop: .audioDrop
         }
     }
 
@@ -155,6 +158,8 @@ enum HostEvent: Encodable, Sendable {
         case .afterInsert(let text, let raw):
             try container.encode(text, forKey: .text)
             try container.encode(raw, forKey: .raw)
+        case .audioDrop(let path):
+            try container.encode(path, forKey: .path)
         }
     }
 }
@@ -185,10 +190,17 @@ struct HostReply<Params: Encodable>: Encodable {
     let deadline: Double
 }
 
-struct GeneratedParams: Encodable {
+struct CallReply: Encodable {
     let call: Int
     let json: String?
     let error: String?
+}
+
+struct TranscribeFileParams: Decodable, Sendable {
+    let call: Int
+    let path: String
+    let speakers: Bool
+    let deadline: Double
 }
 
 struct InsertParams: Encodable {
@@ -271,6 +283,10 @@ struct EmitParams: Encodable {
     let event: String
     let payload: HostEvent
     let app: HostApp
+}
+
+struct EmitResult: Decodable {
+    let failed: Bool
 }
 
 struct CommandResult: Decodable {

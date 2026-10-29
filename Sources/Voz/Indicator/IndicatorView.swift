@@ -18,6 +18,8 @@ enum IndicatorMotion {
     static let pillExit = Animation.easeOut(duration: 0.15)
     static let pillHiddenScale: CGFloat = 0.9
     static let pillHiddenOffset: CGFloat = -6
+    static let swell = Animation.spring(duration: 0.3, bounce: 0.25)
+    static let settle = Animation.spring(duration: 0.25, bounce: 0)
 }
 
 struct NotchContentEffect: ViewModifier {
@@ -101,10 +103,24 @@ struct IndicatorView: View {
     }
 
     private var notchWidth: CGFloat {
-        reduceMotion || model.isExpanded ? layout.panelFrame.width : layout.collapsedWidth
+        (reduceMotion || model.isExpanded ? layout.panelFrame.width : layout.collapsedWidth) + swellWidth
     }
 
-    private var showsPreview: Bool { model.isExpanded && !model.preview.isEmpty }
+    private var isOfferingDrop: Bool { model.state == .dropTarget && model.isExpanded }
+    private var isSwelling: Bool { isOfferingDrop && model.isDropTargeted && !reduceMotion }
+    private var swellWidth: CGFloat { isSwelling ? 2 * IndicatorLayout.dropSwell : 0 }
+
+    private var dropShadow: (opacity: Double, radius: CGFloat, y: CGFloat) {
+        guard isOfferingDrop else { return (0, 0, 0) }
+        return model.isDropTargeted ? (0.55, 22, 10) : (0.3, 14, 6)
+    }
+
+    private var swellAnimation: Animation {
+        if reduceMotion { return IndicatorMotion.reducedMotion }
+        return model.isDropTargeted ? IndicatorMotion.swell : IndicatorMotion.settle
+    }
+
+    private var showsPreview: Bool { model.isExpanded && (!model.preview.isEmpty || model.state == .dropTarget) }
 
     private var notchShape: NotchShape {
         NotchShape(
@@ -113,9 +129,19 @@ struct IndicatorView: View {
         )
     }
 
-    private var preview: some View {
-        TranscriptPreview(text: model.preview)
-            .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { model.previewFrame = $0 }
+    @ViewBuilder private var preview: some View {
+        if model.state == .dropTarget {
+            DropPrompt(isTargeted: model.isDropTargeted, swells: !reduceMotion)
+        } else {
+            TranscriptPreview(text: model.preview)
+                .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { model.previewFrame = $0 }
+        }
+    }
+
+    private func acceptsDrop(_ files: [URL]) -> Bool {
+        guard model.state == .dropTarget, let media = files.first(where: MediaFile.isSupported) else { return false }
+        model.onDrop(media)
+        return true
     }
 
     private var notch: some View {
@@ -139,11 +165,17 @@ struct IndicatorView: View {
                         .transition(transition(anchor: .top, delay: 0))
                 }
             }
-            .frame(width: layout.panelFrame.width)
+            .frame(width: layout.panelFrame.width + swellWidth)
             .background {
                 notchShape.fill(.black).frame(width: notchWidth)
             }
             .mask { notchShape.frame(width: notchWidth) }
+            .background {
+                let shadow = dropShadow
+                notchShape.fill(.black).frame(width: notchWidth)
+                    .shadow(color: .black.opacity(shadow.opacity), radius: shadow.radius, y: shadow.y)
+            }
+            .dropDestination(for: URL.self) { files, _ in acceptsDrop(files) } isTargeted: { model.isDropTargeted = $0 }
             Rectangle()
                 .fill(.black)
                 .frame(width: max(notchWidth - 2 * notchShape.topRadius, 0), height: 1)
@@ -151,6 +183,7 @@ struct IndicatorView: View {
         .opacity(reduceMotion && !model.isExpanded ? 0 : 1)
         .animation(animation, value: model.isExpanded)
         .animation(previewAnimation, value: model.preview)
+        .animation(swellAnimation, value: model.isDropTargeted)
     }
 
     private var previewAnimation: Animation {
@@ -169,6 +202,7 @@ struct IndicatorView: View {
             }
         }
         .padding(.top, IndicatorLayout.shadowMargin)
+        .dropDestination(for: URL.self) { files, _ in acceptsDrop(files) } isTargeted: { model.isDropTargeted = $0 }
         .animation(previewAnimation, value: model.preview)
     }
 
@@ -232,6 +266,7 @@ enum IndicatorState: Equatable {
     case done
     case discarded
     case failed
+    case dropTarget
 }
 
 @MainActor
@@ -243,7 +278,9 @@ final class IndicatorModel {
     var recordingStart = Date.now
     var recordingEnd: Date?
     var preview = ""
+    var isDropTargeted = false
     @ObservationIgnored var previewFrame = CGRect.zero
+    @ObservationIgnored var onDrop: (URL) -> Void = { _ in }
     @ObservationIgnored var levels = LevelHistory()
 }
 
@@ -251,6 +288,16 @@ struct IndicatorLeading: View {
     let model: IndicatorModel
 
     var body: some View {
+        if model.state == .dropTarget {
+            Image(systemName: "waveform")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.primary.opacity(0.9))
+        } else {
+            timer
+        }
+    }
+
+    private var timer: some View {
         Text(
             timerInterval: model.recordingStart...model.recordingStart.addingTimeInterval(3600),
             pauseTime: model.recordingEnd,
@@ -279,6 +326,12 @@ struct IndicatorTrailing: View {
                 ResultSymbol(name: "checkmark", color: .primary, effect: .drawOn).transition(swap)
             case .failed:
                 ResultSymbol(name: "exclamationmark", color: .orange, effect: .bounce).transition(swap)
+            case .dropTarget:
+                Image(systemName: "arrow.down")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.primary.opacity(model.isDropTargeted ? 1 : 0.6))
+                    .symbolEffect(.bounce, value: model.isDropTargeted)
+                    .transition(swap)
             }
         }
         .animation(reduceMotion ? IndicatorMotion.reducedMotion : IndicatorMotion.stateSwap, value: model.state)
@@ -286,5 +339,20 @@ struct IndicatorTrailing: View {
 
     private var swap: AnyTransition {
         reduceMotion ? .opacity : AnyTransition(.blurReplace)
+    }
+}
+
+struct DropPrompt: View {
+    private static let swellHeight: CGFloat = 5
+
+    let isTargeted: Bool
+    let swells: Bool
+
+    var body: some View {
+        Text("Drop to transcribe")
+            .font(.ui(13))
+            .foregroundStyle(.primary.opacity(isTargeted ? 1 : 0.7))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, isTargeted && swells ? Self.swellHeight : 0)
     }
 }

@@ -42,6 +42,9 @@ enum Headless {
             }
             return await CleanupEval.run(path: path, repeats: repeats, budget: .milliseconds(budget))
         }
+        if let path = value(of: "--transcribe", in: arguments), arguments.contains("--speakers") {
+            return await transcribeSpeakers(URL(fileURLWithPath: path), model: speechModel(in: arguments))
+        }
         if let path = value(of: "--transcribe", in: arguments) {
             return await transcribe(URL(fileURLWithPath: path), arguments: arguments)
         }
@@ -52,7 +55,7 @@ enum Headless {
             return await simulateDictation(URL(fileURLWithPath: path), arguments: arguments)
         }
         let models = SpeechModel.allCases.map(\.rawValue).joined(separator: "|")
-        printError("usage: voz --transcribe <audio file> [--model \(models)] [--vocab a,b]\n       voz --benchmark-speech <audio file> [--model \(models)] [--repeat 2...1000] [--vocab a,b]\n       voz --clean <text> [--vocab a,b]\n       voz --eval <cases.json> [--repeat n] [--budget-ms n]\n       voz --simulate-dictation <audio file> [--model \(models)] [--speed n] [--no-cleanup]\n       voz --measure-recorder <seconds>\n       voz --render-design <directory>")
+        printError("usage: voz --transcribe <audio file> [--model \(models)] [--vocab a,b] [--speakers]\n       voz --benchmark-speech <audio file> [--model \(models)] [--repeat 2...1000] [--vocab a,b]\n       voz --clean <text> [--vocab a,b]\n       voz --eval <cases.json> [--repeat n] [--budget-ms n]\n       voz --simulate-dictation <audio file> [--model \(models)] [--speed n] [--no-cleanup]\n       voz --measure-recorder <seconds>\n       voz --render-design <directory>")
         return 64
     }
 
@@ -74,6 +77,21 @@ enum Headless {
                 format: "engine %@, load %.2fs, audio %.2fs, transcription %.3fs",
                 result.model, loadSeconds, result.audioSeconds, result.processingSeconds
             ))
+            return 0
+        } catch {
+            printError("transcription failed: \(error)")
+            return 1
+        }
+    }
+
+    private static func transcribeSpeakers(_ url: URL, model: SpeechModel) async -> Int32 {
+        let start = Date()
+        do {
+            let transcript = try await FileTranscriber(transcriber: Transcriber()).transcribe(url, model: model, speakers: true)
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .withoutEscapingSlashes]
+            print(String(decoding: try encoder.encode(transcript), as: UTF8.self))
+            print(String(format: "audio %.1fs, total %.1fs", transcript.seconds, Date().timeIntervalSince(start)))
             return 0
         } catch {
             printError("transcription failed: \(error)")

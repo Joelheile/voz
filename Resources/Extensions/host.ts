@@ -12,6 +12,7 @@ import { createInterface } from "node:readline";
 import type {
   Action,
   AfterInsertEvent,
+  AudioDropEvent,
   Awaitable,
   App,
   BeforeCleanupEvent,
@@ -33,6 +34,8 @@ import type {
   SettingsValues,
   SettingsSchema,
   SpeechModel,
+  TranscribeOptions,
+  Transcript,
 } from "./voz.d.ts";
 
 type Launch = {
@@ -41,13 +44,14 @@ type Launch = {
   extensionsDirectory: string;
   packages: string[];
 };
-type EventName = "beforeCleanup" | "beforeInsert" | "recording" | "afterInsert";
+type EventName = "beforeCleanup" | "beforeInsert" | "recording" | "afterInsert" | "audioDrop";
 type HandlerResult = BeforeInsertResult | BeforeCleanupResult;
 type HookPayload = {
   beforeCleanup: BeforeCleanupEvent;
   beforeInsert: BeforeInsertEvent;
   recording: RecordingEvent;
   afterInsert: AfterInsertEvent;
+  audioDrop: AudioDropEvent;
 };
 type Handler = {
   extension: string;
@@ -71,8 +75,8 @@ type WireSchema = {
   items?: WireSchema;
   properties?: { name: string; schema: WireSchema; optional: boolean }[];
 };
-type Generation = { resolve: (value: object) => void; reject: (error: Error) => void };
-type GeneratedReply = { call: number; json?: string; error?: string };
+type PendingCall = { resolve: (value: object) => void; reject: (error: Error) => void };
+type CallReply = { call: number; json?: string; error?: string };
 type TranscribeRequest = { model: string; path: string; seconds: number; app: App };
 type CleanRequest = { model: string; text: string; prompt: string; app: App };
 type StepRequest = { step: string; text: string; app: App };
@@ -115,7 +119,7 @@ class Registration {
   }
 }
 
-const apiVersion = 2;
+const apiVersion = 3;
 const loadTimeout = 3000;
 const write = process.stdout.write.bind(process.stdout);
 const send = (message: object) => write(JSON.stringify(message) + "\n");
@@ -141,6 +145,7 @@ const eventNames: EventName[] = [
   "beforeInsert",
   "recording",
   "afterInsert",
+  "audioDrop",
 ];
 const handlers = new Map<EventName, Handler[]>();
 const commands = new Map<string, Command>();
@@ -148,7 +153,7 @@ const speechModels = new Map<string, SpeechModel>();
 const cleanupModels = new Map<string, CleanupModel>();
 const cleanupSteps = new Map<string, CleanupStep>();
 const actions = new Map<string, Action & { extension: string }>();
-const generations = new Map<number, Generation>();
+const calls = new Map<number, PendingCall>();
 let lastCall = 0;
 const settingsSchemas = new Map<string, SettingsSchema>();
 const loaded: string[] = [];
@@ -180,6 +185,10 @@ function context(app: App): Context {
     generate: (request) => {
       if (!isLive()) return Promise.reject(new Error("generate only works while a handler runs"));
       return generate(request, scope!);
+    },
+    transcribe: (path, options) => {
+      if (!isLive()) return Promise.reject(new Error("transcribe only works while a handler runs"));
+      return transcribeFile(path, options, scope!);
     },
   };
 }
@@ -215,30 +224,39 @@ function wireSchema(schema: Schema): WireSchema {
 }
 
 function generate<S extends Schema>(request: GenerateRequest<S>, scope: RequestScope) {
+  const params = { prompt: request.prompt, instructions: request.instructions, schema: wireSchema(request.schema) };
+  return callSwift("generate", params, scope, "The on-device model ran out of time") as Promise<Generated<S>>;
+}
+
+function transcribeFile(path: string, options: TranscribeOptions | undefined, scope: RequestScope) {
+  const params = { path, speakers: options?.speakers ?? false };
+  return callSwift("transcribeFile", params, scope, "Transcribing the file ran out of time") as Promise<Transcript>;
+}
+
+function callSwift(method: string, params: object, scope: RequestScope, timeoutMessage: string) {
   const call = ++lastCall;
-  return new Promise<Generated<S>>((resolve, reject) => {
-    const params = { call, prompt: request.prompt, instructions: request.instructions, schema: wireSchema(request.schema), deadline: scope.deadline };
-    const timer = setTimeout(() => settle({ call, error: "The on-device model ran out of time" }), scope.deadline - Date.now());
-    generations.set(call, {
+  return new Promise<object>((resolve, reject) => {
+    const timer = setTimeout(() => settle({ call, error: timeoutMessage }), scope.deadline - Date.now());
+    calls.set(call, {
       resolve: (value) => {
         clearTimeout(timer);
-        resolve(value as Generated<S>);
+        resolve(value);
       },
       reject: (error) => {
         clearTimeout(timer);
         reject(error);
       },
     });
-    send({ method: "generate", params, requestID: scope.id });
+    send({ method, params: { ...params, call, deadline: scope.deadline }, requestID: scope.id });
   });
 }
 
-function settle({ call, json, error }: GeneratedReply) {
-  const generation = generations.get(call);
-  if (!generation) return;
-  generations.delete(call);
-  if (json === undefined) generation.reject(new Error(error ?? "The on-device model failed"));
-  else generation.resolve(JSON.parse(json));
+function settle({ call, json, error }: CallReply) {
+  const pending = calls.get(call);
+  if (!pending) return;
+  calls.delete(call);
+  if (json === undefined) pending.reject(new Error(error ?? `Voz call ${call} failed`));
+  else pending.resolve(JSON.parse(json));
 }
 
 function register<T extends Component>(
@@ -491,16 +509,18 @@ async function beforeInsert({ text, raw, app }: InsertRequest) {
 
 async function emit({ event, payload, app }: EmitRequest) {
   const ctx = context(app);
+  let failed = false;
   await Promise.all(
     (handlers.get(event) ?? []).map(async (handler) => {
       try {
         await handler.run(payload, ctx);
       } catch (error) {
+        failed = true;
         log(`${handler.extension} ${event} failed: ${describe(error)}`);
       }
     }),
   );
-  return {};
+  return { failed };
 }
 
 function commandKey(phrase: string, at: CommandPosition) {
@@ -601,7 +621,7 @@ for await (const line of createInterface({ input: process.stdin })) {
   if (!line.trim()) continue;
   const request = parseRequest(line);
   if (!request) continue;
-  if (request.method === "generated") {
+  if (request.method === "generated" || request.method === "transcribedFile") {
     settle(request.params);
     continue;
   }

@@ -80,6 +80,7 @@ final class ExtensionService {
     private static let watchdogInterval: Duration = .seconds(5)
     private static let pingTimeout: Duration = .seconds(2)
     private static let eventTimeout: Duration = .seconds(30)
+    private static let audioDropTimeout: Duration = .seconds(1800)
     private static let healthyUptime: Duration = .seconds(60)
     nonisolated private static let audioDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("voz-extension-audio", isDirectory: true)
     nonisolated static let resources = Bundle.main.resourceURL!.appendingPathComponent("Extensions", isDirectory: true)
@@ -88,6 +89,7 @@ final class ExtensionService {
     private let output: TextOutput
     private let toast: ToastController
     private let settings: AppSettings
+    private let fileTranscriber: FileTranscriber
     let catalog = ExtensionCatalog()
     private var host: ExtensionHost?
     private var manifest: HostManifest?
@@ -105,10 +107,11 @@ final class ExtensionService {
         self?.runAction(action)
     }
 
-    init(output: TextOutput, toast: ToastController, settings: AppSettings) {
+    init(output: TextOutput, toast: ToastController, settings: AppSettings, fileTranscriber: FileTranscriber) {
         self.output = output
         self.toast = toast
         self.settings = settings
+        self.fileTranscriber = fileTranscriber
         catalog.perform = { [weak self] action in self?.runAction(action) }
     }
 
@@ -242,6 +245,15 @@ final class ExtensionService {
         Task { await host.emit(.afterInsert(text: text, raw: raw), app: app, timeout: Self.eventTimeout) }
     }
 
+    var acceptsAudioDrops: Bool {
+        manifest?.subscribes(to: .audioDrop) == true
+    }
+
+    func dropAudio(_ file: URL) async -> Bool {
+        guard let host else { return false }
+        return await host.emit(.audioDrop(path: file.path), app: .current, timeout: Self.audioDropTimeout)
+    }
+
     func run(_ command: VoiceCommandMatch, app: HostApp) {
         guard let host else { return }
         Task {
@@ -278,6 +290,10 @@ final class ExtensionService {
                     guard let self, self.generation == generation else { return }
                     self.hostExited(status)
                 }
+            },
+            transcribeFile: { [weak self, fileTranscriber] params in
+                guard let model = await self?.settings.localSpeechModel else { throw CancellationError() }
+                return try await fileTranscriber.transcribe(URL(fileURLWithPath: params.path), model: model, speakers: params.speakers)
             }
         )
         let manifest = try await host.start()

@@ -14,5 +14,6 @@ func indicatorWindowLeavesRoomForThePreviewBelow(hasNotch: Bool) {
     #expect(frame.maxY == layout.panelFrame.maxY)
     #expect(frame.contains(layout.panelFrame))
     #expect(frame.width >= IndicatorLayout.previewWidth)
+    #expect(frame.width >= layout.panelFrame.width + 2 * (IndicatorLayout.dropSwell + IndicatorLayout.dropShadowRoom))
     #expect(screen.frame.contains(frame))
 }

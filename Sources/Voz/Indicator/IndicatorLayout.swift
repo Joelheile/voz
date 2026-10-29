@@ -34,6 +34,8 @@ struct IndicatorLayout: Equatable, Sendable {
     static let pillSize = CGSize(width: 108, height: 32)
     static let pillGap: CGFloat = 8
     static let shadowMargin: CGFloat = 16
+    static let dropSwell: CGFloat = 6
+    static let dropShadowRoom: CGFloat = 32
 
     let style: Style
     let panelFrame: CGRect
@@ -43,7 +45,7 @@ struct IndicatorLayout: Equatable, Sendable {
     static let previewHeight: CGFloat = 120
 
     var windowFrame: CGRect {
-        let width = max(panelFrame.width, Self.previewWidth + 2 * Self.shadowMargin)
+        let width = max(panelFrame.width + 2 * (Self.dropSwell + Self.dropShadowRoom), Self.previewWidth + 2 * Self.shadowMargin)
         return CGRect(
             x: panelFrame.midX - width / 2,
             y: panelFrame.minY - Self.previewHeight,
