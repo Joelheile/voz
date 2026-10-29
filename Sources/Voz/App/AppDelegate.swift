@@ -15,7 +15,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var output = TextOutput(settings: settings)
     private let cleaner = TextCleaner()
     private let toast = ToastController()
-    private lazy var extensions = ExtensionService(output: output, toast: toast, settings: settings)
+    private lazy var extensions = ExtensionService(
+        output: output,
+        toast: toast,
+        settings: settings,
+        fileTranscriber: FileTranscriber(transcriber: transcriber)
+    )
     private var vocabularyWords: [String] = []
     private lazy var dictation = Dictation(
         pipeline: DictationPipeline(
@@ -41,6 +46,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotkeyMonitor: HotkeyMonitor?
     private var quitRequested = false
     private let indicator = IndicatorController()
+    private lazy var audioDrag = MediaDragMonitor(
+        isEnabled: { [weak self] in self?.acceptsAudioDrop ?? false },
+        onStart: { [weak self] in self?.indicator.showDropTarget() },
+        onEnd: { [weak self] in self?.indicator.endDropTarget() }
+    )
     private let uninstallWatcher = UninstallWatcher()
     private lazy var updater = Updater(settings: settings, isBusy: { [weak self] in self?.dictation.phase != .idle })
 
@@ -88,6 +98,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         indicator.attach(to: dictation)
+        indicator.onDrop = { [weak self] file in self?.transcribeDropped(file) }
+        audioDrag.start()
         observeWake()
         OpenRequest.observe { [weak self] in self?.statusItemController?.open() }
         observeSettings()
@@ -119,6 +131,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let name = urls.lazy.compactMap(ExtensionLink.packageName(in:)).first else { return }
         statusItemController?.open(.extensions)
         Task { await extensionsModel.reveal(name) }
+    }
+
+    private var acceptsAudioDrop: Bool {
+        extensions.acceptsAudioDrops && dictation.phase == .idle
+    }
+
+    private func transcribeDropped(_ file: URL) {
+        indicator.showFileTranscribing()
+        Task {
+            let succeeded = await extensions.dropAudio(file)
+            indicator.finishFile(succeeded: succeeded)
+        }
     }
 
     private func manageLaunchAgent() {

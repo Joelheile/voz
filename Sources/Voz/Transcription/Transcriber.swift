@@ -68,6 +68,12 @@ actor Transcriber {
         return TranscriptionResult(text: text, audioSeconds: result.duration, processingSeconds: result.processingTime, model: model.rawValue)
     }
 
+    func recognize(_ url: URL, model: SpeechModel) async throws -> ASRResult {
+        let manager = try await manager(for: model)
+        var decoderState = TdtDecoderState.make()
+        return try await manager.transcribe(url, decoderState: &decoderState)
+    }
+
     private func manager(for model: SpeechModel) async throws -> AsrManager {
         if let loaded, loaded.model == model { return loaded.manager }
         let task: Task<AsrManager, Error>

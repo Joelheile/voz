@@ -7,6 +7,7 @@ final class IndicatorController {
     private static let discardHold = Duration.milliseconds(250)
     private static let failureHold = Duration.milliseconds(700)
     private static let closeDuration = Duration.milliseconds(300)
+    private static let dropGrace = Duration.milliseconds(200)
     private static let sampleInterval = 1.0 / 120
 
     private let model = IndicatorModel()
@@ -19,6 +20,10 @@ final class IndicatorController {
     private var smoother = LevelSmoother()
     private var lastSampleTime = 0.0
     var levelSource: () -> Float = { 0 }
+    var onDrop: (URL) -> Void {
+        get { model.onDrop }
+        set { model.onDrop = newValue }
+    }
 
     init() {
         let reposition: @Sendable (Notification) -> Void = { [weak self] _ in
@@ -66,6 +71,47 @@ final class IndicatorController {
             guard !Task.isCancelled, let self else { return }
             self.collapseAndHide()
         }
+    }
+
+    func showDropTarget() {
+        guard !panel.isVisible || model.state == .dropTarget else { return }
+        lifecycle?.cancel()
+        clearPreview()
+        if !panel.isVisible { present() }
+        model.isDropTargeted = false
+        model.state = .dropTarget
+        panel.ignoresMouseEvents = false
+        lifecycle = Task { [model] in
+            try? await Task.sleep(for: .milliseconds(16))
+            guard !Task.isCancelled else { return }
+            model.isExpanded = true
+        }
+    }
+
+    func endDropTarget() {
+        guard model.state == .dropTarget else { return }
+        lifecycle?.cancel()
+        lifecycle = Task { [weak self] in
+            try? await Task.sleep(for: Self.dropGrace)
+            guard !Task.isCancelled, let self, self.model.state == .dropTarget else { return }
+            self.collapseAndHide()
+        }
+    }
+
+    func showFileTranscribing() {
+        lifecycle?.cancel()
+        if !panel.isVisible { present() }
+        panel.ignoresMouseEvents = true
+        model.isDropTargeted = false
+        model.recordingStart = .now
+        model.recordingEnd = nil
+        model.state = .transcribing
+        model.isExpanded = true
+    }
+
+    func finishFile(succeeded: Bool) {
+        guard lastPhase == .idle, model.state == .transcribing else { return }
+        showOutcome(succeeded ? .done : .failed)
     }
 
     func shake() {
@@ -150,7 +196,7 @@ final class IndicatorController {
         case .done: Self.doneHold
         case .discarded: Self.discardHold
         case .failed: Self.failureHold
-        case .recording, .transcribing: .zero
+        case .recording, .transcribing, .dropTarget: .zero
         }
     }
 
