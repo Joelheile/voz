@@ -53,4 +53,12 @@ struct MediaFileTests {
         #expect(MediaFile.isSupported(directory.appendingPathComponent("clip.ts")))
         #expect(!MediaFile.isSupported(directory.appendingPathComponent("voz.ts")))
     }
+
+    @Test func tellsAVCHDVideoFromTypeScriptModule() throws {
+        let directory = temporaryHome().root
+        try writeFile("\u{00}\u{00}\u{00}\u{00}G\u{40}\u{00}\u{10}", named: "clip.mts", in: directory)
+        try writeFile("export const voz = 1\n", named: "voz.mts", in: directory)
+        #expect(MediaFile.isSupported(directory.appendingPathComponent("clip.mts")))
+        #expect(!MediaFile.isSupported(directory.appendingPathComponent("voz.mts")))
+    }
 }

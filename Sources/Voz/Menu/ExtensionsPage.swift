@@ -142,14 +142,7 @@ struct ExtensionsPage: View {
             PanelRow(title: "New extension", detail: "Built by Claude Code") {
                 HStack(spacing: 8) {
                     IconButton(icon: .folderOpen, help: "Open extensions folder", action: model.openExtensionsFolder)
-                    Button {
-                        guard model.copyClaudeCommand() else { return }
-                        copiedCommand = true
-                        Task {
-                            try? await Task.sleep(for: .seconds(2))
-                            copiedCommand = false
-                        }
-                    } label: {
+                    Button(action: copyClaudeCommand) {
                         ZStack {
                             crossfading("Copy prompt", visible: !copiedCommand)
                             crossfading("Copied", visible: copiedCommand)
@@ -161,6 +154,15 @@ struct ExtensionsPage: View {
                     .animation(Theme.Motion.section, value: copiedCommand)
                 }
             }
+        }
+    }
+
+    private func copyClaudeCommand() {
+        guard model.copyClaudeCommand() else { return }
+        copiedCommand = true
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            copiedCommand = false
         }
     }
 
