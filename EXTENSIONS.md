@@ -1,6 +1,6 @@
 # Extensions
 
-> Extensions are TypeScript modules that change what Voz does with a dictation. Voz runs them with Bun in a separate process, so a crashed or slow extension never stops dictation. This file is the full guide, written so a coding agent can read it and build an extension with you.
+> Extensions are TypeScript modules that change what Voz does with a dictation. Voz runs them with Bun in a separate process, so a crashed or slow extension never stops dictation. A coding agent can read this file and build one with you.
 
 ## Build one with a coding agent
 
@@ -16,7 +16,7 @@ The agent interviews you first, then builds, loads and tests the extension with 
 
 ## Instructions for agents
 
-You help a Voz user turn an idea into a working extension. The user knows what bothers them about dictating. You know the API in this file. Together you find the smallest extension that fixes their problem.
+Help the user turn an idea into the smallest extension that fixes their problem. They know what bothers them about dictating. You know the API in this file.
 
 ### What extensions are for
 
@@ -30,7 +30,7 @@ Voz stays small: record, transcribe, clean up, insert. Extensions add everything
 
 ### Step 1: Interview the user
 
-Grill the user until you share one picture of the extension. Map the idea as a design tree, where each decision opens the decisions that depend on it. Ask in rounds. Each round holds every question you can ask now without guessing an earlier answer. Number the questions, give your recommended answer for each, and word each one so "yes" accepts your recommendation. Use your agent's question tool if it has one. Wait for the answers, then ask the next round.
+Ask in rounds until you and the user picture the same extension. Each round holds every question that doesn't depend on an unanswered one. Number the questions, give your recommended answer for each, and word each one so "yes" accepts it. Use your question tool if you have one.
 
 Work through these branches. Skip any the user already answered.
 
@@ -69,6 +69,7 @@ Put network calls and model calls in commands, actions, `afterInsert` or a regis
 - For one to share, or one that needs npm packages, run `voz new voz-<name>` in the user's code folder, then `voz dev voz-<name>`.
 - If `voz` is not on the PATH, use `/Applications/voz.app/Contents/MacOS/voz`.
 - Read the types in `~/.voz/node_modules/voz/index.d.ts`, or `voz.d.ts` in a package, before you write code.
+- For a package, set `apiVersion` in `package.json` as [Packages](#packages) describes.
 - Keep pure text logic in its own function so you can test it without Voz.
 
 ### Step 4: Verify
@@ -135,7 +136,7 @@ Voz reloads extensions when you save a file in `~/.voz/extensions`, a local pack
 | `voz.registerSpeechModel(model)`                | Adds a speech model to Settings. `model` has `id`, `name` and `transcribe(event, ctx)`, which returns `{ text }`.                                                                                                                                     |
 | `voz.registerCleanupModel(model)`               | Adds a cleanup model to Settings. `model` has `id`, `name` and `clean(event, ctx)`, which returns `{ text }`.                                                                                                                                         |
 | `voz.registerCleanupStep(step)`                 | Adds a cleanup step you can turn on in the extension's details. `step` has `id`, `name` and `run(event, ctx)`, which returns `{ text }` or nothing to keep the text.                                                                                  |
-| `voz.registerCommand(phrase, handler, options)` | Runs `handler` when a dictation ends with `phrase`. Voz inserts the words before the phrase, then runs the command. With `{ at: "start" }`, it runs when a dictation starts with `phrase`: Voz inserts nothing and passes the words after the phrase. Packages that use `at` set `"voz": { "apiVersion": 2 }`. |
+| `voz.registerCommand(phrase, handler, options)` | Runs `handler` when a dictation ends with `phrase`. Voz inserts the words before the phrase, then runs the command. With `{ at: "start" }`, it runs when a dictation starts with `phrase`: Voz inserts nothing and passes the words after the phrase. |
 | `voz.registerAction(action)`                    | Adds a button to the Actions group in the Voz panel. `action` has `id`, `name`, an optional `hotkey` such as `"ctrl+opt+j"`, and `run(ctx)`.                                                                                                          |
 | `voz.settings(schema)`                          | Adds a settings form to the extension's row in the Extensions page, and returns the values. See [Settings](#settings).                                                                                                                                |
 | `voz.name`                                      | The extension name: the file name, or the package name.                                                                                                                                                                                               |
@@ -196,7 +197,6 @@ voz.registerCommand(
 - Voz orders the output the way you order `properties`. Put the fields the model should decide first at the top
 - The model is small. Give it the facts it can't know, such as today's date or the list of valid names, and use `enum` for fixed choices. Do date math in code
 - It takes one to three seconds, so call it in a command, an action or `afterInsert`. It fails if the handler's time runs out, or if Apple Intelligence is off
-- Packages that call it set `"voz": { "apiVersion": 2 }`
 
 ## Settings
 
@@ -323,7 +323,7 @@ A package is a folder, git repo or npm package with extensions in it. Voz looks 
 
 Voz does not read `main`. A package with none of these fails to load with an error.
 
-Install and manage packages from the terminal. The `voz` binary is `/Applications/voz.app/Contents/MacOS/voz`.
+Install and manage packages from the terminal:
 
 ```
 voz install voz-jira
@@ -341,7 +341,7 @@ voz remove voz-jira
 - Packages only change when you run `voz update`. Voz never updates them on its own
 - Voz never runs install scripts
 - Installed packages are listed in `~/.voz/settings.json`
-- A package that needs a newer Voz sets `"voz": { "apiVersion": 2 }` in its `package.json`. Older Voz versions show "Update Voz" instead of loading it. Within one API version, Voz only adds to the API and never changes or removes what is there. Packages that declare API 1, or no version, still get what API 2 removed: `voz.config`, `voz.log`, `voz.events`, `voz.paths.home` and `{ handled: true }` from `beforeInsert`. New code uses `voz.settings`, `console.log` and `{ text: "" }`. `import { apiVersion } from "voz"` gives the version that runs
+- `"voz": { "apiVersion": 1 }` in `package.json` is the oldest API a package needs. Set `2` if it calls `ctx.generate` or uses `{ at: "start" }`. Older Voz versions show "Update Voz" instead of loading it. Within one API version, Voz only adds to the API and never changes or removes what is there. Packages that declare API 1, or no version, still get what API 2 removed: `voz.config`, `voz.log`, `voz.events`, `voz.paths.home` and `{ handled: true }` from `beforeInsert`. New code uses `voz.settings`, `console.log` and `{ text: "" }`. `import { apiVersion } from "voz"` gives the version that runs
 
 ## Settings file
 
@@ -379,8 +379,4 @@ The first time you install a package, or open Voz with an extension in `~/.voz/e
 
 Extensions run with your user's permissions. They can read your transcripts, your recordings, your files and the network. Voz does not sandbox them. Install only packages you trust, and read the source first.
 
-To limit risk, Voz:
-
-- Never runs install scripts, so installing a package does not run its code
-- Installs exact versions and updates only when you run `voz update`
-- Pins packages to a version or git ref when you ask
+Installing a package does not run its code, because Voz never runs install scripts. Voz installs exact versions and changes a package only when you run `voz update`.

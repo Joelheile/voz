@@ -8,10 +8,10 @@ Tap right Command and talk. Voz types clean text into any app.<br>
 Missing a feature? Tell your coding agent and it writes the extension.<br>
 Free and open source. Your audio never leaves your Mac.
 
+[![Star Voz on GitHub](https://img.shields.io/github/stars/Joelheile/voz?style=social&label=Star)](https://github.com/Joelheile/voz)
 [![License: MIT](https://img.shields.io/github/license/Joelheile/voz)](LICENSE)
 [![Latest release](https://img.shields.io/github/v/release/Joelheile/voz)](https://github.com/Joelheile/voz/releases/latest)
 ![macOS 26, Apple Silicon](https://img.shields.io/badge/macOS_26-Apple_Silicon-black)
-[![GitHub stars](https://img.shields.io/github/stars/Joelheile/voz)](https://github.com/Joelheile/voz/stargazers)
 
 [Website](https://voz.joels.tech), [Extensions](https://voz.joels.tech/extensions/)
 
@@ -31,7 +31,7 @@ curl -fsSL https://voz.joels.tech/install | bash
 
 Current builds use a project signing certificate and are not notarized by Apple.
 
-If Voz saves you some typing, [star the repo](https://github.com/Joelheile/voz) so more developers find it.
+If Voz saves you some typing, click **Star** at the top of [the repo page](https://github.com/Joelheile/voz). Stars are how other developers find Voz.
 
 ## Why I built Voz
 
@@ -45,9 +45,9 @@ So I built Voz the way pi works. The core records, transcribes, cleans up and ty
 
 ## How Voz fixes it
 
-- **Free and open source.** MIT licensed, no account, no weekly word limit.
-- **A tiny, fast core.** Record, transcribe, clean up, insert. Nothing else runs on your words.
-- **Extensions, not settings.** Build what you need, share it with others, and the core stays small.
+- Free and open source: MIT licensed, no account, no weekly word limit.
+- A small, fast core that records, transcribes, cleans up and inserts. Nothing else runs on your words.
+- Extensions in place of settings. Build what you need and share it, while the core stays small.
 
 ## You talk 150 words a minute, you type 40
 
@@ -68,7 +68,7 @@ Voz cuts the "um"s and fixes punctuation. It all runs on your Mac, so it works o
   <img src=".github/images/ready-light.png" width="380" alt="The Voz menu bar panel with recent transcripts">
 </picture>
 
-Voz records, transcribes, cleans up and types. It saves your history on your Mac. That is all the core does.
+The core records, transcribes, cleans up, types and saves your history on your Mac.
 
 - Lives in the menu bar
 - Click a transcript to copy it, search finds the rest
@@ -76,7 +76,7 @@ Voz records, transcribes, cleans up and types. It saves your history on your Mac
 
 ## Build the extensions you need, share them with everyone
 
-Instead of a setting for each wish, Voz has extensions: small TypeScript files in `~/.voz/extensions` that can use your apps, files, terminal and the network.
+Extensions are small TypeScript files in `~/.voz/extensions` that can use your apps, files, terminal and the network.
 
 ```ts
 import { defineExtension } from "voz";
@@ -95,7 +95,7 @@ Now "let's ship it, send it" types "Let's ship it" and presses Return. Some othe
 
 Extensions run with your permissions, so only install ones you trust. If one is slow or crashes, dictation keeps working.
 
-## Build extensions at the speed of thought
+## Let a coding agent write them
 
 You don't need to learn the API first. Tell a coding agent in `~/.voz` what you want. It reads the guide Voz keeps there and writes the extension. Voz loads it when you save. The full API is in [EXTENSIONS.md](EXTENSIONS.md).
 
@@ -108,8 +108,6 @@ Publish it to npm with the `voz-package` keyword and it shows up in Extensions f
 | [voz-smart-spacing](https://www.npmjs.com/package/voz-smart-spacing) | Adds the missing space when you dictate right after existing text |
 
 Install one from the menu bar, or run `voz install voz-meeting`. [Browse extensions](https://voz.joels.tech/extensions/) or [build your first one](https://voz.joels.tech/build-extension/).
-
-If you build something with Voz, star the repo. Stars are how other developers find it.
 
 ## Privacy
 

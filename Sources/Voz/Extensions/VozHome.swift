@@ -88,6 +88,7 @@ struct VozHome: Sendable {
         try Self.replace(types.appendingPathComponent("index.d.ts"), with: resources.appendingPathComponent("voz.d.ts"))
         try Data(#"{"name":"voz","private":true,"types":"index.d.ts"}"#.utf8).write(to: types.appendingPathComponent("package.json"))
         try Self.replace(root.appendingPathComponent("AGENTS.md"), with: resources.appendingPathComponent("AGENTS.md"))
+        try Data("@AGENTS.md\n".utf8).write(to: root.appendingPathComponent("CLAUDE.md"))
     }
 
     static func writeTypes(into folder: URL, from resources: URL) throws {
