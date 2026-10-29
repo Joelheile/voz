@@ -64,13 +64,15 @@ enum MediaFile {
         guard file.isFileURL, let type = UTType(filenameExtension: file.pathExtension) else { return false }
         let isAudioOrVideo = type.conforms(to: .audio) || type.conforms(to: .movie)
         guard isAudioOrVideo, readable.contains(AVFileType(rawValue: type.identifier)) else { return false }
-        return type != .mpeg2TransportStream || startsWithTransportStreamSync(file)
+        return !type.conforms(to: .mpeg2TransportStream) || startsWithTransportStreamPacket(file)
     }
 
-    private static func startsWithTransportStreamSync(_ file: URL) -> Bool {
+    // MPEG-TS packets start with the sync byte; AVCHD packets put a 4-byte timestamp before it
+    private static func startsWithTransportStreamPacket(_ file: URL) -> Bool {
         guard let handle = try? FileHandle(forReadingFrom: file) else { return false }
         defer { try? handle.close() }
-        return (try? handle.read(upToCount: 1))?.first == transportStreamSyncByte
+        guard let header = try? handle.read(upToCount: 5) else { return false }
+        return header.first == transportStreamSyncByte || (header.count == 5 && header.last == transportStreamSyncByte)
     }
 }
 

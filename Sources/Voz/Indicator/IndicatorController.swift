@@ -44,11 +44,7 @@ final class IndicatorController {
         model.recordingStart = .now
         model.recordingEnd = nil
         model.state = .recording
-        lifecycle = Task { [model] in
-            try? await Task.sleep(for: .milliseconds(16))
-            guard !Task.isCancelled else { return }
-            model.isExpanded = true
-        }
+        expandAfterPresenting()
     }
 
     func showTranscribing() {
@@ -81,11 +77,7 @@ final class IndicatorController {
         model.isDropTargeted = false
         model.state = .dropTarget
         panel.ignoresMouseEvents = false
-        lifecycle = Task { [model] in
-            try? await Task.sleep(for: .milliseconds(16))
-            guard !Task.isCancelled else { return }
-            model.isExpanded = true
-        }
+        expandAfterPresenting()
     }
 
     func endDropTarget() {
@@ -197,6 +189,14 @@ final class IndicatorController {
         case .discarded: Self.discardHold
         case .failed: Self.failureHold
         case .recording, .transcribing, .dropTarget: .zero
+        }
+    }
+
+    private func expandAfterPresenting() {
+        lifecycle = Task { [model] in
+            try? await Task.sleep(for: .milliseconds(16))
+            guard !Task.isCancelled else { return }
+            model.isExpanded = true
         }
     }
 

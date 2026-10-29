@@ -42,11 +42,10 @@ enum Headless {
             }
             return await CleanupEval.run(path: path, repeats: repeats, budget: .milliseconds(budget))
         }
-        if let path = value(of: "--transcribe", in: arguments), arguments.contains("--speakers") {
-            return await transcribeSpeakers(URL(fileURLWithPath: path), model: speechModel(in: arguments))
-        }
         if let path = value(of: "--transcribe", in: arguments) {
-            return await transcribe(URL(fileURLWithPath: path), arguments: arguments)
+            let url = URL(fileURLWithPath: path)
+            guard arguments.contains("--speakers") else { return await transcribe(url, arguments: arguments) }
+            return await transcribeSpeakers(url, model: speechModel(in: arguments))
         }
         if let seconds = value(of: "--measure-recorder", in: arguments).flatMap(Double.init) {
             return await measureRecorder(seconds: seconds)
