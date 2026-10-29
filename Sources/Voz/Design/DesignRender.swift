@@ -134,7 +134,8 @@ private final class Fixture {
         records = Self.makeRecords()
         for record in records { try history.insert(record) }
         for word in ["Joel", "Parakeet", "GRDB", "Sparkle", "Wispr Flow", "Heil-Escobar"] { try history.vocabulary.add(word, source: .manual) }
-        for word in ["Voz", "FluidAudio"] { try history.vocabulary.suggest(word) }
+        try history.vocabulary.add("superbass -> Supabase", source: .manual)
+        for (word, heard) in [("Voz", "voss"), ("FluidAudio", "fluid audio")] { try history.vocabulary.suggest(word, aliases: [heard]) }
         sources = PopoverSources(
             settings: settings,
             modelStatus: status,

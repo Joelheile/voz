@@ -63,6 +63,19 @@ final class HistoryStore: Sendable {
                 table.column("createdAt", .datetime).notNull()
             }
         }
+        migrator.registerMigration("v4-vocabulary-aliases") { database in
+            try database.alter(table: VocabularyWord.databaseTableName) { table in
+                table.add(column: "aliases", .text).notNull().defaults(to: "[]")
+            }
+            try database.alter(table: VocabularySuggestion.databaseTableName) { table in
+                table.add(column: "aliases", .text).notNull().defaults(to: "[]")
+            }
+        }
+        migrator.registerMigration("v5-vocabulary-replaces") { database in
+            try database.alter(table: VocabularyWord.databaseTableName) { table in
+                table.add(column: "replaces", .text).notNull().defaults(to: "[]")
+            }
+        }
         return migrator
     }
 

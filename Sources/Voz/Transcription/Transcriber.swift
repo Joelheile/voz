@@ -30,8 +30,8 @@ actor Transcriber {
         loaded?.model == model
     }
 
-    func prepareVocabulary(_ words: [String]) async throws {
-        try await booster.prepare(words: words)
+    func prepareVocabulary(_ terms: [VocabularyTerm]) async throws {
+        try await booster.prepare(terms: terms)
     }
 
     func prepare(_ model: SpeechModel) async throws {

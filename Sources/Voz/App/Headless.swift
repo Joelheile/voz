@@ -67,7 +67,7 @@ enum Headless {
         do {
             try await engine.prepare(model)
             if model != .appleSpeech {
-                try await transcriber.prepareVocabulary(words)
+                try await transcriber.prepareVocabulary(words.map { VocabularyTerm(word: $0, aliases: []) })
             }
             let loadSeconds = Date().timeIntervalSince(loadStart)
             let result = try await engine.transcribeFile(url, model: model, vocabulary: words)
