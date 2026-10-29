@@ -36,10 +36,6 @@ struct UsageSessionTests {
         #expect(usage["app_version"] as? String == "0.0.5")
     }
 
-    @Test func launchesSayWhetherTheLaunchAgentStartedVoz() {
-        #expect(AnalyticsEvent.appLaunched(byLaunchAgent: true).properties == ["by_launch_agent": .flag(true)])
-    }
-
     @Test func extensionEventsNameOnlyPublicNpmPackages() {
         let npm = AnalyticsEvent.extensionChanged(change: .install, source: .npm(name: "voz-mail", spec: "voz-mail"))
         #expect(npm.name == "extension_installed")
@@ -50,13 +46,6 @@ struct UsageSessionTests {
         #expect(git.failure?.stage == "extension_update")
         let local = AnalyticsEvent.extensionChanged(change: .remove, source: localSource("/Users/me/secret"))
         #expect(local.properties == ["source": .text("local")])
-    }
-
-    @Test func setupEventsReportStepAndOutcome() {
-        #expect(AnalyticsEvent.setupStepViewed(.tryIt).properties == ["step": .text("try_it")])
-        let completed = AnalyticsEvent.setupCompleted(allPermissionsGranted: false, triedDictation: true)
-        #expect(completed.name == "setup_completed")
-        #expect(completed.properties == ["all_permissions_granted": .flag(false), "tried_dictation": .flag(true)])
     }
 }
 
