@@ -2,6 +2,7 @@ import SwiftUI
 
 struct InsightsPage: View {
     @ObservedObject var model: StatsModel
+    @ObservedObject var settings: AppSettings
     let back: () -> Void
     @State private var period = StatsPeriod.week
     @State private var revealed = false
@@ -12,6 +13,12 @@ struct InsightsPage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             PageBar(title: "Insights", back: back)
+            if !settings.starPromptDismissed, model.stats[.all].words >= StarPromptCard.threshold {
+                StarPromptCard(words: model.stats[.all].words) {
+                    withAnimation(Theme.Motion.section) { settings.starPromptDismissed = true }
+                }
+                .transition(.opacity)
+            }
             StreakSection(stats: model.stats, revealed: revealed)
             VStack(alignment: .leading, spacing: 16) {
                 TabBar(tabs: StatsPeriod.allCases, selection: $period)
