@@ -1,8 +1,9 @@
 import SwiftUI
 
-struct PageBar: View {
+struct PageBar<Trailing: View>: View {
     let title: String
     let back: () -> Void
+    @ViewBuilder var trailing: Trailing
 
     var body: some View {
         HStack(spacing: 4) {
@@ -12,8 +13,15 @@ struct PageBar: View {
                 .font(.display(17))
                 .foregroundStyle(Theme.ink)
             Spacer(minLength: 0)
+            trailing
         }
         .padding(.leading, -6)
+    }
+}
+
+extension PageBar where Trailing == EmptyView {
+    init(title: String, back: @escaping () -> Void) {
+        self.init(title: title, back: back) { EmptyView() }
     }
 }
 

@@ -369,3 +369,11 @@ struct ExtensionHostTests {
         #expect(command.filter { $0 == "'" }.count == 2)
     }
 }
+
+@Test func displayNamesDropTheVozPrefix() {
+    #expect(ExtensionsModel.displayName("voz-apple-calendar") == "Apple Calendar")
+    #expect(ExtensionsModel.displayName("voz-things3") == "Things3")
+    #expect(ExtensionsModel.displayName("voz-mcp") == "MCP")
+    #expect(ExtensionsModel.displayName("@joel/voz-transcribe-file") == "Transcribe File")
+    #expect(ExtensionsModel.displayName("notes") == "Notes")
+}

@@ -3,6 +3,10 @@ import SwiftUI
 
 @MainActor
 final class ExtensionsModel: ObservableObject {
+    enum Tab: String, CaseIterable {
+        case installed = "Installed", browse = "Browse"
+    }
+
     enum Stage: Equatable {
         case gettingBun(Double), installing, updating, removing
 
@@ -47,11 +51,12 @@ final class ExtensionsModel: ObservableObject {
         listings = cached
         loading = cached.isEmpty
         refreshInstalled()
+        tab = installed.isEmpty ? .browse : .installed
     }
 
     @Published var query = ""
-    @Published var confirming: String?
-    @Published var expanded: String?
+    @Published var tab = Tab.installed
+    @Published var selected: String?
     @Published private(set) var listings: [PackageListing]
     @Published private(set) var installed: [InstalledExtension] = []
     @Published private(set) var disabled: [String] = []
@@ -67,6 +72,14 @@ final class ExtensionsModel: ObservableObject {
     var browseRows: [PackageListing] {
         let installedFromNpm = Set(installed.compactMap { $0.source.flatMap(Self.npmName(of:)) })
         return listings.filter { !installedFromNpm.contains($0.name) && matches($0.name, $0.summary, $0.publisher) }.ordered(by: .popular)
+    }
+
+    var selectedInstalled: InstalledExtension? {
+        installed.first { $0.name == selected }
+    }
+
+    var selectedListing: PackageListing? {
+        listings.first { $0.name == selected }
     }
 
     var updateCount: Int {
@@ -92,7 +105,7 @@ final class ExtensionsModel: ObservableObject {
         do {
             let data = try await fetch(Self.search)
             let found = try PackageListing.decodeSearch(data)
-            let pending = listings.filter { listing in listing.name == confirming && !found.contains { $0.name == listing.name } }
+            let pending = listings.filter { listing in listing.name == selected && !found.contains { $0.name == listing.name } }
             listings = found + pending
             message = nil
             if let cache { try? data.write(to: cache) }
@@ -104,9 +117,10 @@ final class ExtensionsModel: ObservableObject {
     }
 
     func reveal(_ name: String) async {
-        query = name
+        query = ""
         if installed.contains(where: { $0.name == name }) {
-            expanded = name
+            tab = .installed
+            selected = name
             return
         }
         if !listings.contains(where: { $0.name == name }) {
@@ -118,13 +132,13 @@ final class ExtensionsModel: ObservableObject {
                 return
             }
         }
-        confirming = name
+        tab = .browse
+        selected = name
     }
 
     func install(_ listing: PackageListing) async {
-        confirming = nil
         await install(.npm(name: listing.name, spec: listing.name), name: listing.name)
-        expanded = listing.name
+        if installed.contains(where: { $0.name == listing.name }) { tab = .installed }
     }
 
     func update(_ item: InstalledExtension) async {
@@ -134,9 +148,9 @@ final class ExtensionsModel: ObservableObject {
 
     func remove(_ item: InstalledExtension) async {
         guard let source = item.source else { return }
-        if expanded == item.name { expanded = nil }
         await run(item.name, .removing, change: .remove, source: source) { _ in try await PackageCLI.remove(source.name) }
         guard message == nil else { return }
+        selected = nil
         removed = source
         undoExpiry?.cancel()
         undoExpiry = Task { [weak self] in
@@ -183,10 +197,6 @@ final class ExtensionsModel: ObservableObject {
 
     func isEnabled(_ name: String) -> Bool {
         !disabled.contains(name)
-    }
-
-    func toggleExpanded(_ name: String) {
-        expanded = expanded == name ? nil : name
     }
 
     func openExtensionsFolder() {
@@ -272,6 +282,14 @@ final class ExtensionsModel: ObservableObject {
     private func listing(for source: PackageSource?) -> PackageListing? {
         guard let name = source.flatMap(Self.npmName(of:)) else { return nil }
         return listings.first { $0.name == name }
+    }
+
+    nonisolated static func displayName(_ name: String) -> String {
+        let base = name.split(separator: "/").last.map(String.init) ?? name
+        let words = (base.hasPrefix("voz-") ? String(base.dropFirst(4)) : base).split(separator: "-")
+        return words.map { word in
+            word.contains(where: "aeiouy".contains) ? word.prefix(1).uppercased() + word.dropFirst() : word.uppercased()
+        }.joined(separator: " ")
     }
 
     private static func npmName(of source: PackageSource) -> String? {
