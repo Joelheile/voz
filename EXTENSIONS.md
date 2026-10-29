@@ -341,7 +341,7 @@ voz remove voz-jira
 - Packages only change when you run `voz update`. Voz never updates them on its own
 - Voz never runs install scripts
 - Installed packages are listed in `~/.voz/settings.json`
-- A package that needs a newer Voz sets `"voz": { "apiVersion": 2 }` in its `package.json`. Older Voz versions show "Update Voz" instead of loading it. Within one API version, Voz only adds to the API and never changes or removes what is there. `import { apiVersion } from "voz"` gives the version that runs
+- A package that needs a newer Voz sets `"voz": { "apiVersion": 2 }` in its `package.json`. Older Voz versions show "Update Voz" instead of loading it. Within one API version, Voz only adds to the API and never changes or removes what is there. Packages that declare API 1, or no version, still get what API 2 removed: `voz.config`, `voz.log`, `voz.events`, `voz.paths.home` and `{ handled: true }` from `beforeInsert`. New code uses `voz.settings`, `console.log` and `{ text: "" }`. `import { apiVersion } from "voz"` gives the version that runs
 
 ## Settings file
 

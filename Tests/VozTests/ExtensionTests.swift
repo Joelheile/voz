@@ -257,6 +257,24 @@ struct ExtensionHostTests {
         await host.stop()
     }
 
+    @Test func apiVersionOnePackagesKeepTheApiTheyWereWrittenFor() async throws {
+        try writeFile(#"{"config":{"old":{"suffix":"!"}}}"#, named: "settings.json", in: home.root)
+        try extensionFile("say.ts", #"export default (voz) => voz.on("beforeInsert", (e) => { voz.events.emit("seen", e.text) })"#)
+        let old = home.packages.appendingPathComponent("node_modules/old")
+        try writeFile(#"{"name":"old","voz":{"apiVersion":1}}"#, named: "package.json", in: old)
+        try writeFile(#"export default (voz) => { let seen = ""; voz.events.on("seen", (t) => { seen = t }); voz.log("loaded"); voz.on("beforeInsert", () => seen === "stop" ? { handled: true } : { text: `${seen}${voz.config.suffix} ${typeof voz.paths.home}` }) }"#, named: "index.ts", in: old)
+        let new = home.packages.appendingPathComponent("node_modules/new")
+        try writeFile(#"{"name":"new","voz":{"apiVersion":2}}"#, named: "package.json", in: new)
+        try writeFile(#"export default (voz) => voz.on("beforeInsert", (e) => ({ text: `${e.text} ${typeof voz.events}` }))"#, named: "index.ts", in: new)
+        let host = makeHost(packages: [old.path, new.path])
+        let manifest = try await host.start()
+        #expect(manifest.errors.isEmpty)
+        #expect(manifest.extensions == ["say", "old", "new"])
+        #expect(await host.beforeInsert(text: "hi", raw: "hi", app: app, timeout: .seconds(2)) == "hi! string undefined")
+        #expect(await host.beforeInsert(text: "stop", raw: "stop", app: app, timeout: .seconds(2)) == "")
+        await host.stop()
+    }
+
     @Test func hostProcessNeverOutlivesVoz() async throws {
         try extensionFile("timer.ts", "export default () => { setInterval(() => {}, 1000) }")
         #expect(try await !hostOutlivesClosedInput(home: home))
