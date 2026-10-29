@@ -21,6 +21,12 @@ enum DesignRender {
             for (title, page) in pages {
                 try write(fixture.popover(page: page), to: outputDirectory, name: "popover-\(title)-\(suffix)", appearance: appearance)
             }
+            fixture.sources.extensions.selected = "voz-tone"
+            try write(fixture.popover(page: .extensions), to: outputDirectory, name: "popover-extension-detail-\(suffix)", appearance: appearance)
+            fixture.sources.extensions.selected = nil
+            fixture.sources.vocabulary.draft = "Kowalski"
+            try write(fixture.popover(page: .dictionary), to: outputDirectory, name: "popover-dictionary-adding-\(suffix)", appearance: appearance)
+            fixture.sources.vocabulary.draft = ""
             try write(PermissionTileView(close: {}), to: outputDirectory, name: "permission-tile-\(suffix)", appearance: appearance)
             for (title, settled, latest) in previewTexts {
                 for (style, hasNotch) in [("notch", true), ("floating", false)] {
