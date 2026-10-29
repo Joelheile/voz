@@ -108,7 +108,6 @@ struct FileTranscriber: Sendable {
         )
     }
 
-    // Nemotron 3 Diarization, 8-bit and Neural Engine only: 95 MB, 9.6% DER on AMI
     private static let diarizerConfig = Nemotron3Config(
         chunkLen: 128, chunkRightContext: 4, fifoLen: 40, spkcacheUpdatePeriod: 40,
         modelFileName: "Nemotron3Diarizer_c128_split_w8a8.mlmodelc", splitGraph: true

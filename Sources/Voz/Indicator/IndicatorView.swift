@@ -131,7 +131,7 @@ struct IndicatorView: View {
 
     @ViewBuilder private var preview: some View {
         if model.state == .dropTarget {
-            DropPrompt(isTargeted: model.isDropTargeted, swells: !reduceMotion)
+            DropPrompt(isTargeted: model.isDropTargeted, swells: !reduceMotion, showsIcons: layout.style == .floating)
         } else {
             TranscriptPreview(text: model.preview)
                 .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { model.previewFrame = $0 }
@@ -192,7 +192,7 @@ struct IndicatorView: View {
 
     private var pill: some View {
         VStack(spacing: IndicatorLayout.pillGap) {
-            pillBody
+            if model.state != .dropTarget { pillBody }
             if showsPreview {
                 preview
                     .padding(14)
@@ -204,6 +204,7 @@ struct IndicatorView: View {
         .padding(.top, IndicatorLayout.shadowMargin)
         .dropDestination(for: URL.self) { files, _ in acceptsDrop(files) } isTargeted: { model.isDropTargeted = $0 }
         .animation(previewAnimation, value: model.preview)
+        .animation(swellAnimation, value: model.isDropTargeted)
     }
 
     private func floatingSurface(_ shape: some InsettableShape) -> some View {
@@ -289,8 +290,7 @@ struct IndicatorLeading: View {
 
     var body: some View {
         if model.state == .dropTarget {
-            Image(systemName: "waveform")
-                .font(.system(size: 13, weight: .semibold))
+            Icon(.audioLines, size: 15, strokeWidth: 2)
                 .foregroundStyle(.primary.opacity(0.9))
         } else {
             timer
@@ -323,15 +323,11 @@ struct IndicatorTrailing: View {
             case .transcribing:
                 ProgressDots().transition(swap)
             case .done:
-                ResultSymbol(name: "checkmark", color: .primary, effect: .drawOn).transition(swap)
+                ResultSymbol(icon: .check, color: .primary, effect: .reveal).transition(swap)
             case .failed:
-                ResultSymbol(name: "exclamationmark", color: .orange, effect: .bounce).transition(swap)
+                ResultSymbol(icon: .triangleAlert, color: .orange, effect: .bounce).transition(swap)
             case .dropTarget:
-                Image(systemName: "arrow.down")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.primary.opacity(model.isDropTargeted ? 1 : 0.6))
-                    .symbolEffect(.bounce, value: model.isDropTargeted)
-                    .transition(swap)
+                DropArrow(isTargeted: model.isDropTargeted, moves: !reduceMotion).transition(swap)
             }
         }
         .animation(reduceMotion ? IndicatorMotion.reducedMotion : IndicatorMotion.stateSwap, value: model.state)
@@ -347,12 +343,33 @@ struct DropPrompt: View {
 
     let isTargeted: Bool
     let swells: Bool
+    let showsIcons: Bool
 
     var body: some View {
-        Text("Drop to transcribe")
-            .font(.ui(13))
-            .foregroundStyle(.primary.opacity(isTargeted ? 1 : 0.7))
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, isTargeted && swells ? Self.swellHeight : 0)
+        HStack(spacing: 0) {
+            if showsIcons {
+                Icon(.audioLines, size: 15, strokeWidth: 2)
+                    .foregroundStyle(.primary.opacity(isTargeted ? 1 : 0.6))
+                    .scaleEffect(isTargeted && swells ? 1.1 : 1)
+            }
+            Text("Drop to transcribe")
+                .font(.ui(13))
+                .foregroundStyle(.primary.opacity(isTargeted ? 1 : 0.7))
+                .frame(maxWidth: .infinity)
+            if showsIcons { DropArrow(isTargeted: isTargeted, moves: swells) }
+        }
+        .padding(.vertical, isTargeted && swells ? Self.swellHeight : 0)
+    }
+}
+
+struct DropArrow: View {
+    let isTargeted: Bool
+    let moves: Bool
+
+    var body: some View {
+        Icon(.arrowDown, size: 15, strokeWidth: 2.25)
+            .foregroundStyle(.primary.opacity(isTargeted ? 1 : 0.6))
+            .offset(y: isTargeted && moves ? 2 : 0)
+            .animation(.easeOut(duration: 0.16), value: isTargeted)
     }
 }
