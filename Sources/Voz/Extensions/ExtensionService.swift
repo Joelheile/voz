@@ -79,8 +79,8 @@ final class ExtensionService {
     private static let maxRestarts = 3
     private static let watchdogInterval: Duration = .seconds(5)
     private static let pingTimeout: Duration = .seconds(2)
-    private static let eventTimeout: Duration = .seconds(30)
-    private static let audioDropTimeout: Duration = .seconds(1800)
+    /// Actions and events that nothing waits for run until they finish. A day stands in for no limit.
+    private static let untimed: Duration = .seconds(86_400)
     private static let healthyUptime: Duration = .seconds(60)
     nonisolated private static let audioDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("voz-extension-audio", isDirectory: true)
     nonisolated static let resources = Bundle.main.resourceURL!.appendingPathComponent("Extensions", isDirectory: true)
@@ -229,7 +229,7 @@ final class ExtensionService {
                 Log.extensions.error("Recording file write failed: \(error.localizedDescription, privacy: .public)")
                 return
             }
-            await host.emit(.afterRecording(path: file.path, seconds: seconds), app: app, timeout: Self.eventTimeout)
+            await host.emit(.afterRecording(path: file.path, seconds: seconds), app: app, timeout: Self.untimed)
         }
     }
 
@@ -242,7 +242,7 @@ final class ExtensionService {
 
     func inserted(_ text: String, raw: String, app: HostApp) {
         guard let host, manifest?.subscribes(to: .afterInsert) == true else { return }
-        Task { await host.emit(.afterInsert(text: text, raw: raw), app: app, timeout: Self.eventTimeout) }
+        Task { await host.emit(.afterInsert(text: text, raw: raw), app: app, timeout: Self.untimed) }
     }
 
     var acceptsAudioDrops: Bool {
@@ -251,7 +251,7 @@ final class ExtensionService {
 
     func dropAudio(_ file: URL) async -> Bool {
         guard let host else { return false }
-        return await host.emit(.audioDrop(path: file.path), app: .current, timeout: Self.audioDropTimeout)
+        return await host.emit(.audioDrop(path: file.path), app: .current, timeout: Self.untimed)
     }
 
     func run(_ command: VoiceCommandMatch, app: HostApp) {
@@ -269,7 +269,7 @@ final class ExtensionService {
         guard let host else { return }
         let app = HostApp.current
         Task {
-            if await !host.runAction(action.id, app: app, timeout: Self.commandTimeout) { toast.show("\(action.name) failed") }
+            if await !host.runAction(action.id, app: app, timeout: Self.untimed) { toast.show("\(action.name) failed") }
         }
     }
 

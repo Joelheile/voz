@@ -237,7 +237,7 @@ voz.on("audioDrop", async ({ path }, ctx) => {
 - Voz reads the formats AVFoundation reads: audio such as MP3, M4A, WAV, AIFF and FLAC, and video such as MP4, MOV and M4V, where it uses only the sound. It rejects MKV and WebM
 - It takes about a second per minute of audio, plus a few seconds the first time to load the models. The first diarization downloads a 95 MB model
 - It fails when the user picked Apple speech in Settings
-- Call it in `audioDrop`, a command or an action. An `audioDrop` handler has 30 minutes. If it throws, the notch shows an error
+- Call it in `audioDrop`, a command or an action. If an `audioDrop` handler throws, the notch shows an error
 
 ## Settings
 
@@ -288,7 +288,7 @@ voz.registerAction({
 });
 ```
 
-The hotkey uses the same keys as `ctx.press`. If another app holds the hotkey, Voz shows a message and the button still works. An action has 10 seconds, like a command.
+The hotkey uses the same keys as `ctx.press`. If another app holds the hotkey, Voz shows a message and the button still works. An action runs until it finishes, so it can record or transcribe for as long as it needs.
 
 ## Per-app prompts
 
@@ -349,7 +349,7 @@ Voz splits a dictation at pauses and transcribes and cleans up each part while y
 - A cleanup model shares the cleanup budget with the other steps: Voz waits at most 1.5 seconds after you stop talking. If it fails, runs over or changes the meaning, Voz uses the text from the other steps
 - A cleanup step has 300 ms, or less if the 1.5 second cleanup budget runs out first. If it fails or runs over, Voz keeps the text from the step before
 - If the cleanup budget runs out before a part is done, Voz uses the built-in steps only for that part
-- A command has 10 seconds, including the time `ctx.generate` takes. `recording` and `afterInsert` handlers have 30 seconds, `audioDrop` handlers 30 minutes
+- A command has 10 seconds, including the time `ctx.generate` takes. Actions and `recording`, `afterInsert` and `audioDrop` handlers have no time limit, because nothing waits for them
 - Each extension has 3 seconds to load. After that, Voz reports it as failed and loads the next one
 - If a handler throws or a promise rejects unhandled, Voz logs the error and skips that handler
 - `ctx.insert`, `ctx.press` and `ctx.notify` do nothing once a handler has finished or run out of time. Voz logs each dropped call, so `voz dev` shows it. Await your work before the handler returns
