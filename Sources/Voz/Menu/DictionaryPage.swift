@@ -5,26 +5,32 @@ struct DictionaryPage: View {
     let back: () -> Void
     @FocusState private var draftFocused: Bool
 
-    private var query: String { model.draft.trimmingCharacters(in: .whitespaces) }
+    private var entry: (heard: String?, word: String) { VocabularyRule.parse(model.draft) }
 
     private var words: [VocabularyWord] {
         model.snapshot.words
-            .filter { query.isEmpty || $0.word.localizedCaseInsensitiveContains(query) }
+            .filter { matches($0.word) || $0.replaces.contains(where: matches) }
             .sorted { $0.word.localizedCaseInsensitiveCompare($1.word) == .orderedAscending }
     }
 
     private var suggestions: [VocabularySuggestion] {
-        model.snapshot.suggestions.filter { query.isEmpty || $0.word.localizedCaseInsensitiveContains(query) }
+        model.snapshot.suggestions.filter { matches($0.word) || $0.aliases.contains(where: matches) }
     }
 
     private var canAdd: Bool {
-        !query.isEmpty && !model.snapshot.words.contains { $0.word.caseInsensitiveCompare(query) == .orderedSame }
+        guard !entry.word.isEmpty else { return false }
+        let isRule = entry.heard != nil
+        return isRule || !model.snapshot.words.contains { $0.word.caseInsensitiveCompare(entry.word) == .orderedSame }
+    }
+
+    private func matches(_ text: String) -> Bool {
+        entry.word.isEmpty || text.localizedCaseInsensitiveContains(entry.word)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             PageBar(title: "Dictionary", back: back)
-            PageNote(text: "Names and terms Voz spells the way you enter them.")
+            PageNote(text: "Names and terms Voz spells the way you enter them. Type voss → Voz to fix a word it mishears.")
             field
             CappedScrollView(maxHeight: 380) {
                 VStack(alignment: .leading, spacing: 16) {
@@ -50,7 +56,7 @@ struct DictionaryPage: View {
             if canAdd {
                 Button("Add", action: model.addDraft)
                     .buttonStyle(.pill(.accent, .small))
-                    .help("Add \(query) (Return)")
+                    .help("Add \(entry.word) (Return)")
                     .padding(.trailing, -8)
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))
             }
@@ -64,7 +70,7 @@ struct DictionaryPage: View {
             SectionLabel(text: "Suggested from your edits")
             FlowLayout(spacing: 6) {
                 ForEach(suggestions) { suggestion in
-                    SuggestionBadge(word: suggestion.word, add: { model.accept(suggestion) }, dismiss: { model.dismiss(suggestion) })
+                    SuggestionBadge(heard: Array(suggestion.aliases.prefix(1)), word: suggestion.word, add: { model.accept(suggestion) }, dismiss: { model.dismiss(suggestion) })
                 }
             }
         }
@@ -80,7 +86,7 @@ struct DictionaryPage: View {
         } else if !words.isEmpty {
             FlowLayout(spacing: 6) {
                 ForEach(words) { word in
-                    WordChip(word: word.word) { model.remove(word) }
+                    WordChip(heard: word.replaces, word: word.word) { model.remove(word) }
                 }
             }
         }
@@ -88,6 +94,7 @@ struct DictionaryPage: View {
 }
 
 private struct SuggestionBadge: View {
+    let heard: [String]
     let word: String
     let add: () -> Void
     let dismiss: () -> Void
@@ -98,7 +105,8 @@ private struct SuggestionBadge: View {
             Button(action: add) {
                 HStack(spacing: 5) {
                     Icon(.plus, size: 12)
-                    Text(word).font(.ui(13, weight: .medium))
+                    Mapping(heard: heard, word: word, heardStyle: Theme.accent.opacity(0.7))
+                        .fontWeight(.medium)
                 }
                 .padding(.leading, 10)
                 .padding(.trailing, 6)
@@ -126,13 +134,15 @@ private struct SuggestionBadge: View {
 }
 
 private struct WordChip: View {
+    let heard: [String]
     let word: String
     let remove: () -> Void
     @State private var hovering = false
 
     var body: some View {
         HStack(spacing: 6) {
-            Text(word).font(.ui(13)).foregroundStyle(Theme.ink)
+            Mapping(heard: heard, word: word, heardStyle: Theme.inkSecondary)
+                .foregroundStyle(Theme.ink)
             Button(action: remove) {
                 Icon(.x, size: 11)
                     .foregroundStyle(hovering ? Theme.ink : Theme.inkTertiary)
@@ -146,5 +156,23 @@ private struct WordChip: View {
         .background(Theme.selected.opacity(hovering ? 1 : 0.6), in: Capsule())
         .onHover { hovering = $0 }
         .animation(Theme.Motion.hover, value: hovering)
+    }
+}
+
+private struct Mapping: View {
+    let heard: [String]
+    let word: String
+    let heardStyle: Color
+
+    var body: some View {
+        HStack(spacing: 5) {
+            if !heard.isEmpty {
+                Text(heard.joined(separator: ", ")).foregroundStyle(heardStyle)
+                Icon(.arrowRight, size: 11).foregroundStyle(heardStyle)
+            }
+            Text(word)
+        }
+        .font(.ui(13))
+        .lineLimit(1)
     }
 }

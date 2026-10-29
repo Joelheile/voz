@@ -22,6 +22,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         fileTranscriber: FileTranscriber(transcriber: transcriber)
     )
     private var vocabularyWords: [String] = []
+    private lazy var vocabularyLearner = VocabularyLearner(
+        store: history.vocabulary,
+        hear: { [transcriber, settings] in await SpokenWord.hear($0, transcriber: transcriber, settings: settings) }
+    )
     private lazy var dictation = Dictation(
         pipeline: DictationPipeline(
             engine: speechEngine,
@@ -29,7 +33,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             settings: settings,
             history: history,
             output: output,
-            editObserver: EditObserver(vocabulary: history.vocabulary),
+            editObserver: EditObserver(learner: vocabularyLearner),
+            vocabularyLearner: vocabularyLearner,
             analytics: analytics,
             extensions: extensions
         ),
@@ -246,18 +251,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func syncVocabulary() {
-        let words: [String]
+        let terms: [VocabularyTerm]
         do {
-            words = try history.vocabulary.words()
+            terms = try history.vocabulary.terms()
         } catch {
             Log.app.error("Vocabulary read failed: \(error.localizedDescription, privacy: .private)")
             return
         }
+        let words = terms.map(\.word)
         vocabularyWords = words
         cleaner.prewarm(prompt: settings.cleanupPrompt, vocabulary: words)
         Task {
             do {
-                try await transcriber.prepareVocabulary(words)
+                try await transcriber.prepareVocabulary(terms)
             } catch {
                 Log.app.error("Vocabulary boosting setup failed: \(error.localizedDescription, privacy: .private)")
             }
