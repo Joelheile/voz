@@ -181,7 +181,7 @@ final class ExtensionsModel: ObservableObject {
         do {
             return try home.config(for: name)
         } catch {
-            message = "\(error)"
+            Log.app.error("Could not read extension settings: \(String(describing: error), privacy: .private)")
             return [:]
         }
     }

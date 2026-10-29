@@ -47,7 +47,6 @@ private struct ExtensionList: View {
                     .buttonStyle(.pill(.accent, .small))
                     .fixedSize()
                     .help("Copy a prompt that has Claude Code build an extension with you")
-                    .animation(Theme.Motion.section, value: copiedCommand)
                 }
             }
             SearchField(text: $model.query, prompt: "Search extensions", focused: $searchFocused)
@@ -152,6 +151,7 @@ private struct ExtensionList: View {
             Spacer(minLength: 0)
             Button("Undo") { Task { await model.undoRemove() } }
                 .buttonStyle(.pill(.quiet, .small))
+                .disabled(model.working != nil)
         }
         .transition(.opacity)
     }
@@ -416,7 +416,7 @@ private struct InstalledDetail: View {
                 }
                 ForEach(actions, id: \.self) { action in
                     PanelRow(title: action.name) {
-                        if let hotkey = action.hotkey.flatMap({ try? KeyChord(parsing: $0).label }) {
+                        if let hotkey = action.hotkeyLabel {
                             Text(hotkey).font(.ui(12)).foregroundStyle(Theme.inkTertiary)
                         }
                     }

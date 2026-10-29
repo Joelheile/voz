@@ -115,4 +115,13 @@ import Testing
         ])
         #expect(try vocabulary.words() == ["Mastra", "Supabase", "Voz"])
     }
+
+    @Test func anArrowWithoutAHeardFormOrOnlyACaseChangeAddsNoRule() throws {
+        let vocabulary = try HistoryStore().vocabulary
+        try vocabulary.add("-> Grok", source: .manual)
+        try vocabulary.add("voz -> Voz", source: .manual)
+        try vocabulary.add("->", source: .manual)
+        #expect(try vocabulary.rules().isEmpty)
+        #expect(try vocabulary.words() == ["Grok", "Voz"])
+    }
 }

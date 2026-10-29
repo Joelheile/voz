@@ -42,6 +42,21 @@ enum DesignRender {
                     )
                 }
             }
+            for (title, state, targeted) in indicatorStates {
+                for (style, hasNotch) in [("notch", true), ("floating", false)] {
+                    let model = IndicatorModel()
+                    model.isExpanded = true
+                    model.state = state
+                    model.isDropTargeted = targeted
+                    try write(
+                        IndicatorView(model: model, layout: previewLayout(hasNotch: hasNotch))
+                            .environment(\.colorScheme, hasNotch || name == .darkAqua ? .dark : .light),
+                        to: outputDirectory,
+                        name: "indicator-\(style)-\(title)-\(suffix)",
+                        appearance: appearance
+                    )
+                }
+            }
             for step in SetupStep.allCases {
                 fixture.sources.setup.step = step
                 try write(fixture.popover(needsSetup: true), to: outputDirectory, name: "popover-setup-\(step)-\(suffix)", appearance: appearance)
@@ -62,6 +77,13 @@ enum DesignRender {
         ("short", "", "Let's move the review to Thursday afternoon."),
         ("long", String(repeating: "Keep the latest words visible as the recording gets longer. ", count: 6), "These are the words you just said."),
         ("multilingual", "Morgen besprechen wir Voz und die nächsten Schritte. ", "然后继续讨论我们的计划。"),
+    ]
+
+    private static let indicatorStates: [(String, IndicatorState, Bool)] = [
+        ("done", .done, false),
+        ("failed", .failed, false),
+        ("drop", .dropTarget, false),
+        ("drop-targeted", .dropTarget, true),
     ]
 
     private static func previewLayout(hasNotch: Bool) -> IndicatorLayout {
@@ -93,7 +115,7 @@ enum DesignRender {
         let window = NSWindow(contentRect: host.frame, styleMask: .borderless, backing: .buffered, defer: false)
         window.appearance = appearance
         window.contentView = host
-        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
         host.layoutSubtreeIfNeeded()
         guard let rep = NSBitmapImageRep(
             bitmapDataPlanes: nil,

@@ -22,6 +22,14 @@ One SwiftPM executable target, `Sources/Voz`, grouped by feature. `Tests/VozTest
 - Keep the native menu bar UI and its theme. Add optional behavior through extension primitives.
 - Test files cannot import `Testing` and `Foundation` together under the Command Line Tools. Put Foundation helpers in `Tests/VozTests/TestSupport.swift`.
 
+## Design
+
+- Every element earns its place. Signal only states that need attention, such as recording. Keep nav icons visible.
+- Use Lucide icons through `Icon`, not SF Symbols. Use stroke 1.25 in the popover and 2 to 2.25 in the indicator.
+- Take colors, radii and motion from `Theme`. Reuse `PanelGroup`, `PanelRow`, `IconButton` and the `.pill` and `.pressable` styles before you add a component.
+- Motion gives feedback or shows a state change, never decoration. Keep it under 300ms and use ease-out or a spring with bounce 0.3 or less. Don't move anything on hover; change only color or background. Under Reduce Motion, keep opacity changes and drop movement.
+- Check UI changes with `.build/debug/Voz --render-design <new dir>` in light and dark.
+
 ## Verify
 
 - `scripts/test.sh`: tests, including Bun integration when Bun is installed.

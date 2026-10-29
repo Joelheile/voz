@@ -47,6 +47,8 @@ struct ExtensionAction: Decodable, Equatable, Hashable, Sendable {
     let name: String
     let hotkey: String?
     let `extension`: String
+
+    var hotkeyLabel: String? { hotkey.flatMap { try? KeyChord(parsing: $0).label } }
 }
 
 struct ExtensionSettings: Decodable, Equatable, Sendable {

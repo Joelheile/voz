@@ -246,7 +246,7 @@ private struct HomePage: View {
                     Button(action.name) { catalog.run(action) }
                         .buttonStyle(.pill(.accent, .small))
                         .fixedSize()
-                        .help(action.hotkey.flatMap { try? KeyChord(parsing: $0).label } ?? action.name)
+                        .help(action.hotkeyLabel ?? action.name)
                 }
             }
             Spacer(minLength: 8)
