@@ -16,8 +16,8 @@ struct DebugLog: Sendable {
         var entry = fields
         entry["step"] = step
         entry["time"] = Date.ISO8601FormatStyle(includingFractionalSeconds: true).format(.now)
-        guard var line = try? JSONSerialization.data(withJSONObject: entry, options: [.sortedKeys, .withoutEscapingSlashes]) else { return }
-        line.append(0x0A)
+        guard let json = try? JSONSerialization.data(withJSONObject: entry, options: [.sortedKeys, .withoutEscapingSlashes]) else { return }
+        let line = json + [0x0A]
         let file = file, previousFile = previousFile
         Self.queue.async { Self.append(line, to: file, rotatingTo: previousFile) }
     }
