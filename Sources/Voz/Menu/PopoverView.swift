@@ -78,9 +78,9 @@ private struct HomePage: View {
     @ObservedObject var extensions: ExtensionsModel
     @FocusState private var searchFocused: Bool
     @State private var selectedID: UUID?
-    @State private var totalWords = 0
+    @State private var usage: UsageStats?
 
-    private var showsStar: Bool { !settings.starPromptDismissed && totalWords >= StarButton.milestoneWords }
+    private var milestone: Milestone? { usage.flatMap { Milestone.unseen(in: $0, seen: settings.milestonesSeen) } }
 
     private var records: [TranscriptRecord] { history.records }
     private var isSearching: Bool { !history.query.isEmpty }
@@ -103,10 +103,8 @@ private struct HomePage: View {
                 footer
             }
         }
-        .onAppear {
-            searchFocused = showsSearch
-            totalWords = history.totalWords()
-        }
+        .onAppear { searchFocused = showsSearch }
+        .task { usage = await history.usage() }
         .onChange(of: history.query) { selectedID = nil }
     }
 
@@ -265,6 +263,11 @@ private struct HomePage: View {
         }
     }
 
+    private func markMilestonesSeen() {
+        guard let usage else { return }
+        settings.milestonesSeen = Milestone.markingSeen(in: usage, seen: settings.milestonesSeen)
+    }
+
     private var footer: some View {
         HStack(spacing: 2) {
             HStack(spacing: 6) {
@@ -274,13 +277,25 @@ private struct HomePage: View {
                         .fixedSize()
                         .help(action.hotkeyLabel ?? action.name)
                 }
-                if showsStar {
-                    StarButton(title: "Star on GitHub") { settings.starPromptDismissed = true }
+                if let milestone {
+                    MilestoneBadge(milestone: milestone) {
+                        markMilestonesSeen()
+                        model.page = .insights
+                    }
+                    if !settings.starPromptDismissed {
+                        StarButton(title: "Star") {
+                            settings.starPromptDismissed = true
+                            markMilestonesSeen()
+                        }
+                    }
                 }
             }
             Spacer(minLength: 8)
             IconButton(icon: .bookA, help: "Dictionary") { model.page = .dictionary }
-            IconButton(icon: .chartNoAxesColumn, help: "Insights") { model.page = .insights }
+            IconButton(icon: .chartNoAxesColumn, help: "Insights") {
+                markMilestonesSeen()
+                model.page = .insights
+            }
             IconButton(icon: .puzzle, help: extensionsHelp) { model.page = .extensions }
                 .overlay(alignment: .topTrailing) {
                     if extensions.updateCount > 0 {
@@ -468,5 +483,29 @@ private struct IndeterminateBar: View {
         .animation(.easeInOut(duration: 0.9).repeatForever(), value: sweeping)
         .onAppear { sweeping = !reduceMotion }
         .accessibilityLabel("Preparing")
+    }
+}
+
+private struct MilestoneBadge: View {
+    let milestone: Milestone
+    let open: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: open) {
+            HStack(spacing: 6) {
+                Icon(.partyPopper, size: 14)
+                    .foregroundStyle(Theme.accent)
+                Text(milestone.title)
+                    .font(.ui(12, weight: .medium))
+                    .foregroundStyle(hovering ? Theme.ink : Theme.inkSecondary)
+                    .fixedSize()
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("See your Insights")
+        .onHover { hovering = $0 }
+        .animation(Theme.Motion.hover, value: hovering)
     }
 }

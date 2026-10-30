@@ -17,6 +17,7 @@ private enum SettingsKey {
     static let errorReportsEnabled = "errorReportsEnabled"
     static let cleanupPrompt = "cleanupPrompt"
     static let starPromptDismissed = "starPromptDismissed"
+    static let milestonesSeen = "milestonesSeen"
     static let logIncludesText = "logIncludesText"
 }
 
@@ -63,6 +64,9 @@ final class AppSettings: ObservableObject {
     }
     @Published var starPromptDismissed: Bool {
         didSet { defaults.set(starPromptDismissed, forKey: SettingsKey.starPromptDismissed) }
+    }
+    @Published var milestonesSeen: [String: Int] {
+        didSet { defaults.set(milestonesSeen, forKey: SettingsKey.milestonesSeen) }
     }
     @Published var cleanupEnabled: Bool {
         didSet { defaults.set(cleanupEnabled, forKey: SettingsKey.cleanupEnabled) }
@@ -128,6 +132,7 @@ final class AppSettings: ObservableObject {
         launchAtLogin = defaults.bool(forKey: SettingsKey.launchAtLogin)
         onboardingCompleted = defaults.bool(forKey: SettingsKey.onboardingCompleted)
         starPromptDismissed = defaults.bool(forKey: SettingsKey.starPromptDismissed)
+        milestonesSeen = defaults.dictionary(forKey: SettingsKey.milestonesSeen) as? [String: Int] ?? [:]
         cleanupEnabled = defaults.bool(forKey: SettingsKey.cleanupEnabled)
         analyticsEnabled = defaults.bool(forKey: SettingsKey.analyticsEnabled)
         receiveBetaUpdates = defaults.bool(forKey: SettingsKey.receiveBetaUpdates)

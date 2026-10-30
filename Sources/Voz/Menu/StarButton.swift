@@ -2,7 +2,6 @@ import AppKit
 import SwiftUI
 
 struct StarButton: View {
-    static let milestoneWords = 2_000
     private static let repo = URL(string: "https://github.com/Joelheile/voz")!
 
     let title: String

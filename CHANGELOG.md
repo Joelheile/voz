@@ -38,7 +38,7 @@ Newest first. To get beta changes now, turn on Beta updates under What's new in 
 - The Voz face is back in the menu bar, and it turns white on dark menu bars
 - Small bars in Top apps stay visible
 - Dragging a TypeScript file no longer opens the drop zone
-- After 2,000 words, a Star on GitHub button shows in the panel until you click it
+- When you reach a word, streak or time-saved milestone, the panel shows it once
 
 ## 0.0.5 (October 22, 2026)
 

@@ -175,3 +175,53 @@ private struct PeriodTally {
         apps[key] = AppUsage(bundleID: row.appBundleID, name: row.appName ?? key, words: words)
     }
 }
+
+struct Milestone: Equatable {
+    enum Kind: String, CaseIterable {
+        case words
+        case streak
+        case hoursSaved
+
+        var thresholds: [Int] {
+            switch self {
+            case .words: [1_000, 2_000, 5_000, 10_000, 25_000, 50_000, 100_000]
+            case .streak: [7, 30, 100, 365]
+            case .hoursSaved: [1, 10, 100]
+            }
+        }
+
+        func amount(in stats: UsageStats) -> Int {
+            switch self {
+            case .words: stats[.all].words
+            case .streak: stats.streak
+            case .hoursSaved: Int(stats[.all].savedSeconds / 3600)
+            }
+        }
+    }
+
+    let kind: Kind
+    let value: Int
+
+    var title: String {
+        switch kind {
+        case .words: "\(value.formatted()) words"
+        case .streak: "\(value) day streak"
+        case .hoursSaved: value == 1 ? "1 hour saved" : "\(value.formatted()) hours saved"
+        }
+    }
+
+    static func reached(in stats: UsageStats) -> [Milestone] {
+        Kind.allCases.compactMap { kind in
+            let amount = kind.amount(in: stats)
+            return kind.thresholds.last { $0 <= amount }.map { Milestone(kind: kind, value: $0) }
+        }
+    }
+
+    static func unseen(in stats: UsageStats, seen: [String: Int]) -> Milestone? {
+        reached(in: stats).first { $0.value > seen[$0.kind.rawValue, default: 0] }
+    }
+
+    static func markingSeen(in stats: UsageStats, seen: [String: Int]) -> [String: Int] {
+        reached(in: stats).reduce(into: seen) { $0[$1.kind.rawValue] = max($0[$1.kind.rawValue, default: 0], $1.value) }
+    }
+}

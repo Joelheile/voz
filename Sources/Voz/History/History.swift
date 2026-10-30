@@ -108,10 +108,6 @@ final class HistoryStore: Sendable {
             .eraseToAnyPublisher()
     }
 
-    func totalWords() throws -> Int {
-        try queue.read { try TranscriptRecord.select(sum(Column("wordCount")), as: Int.self).fetchOne($0) ?? 0 }
-    }
-
     func stats(now: Date = Date(), calendar: Calendar = .current) throws -> UsageStats {
         try queue.read { try Self.stats(in: $0, now: now, calendar: calendar) }
     }

@@ -26,12 +26,12 @@ final class HistoryModel: ObservableObject {
             )
     }
 
-    func totalWords() -> Int {
+    func usage() async -> UsageStats? {
         do {
-            return try store.totalWords()
+            return try await Task.detached { [store] in try store.stats() }.value
         } catch {
-            Log.app.error("History word count failed: \(error.localizedDescription, privacy: .private)")
-            return 0
+            Log.app.error("History stats failed: \(error.localizedDescription, privacy: .private)")
+            return nil
         }
     }
 

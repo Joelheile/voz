@@ -27,14 +27,6 @@ import Testing
         #expect(try store.search("  ").count == 3)
     }
 
-    @Test func totalWordsAddsUpEveryRecord() throws {
-        let store = try HistoryStore()
-        #expect(try store.totalWords() == 0)
-        try store.insert(makeRecord("one two three", at: 1))
-        try store.insert(makeRecord("four five", at: 2))
-        #expect(try store.totalWords() == 5)
-    }
-
     @Test func recordsPersistOnDiskUntilDeleted() async throws {
         let path = makeTemporaryStorePath()
         defer { removeFile(atPath: path) }
