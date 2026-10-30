@@ -24,8 +24,9 @@ The full types are in `~/.voz/node_modules/voz/index.d.ts`. Read them before you
 6. `registerSpeechModel({ id, name, transcribe })`: a speech model. `transcribe` gets a WAV `path` and returns `{ text }`
 7. `registerCleanupModel({ id, name, clean })`: replaces the on-device cleanup model. `clean` gets `text` and `prompt` and returns `{ text }`
 8. `registerCleanupStep({ id, name, run })`: a cleanup step. `run` gets `text` and returns `{ text }`
-9. `registerAction({ id, name, hotkey, run })`: a button in the Voz panel, with an optional global hotkey such as `"ctrl+opt+j"`. `run` gets `ctx`. It returns the button. Call `button.rename(name)` to show what the next press does
-10. `settings(schema)`: a settings form in the Extensions page. Returns the typed values with defaults filled in
+9. `registerAction({ id, name, hotkey, run })`: a button in the Voz panel, with an optional global hotkey such as `"ctrl+opt+j"`. `run` gets `ctx`
+10. `startActivity({ title, since, stop })`: shows that something keeps running, such as a recording, in the menu bar and the Voz panel, with a Stop button when you pass `stop`. Returns `{ end() }`
+11. `settings(schema)`: a settings form in the Extensions page. Returns the typed values with defaults filled in
 
 Registering a model or step only makes it available. The user picks it in Settings, or you set `speechModel`, `cleanupModel` or `cleanupSteps` in `~/.voz/settings.json` to `<extension name>/<id>`. `cleanupSteps` is the full ordered list, by default `["fillers", "punctuation", "dictionary", "model"]`
 

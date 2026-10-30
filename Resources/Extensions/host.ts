@@ -11,6 +11,7 @@ import { basename, extname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import type {
   Action,
+  Activity,
   AfterInsertEvent,
   AudioDropEvent,
   Awaitable,
@@ -81,6 +82,7 @@ type TranscribeRequest = { model: string; path: string; seconds: number; app: Ap
 type CleanRequest = { model: string; text: string; prompt: string; app: App };
 type StepRequest = { step: string; text: string; app: App };
 type ActionRequest = { action: string; app: App };
+type StopActivityRequest = { activity: string; app: App };
 type Component = { id: string; name: string };
 type Entry = { name: string; path?: string; requires?: number };
 type LoadError = { extension: string; message: string };
@@ -157,6 +159,8 @@ const speechModels = new Map<string, SpeechModel>();
 const cleanupModels = new Map<string, CleanupModel>();
 const cleanupSteps = new Map<string, CleanupStep>();
 const actions = new Map<string, Action & { extension: string }>();
+const activities = new Map<string, Activity>();
+let lastActivity = 0;
 const calls = new Map<number, PendingCall>();
 let lastCall = 0;
 const settingsSchemas = new Map<string, SettingsSchema>();
@@ -404,16 +408,13 @@ function api(name: string, config: Config, registration: Registration): Extensio
       register(cleanupModels, "cleanup model", name, model, registration),
     registerCleanupStep: (step) =>
       register(cleanupSteps, "cleanup step", name, step, registration),
-    registerAction(action) {
-      register(actions, "action", name, { ...action, extension: name }, registration);
-      const id = `${name}/${action.id}`;
-      return {
-        rename(newName) {
-          const registered = actions.get(id);
-          if (registered) registered.name = newName;
-          send({ method: "renameAction", params: { id, name: newName } });
-        },
-      };
+    registerAction: (action) => register(actions, "action", name, { ...action, extension: name }, registration),
+    startActivity(activity) {
+      if (!activity.title) throw new Error("An activity needs a title");
+      const id = `${name}/${++lastActivity}`;
+      activities.set(id, activity);
+      send({ method: "startActivity", params: { id, title: activity.title, since: activity.since ?? Date.now(), stoppable: !!activity.stop } });
+      return { end: () => endActivity(id) };
     },
     settings<Schema extends SettingsSchema>(schema: Schema) {
       for (const [key, setting] of Object.entries(schema)) checkSetting(key, setting);
@@ -606,9 +607,22 @@ async function action({ action, app }: ActionRequest) {
   return {};
 }
 
+function endActivity(id: string) {
+  if (activities.delete(id)) send({ method: "endActivity", params: { id } });
+}
+
+async function stopActivity({ activity, app }: StopActivityRequest) {
+  const stop = activities.get(activity)?.stop;
+  if (!stop) throw new Error(`Unknown activity ${activity}`);
+  endActivity(activity);
+  await stop(context(app));
+  return {};
+}
+
 const methods = {
   beforeCleanup,
   action,
+  stopActivity,
   beforeInsert,
   clean,
   cleanupStep,

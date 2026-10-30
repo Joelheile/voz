@@ -15,12 +15,18 @@ final class ExtensionCatalog: ObservableObject {
     @Published fileprivate(set) var cleanupModels: [HostComponent] = []
     @Published fileprivate(set) var cleanupSteps: [HostComponent] = []
     @Published fileprivate(set) var actions: [ExtensionAction] = []
+    @Published fileprivate(set) var activities: [ExtensionActivity] = []
     @Published fileprivate(set) var settings: [ExtensionSettings] = []
     @Published fileprivate(set) var hostError: String?
     fileprivate var perform: (ExtensionAction) -> Void = { _ in }
+    fileprivate var performStop: (ExtensionActivity) -> Void = { _ in }
 
     func run(_ action: ExtensionAction) {
         perform(action)
+    }
+
+    func stop(_ activity: ExtensionActivity) {
+        performStop(activity)
     }
 
     func settings(for name: String) -> [ExtensionSettings] {
@@ -61,10 +67,6 @@ final class ExtensionCatalog: ObservableObject {
         actions = manifest?.actions ?? []
         settings = manifest?.settings ?? []
         hostError = nil
-    }
-
-    fileprivate func rename(_ id: String, to name: String) {
-        actions = actions.map { $0.id == id ? ExtensionAction(id: $0.id, name: name, hotkey: $0.hotkey, extension: $0.extension) : $0 }
     }
 
     fileprivate func fail(_ message: String) {
@@ -120,6 +122,7 @@ final class ExtensionService {
         self.settings = settings
         self.fileTranscriber = fileTranscriber
         catalog.perform = { [weak self] action in self?.runAction(action) }
+        catalog.performStop = { [weak self] activity in self?.stopActivity(activity) }
     }
 
     func start() {
@@ -160,6 +163,7 @@ final class ExtensionService {
         await host?.stop()
         host = nil
         manifest = nil
+        catalog.activities = []
         loadedExtensionSettings = try? home.extensionSettings()
         watch()
         guard home.hasEnabledExtensions else { return catalog.show(nil) }
@@ -282,6 +286,14 @@ final class ExtensionService {
         }
     }
 
+    private func stopActivity(_ activity: ExtensionActivity) {
+        guard let host else { return }
+        let app = HostApp.current
+        Task {
+            if await !host.stopActivity(activity.id, app: app, timeout: Self.untimed) { toast.show("Could not stop \(activity.title)") }
+        }
+    }
+
     private func launch() async throws {
         let generation = generation
         let script = Self.resources.appendingPathComponent("host.ts")
@@ -374,8 +386,10 @@ final class ExtensionService {
             }
         case .notify(let text):
             toast.show(text)
-        case .renameAction(let id, let name):
-            catalog.rename(id, to: name)
+        case .startActivity(let activity):
+            catalog.activities.append(activity)
+        case .endActivity(let id):
+            catalog.activities.removeAll { $0.id == id }
         }
     }
 
@@ -384,6 +398,7 @@ final class ExtensionService {
         hotkeys.unregisterAll()
         host = nil
         manifest = nil
+        catalog.activities = []
         if ContinuousClock.now - started > Self.healthyUptime { restarts = 0 }
         guard restarts < Self.maxRestarts else {
             Log.extensions.error("Extension host keeps exiting, last status \(status), extensions stay off until the next change")

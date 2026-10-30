@@ -94,6 +94,10 @@ func hostApiVersion() -> String? {
     return String(host[start...].prefix(while: \.isNumber))
 }
 
+func startedActivity(_ id: String, _ title: String, since seconds: Double, stoppable: Bool) -> HostAction {
+    .startActivity(ExtensionActivity(id: id, title: title, since: Date(timeIntervalSince1970: seconds), stoppable: stoppable))
+}
+
 private struct HostLaunch: Encodable {
     let home: String
     let settings: String

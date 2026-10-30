@@ -170,7 +170,32 @@ enum HostAction: Equatable, Sendable {
     case insert(String)
     case press(String)
     case notify(String)
-    case renameAction(id: String, name: String)
+    case startActivity(ExtensionActivity)
+    case endActivity(String)
+}
+
+struct ExtensionActivity: Decodable, Equatable, Sendable {
+    let id: String
+    let title: String
+    let since: Date
+    let stoppable: Bool
+
+    private enum CodingKeys: String, CodingKey { case id, title, since, stoppable }
+
+    init(id: String, title: String, since: Date, stoppable: Bool) {
+        self.id = id
+        self.title = title
+        self.since = since
+        self.stoppable = stoppable
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        since = Date(timeIntervalSince1970: try container.decode(Double.self, forKey: .since) / 1000)
+        stoppable = try container.decode(Bool.self, forKey: .stoppable)
+    }
 }
 
 struct HostLaunchArguments: Encodable {
@@ -272,9 +297,13 @@ struct TextParams: Decodable {
     let text: String
 }
 
-struct RenameActionParams: Decodable {
+struct IDParams: Decodable {
     let id: String
-    let name: String
+}
+
+struct StopActivityParams: Encodable {
+    let activity: String
+    let app: HostApp
 }
 
 struct PressParams: Decodable {

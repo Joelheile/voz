@@ -90,6 +90,7 @@ private struct HomePage: View {
                 header(proxy: proxy)
                 if needsAttention { notice }
                 transcripts
+                ForEach(catalog.activities, id: \.id, content: activityRow)
                 footer
             }
         }
@@ -237,6 +238,19 @@ private struct HomePage: View {
             }
         )
         .id(record.id)
+    }
+
+    private func activityRow(_ activity: ExtensionActivity) -> some View {
+        HStack(spacing: 8) {
+            Text(activity.title).font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink).lineLimit(1)
+            Text(activity.since, style: .timer).font(.meta).monospacedDigit().foregroundStyle(Theme.inkSecondary)
+            Spacer(minLength: 8)
+            if activity.stoppable {
+                Button("Stop") { catalog.stop(activity) }
+                    .buttonStyle(.pill(.quiet, .small))
+                    .fixedSize()
+            }
+        }
     }
 
     private var footer: some View {

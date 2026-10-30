@@ -113,6 +113,10 @@ actor ExtensionHost {
         decodeResult(EmptyParams.self, from: await request("action", ActionParams(action: id, app: app), timeout: timeout)) != nil
     }
 
+    func stopActivity(_ id: String, app: HostApp, timeout: Duration) async -> Bool {
+        decodeResult(EmptyParams.self, from: await request("stopActivity", StopActivityParams(activity: id, app: app), timeout: timeout)) != nil
+    }
+
     @discardableResult
     func emit(_ event: HostEvent, app: HostApp, timeout: Duration) async -> Bool {
         guard manifest?.subscribes(to: event.hook) == true else { return false }
@@ -221,7 +225,8 @@ actor ExtensionHost {
         case "insert": decodeNotification(TextParams.self, line).map { onAction(.insert($0.text)) }
         case "press": decodeNotification(PressParams.self, line).map { onAction(.press($0.key)) }
         case "notify": decodeNotification(TextParams.self, line).map { onAction(.notify($0.text)) }
-        case "renameAction": decodeNotification(RenameActionParams.self, line).map { onAction(.renameAction(id: $0.id, name: $0.name)) }
+        case "startActivity": decodeNotification(ExtensionActivity.self, line).map { onAction(.startActivity($0)) }
+        case "endActivity": decodeNotification(IDParams.self, line).map { onAction(.endActivity($0.id)) }
         case "log": decodeNotification(TextParams.self, line).map { onLog($0.text) }
         case "generate":
             decodeNotification(GenerateParams.self, line).map { params in

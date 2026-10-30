@@ -259,13 +259,20 @@ struct ExtensionHostTests {
         await host.stop()
     }
 
-    @Test func actionsRenameTheirButton() async throws {
-        try extensionFile("meeting.ts", #"export default (voz) => { const button = voz.registerAction({ id: "toggle", name: "Start meeting", run: () => button.rename("Stop meeting") }) }"#)
+    @Test func activitiesShowUntilTheyEndOrTheUserStopsThem() async throws {
+        try extensionFile("meeting.ts", #"export default (voz) => { voz.startActivity({ title: "Sync", since: 500 }).end(); voz.startActivity({ title: "Recording meeting", since: 1000, stop: (ctx) => ctx.notify("stopped") }) }"#)
         let actions = RecordedActions()
         let host = makeHost(actions: actions)
         _ = try await host.start()
-        #expect(await host.runAction("meeting/toggle", app: app, timeout: .seconds(2)))
-        #expect(actions.all == [.renameAction(id: "meeting/toggle", name: "Stop meeting")])
+        #expect(await host.stopActivity("meeting/2", app: app, timeout: .seconds(2)))
+        #expect(await host.stopActivity("meeting/2", app: app, timeout: .seconds(2)) == false)
+        #expect(actions.all == [
+            startedActivity("meeting/1", "Sync", since: 0.5, stoppable: false),
+            .endActivity("meeting/1"),
+            startedActivity("meeting/2", "Recording meeting", since: 1, stoppable: true),
+            .endActivity("meeting/2"),
+            .notify("stopped"),
+        ])
         await host.stop()
     }
 

@@ -61,6 +61,7 @@ The interview is done when you can state the extension in one sentence that name
 | Audio or video files the user drops on the notch                          | `audioDrop` and [`ctx.transcribe`](#audio-files)                                |
 | A different speech-to-text or cleanup model                               | [`registerSpeechModel` or `registerCleanupModel`](#models-and-cleanup-steps)    |
 | A button in the Voz panel, or a global hotkey                             | [`registerAction`](#actions)                                                    |
+| Something that keeps running, such as a recording                         | [`startActivity`](#activities)                                                  |
 
 Put network calls and model calls in commands, actions, `afterInsert` or a registered model. `beforeCleanup`, `beforeInsert` and cleanup steps get 300 ms, enough for string work only.
 
@@ -159,6 +160,7 @@ An extension does four kinds of things. The kind sets how much time it gets:
 | `voz.registerCleanupStep(step)`                 | Adds a cleanup step you can turn on in the extension's details. `step` has `id`, `name` and `run(event, ctx)`, which returns `{ text }` or nothing to keep the text.                                                                                  |
 | `voz.registerCommand(command)`                  | Runs `command.run(event, ctx)` when a dictation ends with `command.phrase`. Voz inserts the words before the phrase, then runs the command. With `at: "start"`, it runs when a dictation starts with the phrase: Voz inserts nothing and passes the words after the phrase. |
 | `voz.registerAction(action)`                    | Adds a button to the bottom row of the Voz panel. `action` has `id`, `name`, an optional `hotkey` such as `"ctrl+opt+j"`, and `run(ctx)`.                                                                                                             |
+| `voz.startActivity(activity)`                   | Shows that something keeps running, with an optional Stop button. Returns `{ end() }`. See [Activities](#activities).                                                                                                                                 |
 | `voz.settings(schema)`                          | Adds a settings form to the extension's row in the Extensions page, and returns the values. See [Settings](#settings).                                                                                                                                |
 | `voz.name`                                      | The extension name: the file name, or the package name.                                                                                                                                                                                               |
 | `voz.paths`                                     | `data` is `~/.voz/data/<name>`, a folder for the extension's own files.                                                                                                                                                                               |
@@ -292,21 +294,25 @@ voz.registerAction({
 
 The hotkey uses the same keys as `ctx.press`. If another app holds the hotkey, Voz shows a message and the button still works. An action runs until it finishes, so it can record or transcribe for as long as it needs.
 
-`registerAction` returns the button. Rename it to show what the next press does:
+## Activities
+
+An activity shows that something keeps running, such as a recording. While one runs, the Voz menu bar icon gets a dot, and the Voz panel shows its title, how long it has run and a Stop button.
 
 ```ts
-let recording = false;
-const button = voz.registerAction({
-  id: "meeting",
-  name: "Record meeting",
-  run: () => {
-    recording = !recording;
-    button.rename(recording ? "Stop recording" : "Record meeting");
+const recording = voz.startActivity({
+  title: "Recording meeting",
+  stop: async (ctx) => {
+    // stop the recorder, then transcribe
   },
 });
+// later, when it stops some other way
+recording.end();
 ```
 
-Packages that call `rename` set `"voz": { "apiVersion": 3 }`.
+- `since` is when it started, in milliseconds like `Date.now()`. It defaults to now. Pass it when you start the activity again after a reload
+- `stop` is optional. Without it, the panel shows no Stop button. Voz ends the activity, then runs `stop` with `ctx` and no time limit
+- An extension can run several activities at once
+- Voz ends all activities when it reloads extensions
 
 ## Per-app prompts
 
@@ -417,7 +423,7 @@ What each version changed, and what older packages keep:
 
 | Version | Changes                                                                                                                                          | Older packages keep                                                                       |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| 4       | `registerCommand` takes one object. `recording` is now `afterRecording`. `ctx` in transform hooks is typed as `{ app }`. Dropped `ctx` calls are logged | `registerCommand(phrase, handler, { at })` and `on("recording")`                          |
+| 4       | Adds `voz.startActivity`. `registerCommand` takes one object. `recording` is now `afterRecording`. `ctx` in transform hooks is typed as `{ app }`. Dropped `ctx` calls are logged | `registerCommand(phrase, handler, { at })` and `on("recording")`                          |
 | 3       | Adds `audioDrop` and `ctx.transcribe`                                                                                                            |                                                                                           |
 | 2       | Adds `at: "start"` and `ctx.generate`. Removes `voz.config`, `voz.log`, `voz.events`, `voz.paths.home` and `{ handled: true }` from `beforeInsert` | All of them. New code uses `voz.settings`, `console.log` and `{ text: "" }`               |
 
