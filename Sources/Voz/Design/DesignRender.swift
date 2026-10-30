@@ -101,6 +101,8 @@ enum DesignRender {
         ("dictionary", .dictionary),
         ("insights", .insights),
         ("extensions", .extensions),
+        ("cleanup", .cleanup),
+        ("privacy", .privacy),
         ("cleanup-prompt", .cleanupPrompt),
         ("cleanup-steps", .cleanupSteps),
         ("whats-new", .whatsNew),

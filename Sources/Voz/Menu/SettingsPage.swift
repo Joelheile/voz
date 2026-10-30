@@ -8,7 +8,6 @@ struct SettingsPage: View {
     @ObservedObject var catalog: ExtensionCatalog
     @StateObject private var capture: HotkeyCapture
     @State private var access: PermissionSnapshot?
-    @State private var copiedLog = false
 
     private var allGranted: Bool {
         guard let access else { return true }
@@ -26,12 +25,14 @@ struct SettingsPage: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            PageBar(title: "Settings", back: model.goBack)
+            PageBar(title: "Settings", back: model.goBack) {
+                Button("What's new") { model.page = .whatsNew }
+                    .buttonStyle(.pill(.quiet, .small))
+            }
             CappedScrollView(maxHeight: 520) {
                 VStack(alignment: .leading, spacing: 16) {
                     if !allGranted { permissions }
                     dictation
-                    cleanup
                     general
                 }
             }
@@ -49,7 +50,7 @@ struct SettingsPage: View {
 
     @ViewBuilder
     private var dictation: some View {
-        PanelGroup(title: "Dictation") {
+        PanelGroup {
             PanelRow(title: "Shortcut", detail: capture.warning) {
                 Button(capture.isListening ? capture.preview?.displayName ?? "Press keys…" : settings.hotkey.displayName) {
                     capture.isListening ? capture.cancel() : capture.begin()
@@ -65,41 +66,18 @@ struct SettingsPage: View {
                 Toggle("Live preview", isOn: $settings.livePreviewEnabled).labelsHidden()
             }
         }
-        PanelGroup(title: "Output") {
-            toggle("Type at cursor", isOn: $settings.insertIntoApp)
-            toggle("Copy to clipboard", isOn: $settings.copyToClipboard)
+        PanelGroup(title: "Text") {
+            PanelRow(title: "Output") {
+                TabBar(tabs: OutputMode.allCases, selection: settings.outputMode)
+                    .frame(width: 156)
+            }
+            LinkRow(title: "Cleanup", value: settings.cleanupEnabled ? "On" : "Off") { model.page = .cleanup }
+            LinkRow(title: "Dictionary", value: vocabulary.snapshot.words.count.formatted()) { model.page = .dictionary }
+        }
+        PanelGroup(title: "While recording") {
             toggle("Mute other apps", isOn: $settings.muteWhileRecording)
             toggle("Sound cues", isOn: $settings.soundCues)
         }
-    }
-
-    @ViewBuilder
-    private var cleanup: some View {
-        PanelGroup(title: "Cleanup") {
-            PanelRow(title: "Clean up text", detail: "Removes filler words, fixes punctuation") {
-                Toggle("Clean up text", isOn: $settings.cleanupEnabled).labelsHidden()
-            }
-            if settings.cleanupEnabled {
-                if !catalog.cleanupModels.isEmpty || settings.cleanupModel != CleanupModelID.apple {
-                    ModelPicker(title: "Model", selection: $settings.cleanupModel, options: [ModelOption(id: CleanupModelID.apple, name: "Apple", detail: "On device")] + ModelOption.extensions(catalog.cleanupModels))
-                }
-                LinkRow(title: "Steps", value: edited(stepsEdited)) { model.page = .cleanupSteps }
-                LinkRow(title: "Prompt", value: edited(settings.cleanupPrompt != CleanupPrompt.standard)) { model.page = .cleanupPrompt }
-            }
-            LinkRow(title: "Dictionary", value: vocabulary.snapshot.words.count.formatted()) { model.page = .dictionary }
-            if let error = settings.pipelineError {
-                PanelRow(title: "Could not read settings.json", detail: error) { EmptyView() }
-            }
-        }
-        .animation(Theme.Motion.section, value: settings.cleanupEnabled)
-    }
-
-    private func edited(_ isEdited: Bool) -> String {
-        isEdited ? "Edited" : "Default"
-    }
-
-    private var stepsEdited: Bool {
-        settings.cleanupSteps != CleanupStep.standard
     }
 
     private var speechModelName: String {
@@ -140,62 +118,8 @@ struct SettingsPage: View {
     private var general: some View {
         PanelGroup(title: "App") {
             toggle("Launch at login", isOn: $settings.launchAtLogin)
-            toggle("Beta updates", isOn: $settings.receiveBetaUpdates)
-            PanelRow(title: "Version \(Self.version)") {
-                Button("Check for updates", action: model.actions.checkForUpdates)
-                    .buttonStyle(.pill(.quiet, .small))
-            }
-            if !Changelog.bundled.isEmpty {
-                LinkRow(title: "What's new", value: "") { model.page = .whatsNew }
-            }
+            LinkRow(title: "Privacy and debug log", value: "") { model.page = .privacy }
         }
-        PanelGroup(title: "Privacy") {
-            PanelRow(title: "Share usage stats", detail: "Counts and timings, never text or audio") {
-                Toggle("Share usage stats", isOn: $settings.analyticsEnabled).labelsHidden()
-            }
-            PanelRow(title: "Send crash reports", detail: "Crashes, freezes and error codes, never text or audio") {
-                Toggle("Send crash reports", isOn: $settings.errorReportsEnabled).labelsHidden()
-            }
-        }
-        PanelGroup(title: "Debug log") {
-            PanelRow(title: "Include text", detail: "What you said, kept on this Mac") {
-                Toggle("Include text", isOn: $settings.logIncludesText).labelsHidden()
-            }
-            PanelRow(title: "voz-logs.jsonl") {
-                HStack(spacing: 6) {
-                    Button(action: copyLog) {
-                        ZStack {
-                            crossfading("Copy", visible: !copiedLog)
-                            crossfading("Copied", visible: copiedLog)
-                        }
-                    }
-                    .animation(Theme.Motion.section, value: copiedLog)
-                    Button("Show in Finder") {
-                        NSWorkspace.shared.activateFileViewerSelecting([DebugLog.shared.file])
-                    }
-                }
-                .buttonStyle(.pill(.quiet, .small))
-                .fixedSize()
-            }
-        }
-    }
-
-    private static let copiedLogLines = 200
-
-    private func copyLog() {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(DebugLog.shared.lastLines(Self.copiedLogLines), forType: .string)
-        copiedLog = true
-        Task {
-            try? await Task.sleep(for: .seconds(1.5))
-            copiedLog = false
-        }
-    }
-
-    private func crossfading(_ label: String, visible: Bool) -> some View {
-        Text(label)
-            .opacity(visible ? 1 : 0)
-            .blur(radius: visible ? 0 : 2)
     }
 
     private func allowRow(_ title: String, fix: @escaping () -> Void) -> some View {
@@ -209,10 +133,6 @@ struct SettingsPage: View {
             Toggle(title, isOn: isOn).labelsHidden()
         }
     }
-
-    private static var version: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
-    }
 }
 
 enum TalkMode: String, CaseIterable {
@@ -220,9 +140,33 @@ enum TalkMode: String, CaseIterable {
     case hold = "Hold"
 }
 
+enum OutputMode: String, CaseIterable {
+    case type = "Type"
+    case copy = "Copy"
+    case both = "Both"
+
+    init(pastes: Bool, copies: Bool) {
+        switch (pastes, copies) {
+        case (true, true): self = .both
+        case (true, false): self = .type
+        case (false, _): self = .copy
+        }
+    }
+
+    var pastes: Bool { self != .copy }
+    var copies: Bool { self != .type }
+}
+
 extension AppSettings {
     var talkMode: Binding<TalkMode> {
         Binding { self.holdToTalk ? .hold : .tap } set: { self.holdToTalk = $0 == .hold }
+    }
+
+    var outputMode: Binding<OutputMode> {
+        Binding { OutputMode(pastes: self.insertIntoApp, copies: self.copyToClipboard) } set: {
+            self.insertIntoApp = $0.pastes
+            self.copyToClipboard = $0.copies
+        }
     }
 }
 

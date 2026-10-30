@@ -219,19 +219,9 @@ struct PanelGroup<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if let title { SectionLabel(text: title).padding(.leading, 2) }
-            Group(subviews: content) { rows in
-                VStack(spacing: 0) {
-                    ForEach(rows) { row in
-                        VStack(spacing: 0) {
-                            if row.id != rows.first?.id { RowDivider() }
-                            row.padding(.horizontal, 12)
-                        }
-                    }
-                }
-                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous).strokeBorder(Theme.hairline))
-            }
+        VStack(alignment: .leading, spacing: 2) {
+            if let title { SectionLabel(text: title) }
+            VStack(spacing: 0) { content }
         }
     }
 }
@@ -257,7 +247,7 @@ struct PanelRow<Control: View>: View {
             control
         }
         .frame(minHeight: Theme.Size.row)
-        .padding(.vertical, 6)
+        .padding(.vertical, 4)
     }
 }
 
@@ -290,7 +280,7 @@ struct ActionRow<Trailing: View>: View {
                 trailing(hovering)
             }
             .frame(minHeight: Theme.Size.row)
-            .padding(.vertical, 6)
+            .padding(.vertical, 4)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -349,4 +339,29 @@ struct TabBar<Tab: Hashable & RawRepresentable<String>>: View {
         .background(Theme.selected, in: RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous))
         .animation(.spring(duration: 0.25, bounce: 0), value: selection)
     }
+}
+
+struct AccentSwitchStyle: ToggleStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        Button { configuration.isOn.toggle() } label: {
+            Capsule()
+                .fill(configuration.isOn ? Theme.accent : Theme.selected)
+                .frame(width: 30, height: 18)
+                .overlay(alignment: configuration.isOn ? .trailing : .leading) {
+                    Circle()
+                        .fill(.white)
+                        .shadow(color: .black.opacity(0.18), radius: 1, y: 0.5)
+                        .padding(2)
+                }
+        }
+        .buttonStyle(.plain)
+        .animation(reduceMotion ? nil : .spring(duration: 0.2, bounce: 0), value: configuration.isOn)
+        .accessibilityRepresentation { Toggle(isOn: configuration.$isOn) { configuration.label } }
+    }
+}
+
+extension ToggleStyle where Self == AccentSwitchStyle {
+    static var accentSwitch: AccentSwitchStyle { AccentSwitchStyle() }
 }

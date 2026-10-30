@@ -25,8 +25,7 @@ struct PopoverView: View {
             .frame(width: Self.width)
             .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous).strokeBorder(Theme.hairline))
-            .toggleStyle(.switch)
-            .tint(Theme.accent)
+            .toggleStyle(.accentSwitch)
             .fixedSize(horizontal: false, vertical: true)
             .compositingGroup()
             .shadow(color: .black.opacity(0.16), radius: 18, y: 8)
@@ -57,8 +56,12 @@ struct PopoverView: View {
                 CleanupStepsPage(settings: sources.settings, catalog: sources.catalog, back: model.goBack)
             case .speechModel:
                 SpeechModelPage(settings: sources.settings, status: sources.modelStatus, catalog: sources.catalog, back: model.goBack)
+            case .cleanup:
+                CleanupPage(model: model, settings: sources.settings, catalog: sources.catalog)
+            case .privacy:
+                PrivacyPage(settings: sources.settings, back: model.goBack)
             case .whatsNew:
-                WhatsNewPage(releases: Changelog.bundled, back: model.goBack)
+                WhatsNewPage(settings: sources.settings, releases: Changelog.bundled, checkForUpdates: model.actions.checkForUpdates, back: model.goBack)
             }
         }
     }

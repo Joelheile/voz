@@ -3,6 +3,15 @@ import SwiftUI
 struct ChangelogRelease: Equatable {
     let title: String
     var changes: [String] = []
+
+    var name: String {
+        title.split(separator: " (", maxSplits: 1).first.map(String.init) ?? title
+    }
+
+    var date: String? {
+        guard title.hasSuffix(")"), let open = title.range(of: " (") else { return nil }
+        return String(title[open.upperBound..<title.index(before: title.endIndex)])
+    }
 }
 
 enum Changelog {
@@ -26,7 +35,9 @@ enum Changelog {
 }
 
 struct WhatsNewPage: View {
+    @ObservedObject var settings: AppSettings
     let releases: [ChangelogRelease]
+    let checkForUpdates: () -> Void
     let back: () -> Void
 
     var body: some View {
@@ -34,20 +45,49 @@ struct WhatsNewPage: View {
             PageBar(title: "What's new", back: back)
             CappedScrollView(maxHeight: 520) {
                 VStack(alignment: .leading, spacing: 16) {
-                    ForEach(releases, id: \.title) { release in
-                        PanelGroup(title: release.title) {
-                            ForEach(release.changes, id: \.self) { change in
-                                Text(LocalizedStringKey(change))
-                                    .font(.ui(13))
-                                    .lineSpacing(2)
-                                    .foregroundStyle(Theme.ink)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.vertical, 8)
-                            }
+                    PanelGroup {
+                        PanelRow(title: "Voz \(Self.version)", detail: "Updates install on their own") {
+                            Button("Check now", action: checkForUpdates)
+                                .buttonStyle(.pill(.quiet, .small))
+                        }
+                        PanelRow(title: "Beta updates") {
+                            Toggle("Beta updates", isOn: $settings.receiveBetaUpdates).labelsHidden()
                         }
                     }
+                    ForEach(releases, id: \.title) { release in
+                        ReleaseNotes(release: release)
+                    }
                 }
+            }
+        }
+    }
+
+    private static var version: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+    }
+}
+
+private struct ReleaseNotes: View {
+    let release: ChangelogRelease
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(release.name).font(.ui(13, weight: .semibold)).foregroundStyle(Theme.ink)
+                if let date = release.date {
+                    Text(date).font(.meta).foregroundStyle(Theme.inkTertiary)
+                }
+            }
+            ForEach(release.changes, id: \.self) { change in
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("•").foregroundStyle(Theme.inkTertiary)
+                    Text(LocalizedStringKey(change))
+                        .foregroundStyle(Theme.inkSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .font(.ui(13))
+                .lineSpacing(2)
             }
         }
     }

@@ -22,4 +22,29 @@ import Testing
             ChangelogRelease(title: "0.0.5 (October 22, 2026)", changes: ["Calmer settings"]),
         ])
     }
+
+    @Test func splitsReleaseNameFromDate() {
+        let stable = ChangelogRelease(title: "0.0.5 (October 22, 2026)")
+        #expect(stable.name == "0.0.5")
+        #expect(stable.date == "October 22, 2026")
+        let beta = ChangelogRelease(title: "In beta")
+        #expect(beta.name == "In beta")
+        #expect(beta.date == nil)
+    }
+}
+
+@Suite struct OutputModeTests {
+    @Test func mapsFlagsToOneChoice() {
+        #expect(OutputMode(pastes: true, copies: true) == .both)
+        #expect(OutputMode(pastes: true, copies: false) == .type)
+        #expect(OutputMode(pastes: false, copies: true) == .copy)
+        #expect(OutputMode(pastes: false, copies: false) == .copy)
+    }
+
+    @Test func everyChoiceDeliversText() {
+        for mode in OutputMode.allCases {
+            #expect(mode.pastes || mode.copies)
+            #expect(OutputMode(pastes: mode.pastes, copies: mode.copies) == mode)
+        }
+    }
 }
