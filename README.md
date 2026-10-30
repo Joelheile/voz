@@ -99,13 +99,9 @@ Extensions run with your permissions, so only install ones you trust. If one is 
 
 You don't need to learn the API first. Tell a coding agent in `~/.voz` what you want. It reads the guide Voz keeps there and writes the extension. Voz loads it when you save. The full API is in [EXTENSIONS.md](EXTENSIONS.md).
 
-Publish it to npm with the `voz-package` keyword and it shows up in Extensions for everyone. A few are already there:
+Publish it to npm with the `voz-package` keyword and it shows up in Extensions for everyone. Here is every published extension, updated hourly:
 
-| Extension | What it does |
-| --- | --- |
-| [voz-meeting](https://www.npmjs.com/package/voz-meeting) | Records and transcribes meetings, your microphone plus system audio, on your Mac |
-| [voz-autocorrect](https://www.npmjs.com/package/voz-autocorrect) | Fixes words Voz keeps mishearing and learns from your corrections |
-| [voz-smart-spacing](https://www.npmjs.com/package/voz-smart-spacing) | Adds the missing space when you dictate right after existing text |
+<a href="https://voz.joels.tech/extensions/"><img src="https://voz.joels.tech/extensions.svg" width="720" alt="Voz extensions published on npm, sorted by monthly downloads"></a>
 
 Install one from the menu bar, or run `voz install voz-meeting`. [Browse extensions](https://voz.joels.tech/extensions/) or [build your first one](https://voz.joels.tech/build-extension/).
 
