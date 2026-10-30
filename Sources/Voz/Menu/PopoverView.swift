@@ -43,7 +43,7 @@ struct PopoverView: View {
             case .home:
                 HomePage(model: model, history: sources.history, settings: sources.settings, catalog: sources.catalog, extensions: sources.extensions)
             case .settings:
-                SettingsPage(model: model, settings: sources.settings, status: sources.modelStatus, catalog: sources.catalog)
+                SettingsPage(model: model, settings: sources.settings, catalog: sources.catalog)
             case .dictionary:
                 DictionaryPage(model: sources.vocabulary, back: model.goBack)
             case .insights:
@@ -104,7 +104,10 @@ private struct HomePage: View {
             }
         }
         .onAppear { searchFocused = showsSearch }
-        .task { usage = await history.usage() }
+        .task {
+            usage = await history.usage()
+            countMilestoneShow()
+        }
         .onChange(of: history.query) { selectedID = nil }
     }
 
@@ -263,9 +266,16 @@ private struct HomePage: View {
         }
     }
 
+    private func countMilestoneShow() {
+        guard milestone != nil else { return }
+        settings.milestoneShows += 1
+        if settings.milestoneShows > Milestone.maxShows { markMilestonesSeen() }
+    }
+
     private func markMilestonesSeen() {
         guard let usage else { return }
         settings.milestonesSeen = Milestone.markingSeen(in: usage, seen: settings.milestonesSeen)
+        settings.milestoneShows = 0
     }
 
     private var footer: some View {

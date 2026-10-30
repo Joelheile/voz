@@ -44,13 +44,10 @@ private struct StreakSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(stats.streak.formatted())
-                    .font(.display(32))
+                Text(stats.streak == 1 ? "1 day streak" : "\(stats.streak.formatted()) day streak")
+                    .font(.ui(13, weight: .medium))
                     .foregroundStyle(Theme.ink)
                     .contentTransition(.numericText())
-                Text("day streak")
-                    .font(.ui(13))
-                    .foregroundStyle(Theme.inkSecondary)
                 Spacer(minLength: 0)
                 if stats.longestStreak > 0 {
                     Text("Longest \(stats.longestStreak) \(stats.longestStreak == 1 ? "day" : "days")")

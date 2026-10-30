@@ -3,7 +3,6 @@ import SwiftUI
 struct SettingsPage: View {
     @ObservedObject var model: PopoverModel
     @ObservedObject var settings: AppSettings
-    @ObservedObject var status: ModelStatus
     @ObservedObject var catalog: ExtensionCatalog
     @StateObject private var capture: HotkeyCapture
     @State private var access: PermissionSnapshot?
@@ -13,10 +12,9 @@ struct SettingsPage: View {
         return access.microphone == .authorized && access.accessibility && access.inputMonitoring && (access.systemAudio || !settings.muteWhileRecording)
     }
 
-    init(model: PopoverModel, settings: AppSettings, status: ModelStatus, catalog: ExtensionCatalog) {
+    init(model: PopoverModel, settings: AppSettings, catalog: ExtensionCatalog) {
         self.model = model
         self.settings = settings
-        self.status = status
         self.catalog = catalog
         _capture = StateObject(wrappedValue: HotkeyCapture(settings: settings))
     }

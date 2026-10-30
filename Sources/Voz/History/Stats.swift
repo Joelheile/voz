@@ -177,6 +177,8 @@ private struct PeriodTally {
 }
 
 struct Milestone: Equatable {
+    static let maxShows = 3
+
     enum Kind: String, CaseIterable {
         case words
         case streak
