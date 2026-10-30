@@ -57,6 +57,8 @@ struct PopoverView: View {
                 CleanupStepsPage(settings: sources.settings, catalog: sources.catalog, back: model.goBack)
             case .speechModel:
                 SpeechModelPage(settings: sources.settings, status: sources.modelStatus, catalog: sources.catalog, back: model.goBack)
+            case .whatsNew:
+                WhatsNewPage(releases: Changelog.bundled, back: model.goBack)
             }
         }
     }

@@ -144,6 +144,9 @@ struct SettingsPage: View {
                 Button("Check for updates", action: model.actions.checkForUpdates)
                     .buttonStyle(.pill(.quiet, .small))
             }
+            if !Changelog.bundled.isEmpty {
+                LinkRow(title: "What's new", value: "") { model.page = .whatsNew }
+            }
         }
         PanelGroup(title: "Privacy") {
             PanelRow(title: "Share usage stats", detail: "Counts and timings, never text or audio") {
