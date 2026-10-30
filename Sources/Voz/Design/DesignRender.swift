@@ -92,7 +92,7 @@ enum DesignRender {
             safeAreaTop: hasNotch ? 32 : 0,
             leftAreaWidth: hasNotch ? 662 : nil,
             rightAreaWidth: hasNotch ? 662 : nil,
-            visibleMaxY: 958
+            visibleMinY: 0
         ))
     }
 
