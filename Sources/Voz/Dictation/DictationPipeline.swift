@@ -39,13 +39,13 @@ final class DictationPipeline {
     }
 
     func makeStreaming(app: HostApp) -> StreamingDictation {
-        let prompt = settings.cleanupPrompt
+        let plan = CleanupPlan(prompt: settings.cleanupPrompt, mode: settings.cleanupMode)
         let vocabulary = vocabularyWords()
         return StreamingDictation(
             transcribe: applying(vocabularyRules(), to: transcriber(app: app, vocabulary: vocabulary)),
             cleaner: cleaner,
             vocabulary: vocabulary,
-            prompt: Task { [extensions] in await extensions.cleanupPrompt(prompt, app: app) },
+            plan: Task { [extensions] in await extensions.cleanupPlan(plan, app: app) },
             cleanupEnabled: settings.cleanupEnabled,
             steps: settings.cleanupSteps,
             extensions: extensions.cleanupExtensions(model: settings.cleanupModel, app: app)

@@ -78,7 +78,7 @@ final class ExtensionCatalog: ObservableObject {
 @MainActor
 final class ExtensionService {
     private static let insertTimeout: Duration = .milliseconds(300)
-    private static let cleanupPromptTimeout: Duration = .milliseconds(300)
+    private static let cleanupPlanTimeout: Duration = .milliseconds(300)
     private static let cleanupStepTimeout: Duration = .milliseconds(300)
     private static let transcribeTimeout: Duration = .seconds(2)
     private static let commandTimeout: Duration = .seconds(10)
@@ -181,9 +181,9 @@ final class ExtensionService {
         }
     }
 
-    func cleanupPrompt(_ prompt: String, app: HostApp) async -> String {
-        guard let host, manifest?.subscribes(to: .beforeCleanup) == true else { return prompt }
-        return await host.beforeCleanup(prompt: prompt, app: app, timeout: Self.cleanupPromptTimeout)
+    func cleanupPlan(_ plan: CleanupPlan, app: HostApp) async -> CleanupPlan {
+        guard let host, manifest?.subscribes(to: .beforeCleanup) == true else { return plan }
+        return await host.beforeCleanup(plan, app: app, timeout: Self.cleanupPlanTimeout)
     }
 
     func hasSpeechModel(_ id: String) -> Bool {

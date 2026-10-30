@@ -13,17 +13,31 @@ struct CleanupPage: View {
                     Toggle("Clean up text", isOn: $settings.cleanupEnabled).labelsHidden()
                 }
                 if settings.cleanupEnabled {
-                    if !catalog.cleanupModels.isEmpty || settings.cleanupModel != CleanupModelID.apple {
+                    PanelRow(title: "Mode", detail: modeDetail) {
+                        TabBar(tabs: CleanupModeTab.allCases, selection: settings.cleanupModeTab)
+                            .frame(width: 120)
+                    }
+                    if settings.cleanupMode == .heavy, !catalog.cleanupModels.isEmpty || settings.cleanupModel != CleanupModelID.apple {
                         ModelPicker(title: "Model", selection: $settings.cleanupModel, options: [ModelOption(id: CleanupModelID.apple, name: "Apple", detail: "On device")] + ModelOption.extensions(catalog.cleanupModels))
                     }
                     LinkRow(title: "Steps", value: edited(settings.cleanupSteps != CleanupStep.standard)) { model.page = .cleanupSteps }
-                    LinkRow(title: "Prompt", value: edited(settings.cleanupPrompt != CleanupPrompt.standard)) { model.page = .cleanupPrompt }
+                    if settings.cleanupMode == .heavy {
+                        LinkRow(title: "Prompt", value: edited(settings.cleanupPrompt != CleanupPrompt.standard)) { model.page = .cleanupPrompt }
+                    }
                 }
                 if let error = settings.pipelineError {
                     PanelRow(title: "Could not read settings.json", detail: error) { EmptyView() }
                 }
             }
             .animation(Theme.Motion.section, value: settings.cleanupEnabled)
+            .animation(Theme.Motion.section, value: settings.cleanupMode)
+        }
+    }
+
+    private var modeDetail: String {
+        switch settings.cleanupMode {
+        case .light: "Keeps every word you said"
+        case .heavy: "Rewrites corrections and lists"
         }
     }
 
@@ -92,7 +106,16 @@ struct CleanupStepsPage: View {
     }
 }
 
+enum CleanupModeTab: String, CaseIterable {
+    case light = "Light"
+    case heavy = "Heavy"
+}
+
 extension AppSettings {
+    var cleanupModeTab: Binding<CleanupModeTab> {
+        Binding { self.cleanupMode == .light ? .light : .heavy } set: { self.cleanupMode = $0 == .light ? .light : .heavy }
+    }
+
     func cleanupStepEnabled(_ step: String) -> Binding<Bool> {
         Binding {
             self.cleanupSteps.contains(step)

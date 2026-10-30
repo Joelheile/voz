@@ -37,7 +37,21 @@ struct ExtensionHostTests {
         #expect(manifest.extensions == ["a-upper", "b-tag"])
         #expect(Set(manifest.events) == ["beforeInsert", "beforeCleanup"])
         #expect(await host.beforeInsert(text: "hi", raw: "hi", app: app, timeout: .seconds(2)) == "HI [Slack] #voz")
-        #expect(await host.beforeCleanup(prompt: "Clean.", app: app, timeout: .seconds(2)) == "Clean. Casual. Short.")
+        #expect(await host.beforeCleanup(CleanupPlan(prompt: "Clean.", mode: .heavy), app: app, timeout: .seconds(2)) == CleanupPlan(prompt: "Clean. Casual. Short.", mode: .heavy))
+        await host.stop()
+    }
+
+    @Test func beforeCleanupPicksTheModePerAppAndIgnoresUnknownModes() async throws {
+        try extensionFile("a-notes.ts", #"export default (voz) => voz.on("beforeCleanup", (e, ctx) => ctx.app.name === "Notes" ? { mode: "light" } : { mode: `${e.mode}-ish` })"#)
+        let old = home.packages.appendingPathComponent("node_modules/old")
+        try writeFile(#"{"name":"old","voz":{"apiVersion":4}}"#, named: "package.json", in: old)
+        try writeFile(#"export default (voz) => voz.on("beforeCleanup", (e) => ({ prompt: `${e.prompt} Short.` }))"#, named: "index.ts", in: old)
+        let host = makeHost(packages: [old.path])
+        let manifest = try await host.start()
+        #expect(manifest.errors.isEmpty)
+        let notes = HostApp(bundleID: "com.apple.Notes", name: "Notes")
+        #expect(await host.beforeCleanup(CleanupPlan(prompt: "Clean.", mode: .heavy), app: notes, timeout: .seconds(2)) == CleanupPlan(prompt: "Clean. Short.", mode: .light))
+        #expect(await host.beforeCleanup(CleanupPlan(prompt: "Clean.", mode: .heavy), app: app, timeout: .seconds(2)) == CleanupPlan(prompt: "Clean. Short.", mode: .heavy))
         await host.stop()
     }
 
@@ -204,7 +218,7 @@ struct ExtensionHostTests {
         _ = await host.runCommand(VoiceCommandMatch(phrase: "spin", at: .end, text: ""), app: app, timeout: .seconds(1))
         let started = ContinuousClock.now
         let largeText = String(repeating: "long transcript ", count: 100_000)
-        #expect(await host.beforeCleanup(prompt: largeText, app: app, timeout: .milliseconds(100)) == largeText)
+        #expect(await host.beforeCleanup(CleanupPlan(prompt: largeText, mode: .heavy), app: app, timeout: .milliseconds(100)) == CleanupPlan(prompt: largeText, mode: .heavy))
         #expect(await !host.ping(timeout: .milliseconds(100)))
         // Sending a request larger than pipe capacity must not block the host actor.
         #expect(await !host.runCommand(VoiceCommandMatch(phrase: "spin", at: .end, text: largeText), app: app, timeout: .milliseconds(100)))
@@ -327,13 +341,13 @@ struct ExtensionHostTests {
         try writeFile(#"{"name":"pack"}"#, named: "package.json", in: pack)
         try writeFile(#"export default (voz) => voz.on("beforeInsert", () => ({ text: "pack ran" }))"#, named: "index.ts", in: pack.appendingPathComponent("extensions/a"))
         let future = home.packages.appendingPathComponent("node_modules/future")
-        try writeFile(#"{"name":"future","voz":{"apiVersion":5}}"#, named: "package.json", in: future)
+        try writeFile(#"{"name":"future","voz":{"apiVersion":6}}"#, named: "package.json", in: future)
         try writeFile("export default () => {}", named: "index.ts", in: future)
         let host = makeHost(packages: [pack.path, future.path])
         let manifest = try await host.start()
         #expect(manifest.extensions == ["on"])
         #expect(manifest.errors.first?.message.contains("Update Voz") == true)
-        #expect(await host.beforeInsert(text: "hi", raw: "hi", app: app, timeout: .seconds(2)) == "hi 4")
+        #expect(await host.beforeInsert(text: "hi", raw: "hi", app: app, timeout: .seconds(2)) == "hi 5")
         await host.stop()
     }
 

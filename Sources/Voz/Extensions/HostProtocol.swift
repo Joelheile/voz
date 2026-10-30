@@ -251,12 +251,9 @@ struct InsertParams: Encodable {
     let app: HostApp
 }
 
-struct PromptParams: Codable {
-    let prompt: String
-}
-
 struct CleanupParams: Encodable {
     let prompt: String
+    let mode: CleanupMode
     let app: HostApp
 }
 

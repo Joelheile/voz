@@ -98,10 +98,10 @@ actor ExtensionHost {
         return decodeResult(TextResult.self, from: data)?.text
     }
 
-    func beforeCleanup(prompt: String, app: HostApp, timeout: Duration) async -> String {
-        guard manifest?.subscribes(to: .beforeCleanup) == true else { return prompt }
-        let data = await request("beforeCleanup", CleanupParams(prompt: prompt, app: app), timeout: timeout)
-        return decodeResult(PromptParams.self, from: data)?.prompt ?? prompt
+    func beforeCleanup(_ plan: CleanupPlan, app: HostApp, timeout: Duration) async -> CleanupPlan {
+        guard manifest?.subscribes(to: .beforeCleanup) == true else { return plan }
+        let data = await request("beforeCleanup", CleanupParams(prompt: plan.prompt, mode: plan.mode, app: app), timeout: timeout)
+        return decodeResult(CleanupPlan.self, from: data) ?? plan
     }
 
     func runCommand(_ command: VoiceCommandMatch, app: HostApp, timeout: Duration) async -> Bool {
