@@ -478,12 +478,15 @@ function withinLoadTimeout(work: Promise<void>): Promise<void> {
   return Promise.race([work, timeout]);
 }
 
+const isExpired = () => Date.now() >= requestScope.getStore()!.deadline;
+
 async function beforeCleanup({ prompt, app }: CleanupRequest) {
   const ctx = context(app);
   for (const handler of handlers.get("beforeCleanup") ?? []) {
-    if (Date.now() >= requestScope.getStore()!.deadline) break;
+    if (isExpired()) break;
     try {
       const result = (await handler.run({ prompt }, ctx)) as BeforeCleanupResult;
+      if (isExpired()) break;
       if (result && typeof result.prompt === "string") prompt = result.prompt;
     } catch (error) {
       log(`${handler.extension} beforeCleanup failed: ${describe(error)}`);
@@ -495,9 +498,10 @@ async function beforeCleanup({ prompt, app }: CleanupRequest) {
 async function beforeInsert({ text, raw, app }: InsertRequest) {
   const ctx = context(app);
   for (const handler of handlers.get("beforeInsert") ?? []) {
-    if (Date.now() >= requestScope.getStore()!.deadline) break;
+    if (isExpired()) break;
     try {
       const result = (await handler.run({ text, raw }, ctx)) as BeforeInsertResult;
+      if (isExpired()) break;
       if (result && typeof result.text === "string") text = result.text;
       if (!text) break;
     } catch (error) {
