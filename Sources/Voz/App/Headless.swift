@@ -119,7 +119,7 @@ enum Headless {
                 transcribe: { try await engine.transcribe($0, model: model, vocabulary: []) },
                 cleaner: cleaner,
                 vocabulary: [],
-                prompt: Task { CleanupPrompt.standard },
+                plan: Task { CleanupPlan(prompt: CleanupPrompt.standard, mode: .heavy) },
                 cleanupEnabled: cleanupEnabled
             )
             let clock = ContinuousClock()

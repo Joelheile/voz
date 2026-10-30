@@ -19,6 +19,7 @@ import type {
   App,
   BeforeCleanupEvent,
   BeforeCleanupResult,
+  CleanupMode,
   BeforeInsertEvent,
   BeforeInsertResult,
   CleanupModel,
@@ -126,7 +127,7 @@ class Registration {
   }
 }
 
-const apiVersion = 4;
+const apiVersion = 5;
 const loadTimeout = 3000;
 const write = process.stdout.write.bind(process.stdout);
 const send = (message: object) => write(JSON.stringify(message) + "\n");
@@ -546,19 +547,22 @@ function withinLoadTimeout(work: Promise<void>): Promise<void> {
 
 const isExpired = () => Date.now() >= requestScope.getStore()!.deadline;
 
-async function beforeCleanup({ prompt, app }: CleanupRequest) {
+const cleanupModes: CleanupMode[] = ["light", "heavy"];
+
+async function beforeCleanup({ prompt, mode, app }: CleanupRequest) {
   const ctx = context(app);
   for (const handler of handlers.get("beforeCleanup") ?? []) {
     if (isExpired()) break;
     try {
-      const result = (await handler.run({ prompt }, ctx)) as BeforeCleanupResult;
+      const result = (await handler.run({ prompt, mode }, ctx)) as BeforeCleanupResult;
       if (isExpired()) break;
       if (result && typeof result.prompt === "string") prompt = result.prompt;
+      if (result && cleanupModes.includes(result.mode as CleanupMode)) mode = result.mode!;
     } catch (error) {
       log(`${handler.extension} beforeCleanup failed: ${describe(error)}`);
     }
   }
-  return { prompt };
+  return { prompt, mode };
 }
 
 async function beforeInsert({ text, raw, app }: InsertRequest) {

@@ -10,7 +10,7 @@ import Testing
         }) { _, text, _ in text }
         let stream = StreamingDictation(
             transcribe: { _ in TranscriptionResult(text: "First sentence. Still talking", audioSeconds: 1, processingSeconds: 0, model: "test") },
-            cleaner: TextCleaner(), vocabulary: [], prompt: Task { "" }, cleanupEnabled: true,
+            cleaner: TextCleaner(), vocabulary: [], plan: Task { CleanupPlan(prompt: "", mode: .heavy) }, cleanupEnabled: true,
             steps: ["model"], extensions: extensions
         )
         stream.onPreview = { previews.append($0) }
@@ -30,7 +30,7 @@ import Testing
                 if first { try await Task.sleep(for: .milliseconds(60)) }
                 return TranscriptionResult(text: first ? "First" : "second", audioSeconds: 1, processingSeconds: 0, model: "test")
             },
-            cleaner: TextCleaner(), vocabulary: [], prompt: Task { "" }, cleanupEnabled: false
+            cleaner: TextCleaner(), vocabulary: [], plan: Task { CleanupPlan(prompt: "", mode: .heavy) }, cleanupEnabled: false
         )
         stream.onPreview = { previews.append($0) }
         defer { stream.cancel() }
@@ -46,7 +46,7 @@ import Testing
         var finishTranscription: CheckedContinuation<TranscriptionResult, Never>?
         let stream = StreamingDictation(
             transcribe: { _ in await withCheckedContinuation { finishTranscription = $0 } },
-            cleaner: TextCleaner(), vocabulary: [], prompt: Task { "" }, cleanupEnabled: false
+            cleaner: TextCleaner(), vocabulary: [], plan: Task { CleanupPlan(prompt: "", mode: .heavy) }, cleanupEnabled: false
         )
         stream.onPreview = { previews.append($0) }
         stream.feed(speechWithPause())
@@ -62,7 +62,7 @@ import Testing
         var previews: [String] = []
         let stream = StreamingDictation(
             transcribe: { _ in TranscriptionResult(text: "um ship it", audioSeconds: 1, processingSeconds: 0, model: "test") },
-            cleaner: TextCleaner(), vocabulary: [], prompt: Task { "" }, cleanupEnabled: true, steps: ["fillers"]
+            cleaner: TextCleaner(), vocabulary: [], plan: Task { CleanupPlan(prompt: "", mode: .heavy) }, cleanupEnabled: true, steps: ["fillers"]
         )
         stream.onPreview = { previews.append($0) }
         let result = try #require(await stream.finish(samples: [0.5], released: .now))
@@ -74,7 +74,7 @@ import Testing
         var previews: [String] = []
         let stream = StreamingDictation(
             transcribe: { _ in TranscriptionResult(text: "Still talking", audioSeconds: 1, processingSeconds: 0, model: "test") },
-            cleaner: TextCleaner(), vocabulary: [], prompt: Task { "" }, cleanupEnabled: false
+            cleaner: TextCleaner(), vocabulary: [], plan: Task { CleanupPlan(prompt: "", mode: .heavy) }, cleanupEnabled: false
         )
         stream.onPreview = { previews.append($0) }
         defer { stream.cancel() }
@@ -91,7 +91,7 @@ import Testing
                 calls += 1
                 return TranscriptionResult(text: calls == 1 ? "First draft" : "First sentence.", audioSeconds: 1, processingSeconds: 0, model: "test")
             },
-            cleaner: TextCleaner(), vocabulary: [], prompt: Task { "" }, cleanupEnabled: false
+            cleaner: TextCleaner(), vocabulary: [], plan: Task { CleanupPlan(prompt: "", mode: .heavy) }, cleanupEnabled: false
         )
         stream.onPreview = { previews.append($0) }
         defer { stream.cancel() }

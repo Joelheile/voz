@@ -57,7 +57,7 @@ final class StreamingDictation {
     private let transcribe: SegmentTranscriber
     private let cleaner: TextCleaner
     private let vocabulary: [String]
-    private let prompt: Task<String, Never>
+    private let plan: Task<CleanupPlan, Never>
     private let cleanupEnabled: Bool
     private let steps: [String]
     private let extensions: CleanupExtensions
@@ -81,7 +81,7 @@ final class StreamingDictation {
         transcribe: @escaping SegmentTranscriber,
         cleaner: TextCleaner,
         vocabulary: [String],
-        prompt: Task<String, Never>,
+        plan: Task<CleanupPlan, Never>,
         cleanupEnabled: Bool,
         steps: [String] = CleanupStep.standard,
         extensions: CleanupExtensions = .none
@@ -89,7 +89,7 @@ final class StreamingDictation {
         self.transcribe = transcribe
         self.cleaner = cleaner
         self.vocabulary = vocabulary
-        self.prompt = prompt
+        self.plan = plan
         self.cleanupEnabled = cleanupEnabled
         self.steps = steps
         self.extensions = extensions
@@ -135,7 +135,7 @@ final class StreamingDictation {
         closed = true
         onPreview = nil
         interim?.cancel()
-        prompt.cancel()
+        plan.cancel()
         for segment in segments {
             segment.transcription.cancel()
             segment.collection?.cancel()
@@ -176,7 +176,7 @@ final class StreamingDictation {
         rest.cancel()
         for segment in segments { segment.collection?.cancel() }
         speculation?.result.cancel()
-        prompt.cancel()
+        plan.cancel()
         let cleanupWait = ContinuousClock.now - transcribedAt
 
         let raws = results.map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -303,7 +303,8 @@ final class StreamingDictation {
             return CleanedText(text: raw, fillerWordsRemoved: 0, milliseconds: 0, timedOut: false, rejection: nil)
         }
         let deadline = releaseDeadline ?? ContinuousClock.now + CleanupBudget.segmentTimeout
-        return await cleaner.clean(raw, prompt: await prompt.value, vocabulary: vocabulary, steps: steps, extensions: extensions, deadline: deadline)
+        let plan = await plan.value
+        return await cleaner.clean(raw, prompt: plan.prompt, vocabulary: vocabulary, steps: plan.mode.steps(steps), extensions: extensions, deadline: deadline)
     }
 
     private func wait(for task: Task<Void, Never>, until deadline: ContinuousClock.Instant) async {

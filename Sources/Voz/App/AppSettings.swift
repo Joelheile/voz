@@ -12,6 +12,7 @@ private enum SettingsKey {
     static let launchAtLogin = "launchAtLogin"
     static let onboardingCompleted = "onboardingCompleted"
     static let cleanupEnabled = "cleanupEnabled"
+    static let cleanupMode = "cleanupMode"
     static let analyticsEnabled = "analyticsEnabled"
     static let receiveBetaUpdates = "receiveBetaUpdates"
     static let errorReportsEnabled = "errorReportsEnabled"
@@ -74,6 +75,9 @@ final class AppSettings: ObservableObject {
     }
     @Published var cleanupEnabled: Bool {
         didSet { defaults.set(cleanupEnabled, forKey: SettingsKey.cleanupEnabled) }
+    }
+    @Published var cleanupMode: CleanupMode {
+        didSet { defaults.set(cleanupMode.rawValue, forKey: SettingsKey.cleanupMode) }
     }
     @Published var analyticsEnabled: Bool {
         didSet { defaults.set(analyticsEnabled, forKey: SettingsKey.analyticsEnabled) }
@@ -139,6 +143,7 @@ final class AppSettings: ObservableObject {
         milestoneShows = defaults.integer(forKey: SettingsKey.milestoneShows)
         milestonesSeen = defaults.dictionary(forKey: SettingsKey.milestonesSeen) as? [String: Int] ?? [:]
         cleanupEnabled = defaults.bool(forKey: SettingsKey.cleanupEnabled)
+        cleanupMode = defaults.string(forKey: SettingsKey.cleanupMode).flatMap(CleanupMode.init) ?? .heavy
         analyticsEnabled = defaults.bool(forKey: SettingsKey.analyticsEnabled)
         receiveBetaUpdates = defaults.bool(forKey: SettingsKey.receiveBetaUpdates)
         errorReportsEnabled = defaults.bool(forKey: SettingsKey.errorReportsEnabled)

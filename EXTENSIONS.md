@@ -54,6 +54,7 @@ The interview is done when you can state the extension in one sentence that name
 | A spoken phrase that does something, such as "send it" or "make a ticket" | [`registerCommand`](#api)                                                       |
 | A dictation that becomes data, such as "todo call Milan tomorrow"         | `registerCommand` with `at: "start"` and [`ctx.generate`](#on-device-model)     |
 | A different writing style in some apps                                    | `beforeCleanup`, adding to the prompt ([example](#per-app-prompts))             |
+| Light cleanup in some apps, such as notes where you think out loud        | `beforeCleanup`, returning `{ mode: "light" }` ([example](#per-app-prompts))    |
 | A fixed text rule, such as a regex or word replacement                    | [`registerCleanupStep`](#models-and-cleanup-steps)                              |
 | The final say over what gets typed, or to type nothing                    | `beforeInsert`                                                                  |
 | Dictations saved or sent somewhere after they are typed                   | `afterInsert`                                                                   |
@@ -152,7 +153,7 @@ An extension does four kinds of things. The kind sets how much time it gets:
 
 | Member                                          | What it does                                                                                                                                                                                                                                          |
 | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `voz.on("beforeCleanup", handler)`              | Runs before the on-device model cleans up the text. Return `{ prompt }` to change the cleanup prompt for this dictation. Handlers run in load order, and each one gets the previous one's prompt.                                                     |
+| `voz.on("beforeCleanup", handler)`              | Runs before Voz cleans up the text. Return `{ prompt }` to change the cleanup prompt, or `{ mode }` to change the cleanup mode, for this dictation. Handlers run in load order, and each one gets the previous one's prompt and mode.              |
 | `voz.on("beforeInsert", handler)`               | Runs before Voz inserts text. Return `{ text }` to replace it. Return `{ text: "" }` to insert nothing and skip the remaining handlers. Handlers run in load order, and each one gets the previous one's text.                                        |
 | `voz.on("afterRecording", handler)`             | Runs after each recording with a 16 kHz mono WAV file. Voz deletes the file after all handlers finish. Voz does not wait for it.                                                                                                                      |
 | `voz.on("afterInsert", handler)`                | Runs after Voz inserts text. Voz does not wait for it.                                                                                                                                                                                                |
@@ -170,7 +171,7 @@ An extension does four kinds of things. The kind sets how much time it gets:
 
 Every handler gets `(event, ctx)`.
 
-- The `beforeCleanup` event has `prompt`, the prompt from Settings
+- The `beforeCleanup` event has `prompt`, the prompt from Settings, and `mode`, `"light"` or `"heavy"`. Light skips the cleanup model, so every spoken word stays except obvious fillers
 - The `beforeInsert` event has `text` (cleaned) and `raw` (before cleanup)
 - The `afterRecording` event has `path` and `seconds`
 - The `afterInsert` event has `text` (what Voz inserted) and `raw`
@@ -359,6 +360,20 @@ export default defineExtension((voz) => {
 });
 ```
 
+Settings has a cleanup mode: Heavy runs the cleanup model, Light skips it and keeps your words. To keep your words in some apps only, return a mode:
+
+```ts
+import { defineExtension } from "voz";
+
+const thinkingApps = ["md.obsidian", "com.apple.Notes"];
+
+export default defineExtension((voz) => {
+  voz.on("beforeCleanup", (event, ctx) => {
+    if (thinkingApps.includes(ctx.app.bundleID ?? "")) return { mode: "light" };
+  });
+});
+```
+
 ## Models and cleanup steps
 
 Voz runs each dictation through a speech model, then through cleanup steps in order. The built-in steps are `fillers`, `punctuation`, `dictionary` and `model`. The `model` step uses the cleanup model.
@@ -437,22 +452,23 @@ voz remove voz-jira
 - Packages only change when you run `voz update`. Voz never updates them on its own
 - Voz never runs install scripts
 - Installed packages are listed in `~/.voz/settings.json`
-- See [Versions](#versions) for `"voz": { "apiVersion": 4 }` in `package.json`
+- See [Versions](#versions) for `"voz": { "apiVersion": 5 }` in `package.json`
 
 ## Versions
 
-`"voz": { "apiVersion": 4 }` in `package.json` names the Voz API your package is written for. It works like `swift-tools-version` in a Swift package:
+`"voz": { "apiVersion": 5 }` in `package.json` names the Voz API your package is written for. It works like `swift-tools-version` in a Swift package:
 
 - `voz new` writes the current version. The number is also in `voz.d.ts` as `apiVersion`, and `import { apiVersion } from "voz"` gives the version of the Voz that runs
 - When you use something new, raise it to the number in `voz.d.ts`
 - An older Voz shows "Update Voz" instead of loading a package written for a newer API
 - A newer Voz runs a package with the API it was written for. API 4 is the last version that changes or removes anything. Later versions only add
-- A package without `apiVersion`, and every file in `~/.voz/extensions`, gets API 4 plus everything older versions had
+- A package without `apiVersion`, and every file in `~/.voz/extensions`, gets the current API plus everything older versions had
 
 What each version changed, and what older packages keep:
 
 | Version | Changes                                                                                                                                          | Older packages keep                                                                       |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| 5       | Adds `mode` to the `beforeCleanup` event and result                                                                                              |                                                                                           |
 | 4       | Adds `voz.startActivity`, `voz.addHistory`, and `hidden` with `update({ hidden })` for actions. `registerCommand` takes one object. `recording` is now `afterRecording`. `ctx` in transform hooks is typed as `{ app }`. Dropped `ctx` calls are logged | `registerCommand(phrase, handler, { at })` and `on("recording")`                          |
 | 3       | Adds `audioDrop` and `ctx.transcribe`                                                                                                            |                                                                                           |
 | 2       | Adds `at: "start"` and `ctx.generate`. Removes `voz.config`, `voz.log`, `voz.events`, `voz.paths.home` and `{ handled: true }` from `beforeInsert` | All of them. New code uses `voz.settings`, `console.log` and `{ text: "" }`               |
