@@ -14,9 +14,6 @@ final class Analytics {
         Analytics.report(.appHang)
         PostHogSDK.shared.flush()
     }
-    private var sessionStarted: SuspendingClock.Instant?
-    private var session: UsageSession?
-    private var heartbeat: Timer?
     private var isSetUp = false
 
     var isEnabled: Bool { Self.sharesUsage.load(ordering: .relaxed) || Self.reportsErrors.load(ordering: .relaxed) }
@@ -30,7 +27,7 @@ final class Analytics {
     func setConsent(usage: Bool, errors: Bool) {
         let usage = usage && SystemContext.isOfficialBuild
         let errors = errors && SystemContext.isOfficialBuild
-        let usageChanged = Self.sharesUsage.exchange(usage, ordering: .relaxed) != usage
+        Self.sharesUsage.store(usage, ordering: .relaxed)
         let errorsChanged = Self.reportsErrors.exchange(errors, ordering: .relaxed) != errors
         if usage || errors {
             setUpIfNeeded()
@@ -39,7 +36,6 @@ final class Analytics {
             PostHogSDK.shared.optOut()
         }
         if errorsChanged { errors ? watchdog.start() : watchdog.stop() }
-        if usageChanged { usage ? startSession() : stopSession() }
     }
 
     func capture(_ event: AnalyticsEvent) {
@@ -87,36 +83,6 @@ final class Analytics {
 
     nonisolated static func allows(_ eventName: String, usage: Bool, errors: Bool) -> Bool {
         eventName == "$exception" ? errors : usage
-    }
-
-    private func startSession() {
-        sessionStarted = .now
-        session = UsageSession(startedAt: 0)
-        capture(.appSession(seconds: 0, state: .started))
-        heartbeat = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.checkpoint(.heartbeat) }
-        }
-    }
-
-    private func stopSession() {
-        heartbeat?.invalidate()
-        heartbeat = nil
-        session = nil
-        sessionStarted = nil
-    }
-
-    func finishSession() {
-        checkpoint(.ended)
-        heartbeat?.invalidate()
-        heartbeat = nil
-    }
-
-    private func checkpoint(_ state: SessionState) {
-        guard let sessionStarted, var session else { return }
-        let seconds = Int((SuspendingClock.now - sessionStarted).components.seconds)
-        let elapsed = session.checkpoint(at: seconds)
-        self.session = state == .ended ? nil : session
-        capture(.appSession(seconds: elapsed, state: state))
     }
 
     func flush() {
@@ -184,11 +150,11 @@ enum SystemContext {
         "chip": chip,
     ]
 
-    private static var chip: String {
+    static let chip: String = {
         var size = 0
         guard sysctlbyname("machdep.cpu.brand_string", nil, &size, nil, 0) == 0 else { return "unknown" }
         var buffer = [UInt8](repeating: 0, count: size)
         guard sysctlbyname("machdep.cpu.brand_string", &buffer, &size, nil, 0) == 0 else { return "unknown" }
         return String(decoding: buffer.prefix { $0 != 0 }, as: UTF8.self)
-    }
+    }()
 }

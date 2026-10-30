@@ -140,6 +140,7 @@ final class DictationPipeline {
     }
 
     private func report(_ record: TranscriptRecord, model: String, insertMs: Int, trigger: DictationTrigger) {
+        VersionPinger.recordActiveDay(model: SpeechModel.analyticsLabel(for: model))
         analytics.capture(.dictationCompleted(DictationMetrics(
             audioSeconds: record.audioSeconds,
             wordCount: record.wordCount,

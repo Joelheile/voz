@@ -1,14 +1,7 @@
 import Testing
 @testable import Voz
 
-struct UsageSessionTests {
-    @Test func reportsOnlyTimeSinceLastCheckpoint() {
-        var session = UsageSession(startedAt: 10)
-        #expect(session.checkpoint(at: 70) == 60)
-        #expect(session.checkpoint(at: 100) == 30)
-        #expect(session.checkpoint(at: 100) == 0)
-    }
-
+struct AnalyticsEventTests {
     @Test func boundedFailureCodesExcludeContent() {
         let event = AnalyticsEvent.dictationFailed(stage: .transcription, errorCode: .transcriptionFailed)
         #expect(event.failure?.stage == "transcription")
@@ -19,7 +12,6 @@ struct UsageSessionTests {
         #expect(AppError.accessibilityDenied.stage == "delivery")
         let interrupted = AnalyticsEvent.dictationFailed(stage: .recording, errorCode: .recorderInterrupted)
         #expect(interrupted.failure?.code == "recorder_interrupted")
-        #expect(AnalyticsEvent.appSession(seconds: 60, state: .heartbeat).properties == ["seconds": .integer(60), "state": .text("heartbeat")])
     }
 
     @Test func errorReportsAndUsageFollowTheirOwnSetting() {
@@ -53,10 +45,9 @@ struct VersionPingQueueTests {
     @Test func retriesKeepPayloadAndAcknowledgementRemovesOnlySentPing() throws {
         let restore = makeVersionPingQueue()
         let queue = try restore()
-        let (pingID, pingIDText) = makePingID()
-        try queue.enqueue(.install, version: "1.0", previous: nil, pingID: pingID, projectToken: "test")
+        try queue.enqueue(VersionPing.install.body(version: "1.0", previous: nil, projectToken: "test"))
         let install = try #require(queue.pending.first)
-        try queue.enqueue(.update, version: "1.1-beta.4", previous: "1.0", pingID: pingID, projectToken: "test")
+        try queue.enqueue(VersionPing.update.body(version: "1.1-beta.4", previous: "1.0", projectToken: "test"))
         let restored = try restore()
         #expect(restored.pending.first == install)
         let payload = try decodeVersionPing(install)
@@ -64,8 +55,7 @@ struct VersionPingQueueTests {
         #expect(!payload.uuid.isEmpty)
         #expect(!payload.timestamp.isEmpty)
         let update = try decodeVersionPing(#require(restored.pending.last))
-        #expect(update.distinctID == pingIDText)
-        #expect(payload.distinctID == pingIDText)
+        #expect(update.distinctID != payload.distinctID)
         #expect(payload.properties.kind == "install")
         #expect(payload.properties.channel == "stable")
         #expect(payload.properties.previous == nil)
@@ -77,6 +67,30 @@ struct VersionPingQueueTests {
         #expect(try restore().pending.count == 1)
         try restored.clear()
         #expect(try restore().pending.isEmpty)
+    }
+}
+
+struct DailyActivePingTests {
+    @Test func claimsEachUTCDayOnce() {
+        let defaults = makeDefaults()
+        let evening = utcDate("2026-10-30T23:30:00Z")
+        #expect(DailyActivePing.claimDay(now: evening, defaults: defaults))
+        #expect(!DailyActivePing.claimDay(now: evening.addingTimeInterval(60), defaults: defaults))
+        #expect(DailyActivePing.claimDay(now: evening.addingTimeInterval(3600), defaults: defaults))
+    }
+
+    @Test func carriesOnlyCoarseContextUnderTheInstallID() throws {
+        let (installID, installIDText) = makePingID()
+        let body = try DailyActivePing.body(version: "0.0.5-beta.3", model: "parakeet", installID: installID, projectToken: "test")
+        let payload = try decodeDailyActivePing(body)
+        #expect(payload.event == "daily_active")
+        #expect(payload.distinctID == installIDText)
+        #expect(payload.properties.version == "0.0.5-beta.3")
+        #expect(payload.properties.channel == "beta")
+        #expect(payload.properties.model == "parakeet")
+        #expect(payload.properties.osMajor > 0)
+        #expect(!payload.properties.processPersonProfile)
+        #expect(payload.properties.geoIPDisable)
     }
 }
 

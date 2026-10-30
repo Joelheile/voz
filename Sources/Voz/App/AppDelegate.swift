@@ -143,7 +143,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         VersionPinger.sendPending(launch: launch)
         updater.start()
-        analytics.capture(.appLaunched(byLaunchAgent: LaunchAgent.launchedByLaunchd))
         manageLaunchAgent()
     }
 
@@ -168,16 +167,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func manageLaunchAgent() {
         guard settings.launchAtLogin else {
             LaunchAgent.unregisterIfRegistered()
-            return openIfUserLaunched()
+            return finishLaunch()
         }
         Task {
-            guard await LaunchAgent.handOver() else { return openIfUserLaunched() }
+            guard await LaunchAgent.handOver() else { return finishLaunch() }
             OpenRequest.deferToNextLaunch()
             NSApp.perform(#selector(NSApplication.terminate(_:)), with: nil, afterDelay: 0)
         }
     }
 
-    private func openIfUserLaunched() {
+    /// Runs only in the instance that keeps running, so a launch handed over to the launch agent counts once.
+    private func finishLaunch() {
+        analytics.capture(.appLaunched(byLaunchAgent: LaunchAgent.launchedByLaunchd))
         if OpenRequest.takePending() || !LaunchAgent.launchedByLaunchd {
             statusItemController?.open()
         }
@@ -199,7 +200,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard analytics.isEnabled else { return .terminateNow }
-        analytics.finishSession()
         analytics.flush()
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             NSApp.reply(toApplicationShouldTerminate: true)
