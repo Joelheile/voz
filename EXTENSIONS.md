@@ -360,7 +360,7 @@ export default defineExtension((voz) => {
 });
 ```
 
-Settings has a cleanup mode: Heavy runs the cleanup model, Light skips it and keeps your words. To keep your words in some apps only, return a mode:
+Settings has a cleanup mode. Heavy runs the cleanup model. Light runs no model, neither Apple's nor one from an extension, so your words stay as you said them and the prompt has no effect. To keep your words in some apps only, return a mode:
 
 ```ts
 import { defineExtension } from "voz";
@@ -371,6 +371,15 @@ export default defineExtension((voz) => {
   voz.on("beforeCleanup", (event, ctx) => {
     if (thinkingApps.includes(ctx.app.bundleID ?? "")) return { mode: "light" };
   });
+});
+```
+
+A prompt only applies when the model runs. If your extension needs its prompt, return `mode: "heavy"` with it, for the apps it handles:
+
+```ts
+voz.on("beforeCleanup", (event, ctx) => {
+  if (ctx.app.bundleID !== "com.apple.mail") return;
+  return { prompt: event.prompt + "\n\nFormat it as an email with a greeting and a sign-off.", mode: "heavy" };
 });
 ```
 
