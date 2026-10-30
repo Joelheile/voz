@@ -108,11 +108,11 @@ Install one from the menu bar, or run `voz install voz-meeting`. [Browse extensi
 ## What's new
 
 <!-- changelog -->
+- Voz sends one anonymous ping on days you dictate, never what you said
 - Transcribe dropped files about four times faster, and hover the progress ring to cancel
 - Your last word no longer gets cut off when you release the hotkey early
 - Find settings faster, with release notes one click away at the top
 - Open your dictionary straight from the main panel
-- Quit Voz from the bottom of Settings
 
 [See everything new](CHANGELOG.md)
 <!-- /changelog -->

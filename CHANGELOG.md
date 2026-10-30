@@ -4,6 +4,7 @@ Newest first. To get beta changes now, turn on Beta updates under What's new in 
 
 ## In beta
 
+- Voz sends one anonymous ping on days you dictate, never what you said
 - Transcribe dropped files about four times faster, and hover the progress ring to cancel
 - Your last word no longer gets cut off when you release the hotkey early
 - Find settings faster, with release notes one click away at the top
