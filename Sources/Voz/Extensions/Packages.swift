@@ -88,7 +88,7 @@ enum PackageSource: Equatable, Sendable, CustomStringConvertible {
         }
         if location.hasSuffix(".git") { location = String(location.dropLast(4)) }
         let parts = location.split(separator: "/", maxSplits: 1).map(String.init)
-        guard parts.count == 2, isSafeToken(parts[0][...]), isSafePath(parts[1]), ref.map(isSafePath) != false else { throw .unrecognized(raw) }
+        guard parts.count == 2, isSafePath(parts[0]), isSafePath(parts[1]), ref.map(isSafePath) != false else { throw .unrecognized(raw) }
         return .git(host: parts[0], path: parts[1], ref: ref)
     }
 

@@ -194,7 +194,7 @@ struct ProgressRing: View {
                 .trim(from: 0, to: progress)
                 .stroke(.primary.opacity(0.9), style: StrokeStyle(lineWidth: Self.lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-            Icon(.x, size: 8, strokeWidth: 2.5)
+            Icon(.x, size: 8, strokeWidth: 2.25)
                 .foregroundStyle(.primary)
                 .opacity(showsCancel ? 1 : 0)
         }

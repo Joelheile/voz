@@ -164,10 +164,12 @@ struct ExtensionHostTests {
         let pack = home.packages.appendingPathComponent("git/github.com/acme/voz-pack")
         try writeFile(#"{"name":"voz-pack","voz":{"extensions":["src/main.ts"]}}"#, named: "package.json", in: pack)
         try writeFile(#"export default (voz) => voz.on("beforeInsert", (e) => ({ text: e.text.toUpperCase() }))"#, named: "main.ts", in: pack.appendingPathComponent("src"))
-        let host = makeHost(packages: [distOnly.path, pack.path])
+        let malformed = home.packages.appendingPathComponent("node_modules/voz-malformed")
+        try writeFile(#"{"name": "voz-malformed","#, named: "package.json", in: malformed)
+        let host = makeHost(packages: [distOnly.path, malformed.path, pack.path])
         let manifest = try await host.start(timeout: .seconds(5))
         #expect(Set(manifest.extensions) == ["noisy", "voz-pack"])
-        #expect(Set(manifest.errors.map(\.extension)) == ["broken", "partial", "hang", "voz-dist"])
+        #expect(Set(manifest.errors.map(\.extension)) == ["broken", "partial", "hang", "voz-dist", "voz-malformed"])
         #expect(await host.beforeInsert(text: "hi", raw: "hi", app: app, timeout: .seconds(2)) == "HI!")
         await host.stop()
     }
@@ -502,4 +504,11 @@ struct ExtensionHostTests {
     #expect(ExtensionsModel.displayName("voz-mcp") == "MCP")
     #expect(ExtensionsModel.displayName("@joel/voz-transcribe-file") == "Transcribe File")
     #expect(ExtensionsModel.displayName("notes") == "Notes")
+}
+
+@Test func gitSourcesRejectDotHostsThatEscapeTheGitFolder() throws {
+    #expect(try parseSource("git:github.com/me/repo") == .git(host: "github.com", path: "me/repo", ref: nil))
+    for raw in ["git:../me/repo", "git:./me/repo", "https://../me/repo"] {
+        #expect(throws: PackageSourceError.unrecognized(raw)) { try parseSource(raw) }
+    }
 }

@@ -48,7 +48,7 @@ struct ModelStatusLabel: View {
         case let .ready(bytes):
             Text("Ready, \(bytes.formatted(.byteCount(style: .file)))")
         case let .failed(message):
-            Text("Failed: \(message)").foregroundStyle(.red)
+            Text("Failed: \(message)").foregroundStyle(Theme.failure)
         }
     }
 }

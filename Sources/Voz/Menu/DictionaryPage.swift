@@ -58,7 +58,7 @@ struct DictionaryPage: View {
                     .buttonStyle(.pill(.accent, .small))
                     .help("Add \(entry.word) (Return)")
                     .padding(.trailing, -8)
-                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                    .popIn(from: 0.9)
             }
         }
         .fieldBackground()

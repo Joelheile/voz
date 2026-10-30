@@ -90,7 +90,7 @@ struct ModelOptionRow: View {
                     if selected {
                         Icon(.check, size: 13)
                             .foregroundStyle(Theme.accent)
-                            .transition(.scale(scale: 0.6).combined(with: .opacity))
+                            .popIn()
                     }
                 }
                 .frame(width: 14)

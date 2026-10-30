@@ -6,47 +6,45 @@ Newest first. To get beta changes now, turn on Beta updates under What's new in 
 
 - Pick Light cleanup to keep every word when you think out loud
 - Voz sends one anonymous ping on days you dictate, never what you said
-- Transcribe dropped files about four times faster, and hover the progress ring to cancel
+- Hover the progress ring to cancel a file transcription
 - Your last word no longer gets cut off when you release the hotkey early
 - Find settings faster, with release notes one click away at the top
 - Open your dictionary straight from the main panel
 - Quit Voz from the bottom of Settings
-- See how many times faster than typing you speak, on a pace gauge in Insights
-- See your word, streak and time-saved milestones right in the panel
-- Claude Code now reads the Voz extension guide when you build an extension in ~/.voz
-- Copy a debug log from Privacy in Settings to report problems or debug an extension
-- Extensions can show a recording in the menu bar and let you stop it from the Voz panel
+- See how many times faster than typing you speak in Insights
+- Claude Code reads the Voz extension guide when you build an extension
+- Copy a debug log from Privacy in Settings to report problems
+- See extension recordings in the menu bar and stop them from the panel
 - Extension actions can now record or transcribe for as long as they need
 - Extensions can add entries, such as meeting transcripts, to your Voz history
 - Transcripts from extensions use your dictionary and show progress in the notch
 - On screens without a notch, the recording pill now sits above the Dock
-- Drop an audio or video file on the indicator to transcribe it with an extension
+- Drop an audio or video file on the indicator to transcribe it
 - Track your dictation streak, speaking pace and time saved in Insights
 - Fix words Voz keeps mishearing with dictionary rules, like voss → Voz
-- Preview your words below the recording indicator while you speak. Turn on Live preview in Settings
-- Text appears sooner after you stop talking, and the first dictation after launch transcribes faster
+- Preview your words under the indicator while you speak. See Live preview in Settings
+- Text appears sooner after you stop, and the first dictation after launch is faster
 - A cleaner panel that opens and switches pages instantly
 - The dictionary learns words from names you spell out and corrections you say
 - Find, add and accept dictionary words from one field
 - Cleanup now fixes whole sentences across pauses
-- The hotkey starts recording on the first press after your Mac wakes or switches microphones
+- The hotkey records on the first press after wake or a microphone switch
 - Voz no longer freezes when your microphone changes, like when AirPods disconnect
 - Voz tells you when it can't start recording
 - Voz starts faster after an install or update
 - Updates arrive within an hour of release
-- Crash and freeze reports are on by default, with their own switch under Privacy. They never include text or audio
-- Extensions get a simpler list, with a page for each one that shows what it does
+- Crash reports are on, never with text or audio. Turn them off in Privacy
+- Extensions get a simpler list, with a page that shows what each one does
 - Run extension actions from buttons at the bottom of the panel
 - Turn on an extension's cleanup steps from its page
 - Copy a Claude Code prompt from the Extensions page to build your own extension
-- Extensions can use the on-device model and run commands you say at the start of a dictation
+- Extensions can use the on-device model and handle commands you say first
 - Extensions written for the first extension API, such as voz-autocorrect and voz-meeting, load again
 - Extensions that miss their deadline can no longer change your text
 - `ctx.generate` gives a clear error when a required field doesn't exist
 - Long notifications show in full
-- The Voz face is back in the menu bar, and it turns white on dark menu bars
+- The Voz face is back in the menu bar, turning white on dark bars
 - Small bars in Top apps stay visible
-- Dragging a TypeScript file no longer opens the drop zone
 - When you reach a word, streak or time-saved milestone, the panel shows it once
 
 ## 0.0.5 (October 22, 2026)

@@ -37,7 +37,7 @@ struct DebugLog: Sendable {
             try? manager.moveItem(at: file, to: previousFile)
         }
         guard let handle = try? FileHandle(forWritingTo: file) else {
-            manager.createFile(atPath: file.path, contents: line, attributes: [.posixPermissions: 0o600])
+            manager.createFile(atPath: file.path, contents: line, attributes: [.posixPermissions: AppStorage.filePermissions])
             return
         }
         defer { try? handle.close() }

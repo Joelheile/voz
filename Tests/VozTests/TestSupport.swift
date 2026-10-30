@@ -129,6 +129,10 @@ func localSource(_ path: String) -> PackageSource {
     .local(URL(fileURLWithPath: path))
 }
 
+func parseSource(_ raw: String) throws(PackageSourceError) -> PackageSource {
+    try PackageSource(parsing: raw, relativeTo: URL(fileURLWithPath: "/"))
+}
+
 func makeVersionPingQueue() -> () throws -> VersionPingQueue {
     let suite = UUID().uuidString
     let defaults = UserDefaults(suiteName: suite)!

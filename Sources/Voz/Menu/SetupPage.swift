@@ -79,7 +79,7 @@ struct SetupPage: View {
     private func go(to index: Int) {
         guard let step = SetupStep(rawValue: index) else { return }
         forward = step.rawValue > model.step.rawValue
-        withAnimation(.spring(duration: 0.32, bounce: 0)) { model.step = step }
+        withAnimation(.spring(duration: 0.28, bounce: 0)) { model.step = step }
     }
 }
 
@@ -94,7 +94,7 @@ private struct StepProgress: View {
                     .frame(width: 20, height: 3)
             }
         }
-        .animation(.spring(duration: 0.32, bounce: 0), value: current)
+        .animation(.spring(duration: 0.28, bounce: 0), value: current)
         .accessibilityElement()
         .accessibilityLabel("Step \(current.rawValue + 1) of \(SetupStep.allCases.count)")
     }
@@ -230,7 +230,7 @@ private struct TryStep: View {
             if let tried {
                 Icon(.circleCheck, size: 15)
                     .foregroundStyle(Theme.accent)
-                    .transition(.scale(scale: 0.6).combined(with: .opacity))
+                    .popIn()
                 Text(tried.finalText)
                     .font(.ui(13))
                     .foregroundStyle(Theme.ink)
@@ -250,7 +250,7 @@ private struct TryStep: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 2)
-        .animation(.spring(duration: 0.4, bounce: 0.2), value: tried?.id)
+        .animation(.spring(duration: 0.28, bounce: 0.2), value: tried?.id)
     }
 }
 
@@ -266,9 +266,9 @@ private struct KeyCap: View {
             .contentTransition(.interpolate)
             .padding(.horizontal, 18)
             .frame(minWidth: 64, minHeight: 48)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous)
                     .strokeBorder(listening ? Theme.accent : Theme.hairline, lineWidth: listening ? 1.5 : 1)
             )
             .shadow(color: .black.opacity(pressed ? 0 : 0.08), radius: 0, y: pressed ? 0 : 2)

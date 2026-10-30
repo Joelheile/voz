@@ -40,9 +40,9 @@ final class DictationPipeline {
 
     func makeStreaming(app: HostApp) -> StreamingDictation {
         let plan = CleanupPlan(prompt: settings.cleanupPrompt, mode: settings.cleanupMode)
-        let vocabulary = vocabularyWords()
+        let vocabulary = history.vocabulary.wordsOrLogged()
         return StreamingDictation(
-            transcribe: applying(vocabularyRules(), to: transcriber(app: app, vocabulary: vocabulary)),
+            transcribe: applying(history.vocabulary.rulesOrLogged(), to: transcriber(app: app, vocabulary: vocabulary)),
             cleaner: cleaner,
             vocabulary: vocabulary,
             plan: Task { [extensions] in await extensions.cleanupPlan(plan, app: app) },
@@ -119,24 +119,6 @@ final class DictationPipeline {
         let candidates = SpokenCandidates.find(in: raw, isKnownWord: EditObserver.isKnownWord)
         guard !candidates.isEmpty else { return }
         Task { [vocabularyLearner] in await vocabularyLearner.consider(candidates) }
-    }
-
-    private func vocabularyRules() -> [VocabularyRule] {
-        do {
-            return try history.vocabulary.rules()
-        } catch {
-            Log.app.error("Vocabulary rules read failed: \(error.localizedDescription, privacy: .private)")
-            return []
-        }
-    }
-
-    private func vocabularyWords() -> [String] {
-        do {
-            return try history.vocabulary.words()
-        } catch {
-            Log.app.error("Vocabulary read failed: \(error.localizedDescription, privacy: .private)")
-            return []
-        }
     }
 
     private func report(_ record: TranscriptRecord, model: String, insertMs: Int, trigger: DictationTrigger) {

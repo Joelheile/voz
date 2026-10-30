@@ -122,7 +122,7 @@ private struct SpeechModelCard: View {
                     Icon(.circleCheck, size: 15)
                         .foregroundStyle(Theme.accent)
                         .padding(8)
-                        .transition(.scale(scale: 0.6).combined(with: .opacity))
+                        .popIn()
                 }
             }
             .background { background }
