@@ -38,6 +38,7 @@ final class Dictation {
     var onChange: () -> Void = {}
     var onOutcome: (Outcome) -> Void = { _ in }
     var onBusy: () -> Void = {}
+    var onStartFailed: (String) -> Void = { _ in }
     var onPreview: (String) -> Void = { _ in }
 
     init(pipeline: DictationPipeline, settings: AppSettings, analytics: Analytics) {
@@ -75,6 +76,7 @@ final class Dictation {
         guard Permissions.microphoneGranted else {
             Log.app.error("Microphone access not granted")
             analytics.capture(.dictationFailed(stage: .recording, errorCode: .microphoneDenied))
+            if !Permissions.microphoneUndecided { onStartFailed("Allow microphone access for Voz in System Settings") }
             Task { await Permissions.requestMicrophone() }
             return
         }
@@ -92,8 +94,9 @@ final class Dictation {
             Log.app.notice("Recorder started in \((ContinuousClock.now - startClock).wholeMilliseconds) ms")
         } catch {
             session.cancel()
-            Log.app.error("Recording failed to start: \(error.localizedDescription, privacy: .private)")
+            Log.app.error("Recording failed to start (\((error as NSError).code, privacy: .public)): \(error.localizedDescription, privacy: .private)")
             analytics.capture(.dictationFailed(stage: .recording, errorCode: .recorderStartFailed))
+            onStartFailed("Could not start recording. Check your microphone.")
             return
         }
         streaming = session

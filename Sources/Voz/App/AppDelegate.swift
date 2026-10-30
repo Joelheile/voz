@@ -77,6 +77,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.indicator.sync(phase: self.dictation.phase)
             self.updater.resumePendingInstall()
         }
+        dictation.onStartFailed = { [toast] in toast.show($0) }
         hotkeyMonitor = HotkeyMonitor(
             hotkey: settings.hotkey,
             holdToTalk: settings.holdToTalk,
