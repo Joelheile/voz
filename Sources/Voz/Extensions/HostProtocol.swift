@@ -170,6 +170,7 @@ enum HostAction: Equatable, Sendable {
     case insert(String)
     case press(String)
     case notify(String)
+    case renameAction(id: String, name: String)
 }
 
 struct HostLaunchArguments: Encodable {
@@ -269,6 +270,11 @@ struct HostResponse<Result: Decodable>: Decodable {
 
 struct TextParams: Decodable {
     let text: String
+}
+
+struct RenameActionParams: Decodable {
+    let id: String
+    let name: String
 }
 
 struct PressParams: Decodable {

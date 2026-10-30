@@ -98,6 +98,10 @@ export type Action = {
   run(ctx: Context): Awaitable<void>;
 };
 
+export type ActionButton = {
+  rename(name: string): void;
+};
+
 type SettingBase = { title: string; description?: string };
 
 export type Setting =
@@ -146,7 +150,7 @@ export type ExtensionAPI = {
   registerSpeechModel(model: SpeechModel): void;
   registerCleanupModel(model: CleanupModel): void;
   registerCleanupStep(step: CleanupStep): void;
-  registerAction(action: Action): void;
+  registerAction(action: Action): ActionButton;
   settings<Schema extends SettingsSchema>(schema: Schema): SettingsValues<Schema>;
 };
 

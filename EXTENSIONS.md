@@ -234,6 +234,8 @@ voz.on("audioDrop", async ({ path }, ctx) => {
 ```
 
 - The result has `text`, `seconds`, `speakers` and `turns`. Each turn has `speaker` (1 is the first to talk), `start` and `end` in seconds, and `text`. Without `speakers`, all text is one turn
+- Voz fixes words from the user's dictionary in `text` and in each turn, the same way it does for dictation
+- The notch shows that Voz is transcribing until the call returns
 - Voz reads the formats AVFoundation reads: audio such as MP3, M4A, WAV, AIFF and FLAC, and video such as MP4, MOV and M4V, where it uses only the sound. It rejects MKV and WebM
 - It takes about a second per minute of audio, plus a few seconds the first time to load the models. The first diarization downloads a 95 MB model
 - It fails when the user picked Apple speech in Settings
@@ -289,6 +291,22 @@ voz.registerAction({
 ```
 
 The hotkey uses the same keys as `ctx.press`. If another app holds the hotkey, Voz shows a message and the button still works. An action runs until it finishes, so it can record or transcribe for as long as it needs.
+
+`registerAction` returns the button. Rename it to show what the next press does:
+
+```ts
+let recording = false;
+const button = voz.registerAction({
+  id: "meeting",
+  name: "Record meeting",
+  run: () => {
+    recording = !recording;
+    button.rename(recording ? "Stop recording" : "Record meeting");
+  },
+});
+```
+
+Packages that call `rename` set `"voz": { "apiVersion": 3 }`.
 
 ## Per-app prompts
 

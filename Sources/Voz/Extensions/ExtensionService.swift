@@ -63,6 +63,10 @@ final class ExtensionCatalog: ObservableObject {
         hostError = nil
     }
 
+    fileprivate func rename(_ id: String, to name: String) {
+        actions = actions.map { $0.id == id ? ExtensionAction(id: $0.id, name: name, hotkey: $0.hotkey, extension: $0.extension) : $0 }
+    }
+
     fileprivate func fail(_ message: String) {
         show(nil)
         hostError = message
@@ -91,6 +95,8 @@ final class ExtensionService {
     private let settings: AppSettings
     private let fileTranscriber: FileTranscriber
     let catalog = ExtensionCatalog()
+    var onFileTranscribing: () -> Void = {}
+    var onFileTranscribed: (_ succeeded: Bool) -> Void = { _ in }
     private var host: ExtensionHost?
     private var manifest: HostManifest?
     private var restarts = 0
@@ -291,9 +297,9 @@ final class ExtensionService {
                     self.hostExited(status)
                 }
             },
-            transcribeFile: { [weak self, fileTranscriber] params in
-                guard let model = await self?.settings.localSpeechModel else { throw CancellationError() }
-                return try await fileTranscriber.transcribe(URL(fileURLWithPath: params.path), model: model, speakers: params.speakers)
+            transcribeFile: { [weak self] params in
+                guard let self else { throw CancellationError() }
+                return try await self.transcribe(params)
             }
         )
         let manifest = try await host.start()
@@ -337,6 +343,18 @@ final class ExtensionService {
         }
     }
 
+    private func transcribe(_ params: TranscribeFileParams) async throws -> FileTranscript {
+        onFileTranscribing()
+        do {
+            let transcript = try await fileTranscriber.transcribe(URL(fileURLWithPath: params.path), model: settings.localSpeechModel, speakers: params.speakers)
+            onFileTranscribed(true)
+            return transcript
+        } catch {
+            onFileTranscribed(false)
+            throw error
+        }
+    }
+
     private func perform(_ action: HostAction) async {
         switch action {
         case .insert(let text):
@@ -349,6 +367,8 @@ final class ExtensionService {
             }
         case .notify(let text):
             toast.show(text)
+        case .renameAction(let id, let name):
+            catalog.rename(id, to: name)
         }
     }
 

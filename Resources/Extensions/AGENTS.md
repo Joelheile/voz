@@ -24,7 +24,7 @@ The full types are in `~/.voz/node_modules/voz/index.d.ts`. Read them before you
 6. `registerSpeechModel({ id, name, transcribe })`: a speech model. `transcribe` gets a WAV `path` and returns `{ text }`
 7. `registerCleanupModel({ id, name, clean })`: replaces the on-device cleanup model. `clean` gets `text` and `prompt` and returns `{ text }`
 8. `registerCleanupStep({ id, name, run })`: a cleanup step. `run` gets `text` and returns `{ text }`
-9. `registerAction({ id, name, hotkey, run })`: a button in the Voz panel, with an optional global hotkey such as `"ctrl+opt+j"`. `run` gets `ctx`
+9. `registerAction({ id, name, hotkey, run })`: a button in the Voz panel, with an optional global hotkey such as `"ctrl+opt+j"`. `run` gets `ctx`. It returns the button. Call `button.rename(name)` to show what the next press does
 10. `settings(schema)`: a settings form in the Extensions page. Returns the typed values with defaults filled in
 
 Registering a model or step only makes it available. The user picks it in Settings, or you set `speechModel`, `cleanupModel` or `cleanupSteps` in `~/.voz/settings.json` to `<extension name>/<id>`. `cleanupSteps` is the full ordered list, by default `["fillers", "punctuation", "dictionary", "model"]`
@@ -35,7 +35,7 @@ Registering a model or step only makes it available. The user picks it in Settin
 - A cleanup step has 300 ms, cut short if the cleanup budget runs out. A speech model has 2 seconds per part. A cleanup model has what is left of 1.5 seconds after the user stops talking. Prefer local, fast models. On failure or timeout Voz falls back to its built-in models
 - The default export has 3 seconds to finish. Register handlers there and do nothing slow
 - `ctx.generate({ prompt, instructions, schema })` returns JSON from Apple's on-device model that fits a JSON schema (`object`, `array`, `string` with `enum`, `number`, `integer`, `boolean`). Use it in commands to turn speech into fields. Pass today's date and valid names in the prompt. It takes 1 to 3 seconds
-- `ctx.transcribe(path, { speakers: true })` transcribes an audio or video file with Parakeet and splits it into speaker turns. Use it in `voz.on("audioDrop", ...)`, which runs when the user drops an audio or video file on the notch
+- `ctx.transcribe(path, { speakers: true })` transcribes an audio or video file with Parakeet and splits it into speaker turns. It fixes words from the user's dictionary, and the notch shows that Voz is transcribing. Use it in `voz.on("audioDrop", ...)`, which runs when the user drops an audio or video file on the notch
 - Give feedback with `ctx.notify("Sent to Linear")`. It shows a short message under the menu bar. Await your work first: `ctx` calls after a handler returns do nothing
 - Anything the user may want to change is a setting. Declare it with `voz.settings({ key: { type, title, default } })`. `type` is `string`, `number` or `boolean`. A string can have `options` for a picker, `secret: true` for a token, or `required: true` when the extension can't work without it. Never ask the user to edit `settings.json`
 - Write files to `voz.paths.data`, never next to the extension, or Voz reloads it on every write

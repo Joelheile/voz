@@ -259,6 +259,16 @@ struct ExtensionHostTests {
         await host.stop()
     }
 
+    @Test func actionsRenameTheirButton() async throws {
+        try extensionFile("meeting.ts", #"export default (voz) => { const button = voz.registerAction({ id: "toggle", name: "Start meeting", run: () => button.rename("Stop meeting") }) }"#)
+        let actions = RecordedActions()
+        let host = makeHost(actions: actions)
+        _ = try await host.start()
+        #expect(await host.runAction("meeting/toggle", app: app, timeout: .seconds(2)))
+        #expect(actions.all == [.renameAction(id: "meeting/toggle", name: "Stop meeting")])
+        await host.stop()
+    }
+
     @Test func newExtensionTemplateLoadsAndRuns() async throws {
         let folder = try ExtensionTemplate.create(named: "voz-hello", in: home.root, from: extensionResources)
         let apiVersion = try ExtensionTemplate.apiVersion(in: extensionResources)

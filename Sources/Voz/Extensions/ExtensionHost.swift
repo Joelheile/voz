@@ -221,6 +221,7 @@ actor ExtensionHost {
         case "insert": decodeNotification(TextParams.self, line).map { onAction(.insert($0.text)) }
         case "press": decodeNotification(PressParams.self, line).map { onAction(.press($0.key)) }
         case "notify": decodeNotification(TextParams.self, line).map { onAction(.notify($0.text)) }
+        case "renameAction": decodeNotification(RenameActionParams.self, line).map { onAction(.renameAction(id: $0.id, name: $0.name)) }
         case "log": decodeNotification(TextParams.self, line).map { onLog($0.text) }
         case "generate":
             decodeNotification(GenerateParams.self, line).map { params in

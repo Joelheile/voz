@@ -404,7 +404,17 @@ function api(name: string, config: Config, registration: Registration): Extensio
       register(cleanupModels, "cleanup model", name, model, registration),
     registerCleanupStep: (step) =>
       register(cleanupSteps, "cleanup step", name, step, registration),
-    registerAction: (action) => register(actions, "action", name, { ...action, extension: name }, registration),
+    registerAction(action) {
+      register(actions, "action", name, { ...action, extension: name }, registration);
+      const id = `${name}/${action.id}`;
+      return {
+        rename(newName) {
+          const registered = actions.get(id);
+          if (registered) registered.name = newName;
+          send({ method: "renameAction", params: { id, name: newName } });
+        },
+      };
+    },
     settings<Schema extends SettingsSchema>(schema: Schema) {
       for (const [key, setting] of Object.entries(schema)) checkSetting(key, setting);
       setRegistered(settingsSchemas, name, schema, registration);

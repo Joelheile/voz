@@ -33,6 +33,21 @@ struct SpeakerTurnsTests {
     }
 }
 
+struct FileTranscriptRulesTests {
+    @Test func fixesMisheardWordsInTheTextAndEveryTurn() {
+        let transcript = FileTranscript(
+            text: "Ask cloud code. Cloud code agrees with openai.",
+            seconds: 4,
+            speakers: 2,
+            turns: [SpeakerTurn(speaker: 1, start: 0, end: 1, text: "Ask cloud code."), SpeakerTurn(speaker: 2, start: 2, end: 3, text: "Cloud code agrees with openai.")]
+        )
+        let fixed = transcript.applying([VocabularyRule(heard: "cloud code", word: "Claude Code")], words: ["OpenAI"])
+        #expect(fixed.text == "Ask Claude Code. Claude Code agrees with OpenAI.")
+        #expect(fixed.turns.map(\.text) == ["Ask Claude Code.", "Claude Code agrees with OpenAI."])
+        #expect(fixed.turns.map(\.start) == [0, 2])
+    }
+}
+
 struct MediaFileTests {
     @Test func acceptsAudioAndVideoThatCoreAudioReads() {
         for path in ["/a/call.mp3", "/a/memo.m4a", "/a/talk.wav", "/a/song.aiff", "/a/take.flac", "/a/meeting.mp4", "/a/screen.mov", "/a/clip.m4v"] {
