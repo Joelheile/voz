@@ -1,6 +1,6 @@
 # Extensions
 
-> Extensions are TypeScript modules that change what Voz does with a dictation. Voz runs them with Bun in a separate process, so a crashed or slow extension never stops dictation. This file is the full guide, written so a coding agent can read it and build an extension with you.
+> Extensions are TypeScript modules that change what Voz does with a dictation. Voz runs them with Bun in a separate process, so a crashed or slow extension never stops dictation. A coding agent can read this file and build one with you.
 
 ## Build one with a coding agent
 
@@ -16,7 +16,7 @@ The agent interviews you first, then builds, loads and tests the extension with 
 
 ## Instructions for agents
 
-You help a Voz user turn an idea into a working extension. The user knows what bothers them about dictating. You know the API in this file. Together you find the smallest extension that fixes their problem.
+Help the user turn an idea into the smallest extension that fixes their problem. They know what bothers them about dictating. You know the API in this file.
 
 ### What extensions are for
 
@@ -30,7 +30,7 @@ Voz stays small: record, transcribe, clean up, insert. Extensions add everything
 
 ### Step 1: Interview the user
 
-Grill the user until you share one picture of the extension. Map the idea as a design tree, where each decision opens the decisions that depend on it. Ask in rounds. Each round holds every question you can ask now without guessing an earlier answer. Number the questions, give your recommended answer for each, and word each one so "yes" accepts your recommendation. Use your agent's question tool if it has one. Wait for the answers, then ask the next round.
+Ask in rounds until you and the user picture the same extension. Each round holds every question that doesn't depend on an unanswered one. Number the questions, give your recommended answer for each, and word each one so "yes" accepts it. Use your question tool if you have one.
 
 Work through these branches. Skip any the user already answered.
 
@@ -72,6 +72,7 @@ Put network calls and model calls in commands, actions, `afterInsert` or a regis
 - For one to share, or one that needs npm packages, run `voz new voz-<name>` in the user's code folder, then `voz dev voz-<name>`.
 - If `voz` is not on the PATH, use `/Applications/voz.app/Contents/MacOS/voz`.
 - Read the types in `~/.voz/node_modules/voz/index.d.ts`, or `voz.d.ts` in a package, before you write code.
+- For a package, set `apiVersion` in `package.json` as [Versions](#versions) describes.
 - Keep pure text logic in its own function so you can test it without Voz.
 
 ### Step 4: Verify
@@ -418,7 +419,7 @@ A package is a folder, git repo or npm package with extensions in it. Voz looks 
 
 Voz does not read `main`. A package with none of these fails to load with an error.
 
-Install and manage packages from the terminal. The `voz` binary is `/Applications/voz.app/Contents/MacOS/voz`.
+Install and manage packages from the terminal:
 
 ```
 voz install voz-jira
@@ -492,8 +493,4 @@ The first time you install a package, or open Voz with an extension in `~/.voz/e
 
 Extensions run with your user's permissions. They can read your transcripts, your recordings, your files and the network. Voz does not sandbox them. Install only packages you trust, and read the source first.
 
-To limit risk, Voz:
-
-- Never runs install scripts, so installing a package does not run its code
-- Installs exact versions and updates only when you run `voz update`
-- Pins packages to a version or git ref when you ask
+Installing a package does not run its code, because Voz never runs install scripts. Voz installs exact versions and changes a package only when you run `voz update`.

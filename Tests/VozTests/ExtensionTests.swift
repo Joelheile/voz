@@ -447,6 +447,13 @@ struct ExtensionHostTests {
         #expect(try home.packageSources() == ["npm:voz-jira"])
     }
 
+    @Test func authoringFilesPointClaudeCodeAtTheAgentGuide() throws {
+        let home = temporaryHome()
+        try home.writeAuthoringFiles(from: extensionResources)
+        #expect(fileContents(home.root.appendingPathComponent("CLAUDE.md")) == "@AGENTS.md\n")
+        #expect(fileContents(home.root.appendingPathComponent("AGENTS.md")) == fileContents(extensionResources.appendingPathComponent("AGENTS.md")))
+    }
+
     @Test func installedPackagesReadTheirDescription() throws {
         let home = temporaryHome()
         let package = home.root.appendingPathComponent("voz-things3")
