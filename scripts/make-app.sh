@@ -49,7 +49,7 @@ cp -R Resources/Sounds "$APP/Contents/Resources/Sounds"
 cp -R Resources/Extensions "$APP/Contents/Resources/Extensions"
 cp -R Resources/Fonts "$APP/Contents/Resources/Fonts"
 python3 scripts/third-party-notices.py "$APP/Contents/Resources/ThirdPartyNotices.txt"
-cp Resources/AppIcon.icns Resources/MenuBarIcon.png "$APP/Contents/Resources/"
+cp Resources/AppIcon.icns Resources/MenuBarIcon.png CHANGELOG.md "$APP/Contents/Resources/"
 for bundle in "$BIN_PATH"/*.bundle; do
     [[ -e "$bundle" && "$bundle" != *FluidAudio_FluidAudio.bundle ]] && cp -R "$bundle" "$APP/Contents/Resources/"
 done
