@@ -12,21 +12,15 @@ struct InsightsPage: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            PageBar(title: "Insights", back: back)
-            if !settings.starPromptDismissed, model.stats[.all].words >= StarPromptCard.threshold {
-                StarPromptCard(words: model.stats[.all].words) {
-                    withAnimation(Theme.Motion.section) { settings.starPromptDismissed = true }
-                }
-                .transition(.opacity)
+            PageBar(title: "Insights", back: back) {
+                StarButton(title: "Star") { settings.starPromptDismissed = true }
             }
             StreakSection(stats: model.stats, revealed: revealed)
             VStack(alignment: .leading, spacing: 16) {
                 TabBar(tabs: StatsPeriod.allCases, selection: $period)
                 WordsHeadline(stats: stats)
-                HStack(alignment: .top, spacing: Theme.Spacing.item) {
-                    PaceGauge(wordsPerMinute: stats.wordsPerMinute, revealed: revealed)
-                    TimeSaved(stats: stats, revealed: revealed)
-                }
+                PaceScale(wordsPerMinute: stats.wordsPerMinute, revealed: revealed)
+                TimeSaved(stats: stats, revealed: revealed)
                 if !stats.topApps.isEmpty { TopApps(apps: stats.topApps) }
             }
             .animation(Theme.Motion.section, value: period)
@@ -50,13 +44,10 @@ private struct StreakSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(stats.streak.formatted())
-                    .font(.display(32))
+                Text(stats.streak == 1 ? "1 day streak" : "\(stats.streak.formatted()) day streak")
+                    .font(.ui(13, weight: .medium))
                     .foregroundStyle(Theme.ink)
                     .contentTransition(.numericText())
-                Text("day streak")
-                    .font(.ui(13))
-                    .foregroundStyle(Theme.inkSecondary)
                 Spacer(minLength: 0)
                 if stats.longestStreak > 0 {
                     Text("Longest \(stats.longestStreak) \(stats.longestStreak == 1 ? "day" : "days")")
@@ -184,9 +175,13 @@ private struct WordsHeadline: View {
     }
 }
 
-private struct PaceGauge: View {
-    private static let maximum = 200.0
-    private static let lineWidth: CGFloat = 7
+private struct PaceScale: View {
+    private static let maximum = 220.0
+    private static let marks: [(label: String, wordsPerMinute: Double)] = [
+        ("Typing", PeriodStats.typingWordsPerMinute),
+        ("Average", PeriodStats.averageSpeakingWordsPerMinute),
+        ("Fast", PeriodStats.fastSpeakingWordsPerMinute),
+    ]
 
     let wordsPerMinute: Double?
     let revealed: Bool
@@ -197,68 +192,53 @@ private struct PaceGauge: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "Speaking pace")
-            ZStack(alignment: .bottom) {
-                HalfArc().stroke(Theme.selected, style: StrokeStyle(lineWidth: Self.lineWidth, lineCap: .round))
-                HalfArc()
-                    .trim(from: 0, to: revealed ? fraction : 0)
-                    .stroke(Theme.accent, style: StrokeStyle(lineWidth: Self.lineWidth, lineCap: .round))
-                TypingTick(fraction: PeriodStats.typingWordsPerMinute / Self.maximum, lineWidth: Self.lineWidth)
-                VStack(spacing: 0) {
-                    Text(wordsPerMinute.map { Int($0.rounded()).formatted() } ?? "–")
-                        .font(.display(22))
-                        .foregroundStyle(Theme.ink)
-                        .contentTransition(.numericText())
-                    Text("wpm")
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(wordsPerMinute.map { Int($0.rounded()).formatted() } ?? "–")
+                    .font(.display(22))
+                    .foregroundStyle(Theme.ink)
+                    .contentTransition(.numericText())
+                Text("wpm")
+                    .font(.meta)
+                    .foregroundStyle(Theme.inkTertiary)
+                Spacer(minLength: 8)
+                Text(wordsPerMinute.map(PeriodStats.paceVerdict) ?? "Measured after you dictate")
+                    .font(.meta)
+                    .foregroundStyle(Theme.inkSecondary)
+            }
+            GeometryReader { proxy in
+                let width = proxy.size.width
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Theme.selected).frame(height: 4)
+                    Capsule().fill(Theme.accent).frame(width: width * (revealed ? fraction : 0), height: 4)
+                    ForEach(Self.marks, id: \.label) { mark in
+                        Capsule()
+                            .fill(Theme.inkTertiary)
+                            .frame(width: 1.5, height: 10)
+                            .position(x: width * mark.wordsPerMinute / Self.maximum, y: 6)
+                    }
+                    if wordsPerMinute != nil {
+                        Circle()
+                            .fill(Theme.accent)
+                            .overlay(Circle().strokeBorder(Theme.surface, lineWidth: 2))
+                            .frame(width: 12, height: 12)
+                            .position(x: width * (revealed ? fraction : 0), y: 6)
+                    }
+                }
+            }
+            .frame(height: 12)
+            GeometryReader { proxy in
+                ForEach(Self.marks, id: \.label) { mark in
+                    Text(mark.label)
                         .font(.ui(11))
                         .foregroundStyle(Theme.inkTertiary)
+                        .fixedSize()
+                        .position(x: proxy.size.width * mark.wordsPerMinute / Self.maximum, y: 7)
+                        .help("About \(Int(mark.wordsPerMinute)) wpm")
                 }
-                .offset(y: 4)
             }
-            .padding(.horizontal, Self.lineWidth / 2)
-            .aspectRatio(2, contentMode: .fit)
-            Text(comparison)
-                .font(.meta)
-                .monospacedDigit()
-                .foregroundStyle(Theme.inkSecondary)
-                .contentTransition(.numericText())
+            .frame(height: 14)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
         .animation(reduceMotion ? nil : .reveal, value: revealed)
-    }
-
-    private var comparison: String {
-        guard let wordsPerMinute else { return "Measured after you dictate" }
-        let ratio = wordsPerMinute / PeriodStats.typingWordsPerMinute
-        return "\(ratio.formatted(.number.precision(.fractionLength(1))))× typing speed"
-    }
-}
-
-private struct HalfArc: Shape {
-    func path(in rect: CGRect) -> Path {
-        Path { path in
-            path.addArc(center: CGPoint(x: rect.midX, y: rect.maxY), radius: rect.width / 2, startAngle: .degrees(180), endAngle: .degrees(360), clockwise: false)
-        }
-    }
-}
-
-private struct TypingTick: View {
-    let fraction: Double
-    let lineWidth: CGFloat
-
-    var body: some View {
-        GeometryReader { proxy in
-            let radius = proxy.size.width / 2
-            let angle = Angle.degrees(180 + 180 * fraction)
-            Capsule()
-                .fill(Theme.inkSecondary)
-                .frame(width: lineWidth + 6, height: 1.5)
-                .rotationEffect(angle)
-                .position(
-                    x: proxy.size.width / 2 + radius * cos(angle.radians),
-                    y: proxy.size.height + radius * sin(angle.radians)
-                )
-        }
-        .help("Typing, about \(Int(PeriodStats.typingWordsPerMinute)) wpm")
     }
 }
 

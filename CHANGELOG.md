@@ -1,17 +1,16 @@
 # What's new in Voz
 
-Newest first. To get beta changes now, turn on Beta updates in Settings.
+Newest first. To get beta changes now, turn on Beta updates under What's new in Settings.
 
 ## In beta
 
 - Claude Code now reads the Voz extension guide when you build an extension in ~/.voz
-- Copy a debug log from Settings to report problems or debug an extension
+- Copy a debug log from Privacy in Settings to report problems or debug an extension
 - Extensions can show a recording in the menu bar and let you stop it from the Voz panel
 - Extension actions can now record or transcribe for as long as they need
 - Extensions can add entries, such as meeting transcripts, to your Voz history
 - Transcripts from extensions use your dictionary and show progress in the notch
 - On screens without a notch, the recording pill now sits above the Dock
-- See what's new in each release from Settings
 - Drop an audio or video file on the indicator to transcribe it with an extension
 - Track your dictation streak, speaking pace and time saved in Insights
 - Fix words Voz keeps mishearing with dictionary rules, like voss → Voz
@@ -39,7 +38,7 @@ Newest first. To get beta changes now, turn on Beta updates in Settings.
 - The Voz face is back in the menu bar, and it turns white on dark menu bars
 - Small bars in Top apps stay visible
 - Dragging a TypeScript file no longer opens the drop zone
-- After 2,000 words, Voz asks once for a GitHub star
+- When you reach a word, streak or time-saved milestone, the panel shows it once
 
 ## 0.0.5 (October 22, 2026)
 

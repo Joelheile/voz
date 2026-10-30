@@ -49,6 +49,8 @@ enum PopoverPage {
     case dictionary
     case insights
     case extensions
+    case cleanup
+    case privacy
     case cleanupPrompt
     case cleanupSteps
     case speechModel
@@ -61,6 +63,8 @@ enum PopoverPage {
         case .dictionary: "Dictionary"
         case .insights: "Insights"
         case .extensions: "Extensions"
+        case .cleanup: "Cleanup"
+        case .privacy: "Privacy"
         case .cleanupPrompt: "Cleanup prompt"
         case .cleanupSteps: "Cleanup steps"
         case .speechModel: "Speech model"
@@ -69,7 +73,11 @@ enum PopoverPage {
     }
 
     var parent: PopoverPage {
-        [.dictionary, .cleanupPrompt, .cleanupSteps, .speechModel, .whatsNew].contains(self) ? .settings : .home
+        switch self {
+        case .cleanupPrompt, .cleanupSteps: .cleanup
+        case .cleanup, .privacy, .speechModel, .whatsNew: .settings
+        case .home, .settings, .dictionary, .insights, .extensions: .home
+        }
     }
 }
 

@@ -1,5 +1,37 @@
 import SwiftUI
 
+struct CleanupPage: View {
+    @ObservedObject var model: PopoverModel
+    @ObservedObject var settings: AppSettings
+    @ObservedObject var catalog: ExtensionCatalog
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            PageBar(title: "Cleanup", back: model.goBack)
+            PanelGroup {
+                PanelRow(title: "Clean up text", detail: "Removes filler words, fixes punctuation") {
+                    Toggle("Clean up text", isOn: $settings.cleanupEnabled).labelsHidden()
+                }
+                if settings.cleanupEnabled {
+                    if !catalog.cleanupModels.isEmpty || settings.cleanupModel != CleanupModelID.apple {
+                        ModelPicker(title: "Model", selection: $settings.cleanupModel, options: [ModelOption(id: CleanupModelID.apple, name: "Apple", detail: "On device")] + ModelOption.extensions(catalog.cleanupModels))
+                    }
+                    LinkRow(title: "Steps", value: edited(settings.cleanupSteps != CleanupStep.standard)) { model.page = .cleanupSteps }
+                    LinkRow(title: "Prompt", value: edited(settings.cleanupPrompt != CleanupPrompt.standard)) { model.page = .cleanupPrompt }
+                }
+                if let error = settings.pipelineError {
+                    PanelRow(title: "Could not read settings.json", detail: error) { EmptyView() }
+                }
+            }
+            .animation(Theme.Motion.section, value: settings.cleanupEnabled)
+        }
+    }
+
+    private func edited(_ isEdited: Bool) -> String {
+        isEdited ? "Edited" : "Default"
+    }
+}
+
 struct CleanupStepsPage: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var catalog: ExtensionCatalog

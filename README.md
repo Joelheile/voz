@@ -109,7 +109,7 @@ Install one from the menu bar, or run `voz install voz-meeting`. [Browse extensi
 
 <!-- changelog -->
 - Claude Code now reads the Voz extension guide when you build an extension in ~/.voz
-- Copy a debug log from Settings to report problems or debug an extension
+- Copy a debug log from Privacy in Settings to report problems or debug an extension
 - Extensions can show a recording in the menu bar and let you stop it from the Voz panel
 - Extension actions can now record or transcribe for as long as they need
 - Extensions can add entries, such as meeting transcripts, to your Voz history
@@ -121,7 +121,7 @@ Install one from the menu bar, or run `voz install voz-meeting`. [Browse extensi
 
 Built-in dictation processes audio and transcripts on your Mac. Extensions can send data to external services, so review what you install. Voz sends a version ping on install and update. Usage analytics are off unless you opt in, and they never contain what you said. Crash reports are on by default and have their own setting under Privacy. They send crashes, freezes and fixed error codes with a stack trace, never text, audio or app names.
 
-For debugging, Voz keeps a log on your Mac at `~/Library/Logs/Voz/voz-logs.jsonl`, with one line per dictation: timings, model and app names. It includes what you said only when you turn on Include text under Debug log in Settings. It never leaves your Mac unless you copy it.
+For debugging, Voz keeps a log on your Mac at `~/Library/Logs/Voz/voz-logs.jsonl`, with one line per dictation: timings, model and app names. It includes what you said only when you turn on Include text under Privacy in Settings. It never leaves your Mac unless you copy it.
 
 To mute other apps while you dictate, Voz asks for System Audio Recording access. It silences their sound and does not save their audio.
 

@@ -26,6 +26,15 @@ final class HistoryModel: ObservableObject {
             )
     }
 
+    func usage() async -> UsageStats? {
+        do {
+            return try await Task.detached { [store] in try store.stats() }.value
+        } catch {
+            Log.app.error("History stats failed: \(error.localizedDescription, privacy: .private)")
+            return nil
+        }
+    }
+
     func delete(_ record: TranscriptRecord) {
         do {
             try store.delete(id: record.id)

@@ -25,8 +25,7 @@ struct PopoverView: View {
             .frame(width: Self.width)
             .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous).strokeBorder(Theme.hairline))
-            .toggleStyle(.switch)
-            .tint(Theme.accent)
+            .toggleStyle(.accentSwitch)
             .fixedSize(horizontal: false, vertical: true)
             .compositingGroup()
             .shadow(color: .black.opacity(0.16), radius: 18, y: 8)
@@ -42,9 +41,9 @@ struct PopoverView: View {
         } else {
             switch model.page {
             case .home:
-                HomePage(model: model, history: sources.history, catalog: sources.catalog, extensions: sources.extensions)
+                HomePage(model: model, history: sources.history, settings: sources.settings, catalog: sources.catalog, extensions: sources.extensions)
             case .settings:
-                SettingsPage(model: model, settings: sources.settings, status: sources.modelStatus, vocabulary: sources.vocabulary, catalog: sources.catalog)
+                SettingsPage(model: model, settings: sources.settings, catalog: sources.catalog)
             case .dictionary:
                 DictionaryPage(model: sources.vocabulary, back: model.goBack)
             case .insights:
@@ -57,8 +56,12 @@ struct PopoverView: View {
                 CleanupStepsPage(settings: sources.settings, catalog: sources.catalog, back: model.goBack)
             case .speechModel:
                 SpeechModelPage(settings: sources.settings, status: sources.modelStatus, catalog: sources.catalog, back: model.goBack)
+            case .cleanup:
+                CleanupPage(model: model, settings: sources.settings, catalog: sources.catalog)
+            case .privacy:
+                PrivacyPage(settings: sources.settings, back: model.goBack)
             case .whatsNew:
-                WhatsNewPage(releases: Changelog.bundled, back: model.goBack)
+                WhatsNewPage(settings: sources.settings, releases: Changelog.bundled, checkForUpdates: model.actions.checkForUpdates, back: model.goBack)
             }
         }
     }
@@ -70,10 +73,14 @@ private struct HomePage: View {
 
     @ObservedObject var model: PopoverModel
     @ObservedObject var history: HistoryModel
+    @ObservedObject var settings: AppSettings
     @ObservedObject var catalog: ExtensionCatalog
     @ObservedObject var extensions: ExtensionsModel
     @FocusState private var searchFocused: Bool
     @State private var selectedID: UUID?
+    @State private var usage: UsageStats?
+
+    private var milestone: Milestone? { usage.flatMap { Milestone.unseen(in: $0, seen: settings.milestonesSeen) } }
 
     private var records: [TranscriptRecord] { history.records }
     private var isSearching: Bool { !history.query.isEmpty }
@@ -97,6 +104,10 @@ private struct HomePage: View {
             }
         }
         .onAppear { searchFocused = showsSearch }
+        .task {
+            usage = await history.usage()
+            countMilestoneShow()
+        }
         .onChange(of: history.query) { selectedID = nil }
     }
 
@@ -255,6 +266,18 @@ private struct HomePage: View {
         }
     }
 
+    private func countMilestoneShow() {
+        guard milestone != nil else { return }
+        settings.milestoneShows += 1
+        if settings.milestoneShows > Milestone.maxShows { markMilestonesSeen() }
+    }
+
+    private func markMilestonesSeen() {
+        guard let usage else { return }
+        settings.milestonesSeen = Milestone.markingSeen(in: usage, seen: settings.milestonesSeen)
+        settings.milestoneShows = 0
+    }
+
     private var footer: some View {
         HStack(spacing: 2) {
             HStack(spacing: 6) {
@@ -264,9 +287,25 @@ private struct HomePage: View {
                         .fixedSize()
                         .help(action.hotkeyLabel ?? action.name)
                 }
+                if let milestone {
+                    MilestoneBadge(milestone: milestone) {
+                        markMilestonesSeen()
+                        model.page = .insights
+                    }
+                    if !settings.starPromptDismissed {
+                        StarButton(title: "Star") {
+                            settings.starPromptDismissed = true
+                            markMilestonesSeen()
+                        }
+                    }
+                }
             }
             Spacer(minLength: 8)
-            IconButton(icon: .chartNoAxesColumn, help: "Insights") { model.page = .insights }
+            IconButton(icon: .bookA, help: "Dictionary") { model.page = .dictionary }
+            IconButton(icon: .chartNoAxesColumn, help: "Insights") {
+                markMilestonesSeen()
+                model.page = .insights
+            }
             IconButton(icon: .puzzle, help: extensionsHelp) { model.page = .extensions }
                 .overlay(alignment: .topTrailing) {
                     if extensions.updateCount > 0 {
@@ -275,7 +314,6 @@ private struct HomePage: View {
                 }
             IconButton(icon: .settings, help: "Settings") { model.page = .settings }
                 .keyboardShortcut(",", modifiers: .command)
-            IconButton(icon: .power, help: "Quit Voz", action: model.actions.quit)
         }
         .padding(.trailing, -8)
     }
@@ -455,5 +493,29 @@ private struct IndeterminateBar: View {
         .animation(.easeInOut(duration: 0.9).repeatForever(), value: sweeping)
         .onAppear { sweeping = !reduceMotion }
         .accessibilityLabel("Preparing")
+    }
+}
+
+private struct MilestoneBadge: View {
+    let milestone: Milestone
+    let open: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: open) {
+            HStack(spacing: 6) {
+                Icon(.partyPopper, size: 14)
+                    .foregroundStyle(Theme.accent)
+                Text(milestone.title)
+                    .font(.ui(12, weight: .medium))
+                    .foregroundStyle(hovering ? Theme.ink : Theme.inkSecondary)
+                    .fixedSize()
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("See your Insights")
+        .onHover { hovering = $0 }
+        .animation(Theme.Motion.hover, value: hovering)
     }
 }
