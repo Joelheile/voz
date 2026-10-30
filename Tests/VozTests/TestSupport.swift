@@ -145,6 +145,42 @@ func makePingID() -> (UUID, String) {
     return (id, id.uuidString)
 }
 
+func makeDefaults() -> UserDefaults {
+    UserDefaults(suiteName: UUID().uuidString)!
+}
+
+func utcDate(_ text: String) -> Date {
+    ISO8601DateFormatter().date(from: text)!
+}
+
+func decodeDailyActivePing(_ data: Data) throws -> DailyActivePayload {
+    try JSONDecoder().decode(DailyActivePayload.self, from: data)
+}
+
+struct DailyActivePayload: Decodable {
+    struct Properties: Decodable {
+        let version: String
+        let channel: String
+        let model: String
+        let osMajor: Int
+        let processPersonProfile: Bool
+        let geoIPDisable: Bool
+        enum CodingKeys: String, CodingKey {
+            case version, channel, model
+            case osMajor = "os_major"
+            case processPersonProfile = "$process_person_profile"
+            case geoIPDisable = "$geoip_disable"
+        }
+    }
+    let event: String
+    let distinctID: String
+    let properties: Properties
+    enum CodingKeys: String, CodingKey {
+        case event, properties
+        case distinctID = "distinct_id"
+    }
+}
+
 func decodeVersionPing(_ data: Data) throws -> PingPayload {
     try JSONDecoder().decode(PingPayload.self, from: data)
 }

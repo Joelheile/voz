@@ -1,6 +1,5 @@
 enum AnalyticsEvent: Equatable, Sendable {
     case appOpened
-    case appSession(seconds: Int, state: SessionState)
     case modelFailed(model: SpeechModel)
     case appLaunched(byLaunchAgent: Bool)
     case permissionResult(permission: PermissionName, granted: Bool)
@@ -21,7 +20,6 @@ enum AnalyticsEvent: Equatable, Sendable {
     var name: String {
         switch self {
         case .appOpened: "app_opened"
-        case .appSession: "app_session"
         case .modelFailed: "model_failed"
         case .appLaunched: "app_launched"
         case .permissionResult: "permission_result"
@@ -51,8 +49,6 @@ enum AnalyticsEvent: Equatable, Sendable {
             ["stage": .text(stage.rawValue), "error_code": .text(errorCode.rawValue)]
         case let .dictationDiscarded(reason):
             ["reason": .text(reason.rawValue)]
-        case let .appSession(seconds, state):
-            ["seconds": .integer(seconds), "state": .text(state.rawValue)]
         case let .modelFailed(model):
             ["model": .text(model.rawValue)]
         case let .appLaunched(byLaunchAgent):
@@ -245,24 +241,4 @@ struct DictationMetrics: Equatable, Sendable {
         self.trigger = trigger
         self.output = output
     }
-}
-
-struct UsageSession {
-    private var lastCheckpoint: Int
-
-    init(startedAt: Int) {
-        lastCheckpoint = startedAt
-    }
-
-    mutating func checkpoint(at seconds: Int) -> Int {
-        let elapsed = max(0, seconds - lastCheckpoint)
-        lastCheckpoint = seconds
-        return elapsed
-    }
-}
-
-enum SessionState: String, Sendable {
-    case started
-    case heartbeat
-    case ended
 }

@@ -15,20 +15,13 @@ enum VersionPing: String, Sendable, Encodable {
         }
     }
 
-    func body(version: String, previous: String?, pingID: UUID, projectToken: String) throws -> Data {
-        let payload = Payload(
-            uuid: UUID().uuidString,
-            timestamp: ISO8601DateFormatter().string(from: Date()),
-            apiKey: projectToken,
-            distinctID: pingID.uuidString,
-            properties: .init(kind: self, version: version, previous: previous, channel: UpdateChannel(version: version).rawValue)
-        )
-        return try JSONEncoder().encode(payload)
+    /// Each ping gets a fresh ID, so install and update pings cannot be linked to each other or to one Mac.
+    func body(version: String, previous: String?, projectToken: String) throws -> Data {
+        let properties = Properties(kind: self, version: version, previous: previous, channel: UpdateChannel(version: version).rawValue)
+        return try PingPayload(event: "version_ping", distinctID: UUID(), properties: properties, projectToken: projectToken).encoded()
     }
-}
 
-private struct Payload: Encodable {
-    struct Properties: Encodable {
+    private struct Properties: Encodable {
         let kind: VersionPing
         let version: String
         let previous: String?
@@ -42,13 +35,66 @@ private struct Payload: Encodable {
             case geoIPDisable = "$geoip_disable"
         }
     }
+}
 
-    let uuid: String
-    let timestamp: String
+/// Sent without opt-in on the first finished dictation of each UTC day, so active installs can be counted. It carries no text, app names or settings.
+enum DailyActivePing {
+    private static let lastDayKey = "lastDailyActivePingDay"
+
+    static func claimDay(now: Date, defaults: UserDefaults) -> Bool {
+        let day = now.ISO8601Format(.iso8601.year().month().day())
+        guard defaults.string(forKey: lastDayKey) != day else { return false }
+        defaults.set(day, forKey: lastDayKey)
+        return true
+    }
+
+    static func body(version: String, model: String, installID: UUID, projectToken: String) throws -> Data {
+        let properties = Properties(
+            version: version,
+            channel: UpdateChannel(version: version).rawValue,
+            model: model,
+            osMajor: ProcessInfo.processInfo.operatingSystemVersion.majorVersion,
+            chip: SystemContext.chip
+        )
+        return try PingPayload(event: "daily_active", distinctID: installID, properties: properties, projectToken: projectToken).encoded()
+    }
+
+    private struct Properties: Encodable {
+        let version: String
+        let channel: String
+        let model: String
+        let osMajor: Int
+        let chip: String
+        let processPersonProfile = false
+        let geoIPDisable = true
+
+        enum CodingKeys: String, CodingKey {
+            case version, channel, model, chip
+            case osMajor = "os_major"
+            case processPersonProfile = "$process_person_profile"
+            case geoIPDisable = "$geoip_disable"
+        }
+    }
+}
+
+private struct PingPayload<Properties: Encodable>: Encodable {
+    let uuid = UUID().uuidString
+    let timestamp = ISO8601DateFormatter().string(from: Date())
     let apiKey: String
-    let event = "version_ping"
+    let event: String
     let distinctID: String
     let properties: Properties
+
+    init(event: String, distinctID: UUID, properties: Properties, projectToken: String) {
+        self.event = event
+        self.distinctID = distinctID.uuidString
+        self.properties = properties
+        apiKey = projectToken
+    }
+
+    func encoded() throws -> Data {
+        try JSONEncoder().encode(self)
+    }
 
     enum CodingKeys: String, CodingKey {
         case apiKey = "api_key"
@@ -72,8 +118,8 @@ final class VersionPingQueue {
         }
     }
 
-    func enqueue(_ ping: VersionPing, version: String, previous: String?, pingID: UUID, projectToken: String) throws {
-        pending.append(try ping.body(version: version, previous: previous, pingID: pingID, projectToken: projectToken))
+    func enqueue(_ body: Data) throws {
+        pending.append(body)
         try save()
     }
 
@@ -96,30 +142,54 @@ final class VersionPingQueue {
 enum VersionPinger {
     private static let endpoint = URL(string: "\(Analytics.host)/i/v0/e/")!
     private static let retryInterval: Duration = .seconds(600)
+    private static var queue: VersionPingQueue?
+    private static var draining: Task<Void, Never>?
 
     static func sendPending(launch: LaunchVersion) {
         do {
             let queue = try VersionPingQueue()
-            guard SystemContext.isOfficialBuild, UpdateChannel(version: launch.current) != .dev else { return try queue.clear() }
+            guard sendsPings(version: launch.current) else { return try queue.clear() }
+            self.queue = queue
             let pingID = InstallID(key: InstallID.versionPing)
             if let ping = VersionPing(pingIDIsNew: pingID.isNew, updatedFrom: launch.updatedFrom) {
-                try queue.enqueue(ping, version: launch.current, previous: launch.updatedFrom, pingID: pingID.value, projectToken: Analytics.projectToken)
+                try queue.enqueue(ping.body(version: launch.current, previous: launch.updatedFrom, projectToken: Analytics.projectToken))
             }
-            Task {
-                do {
-                    while true {
-                        for body in queue.pending where try await send(body) {
-                            try queue.acknowledge(body)
-                        }
-                        if queue.pending.isEmpty { return }
-                        try await Task.sleep(for: retryInterval)
-                    }
-                } catch {
-                    Log.app.error("Version ping retry stopped: \(error.localizedDescription, privacy: .public)")
-                }
-            }
+            drain()
         } catch {
             Log.app.error("Version ping queue failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    static func recordActiveDay(model: String) {
+        guard let queue, DailyActivePing.claimDay(now: Date(), defaults: .standard) else { return }
+        do {
+            let installID = InstallID(key: InstallID.versionPing).value
+            try queue.enqueue(DailyActivePing.body(version: SystemContext.appVersion, model: model, installID: installID, projectToken: Analytics.projectToken))
+            drain()
+        } catch {
+            Log.app.error("Daily active ping failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private static func sendsPings(version: String) -> Bool {
+        SystemContext.isOfficialBuild && UpdateChannel(version: version) != .dev
+    }
+
+    private static func drain() {
+        guard draining == nil, let queue else { return }
+        draining = Task {
+            defer { draining = nil }
+            do {
+                while true {
+                    for body in queue.pending where try await send(body) {
+                        try queue.acknowledge(body)
+                    }
+                    if queue.pending.isEmpty { return }
+                    try await Task.sleep(for: retryInterval)
+                }
+            } catch {
+                Log.app.error("Version ping retry stopped: \(error.localizedDescription, privacy: .public)")
+            }
         }
     }
 
