@@ -1,7 +1,49 @@
 import AppKit
 import CoreAudio
 
+struct Microphone: Hashable, Sendable {
+    let uid: String
+    let name: String
+    let kind: String
+}
+
 enum InputDevice {
+    static func microphones() -> [Microphone] {
+        allDevices().filter(hasInputStreams).compactMap { device in
+            guard let uid = string(kAudioDevicePropertyDeviceUID, of: device), let name = name(of: device) else { return nil }
+            return Microphone(uid: uid, name: name, kind: kind(of: device))
+        }
+    }
+
+    static func defaultName() -> String? {
+        defaultInput().flatMap(name)
+    }
+
+    private static func name(of device: AudioDeviceID) -> String? {
+        string(kAudioObjectPropertyName, of: device)
+    }
+
+    /// The device with this UID, or nil when it is unplugged or the UID is empty.
+    static func connected(uid: String) -> AudioDeviceID? {
+        guard !uid.isEmpty else { return nil }
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyTranslateUIDToDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var cfUID = uid as CFString
+        var device = AudioDeviceID(kAudioObjectUnknown)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        let status = withUnsafeMutablePointer(to: &cfUID) { pointer in
+            AudioObjectGetPropertyData(
+                AudioObjectID(kAudioObjectSystemObject), &address,
+                UInt32(MemoryLayout<CFString>.size), pointer, &size, &device
+            )
+        }
+        guard status == noErr, device != kAudioObjectUnknown, hasInputStreams(device) else { return nil }
+        return device
+    }
+
     static func builtInIfDefaultIsBluetooth() -> AudioDeviceID? {
         guard let defaultDevice = defaultInput(), isBluetooth(defaultDevice) else { return nil }
         return allDevices().first { transportType($0) == kAudioDeviceTransportTypeBuiltIn && hasInputStreams($0) }
@@ -54,6 +96,29 @@ enum InputDevice {
         var size = UInt32(MemoryLayout<UInt32>.size)
         guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, &value) == noErr else { return nil }
         return value
+    }
+
+    private static func kind(of device: AudioDeviceID) -> String {
+        switch transportType(device) {
+        case kAudioDeviceTransportTypeBuiltIn: "Built in"
+        case kAudioDeviceTransportTypeBluetooth, kAudioDeviceTransportTypeBluetoothLE: "Bluetooth"
+        case kAudioDeviceTransportTypeUSB: "USB"
+        case kAudioDeviceTransportTypeContinuityCaptureWired, kAudioDeviceTransportTypeContinuityCaptureWireless: "iPhone"
+        case kAudioDeviceTransportTypeVirtual, kAudioDeviceTransportTypeAggregate: "Virtual"
+        default: "External"
+        }
+    }
+
+    private static func string(_ selector: AudioObjectPropertySelector, of device: AudioDeviceID) -> String? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: selector,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var value: Unmanaged<CFString>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, &value) == noErr, let value else { return nil }
+        return value.takeRetainedValue() as String
     }
 
     private static func isBluetooth(_ device: AudioDeviceID) -> Bool {

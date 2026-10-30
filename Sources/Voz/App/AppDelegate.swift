@@ -246,6 +246,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .dropFirst()
             .sink { [weak self] usage, errors in self?.analytics.setConsent(usage: usage, errors: errors) }
             .store(in: &cancellables)
+        settings.$microphone
+            .dropFirst()
+            .receive(on: DispatchQueue.main) // @Published emits before the new value is stored
+            .sink { [weak self] _ in self?.dictation.prepareRecorder() }
+            .store(in: &cancellables)
         settings.$speechModel
             .map { SpeechModel(rawValue: $0) ?? .parakeetUltra }
             .removeDuplicates()

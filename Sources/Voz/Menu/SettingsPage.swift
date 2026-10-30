@@ -70,6 +70,7 @@ struct SettingsPage: View {
             LinkRow(title: "Cleanup", value: settings.cleanupEnabled ? "On" : "Off") { model.page = .cleanup }
         }
         PanelGroup(title: "While recording") {
+            MicrophonePicker(selection: $settings.microphone)
             toggle("Mute other apps", isOn: $settings.muteWhileRecording)
             toggle("Sound cues", isOn: $settings.soundCues)
         }
