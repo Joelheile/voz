@@ -60,7 +60,7 @@ final class Dictation {
         switch (action, phase) {
         case (.toggle, .idle): start(trigger: .tap)
         case (.start, .idle): start(trigger: .hold)
-        case (.toggle, .recording), (.stop, .recording): stopAndTranscribe()
+        case (.toggle, .recording), (.stop, .recording): stopAfterTrailingWords()
         case (.toggle, .transcribing), (.start, .transcribing): onBusy()
         default: break
         }
@@ -117,8 +117,16 @@ final class Dictation {
         }
     }
 
-    private func stopAndTranscribe() {
+    private func stopAfterTrailingWords() {
         let released = ContinuousClock.now
+        phase = .transcribing
+        Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            stopAndTranscribe(released: released)
+        }
+    }
+
+    private func stopAndTranscribe(released: ContinuousClock.Instant = .now) {
         let samples = recorder.stop()
         muter.unmute()
         if settings.soundCues { SoundCues.play(.stop) }
