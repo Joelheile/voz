@@ -114,11 +114,11 @@ If you build something with Voz, star the repo. Stars are how other developers f
 ## What's new
 
 <!-- changelog -->
+- On screens without a notch, the recording pill now sits above the Dock
 - See what's new in each release from Settings
 - Drop an audio or video file on the indicator to transcribe it with an extension
 - Track your dictation streak, speaking pace and time saved in Insights
 - Fix words Voz keeps mishearing with dictionary rules, like voss → Voz
-- Preview your words below the recording indicator while you speak. Turn on Live preview in Settings
 
 [See everything new](CHANGELOG.md)
 <!-- /changelog -->

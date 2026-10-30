@@ -3,6 +3,17 @@
   <channel>
     <title>voz</title>
     <item>
+      <title>voz 0.0.5-beta.100030</title>
+      <description>&lt;ul&gt;&lt;li&gt;On screens without a notch, the recording pill now sits above the Dock&lt;/li&gt;&lt;/ul&gt;</description>
+      <link>https://github.com/Joelheile/voz/releases/tag/beta-100030</link>
+      <pubDate>Fri, 30 Oct 2026 08:42:59 GMT</pubDate>
+      <sparkle:version>100030</sparkle:version>
+      <sparkle:shortVersionString>0.0.5-beta.100030</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100030/voz-0.0.5-beta.100030.zip" length="8406814" sparkle:edSignature="M7ZCQcJV6F82iXOKThr31C++0Ewp1gK9sRmT0ERJ3m84elLm7NNAYlnL911wabO0rCTjoEe7/reU9i2RQ70VDg==" type="application/octet-stream" />
+    </item>
+    <item>
       <title>voz 0.0.5-beta.100029</title>
       <description>&lt;ul&gt;&lt;li&gt;See what&amp;#x27;s new in each release from Settings&lt;/li&gt;&lt;/ul&gt;</description>
       <link>https://github.com/Joelheile/voz/releases/tag/beta-100029</link>
@@ -100,17 +111,6 @@
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <sparkle:channel>beta</sparkle:channel>
       <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100021/voz-0.0.5-beta.100021.zip" length="8306517" sparkle:edSignature="059xn5iZU2KdoPeXw+oPxgfOE72/kxZkC1SM9v5pRlpNfKi4n8FAO3G3a5pkuLjA6QrHTIKYRRbhJkfsN3hYDA==" type="application/octet-stream" />
-    </item>
-    <item>
-      <title>voz 0.0.5-beta.100020</title>
-      <description>&lt;ul&gt;&lt;li&gt;A cleaner panel that opens and switches pages instantly&lt;/li&gt;&lt;li&gt;Turn on an extension&amp;#x27;s cleanup steps from its details in the Extensions page&lt;/li&gt;&lt;/ul&gt;</description>
-      <link>https://github.com/Joelheile/voz/releases/tag/beta-100020</link>
-      <pubDate>Tue, 27 Oct 2026 23:48:12 GMT</pubDate>
-      <sparkle:version>100020</sparkle:version>
-      <sparkle:shortVersionString>0.0.5-beta.100020</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <sparkle:channel>beta</sparkle:channel>
-      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100020/voz-0.0.5-beta.100020.zip" length="8306436" sparkle:edSignature="TL0D0SMCIOBKko4TUV28eMg/tV7nz21ekb4rj9KyC6UAguRuttyJckB9h3iD1NjFAc0A6fPwtpX946zP+9tzCg==" type="application/octet-stream" />
     </item>
     <item>
       <title>voz 0.0.5</title>
