@@ -117,6 +117,16 @@ To share it, run `npm publish` in the folder. Anyone can then install it with `v
 
 `voz dev` writes `voz.d.ts` again each time, so the types match the Voz you run. In a folder you did not create with `voz new`, add `"paths": { "voz": ["./voz.d.ts"] }` to `compilerOptions` in `tsconfig.json`.
 
+## Examples
+
+Each example is a published package you can install or copy as a starting point:
+
+| Example                                                                      | What it does                                                      | API it shows                  |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------------------- | ----------------------------- |
+| [voz-send-it](https://github.com/Joelheile/voz/tree/main/examples/send-it)   | Types the words before "send it", then presses Return             | `registerCommand`, `settings` |
+| [voz-mail](https://github.com/Joelheile/voz/tree/main/examples/mail)         | Formats dictations in Mail or Outlook as an email                 | `beforeCleanup`, `settings`   |
+| [voz-launcher](https://github.com/Joelheile/voz/tree/main/examples/launcher) | Runs dictations that start with "computer" instead of typing them | `beforeInsert`, `settings`    |
+
 ## Loose files
 
 For a quick change you do not plan to share, put a file in `~/.voz/extensions`. Voz loads every `.ts` and `.js` file there, and every folder with an `index.ts` or `index.js`, in alphabetical order. Voz writes the types to `~/.voz/node_modules/voz`, so editors type-check these files.

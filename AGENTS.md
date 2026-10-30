@@ -2,6 +2,17 @@
 
 Local macOS dictation in Swift. The app records, transcribes, cleans, inserts and saves history. Optional features ship as TypeScript extensions run by Bun.
 
+## Repo layout
+
+Capitalized folders follow SwiftPM and app bundle conventions. Lowercase folders hold tooling and samples.
+
+- `Sources/Voz`: the app. See the code map below.
+- `Tests/VozTests`: unit tests. `Tests/Fixtures` holds cases for `voz --eval`.
+- `Resources`: files `scripts/make-app.sh` copies into `voz.app`: Info.plist, icons, sounds, fonts and the extension host in `Resources/Extensions`.
+- `scripts`: build, test, signing and release scripts used locally and by `.github/workflows`.
+- `examples`: published sample extensions, linked from `EXTENSIONS.md`.
+- `install.sh`, `appcast.xml`: installer and update feed. See release hazards.
+
 ## Code map
 
 One SwiftPM executable target, `Sources/Voz`, grouped by feature. `Tests/VozTests` imports it with `@testable import Voz`.
@@ -10,7 +21,8 @@ One SwiftPM executable target, `Sources/Voz`, grouped by feature. `Tests/VozTest
 - `Dictation`: one dictation from hotkey to inserted text. `DictationPipeline` orders the steps.
 - `Audio`, `Transcription`, `Cleanup`, `Text`: capture, speech to text, on-device model cleanup, deterministic text rules.
 - `Extensions`: Bun host process, JSON protocol, npm packages, `~/.voz`. `Resources/Extensions` holds the TypeScript side.
-- `History`, `Vocabulary`, `Analytics`, `Hotkey`, `Indicator`, `Menu`, `Design`: what the names say.
+- `History`, `Vocabulary`, `Analytics`, `Hotkey`, `Indicator`, `Menu`, `Design`: what the names say. `Design/Components.swift` holds the shared controls and panel views.
+- `Support`: small concurrency and `Duration` helpers shared across features.
 
 ## Constraints
 
