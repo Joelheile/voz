@@ -4,6 +4,7 @@ Newest first. To get beta changes now, turn on Beta updates in Settings.
 
 ## In beta
 
+- See what's new in each release from Settings
 - Drop an audio or video file on the indicator to transcribe it with an extension
 - Track your dictation streak, speaking pace and time saved in Insights
 - Fix words Voz keeps mishearing with dictionary rules, like voss → Voz
