@@ -18,8 +18,7 @@ enum IndicatorMotion {
     static let pillExit = Animation.easeOut(duration: 0.15)
     static let pillHiddenScale: CGFloat = 0.9
     static let pillHiddenOffset: CGFloat = 6
-    static let swell = Animation.spring(duration: 0.3, bounce: 0.25)
-    static let settle = Animation.spring(duration: 0.25, bounce: 0)
+    static let glow = Animation.easeOut(duration: 0.2)
 }
 
 struct NotchContentEffect: ViewModifier {
@@ -103,22 +102,17 @@ struct IndicatorView: View {
     }
 
     private var notchWidth: CGFloat {
-        (reduceMotion || model.isExpanded ? layout.panelFrame.width : layout.collapsedWidth) + swellWidth
+        reduceMotion || model.isExpanded ? layout.panelFrame.width : layout.collapsedWidth
     }
 
     private var isOfferingDrop: Bool { model.state == .dropTarget && model.isExpanded }
-    private var isSwelling: Bool { isOfferingDrop && model.isDropTargeted && !reduceMotion }
-    private var swellWidth: CGFloat { isSwelling ? 2 * IndicatorLayout.dropSwell : 0 }
 
-    private var dropShadow: (opacity: Double, radius: CGFloat, y: CGFloat) {
-        guard isOfferingDrop else { return (0, 0, 0) }
-        return model.isDropTargeted ? (0.55, 22, 10) : (0.3, 14, 6)
+    private var dropGlow: DropGlow {
+        if model.isInvitingDrop { return .invited }
+        guard isOfferingDrop else { return .hidden }
+        return model.isDropTargeted ? .targeted : .offered
     }
 
-    private var swellAnimation: Animation {
-        if reduceMotion { return IndicatorMotion.reducedMotion }
-        return model.isDropTargeted ? IndicatorMotion.swell : IndicatorMotion.settle
-    }
 
     private var showsPreview: Bool { model.isExpanded && (!model.preview.isEmpty || model.state == .dropTarget) }
 
@@ -131,17 +125,11 @@ struct IndicatorView: View {
 
     @ViewBuilder private var preview: some View {
         if model.state == .dropTarget {
-            DropPrompt(isTargeted: model.isDropTargeted, swells: !reduceMotion, showsIcons: layout.style == .floating)
+            DropPrompt(isTargeted: model.isDropTargeted, showsIcons: layout.style == .floating)
         } else {
             TranscriptPreview(text: model.preview)
                 .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { model.previewFrame = $0 }
         }
-    }
-
-    private func acceptsDrop(_ files: [URL]) -> Bool {
-        guard model.state == .dropTarget, let media = files.first(where: MediaFile.isSupported) else { return false }
-        model.onDrop(media)
-        return true
     }
 
     private var notch: some View {
@@ -165,17 +153,21 @@ struct IndicatorView: View {
                         .transition(transition(anchor: .top, delay: 0))
                 }
             }
-            .frame(width: layout.panelFrame.width + swellWidth)
+            .frame(width: layout.panelFrame.width)
             .background {
                 notchShape.fill(.black).frame(width: notchWidth)
+            }
+            .overlay {
+                notchShape
+                    .stroke(LinearGradient(colors: [.clear, Theme.accent], startPoint: .top, endPoint: .bottom), lineWidth: 3)
+                    .frame(width: notchWidth)
+                    .animation(IndicatorMotion.glow) { $0.opacity(dropGlow.rim) }
             }
             .mask { notchShape.frame(width: notchWidth) }
             .background {
-                let shadow = dropShadow
                 notchShape.fill(.black).frame(width: notchWidth)
-                    .shadow(color: .black.opacity(shadow.opacity), radius: shadow.radius, y: shadow.y)
+                    .animation(IndicatorMotion.glow) { $0.dropGlow(dropGlow) }
             }
-            .dropDestination(for: URL.self) { files, _ in acceptsDrop(files) } isTargeted: { model.isDropTargeted = $0 }
             Rectangle()
                 .fill(.black)
                 .frame(width: max(notchWidth - 2 * notchShape.topRadius, 0), height: 1)
@@ -183,7 +175,6 @@ struct IndicatorView: View {
         .opacity(reduceMotion && !model.isExpanded ? 0 : 1)
         .animation(animation, value: model.isExpanded)
         .animation(previewAnimation, value: model.preview)
-        .animation(swellAnimation, value: model.isDropTargeted)
     }
 
     private var previewAnimation: Animation {
@@ -196,15 +187,16 @@ struct IndicatorView: View {
                 preview
                     .padding(14)
                     .frame(width: IndicatorLayout.previewWidth)
-                    .background { floatingSurface(RoundedRectangle(cornerRadius: 16)) }
+                    .background {
+                        floatingSurface(RoundedRectangle(cornerRadius: 16))
+                            .animation(IndicatorMotion.glow) { $0.dropGlow(dropGlow) }
+                    }
                     .transition(reduceMotion ? .opacity.animation(IndicatorMotion.reducedMotion) : .pill)
             }
             if model.state != .dropTarget { pillBody }
         }
         .padding(.bottom, IndicatorLayout.shadowMargin)
-        .dropDestination(for: URL.self) { files, _ in acceptsDrop(files) } isTargeted: { model.isDropTargeted = $0 }
         .animation(previewAnimation, value: model.preview)
-        .animation(swellAnimation, value: model.isDropTargeted)
     }
 
     private func floatingSurface(_ shape: some InsettableShape) -> some View {
@@ -261,6 +253,29 @@ struct IndicatorView: View {
     }
 }
 
+// The accent glow invites the drag to the notch and fades as the notch opens, then a black shadow lifts the open drop target
+struct DropGlow {
+    static let hidden = DropGlow(rim: 0, accent: 0, accentRadius: 0, depth: 0, depthRadius: 0, depthY: 0)
+    static let invited = DropGlow(rim: 1, accent: 1, accentRadius: 20, depth: 0, depthRadius: 0, depthY: 0)
+    static let offered = DropGlow(rim: 0, accent: 0, accentRadius: 0, depth: 0.3, depthRadius: 14, depthY: 6)
+    static let targeted = DropGlow(rim: 0, accent: 0, accentRadius: 0, depth: 0.55, depthRadius: 22, depthY: 10)
+
+    let rim: Double
+    let accent: Double
+    let accentRadius: CGFloat
+    let depth: Double
+    let depthRadius: CGFloat
+    let depthY: CGFloat
+}
+
+extension View {
+    func dropGlow(_ glow: DropGlow) -> some View {
+        shadow(color: Theme.accent.opacity(glow.accent), radius: glow.accentRadius / 4)
+            .shadow(color: Theme.accent.opacity(glow.accent), radius: glow.accentRadius)
+            .shadow(color: .black.opacity(glow.depth), radius: glow.depthRadius, y: glow.depthY)
+    }
+}
+
 enum IndicatorState: Equatable {
     case recording
     case transcribing
@@ -280,11 +295,11 @@ final class IndicatorModel {
     var recordingEnd: Date?
     var preview = ""
     var isDropTargeted = false
+    var isInvitingDrop = false
     var progress: Double?
     var canCancel = false
     var isHovering = false
     @ObservationIgnored var previewFrame = CGRect.zero
-    @ObservationIgnored var onDrop: (URL) -> Void = { _ in }
     @ObservationIgnored var onCancel: () -> Void = {}
     @ObservationIgnored var levels = LevelHistory()
 }
@@ -336,7 +351,7 @@ struct IndicatorTrailing: View {
             case .failed:
                 ResultSymbol(icon: .triangleAlert, color: .orange, effect: .bounce).transition(swap)
             case .dropTarget:
-                DropArrow(isTargeted: model.isDropTargeted, moves: !reduceMotion).transition(swap)
+                DropArrow(isTargeted: model.isDropTargeted).transition(swap)
             }
         }
         .animation(reduceMotion ? IndicatorMotion.reducedMotion : IndicatorMotion.stateSwap, value: model.state)
@@ -348,10 +363,7 @@ struct IndicatorTrailing: View {
 }
 
 struct DropPrompt: View {
-    private static let swellHeight: CGFloat = 5
-
     let isTargeted: Bool
-    let swells: Bool
     let showsIcons: Bool
 
     var body: some View {
@@ -359,26 +371,23 @@ struct DropPrompt: View {
             if showsIcons {
                 Icon(.audioLines, size: 15, strokeWidth: 2)
                     .foregroundStyle(.primary.opacity(isTargeted ? 1 : 0.6))
-                    .scaleEffect(isTargeted && swells ? 1.1 : 1)
             }
             Text("Drop to transcribe")
                 .font(.ui(13))
                 .foregroundStyle(.primary.opacity(isTargeted ? 1 : 0.7))
                 .frame(maxWidth: .infinity)
-            if showsIcons { DropArrow(isTargeted: isTargeted, moves: swells) }
+            if showsIcons { DropArrow(isTargeted: isTargeted) }
         }
-        .padding(.vertical, isTargeted && swells ? Self.swellHeight : 0)
+        .animation(IndicatorMotion.glow, value: isTargeted)
     }
 }
 
 struct DropArrow: View {
     let isTargeted: Bool
-    let moves: Bool
 
     var body: some View {
         Icon(.arrowDown, size: 15, strokeWidth: 2.25)
             .foregroundStyle(.primary.opacity(isTargeted ? 1 : 0.6))
-            .offset(y: isTargeted && moves ? 2 : 0)
-            .animation(.easeOut(duration: 0.16), value: isTargeted)
+            .animation(IndicatorMotion.glow, value: isTargeted)
     }
 }

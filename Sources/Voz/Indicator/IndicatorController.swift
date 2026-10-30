@@ -10,6 +10,7 @@ final class IndicatorController {
     private static let dropGrace = Duration.milliseconds(200)
     private static let sampleInterval = 1.0 / 120
     private static let hoverInterval = 1.0 / 30
+    private static let dragCheckInterval = 1.0 / 20
 
     private let model = IndicatorModel()
     private let panel = IndicatorPanel()
@@ -19,14 +20,12 @@ final class IndicatorController {
     private var lastPhase = Dictation.Phase.idle
     private var sampler: Timer?
     private var hoverTracker: Timer?
+    private var dragWatch: Timer?
+    private var isInvitingDrop = false
     private var cancelledFile = false
     private var smoother = LevelSmoother()
     private var lastSampleTime = 0.0
     var levelSource: () -> Float = { 0 }
-    var onDrop: (URL) -> Void {
-        get { model.onDrop }
-        set { model.onDrop = newValue }
-    }
     var onCancelFile: () -> Void = {}
 
     init() {
@@ -77,23 +76,74 @@ final class IndicatorController {
         }
     }
 
-    func showDropTarget() {
-        guard !panel.isVisible || model.state == .dropTarget else { return }
+    func inviteDrop(on screen: NSScreen) {
+        guard !panel.isVisible, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
         lifecycle?.cancel()
         clearPreview()
-        if !panel.isVisible { present() }
-        model.isDropTargeted = false
+        present(on: screen)
         model.state = .dropTarget
-        panel.ignoresMouseEvents = false
-        expandAfterPresenting()
+        model.isDropTargeted = false
+        isInvitingDrop = true
+        lifecycle = Task { [model] in
+            try? await Task.sleep(for: .milliseconds(16))
+            guard !Task.isCancelled else { return }
+            model.isInvitingDrop = true
+        }
+        watchDrag()
     }
 
-    func endDropTarget() {
-        guard model.state == .dropTarget else { return }
+    func showDropTarget(on screen: NSScreen) -> Bool {
+        guard !panel.isVisible || model.state == .dropTarget else { return false }
+        lifecycle?.cancel()
+        clearPreview()
+        if !panel.isVisible || layout != IndicatorLayout.make(screen: ScreenResolver.metrics(for: screen)) { present(on: screen) }
+        model.state = .dropTarget
+        isInvitingDrop = false
+        model.isDropTargeted = true
+        expandAfterPresenting()
+        watchDrag()
+        return true
+    }
+
+    private var isDraggingOverDropTarget: Bool {
+        NSEvent.pressedMouseButtons & 1 != 0 && layout?.windowFrame.contains(NSEvent.mouseLocation) == true
+    }
+
+    private func watchDrag() {
+        dragWatch?.invalidate()
+        let timer = Timer(timeInterval: Self.dragCheckInterval, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.checkDrag() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        dragWatch = timer
+    }
+
+    private func checkDrag() {
+        guard model.state == .dropTarget else { return stopDragWatch() }
+        if isInvitingDrop {
+            guard NSEvent.pressedMouseButtons & 1 == 0 else { return }
+            stopDragWatch()
+            isInvitingDrop = false
+            return collapseAndHide()
+        }
+        guard !isDraggingOverDropTarget else { return }
+        stopDragWatch()
+        endDropTarget()
+    }
+
+    private func stopDragWatch() {
+        dragWatch?.invalidate()
+        dragWatch = nil
+    }
+
+    // The grace lets a drop that lands as the button comes up start transcribing without a close in between
+    private func endDropTarget() {
         lifecycle?.cancel()
         lifecycle = Task { [weak self] in
             try? await Task.sleep(for: Self.dropGrace)
             guard !Task.isCancelled, let self, self.model.state == .dropTarget else { return }
+            if self.isDraggingOverDropTarget { return self.watchDrag() }
+            self.model.isDropTargeted = false
             self.collapseAndHide()
         }
     }
@@ -243,12 +293,14 @@ final class IndicatorController {
         lifecycle = Task { [model] in
             try? await Task.sleep(for: .milliseconds(16))
             guard !Task.isCancelled else { return }
+            model.isInvitingDrop = false
             model.isExpanded = true
         }
     }
 
     private func collapseAndHide() {
         stopTimer()
+        model.isInvitingDrop = false
         model.isExpanded = false
         lifecycle = Task { [weak self] in
             try? await Task.sleep(for: Self.closeDuration)
@@ -259,8 +311,8 @@ final class IndicatorController {
         }
     }
 
-    private func present() {
-        guard let screen = ScreenResolver.targetScreen() else {
+    private func present(on chosen: NSScreen? = nil) {
+        guard let screen = chosen ?? ScreenResolver.targetScreen() else {
             Log.app.error("Indicator has no screen to show on")
             return
         }

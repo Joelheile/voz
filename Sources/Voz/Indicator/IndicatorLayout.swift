@@ -34,7 +34,6 @@ struct IndicatorLayout: Equatable, Sendable {
     static let pillGap: CGFloat = 8
     static let bottomGap: CGFloat = 16
     static let shadowMargin: CGFloat = 16
-    static let dropSwell: CGFloat = 6
     static let dropShadowRoom: CGFloat = 32
 
     let style: Style
@@ -45,13 +44,17 @@ struct IndicatorLayout: Equatable, Sendable {
     static let previewHeight: CGFloat = 120
 
     var windowFrame: CGRect {
-        let width = max(panelFrame.width + 2 * (Self.dropSwell + Self.dropShadowRoom), Self.previewWidth + 2 * Self.shadowMargin)
+        let width = max(panelFrame.width + 2 * Self.dropShadowRoom, Self.previewWidth + 2 * Self.shadowMargin)
         return CGRect(
             x: panelFrame.midX - width / 2,
             y: style == .notch ? panelFrame.minY - Self.previewHeight : panelFrame.minY,
             width: width,
             height: panelFrame.height + Self.previewHeight
         )
+    }
+
+    var dropSensorFrame: CGRect {
+        style == .notch ? panelFrame.insetBy(dx: Self.sideWidth, dy: 0) : panelFrame
     }
 
     static func make(screen: ScreenMetrics) -> IndicatorLayout {

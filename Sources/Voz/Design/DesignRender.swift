@@ -57,6 +57,15 @@ enum DesignRender {
                     )
                 }
             }
+            let invited = IndicatorModel()
+            invited.state = .dropTarget
+            invited.isInvitingDrop = true
+            try write(
+                IndicatorView(model: invited, layout: previewLayout(hasNotch: true)).environment(\.colorScheme, .dark),
+                to: outputDirectory,
+                name: "indicator-notch-drop-invite-\(suffix)",
+                appearance: appearance
+            )
             for (title, progress, hovering) in fileProgressStates {
                 for (style, hasNotch) in [("notch", true), ("floating", false)] {
                     let model = IndicatorModel()
