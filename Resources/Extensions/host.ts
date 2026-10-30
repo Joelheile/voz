@@ -11,6 +11,8 @@ import { basename, extname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import type {
   Action,
+  ActionHandle,
+  Activity,
   AfterInsertEvent,
   AudioDropEvent,
   Awaitable,
@@ -21,8 +23,8 @@ import type {
   BeforeInsertResult,
   CleanupModel,
   CleanupStep,
+  Command,
   CommandEvent,
-  CommandOptions,
   Context,
   GenerateRequest,
   Generated,
@@ -44,12 +46,12 @@ type Launch = {
   extensionsDirectory: string;
   packages: string[];
 };
-type EventName = "beforeCleanup" | "beforeInsert" | "recording" | "afterInsert" | "audioDrop";
+type EventName = "beforeCleanup" | "beforeInsert" | "afterRecording" | "afterInsert" | "audioDrop";
 type HandlerResult = BeforeInsertResult | BeforeCleanupResult;
 type HookPayload = {
   beforeCleanup: BeforeCleanupEvent;
   beforeInsert: BeforeInsertEvent;
-  recording: RecordingEvent;
+  afterRecording: RecordingEvent;
   afterInsert: AfterInsertEvent;
   audioDrop: AudioDropEvent;
 };
@@ -57,8 +59,8 @@ type Handler = {
   extension: string;
   run: (event: object, ctx: Context) => HandlerResult | Promise<HandlerResult>;
 };
-type CommandPosition = NonNullable<CommandOptions["at"]>;
-type Command = {
+type CommandPosition = NonNullable<Command["at"]>;
+type RegisteredCommand = {
   extension: string;
   phrase: string;
   at: CommandPosition;
@@ -81,6 +83,7 @@ type TranscribeRequest = { model: string; path: string; seconds: number; app: Ap
 type CleanRequest = { model: string; text: string; prompt: string; app: App };
 type StepRequest = { step: string; text: string; app: App };
 type ActionRequest = { action: string; app: App };
+type StopActivityRequest = { activity: string; app: App };
 type Component = { id: string; name: string };
 type Entry = { name: string; path?: string; requires?: number };
 type LoadError = { extension: string; message: string };
@@ -91,6 +94,10 @@ type Config = Record<string, string | number | boolean>;
 type SettingsFile = {
   disabled?: string[];
   config?: Record<string, Config>;
+};
+type VersionChange = {
+  version: number;
+  restore: (api: ExtensionAPI, config: Config, registration: Registration) => ExtensionAPI;
 };
 type PackageManifest = {
   name?: string;
@@ -119,7 +126,7 @@ class Registration {
   }
 }
 
-const apiVersion = 3;
+const apiVersion = 4;
 const loadTimeout = 3000;
 const write = process.stdout.write.bind(process.stdout);
 const send = (message: object) => write(JSON.stringify(message) + "\n");
@@ -143,18 +150,21 @@ const launch: Launch = JSON.parse(process.argv[2]);
 const eventNames: EventName[] = [
   "beforeCleanup",
   "beforeInsert",
-  "recording",
+  "afterRecording",
   "afterInsert",
   "audioDrop",
 ];
 const handlers = new Map<EventName, Handler[]>();
-const commands = new Map<string, Command>();
+const commands = new Map<string, RegisteredCommand>();
 const speechModels = new Map<string, SpeechModel>();
 const cleanupModels = new Map<string, CleanupModel>();
 const cleanupSteps = new Map<string, CleanupStep>();
 const actions = new Map<string, Action & { extension: string }>();
+const activities = new Map<string, Activity>();
+let lastActivity = 0;
 const calls = new Map<number, PendingCall>();
 let lastCall = 0;
+let isReady = false;
 const settingsSchemas = new Map<string, SettingsSchema>();
 const loaded: string[] = [];
 const bus = new EventEmitter();
@@ -174,7 +184,7 @@ function context(app: App): Context {
   const scope = requestScope.getStore();
   const isLive = () => scope?.active === true && Date.now() < scope.deadline;
   const action = (method: string, params: { text: string } | { key: string }) => {
-    if (!isLive()) return;
+    if (!isLive()) return log(`Dropped ctx.${method}: it ran after its handler finished or ran out of time`);
     send({ method, params, requestID: scope!.id });
   };
   return {
@@ -269,7 +279,29 @@ function register<T extends Component>(
   if (!component.id || !component.name)
     throw new Error(`A ${kind} needs an id and a name`);
   const id = `${extension}/${component.id}`;
-  setRegistered(registry, id, { ...component, id }, registration);
+  const registered = { ...component, id };
+  setRegistered(registry, id, registered, registration);
+  return registered;
+}
+
+function registerAction(extension: string, action: Action, registration: Registration): ActionHandle {
+  const registered = register(actions, "action", extension, { ...action, extension }, registration);
+  return {
+    update({ hidden }) {
+      registered.hidden = hidden;
+      if (isReady) send({ method: "actions", params: { actions: wireActions() } });
+    },
+  };
+}
+
+function wireActions() {
+  return [...actions.values()].map(({ id, name, hotkey, hidden, extension }) => ({
+    id,
+    name,
+    hotkey,
+    hidden: hidden === true,
+    extension,
+  }));
 }
 
 function setRegistered<Key, Value>(registry: Map<Key, Value>, key: Key, value: Value, registration: Registration) {
@@ -382,14 +414,17 @@ function api(name: string, config: Config, registration: Registration): Extensio
       });
       handlers.set(event, [...(handlers.get(event) ?? []), registered]);
     },
-    registerCommand(phrase, handler, options) {
-      const at = options?.at ?? "end";
+    registerCommand(command) {
+      if (typeof command?.phrase !== "string" || typeof command.run !== "function")
+        throw new Error("registerCommand needs { phrase, run }");
+      const { phrase, run } = command;
+      const at = command.at ?? "end";
       if (at !== "start" && at !== "end") throw new Error(`Command "${phrase}" needs at: "start" or "end"`);
       const key = commandKey(phrase, at);
       const existing = commands.get(key);
       if (existing)
         log(`${name} replaces command "${phrase}" from ${existing.extension}`);
-      setRegistered(commands, key, { extension: name, phrase, at, run: handler }, registration);
+      setRegistered(commands, key, { extension: name, phrase, at, run }, registration);
     },
     registerSpeechModel: (model) =>
       register(speechModels, "speech model", name, model, registration),
@@ -397,7 +432,18 @@ function api(name: string, config: Config, registration: Registration): Extensio
       register(cleanupModels, "cleanup model", name, model, registration),
     registerCleanupStep: (step) =>
       register(cleanupSteps, "cleanup step", name, step, registration),
-    registerAction: (action) => register(actions, "action", name, { ...action, extension: name }, registration),
+    registerAction: (action) => registerAction(name, action, registration),
+    startActivity(activity) {
+      if (!activity.title) throw new Error("An activity needs a title");
+      const id = `${name}/${++lastActivity}`;
+      activities.set(id, activity);
+      send({ method: "startActivity", params: { id, title: activity.title, since: activity.since ?? Date.now(), stoppable: !!activity.stop } });
+      return { end: () => endActivity(id) };
+    },
+    addHistory(entry) {
+      if (!entry.text) throw new Error("A history entry needs text");
+      send({ method: "addHistory", params: { extension: name, text: entry.text, seconds: entry.seconds ?? 0, file: entry.file } });
+    },
     settings<Schema extends SettingsSchema>(schema: Schema) {
       for (const [key, setting] of Object.entries(schema)) checkSetting(key, setting);
       setRegistered(settingsSchemas, name, schema, registration);
@@ -441,11 +487,31 @@ async function loadEntry(entry: Entry, config: Config = {}, registration: Regist
   const module = await import(entry.path);
   if (typeof module.default !== "function")
     throw new Error("default export is not a function");
-  const current = api(entry.name, config, registration);
-  await module.default((entry.requires ?? 1) < 2 ? withApi1Removals(current, config, registration) : current);
+  const writtenFor = entry.requires ?? 1;
+  const surface = versionChanges
+    .filter((change) => writtenFor < change.version)
+    .reduce((surface, change) => change.restore(surface, config, registration), api(entry.name, config, registration));
+  await module.default(surface);
 }
 
-function withApi1Removals(current: ExtensionAPI, config: Config, registration: Registration) {
+const versionChanges: VersionChange[] = [
+  { version: 4, restore: withApi3Forms },
+  { version: 2, restore: withApi1Removals },
+];
+
+function withApi3Forms(current: ExtensionAPI): ExtensionAPI {
+  return {
+    ...current,
+    on(event: EventName | "recording", handler: Handler["run"]) {
+      current.on((event === "recording" ? "afterRecording" : event) as never, handler as never);
+    },
+    registerCommand(command: Command | string, run?: Command["run"], options?: Pick<Command, "at">) {
+      current.registerCommand(typeof command === "string" ? { phrase: command, run: run!, at: options?.at } : command);
+    },
+  } as ExtensionAPI;
+}
+
+function withApi1Removals(current: ExtensionAPI, config: Config, registration: Registration): ExtensionAPI {
   return {
     ...current,
     config,
@@ -465,7 +531,7 @@ function withApi1Removals(current: ExtensionAPI, config: Config, registration: R
       };
       current.on(event as never, (event === "beforeInsert" ? handled : handler) as never);
     },
-  };
+  } as ExtensionAPI;
 }
 
 function withinLoadTimeout(work: Promise<void>): Promise<void> {
@@ -569,9 +635,22 @@ async function action({ action, app }: ActionRequest) {
   return {};
 }
 
+function endActivity(id: string) {
+  if (activities.delete(id)) send({ method: "endActivity", params: { id } });
+}
+
+async function stopActivity({ activity, app }: StopActivityRequest) {
+  const stop = activities.get(activity)?.stop;
+  if (!stop) throw new Error(`Unknown activity ${activity}`);
+  endActivity(activity);
+  await stop(context(app));
+  return {};
+}
+
 const methods = {
   beforeCleanup,
   action,
+  stopActivity,
   beforeInsert,
   clean,
   cleanupStep,
@@ -612,7 +691,7 @@ send({
     speechModels: components(speechModels),
     cleanupModels: components(cleanupModels),
     cleanupSteps: components(cleanupSteps),
-    actions: [...actions.values()].map(({ id, name, hotkey, extension }) => ({ id, name, hotkey, extension })),
+    actions: wireActions(),
     settings: [...settingsSchemas].map(([extension, schema]) => ({
       extension,
       fields: Object.entries(schema).map(([key, setting]) => ({ key, ...setting })),
@@ -620,6 +699,7 @@ send({
     errors,
   },
 });
+isReady = true;
 
 for await (const line of createInterface({ input: process.stdin })) {
   if (!line.trim()) continue;

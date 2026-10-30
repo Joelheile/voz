@@ -41,8 +41,9 @@ export type TranscribeOptions = { speakers?: boolean };
 export type Turn = { speaker: number; start: number; end: number; text: string };
 export type Transcript = { text: string; seconds: number; speakers: number; turns: Turn[] };
 
-export type Context = {
-  app: App;
+export type TransformContext = { app: App };
+
+export type Context = TransformContext & {
   insert(text: string): void;
   press(key: string): void;
   notify(text: string): void;
@@ -50,7 +51,6 @@ export type Context = {
   transcribe(path: string, options?: TranscribeOptions): Promise<Transcript>;
 };
 
-export type CommandOptions = { at?: "start" | "end" };
 
 export type BeforeCleanupEvent = { prompt: string };
 export type BeforeCleanupResult = { prompt: string } | void;
@@ -82,15 +82,36 @@ export type CleanupModel = {
 export type CleanupStep = {
   id: string;
   name: string;
-  run(event: CleanupStepEvent, ctx: Context): Awaitable<{ text: string } | void>;
+  run(event: CleanupStepEvent, ctx: TransformContext): Awaitable<{ text: string } | void>;
+};
+
+export type Command = {
+  phrase: string;
+  at?: "start" | "end";
+  run(event: CommandEvent, ctx: Context): Awaitable<void>;
 };
 
 export type Action = {
   id: string;
   name: string;
   hotkey?: string;
+  hidden?: boolean;
   run(ctx: Context): Awaitable<void>;
 };
+
+export type ActionHandle = {
+  update(changes: { hidden?: boolean }): void;
+};
+
+export type Activity = {
+  title: string;
+  since?: number;
+  stop?(ctx: Context): Awaitable<void>;
+};
+
+export type RunningActivity = { end(): void };
+
+export type HistoryEntry = { text: string; seconds?: number; file?: string };
 
 type SettingBase = { title: string; description?: string };
 
@@ -114,18 +135,18 @@ export type ExtensionAPI = {
     event: "beforeCleanup",
     handler: (
       event: BeforeCleanupEvent,
-      ctx: Context,
+      ctx: TransformContext,
     ) => Awaitable<BeforeCleanupResult>,
   ): void;
   on(
     event: "beforeInsert",
     handler: (
       event: BeforeInsertEvent,
-      ctx: Context,
+      ctx: TransformContext,
     ) => Awaitable<BeforeInsertResult>,
   ): void;
   on(
-    event: "recording",
+    event: "afterRecording",
     handler: (event: RecordingEvent, ctx: Context) => Awaitable<void>,
   ): void;
   on(
@@ -136,20 +157,18 @@ export type ExtensionAPI = {
     event: "audioDrop",
     handler: (event: AudioDropEvent, ctx: Context) => Awaitable<void>,
   ): void;
-  registerCommand(
-    phrase: string,
-    handler: (event: CommandEvent, ctx: Context) => Awaitable<void>,
-    options?: CommandOptions,
-  ): void;
+  registerCommand(command: Command): void;
   registerSpeechModel(model: SpeechModel): void;
   registerCleanupModel(model: CleanupModel): void;
   registerCleanupStep(step: CleanupStep): void;
-  registerAction(action: Action): void;
+  registerAction(action: Action): ActionHandle;
+  startActivity(activity: Activity): RunningActivity;
+  addHistory(entry: HistoryEntry): void;
   settings<Schema extends SettingsSchema>(schema: Schema): SettingsValues<Schema>;
 };
 
 export type Extension = (voz: ExtensionAPI) => Awaitable<void>;
 
-export const apiVersion: 3;
+export const apiVersion: 4;
 
 export function defineExtension(extension: Extension): Extension;

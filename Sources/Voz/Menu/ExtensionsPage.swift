@@ -419,6 +419,8 @@ private struct InstalledDetail: View {
                         if let hotkey = action.hotkeyLabel {
                             Text(hotkey).font(.ui(12)).foregroundStyle(Theme.inkTertiary)
                         }
+                        Button("Run") { catalog.run(action) }
+                            .buttonStyle(.pill(.accent, .small))
                     }
                 }
                 ForEach(steps, id: \.self) { step in

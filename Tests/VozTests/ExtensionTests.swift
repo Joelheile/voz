@@ -14,13 +14,14 @@ struct ExtensionHostTests {
     private func makeHost(
         packages: [String] = [],
         actions: RecordedActions = RecordedActions(),
+        logs: RecordedLogs = RecordedLogs(),
         generate: @escaping @Sendable (GenerateParams) async throws -> String = { _ in throw ExtensionModelError.unavailable("not in tests") },
         transcribeFile: @escaping @Sendable (TranscribeFileParams) async throws -> FileTranscript = { _ in throw FileTranscriberError.needsParakeet }
     ) -> ExtensionHost {
         ExtensionHost(
             launch: .init(bun: installedBun!, script: hostScript, home: home, packageDirectories: packages.map(fileURL)),
             onAction: { actions.append($0) },
-            onLog: { _ in },
+            onLog: { logs.append($0) },
             onExit: { _ in },
             generate: generate,
             transcribeFile: transcribeFile
@@ -258,8 +259,56 @@ struct ExtensionHostTests {
         await host.stop()
     }
 
+    @Test func activitiesShowUntilTheyEndOrTheUserStopsThem() async throws {
+        try extensionFile("meeting.ts", #"export default (voz) => { voz.startActivity({ title: "Sync", since: 500 }).end(); voz.startActivity({ title: "Recording meeting", since: 1000, stop: (ctx) => ctx.notify("stopped") }) }"#)
+        let actions = RecordedActions()
+        let host = makeHost(actions: actions)
+        _ = try await host.start()
+        #expect(await host.stopActivity("meeting/2", app: app, timeout: .seconds(2)))
+        #expect(await host.stopActivity("meeting/2", app: app, timeout: .seconds(2)) == false)
+        #expect(actions.all == [
+            startedActivity("meeting/1", "Sync", since: 0.5, stoppable: false),
+            .endActivity("meeting/1"),
+            startedActivity("meeting/2", "Recording meeting", since: 1, stoppable: true),
+            .endActivity("meeting/2"),
+            .notify("stopped"),
+        ])
+        await host.stop()
+    }
+
+    @Test func extensionsAddEntriesToTheHistory() async throws {
+        try extensionFile("meeting.ts", #"export default (voz) => { voz.addHistory({ text: "hello team", seconds: 3, file: "/tmp/meeting.md" }); voz.addHistory({ text: "short" }) }"#)
+        let actions = RecordedActions()
+        let host = makeHost(actions: actions)
+        _ = try await host.start()
+        #expect(actions.all == [
+            .addHistory(ExtensionHistoryEntry(extension: "meeting", text: "hello team", seconds: 3, file: "/tmp/meeting.md")),
+            .addHistory(ExtensionHistoryEntry(extension: "meeting", text: "short", seconds: 0, file: nil)),
+        ])
+        await host.stop()
+    }
+
+    @Test func hiddenActionsLeaveThePanelAndUpdatesReachVoz() async throws {
+        try extensionFile("setup.ts", #"export default (voz) => { const done = voz.registerAction({ id: "done", name: "Done", hidden: true, run() {} }); const connect = voz.registerAction({ id: "connect", name: "Connect", hotkey: "ctrl+opt+t", run() { connect.update({ hidden: true }); done.update({ hidden: false }) } }) }"#)
+        let actions = RecordedActions()
+        let host = makeHost(actions: actions)
+        let manifest = try await host.start()
+        #expect(manifest.actions == [
+            ExtensionAction(id: "setup/done", name: "Done", hotkey: nil, hidden: true, extension: "setup"),
+            ExtensionAction(id: "setup/connect", name: "Connect", hotkey: "ctrl+opt+t", hidden: false, extension: "setup"),
+        ])
+        #expect(await host.runAction("setup/connect", app: app, timeout: .seconds(2)))
+        #expect(actions.all.last == .actions([
+            ExtensionAction(id: "setup/done", name: "Done", hotkey: nil, hidden: false, extension: "setup"),
+            ExtensionAction(id: "setup/connect", name: "Connect", hotkey: "ctrl+opt+t", hidden: true, extension: "setup"),
+        ]))
+        await host.stop()
+    }
+
     @Test func newExtensionTemplateLoadsAndRuns() async throws {
         let folder = try ExtensionTemplate.create(named: "voz-hello", in: home.root, from: extensionResources)
+        let apiVersion = try ExtensionTemplate.apiVersion(in: extensionResources)
+        #expect(fileContents(folder.appendingPathComponent("package.json"))?.contains(#""apiVersion": \#(apiVersion) }"#) == true)
         let actions = RecordedActions()
         let host = makeHost(packages: [folder.path], actions: actions)
         let manifest = try await host.start()
@@ -278,13 +327,13 @@ struct ExtensionHostTests {
         try writeFile(#"{"name":"pack"}"#, named: "package.json", in: pack)
         try writeFile(#"export default (voz) => voz.on("beforeInsert", () => ({ text: "pack ran" }))"#, named: "index.ts", in: pack.appendingPathComponent("extensions/a"))
         let future = home.packages.appendingPathComponent("node_modules/future")
-        try writeFile(#"{"name":"future","voz":{"apiVersion":4}}"#, named: "package.json", in: future)
+        try writeFile(#"{"name":"future","voz":{"apiVersion":5}}"#, named: "package.json", in: future)
         try writeFile("export default () => {}", named: "index.ts", in: future)
         let host = makeHost(packages: [pack.path, future.path])
         let manifest = try await host.start()
         #expect(manifest.extensions == ["on"])
         #expect(manifest.errors.first?.message.contains("Update Voz") == true)
-        #expect(await host.beforeInsert(text: "hi", raw: "hi", app: app, timeout: .seconds(2)) == "hi 3")
+        #expect(await host.beforeInsert(text: "hi", raw: "hi", app: app, timeout: .seconds(2)) == "hi 4")
         await host.stop()
     }
 
@@ -303,6 +352,58 @@ struct ExtensionHostTests {
         #expect(manifest.extensions == ["say", "old", "new"])
         #expect(await host.beforeInsert(text: "hi", raw: "hi", app: app, timeout: .seconds(2)) == "hi! string undefined")
         #expect(await host.beforeInsert(text: "stop", raw: "stop", app: app, timeout: .seconds(2)) == "")
+        await host.stop()
+    }
+
+    @Test func apiVersionFourPackagesUseCommandObjectsAndAfterRecording() async throws {
+        let current = home.packages.appendingPathComponent("node_modules/current")
+        try writeFile(#"{"name":"current","voz":{"apiVersion":4}}"#, named: "package.json", in: current)
+        try writeFile(#"export default (voz) => { voz.registerCommand({ phrase: "todo", at: "start", run: (e, ctx) => ctx.notify(`todo ${e.text}`) }); voz.on("afterRecording", (e, ctx) => ctx.notify(`heard ${e.seconds}`)) }"#, named: "index.ts", in: current)
+        let positional = home.packages.appendingPathComponent("node_modules/positional")
+        try writeFile(#"{"name":"positional","voz":{"apiVersion":4}}"#, named: "package.json", in: positional)
+        try writeFile(#"export default (voz) => voz.registerCommand("todo", () => {})"#, named: "index.ts", in: positional)
+        let renamed = home.packages.appendingPathComponent("node_modules/renamed")
+        try writeFile(#"{"name":"renamed","voz":{"apiVersion":4}}"#, named: "package.json", in: renamed)
+        try writeFile(#"export default (voz) => voz.on("recording", () => {})"#, named: "index.ts", in: renamed)
+        let actions = RecordedActions()
+        let host = makeHost(packages: [current.path, positional.path, renamed.path], actions: actions)
+        let manifest = try await host.start()
+        #expect(manifest.extensions == ["current"])
+        #expect(manifest.errors.map(\.extension) == ["positional", "renamed"])
+        #expect(manifest.errors.first?.message.contains("registerCommand needs { phrase, run }") == true)
+        #expect(manifest.errors.last?.message.contains(#"Unknown event "recording""#) == true)
+        #expect(manifest.subscribes(to: .afterRecording))
+        #expect(await host.runCommand(VoiceCommandMatch(phrase: "todo", at: .start, text: "call Milan"), app: app, timeout: .seconds(2)))
+        #expect(await host.emit(.afterRecording(path: "/tmp/a.wav", seconds: 2), app: app, timeout: .seconds(2)))
+        #expect(actions.all == [.notify("todo call Milan"), .notify("heard 2")])
+        await host.stop()
+    }
+
+    @Test func apiVersionThreePackagesKeepPositionalCommandsAndTheRecordingEvent() async throws {
+        let old = home.packages.appendingPathComponent("node_modules/old")
+        try writeFile(#"{"name":"old","voz":{"apiVersion":3}}"#, named: "package.json", in: old)
+        try writeFile(#"export default (voz) => { voz.registerCommand("todo", (e, ctx) => ctx.notify(`todo ${e.text}`), { at: "start" }); voz.registerCommand({ phrase: "send it", run: (e, ctx) => ctx.press("return") }); voz.on("recording", (e, ctx) => ctx.notify(`heard ${e.seconds}`)) }"#, named: "index.ts", in: old)
+        let actions = RecordedActions()
+        let host = makeHost(packages: [old.path], actions: actions)
+        let manifest = try await host.start()
+        #expect(manifest.errors.isEmpty)
+        #expect(manifest.subscribes(to: .afterRecording))
+        #expect(await host.runCommand(VoiceCommandMatch(phrase: "todo", at: .start, text: "call Milan"), app: app, timeout: .seconds(2)))
+        #expect(await host.runCommand(VoiceCommandMatch(phrase: "send it", at: .end, text: ""), app: app, timeout: .seconds(2)))
+        #expect(await host.emit(.afterRecording(path: "/tmp/a.wav", seconds: 2), app: app, timeout: .seconds(2)))
+        #expect(actions.all == [.notify("todo call Milan"), .press("return"), .notify("heard 2")])
+        await host.stop()
+    }
+
+    @Test func contextCallsAfterTheHandlerFinishedAreLogged() async throws {
+        try extensionFile("late.ts", #"export default (voz) => voz.registerCommand({ phrase: "later", run: (e, ctx) => { setTimeout(() => ctx.notify("late"), 50) } })"#)
+        let actions = RecordedActions()
+        let logs = RecordedLogs()
+        let host = makeHost(actions: actions, logs: logs)
+        _ = try await host.start()
+        #expect(await host.runCommand(VoiceCommandMatch(phrase: "later", at: .end, text: ""), app: app, timeout: .seconds(2)))
+        #expect(try await logs.waitFor { $0.contains("Dropped ctx.notify") })
+        #expect(actions.all.isEmpty)
         await host.stop()
     }
 
@@ -353,6 +454,10 @@ struct ExtensionHostTests {
         try home.setPackageSources([package.path])
         #expect(try home.installedExtensions() == [InstalledExtension(name: "voz-things3", source: localSource(package.path), version: "0.1.0", description: "Say todo to add a to-do")])
     }
+}
+
+@Test func typesDeclareTheApiVersionTheHostRuns() throws {
+    #expect(try ExtensionTemplate.apiVersion(in: extensionResources) == hostApiVersion())
 }
 
 @Test func administratorScriptQuotesAnyAppPath() {

@@ -26,6 +26,16 @@ struct FileTranscript: Codable, Equatable, Sendable {
     let seconds: Double
     let speakers: Int
     let turns: [SpeakerTurn]
+
+    func applying(_ rules: [VocabularyRule], words: [String]) -> FileTranscript {
+        let fix = { VocabularyCasing.apply(words, to: VocabularyRule.apply(rules, to: $0)) }
+        return FileTranscript(
+            text: fix(text),
+            seconds: seconds,
+            speakers: speakers,
+            turns: turns.map { SpeakerTurn(speaker: $0.speaker, start: $0.start, end: $0.end, text: fix($0.text)) }
+        )
+    }
 }
 
 enum SpeakerTurns {
@@ -90,6 +100,7 @@ enum FileTranscriberError: Error, LocalizedError {
 
 struct FileTranscriber: Sendable {
     let transcriber: Transcriber
+    let vocabulary: VocabularyStore?
 
     func transcribe(_ url: URL, model: SpeechModel, speakers: Bool) async throws -> FileTranscript {
         guard MediaFile.isSupported(url) else { throw FileTranscriberError.unsupported(url.lastPathComponent) }
@@ -105,7 +116,7 @@ struct FileTranscriber: Sendable {
             seconds: result.duration,
             speakers: Set(turns.map(\.speaker)).count,
             turns: turns
-        )
+        ).applying((try? vocabulary?.rules()) ?? [], words: (try? vocabulary?.words()) ?? [])
     }
 
     private static let diarizerConfig = Nemotron3Config(

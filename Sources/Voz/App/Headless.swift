@@ -86,7 +86,7 @@ enum Headless {
     private static func transcribeSpeakers(_ url: URL, model: SpeechModel) async -> Int32 {
         let start = Date()
         do {
-            let transcript = try await FileTranscriber(transcriber: Transcriber()).transcribe(url, model: model, speakers: true)
+            let transcript = try await FileTranscriber(transcriber: Transcriber(), vocabulary: nil).transcribe(url, model: model, speakers: true)
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .withoutEscapingSlashes]
             print(String(decoding: try encoder.encode(transcript), as: UTF8.self))

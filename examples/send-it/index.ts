@@ -5,5 +5,5 @@ export default defineExtension((voz) => {
     key: { type: "string", title: "Key", default: "return", options: ["return", "cmd+return", "shift+return"] },
   });
 
-  voz.registerCommand("send it", (event, ctx) => ctx.press(key));
+  voz.registerCommand({ phrase: "send it", run: (event, ctx) => ctx.press(key) });
 });

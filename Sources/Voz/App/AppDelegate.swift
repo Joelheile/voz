@@ -19,7 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         output: output,
         toast: toast,
         settings: settings,
-        fileTranscriber: FileTranscriber(transcriber: transcriber)
+        fileTranscriber: FileTranscriber(transcriber: transcriber, vocabulary: history.vocabulary)
     )
     private var vocabularyWords: [String] = []
     private lazy var vocabularyLearner = VocabularyLearner(
@@ -105,6 +105,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         indicator.attach(to: dictation)
         indicator.onDrop = { [weak self] file in self?.transcribeDropped(file) }
+        extensions.onFileTranscribing = { [weak self] in
+            guard let self, self.dictation.phase == .idle else { return }
+            self.indicator.showFileTranscribing()
+        }
+        extensions.onFileTranscribed = { [weak self] succeeded in self?.indicator.finishFile(succeeded: succeeded) }
+        extensions.onHistory = { [history] entry in
+            do {
+                try history.insert(TranscriptRecord(entry))
+            } catch {
+                Log.extensions.error("History write failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
         audioDrag.start()
         observeWake()
         OpenRequest.observe { [weak self] in self?.statusItemController?.open() }

@@ -92,6 +92,7 @@ private struct HomePage: View {
                 header(proxy: proxy)
                 if needsAttention { notice }
                 transcripts
+                ForEach(catalog.activities, id: \.id, content: activityRow)
                 footer
             }
         }
@@ -241,10 +242,23 @@ private struct HomePage: View {
         .id(record.id)
     }
 
+    private func activityRow(_ activity: ExtensionActivity) -> some View {
+        HStack(spacing: 8) {
+            Text(activity.title).font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink).lineLimit(1)
+            Text(activity.since, style: .timer).font(.meta).monospacedDigit().foregroundStyle(Theme.inkSecondary)
+            Spacer(minLength: 8)
+            if activity.stoppable {
+                Button("Stop") { catalog.stop(activity) }
+                    .buttonStyle(.pill(.quiet, .small))
+                    .fixedSize()
+            }
+        }
+    }
+
     private var footer: some View {
         HStack(spacing: 2) {
             HStack(spacing: 6) {
-                ForEach(catalog.actions, id: \.id) { action in
+                ForEach(catalog.actions.filter { !$0.hidden }, id: \.id) { action in
                     Button(action.name) { catalog.run(action) }
                         .buttonStyle(.pill(.accent, .small))
                         .fixedSize()
@@ -343,7 +357,11 @@ private struct TranscriptRow: View {
     var body: some View {
         Button(action: copy) {
             HStack(spacing: 10) {
-                AppIcon(bundleID: record.appBundleID, size: 24)
+                if record.source == nil {
+                    AppIcon(bundleID: record.appBundleID, size: 24)
+                } else {
+                    Icon(.puzzle, size: 16).foregroundStyle(Theme.inkSecondary).frame(width: 24, height: 24)
+                }
                 Text(text)
                     .font(.ui(13))
                     .foregroundStyle(Theme.ink)
@@ -359,9 +377,12 @@ private struct TranscriptRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.pressable(0.99))
-        .help(record.finalText)
+        .help(record.source.map { "From \($0)" } ?? record.finalText)
         .contextMenu {
             Button("Copy", action: copy)
+            if let file = record.file {
+                Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: file)]) }
+            }
             Button("Delete", role: .destructive, action: delete)
         }
         .onHover(perform: hover)

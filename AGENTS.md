@@ -2,6 +2,17 @@
 
 Local macOS dictation in Swift. The app records, transcribes, cleans, inserts and saves history. Optional features ship as TypeScript extensions run by Bun.
 
+## Repo layout
+
+Capitalized folders follow SwiftPM and app bundle conventions. Lowercase folders hold tooling and samples.
+
+- `Sources/Voz`: the app. See the code map below.
+- `Tests/VozTests`: unit tests. `Tests/Fixtures` holds cases for `voz --eval`.
+- `Resources`: files `scripts/make-app.sh` copies into `voz.app`: Info.plist, icons, sounds, fonts and the extension host in `Resources/Extensions`.
+- `scripts`: build, test, signing and release scripts used locally and by `.github/workflows`.
+- `examples`: published sample extensions, linked from `EXTENSIONS.md`.
+- `install.sh`, `appcast.xml`: installer and update feed. See release hazards.
+
 ## Code map
 
 One SwiftPM executable target, `Sources/Voz`, grouped by feature. `Tests/VozTests` imports it with `@testable import Voz`.
@@ -10,13 +21,14 @@ One SwiftPM executable target, `Sources/Voz`, grouped by feature. `Tests/VozTest
 - `Dictation`: one dictation from hotkey to inserted text. `DictationPipeline` orders the steps.
 - `Audio`, `Transcription`, `Cleanup`, `Text`: capture, speech to text, on-device model cleanup, deterministic text rules.
 - `Extensions`: Bun host process, JSON protocol, npm packages, `~/.voz`. `Resources/Extensions` holds the TypeScript side.
-- `History`, `Vocabulary`, `Analytics`, `Hotkey`, `Indicator`, `Menu`, `Design`: what the names say.
+- `History`, `Vocabulary`, `Analytics`, `Hotkey`, `Indicator`, `Menu`, `Design`: what the names say. `Design/Components.swift` holds the shared controls and panel views.
+- `Support`: small concurrency and `Duration` helpers shared across features.
 
 ## Constraints
 
 - Builds must work with the Command Line Tools on Apple Silicon and macOS 26. Xcode-only tools are not available locally.
 - Extension failures must not block dictation. Text-changing hooks have deadlines. Observation hooks do not delay delivery.
-- Never remove or change extension API within one `apiVersion`. Bump `apiVersion` in `host.ts` and keep the old surface for older packages, as `withApi1Removals` in `host.ts` does, with a test that loads a package declaring the old version. An API with "no users" can still have published ones: search npm for the `voz-package` keyword first.
+- Extension API only grows: since `apiVersion` 4, never remove or change a member. When you add one, bump `apiVersion` in `host.ts` and `voz.d.ts` (`voz new` copies it into the template), and add a row to the Versions table in `EXTENSIONS.md`. Older surfaces live in `versionChanges` in `host.ts`, each with a test that loads a package declaring that version. An API with "no users" can still have published ones: search npm for the `voz-package` keyword first.
 - Without installed extensions, Bun stays absent. Extensions run unsandboxed in a separate process. Read `EXTENSIONS.md` before you change their interface.
 - Keep transcript text, vocabulary and app names out of telemetry. Usage analytics require opt-in. Read the README privacy section before you change privacy behavior.
 - Keep the native menu bar UI and its theme. Add optional behavior through extension primitives.

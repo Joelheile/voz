@@ -46,6 +46,7 @@ struct ExtensionAction: Decodable, Equatable, Hashable, Sendable {
     let id: String
     let name: String
     let hotkey: String?
+    let hidden: Bool
     let `extension`: String
 
     var hotkeyLabel: String? { hotkey.flatMap { try? KeyChord(parsing: $0).label } }
@@ -126,7 +127,7 @@ enum SettingValue: Codable, Equatable, Sendable {
 enum HostHook: String, Sendable {
     case beforeInsert
     case beforeCleanup
-    case recording
+    case afterRecording
     case afterInsert
     case audioDrop
 }
@@ -137,13 +138,13 @@ struct LoadError: Decodable, Equatable, Sendable {
 }
 
 enum HostEvent: Encodable, Sendable {
-    case recording(path: String, seconds: Double)
+    case afterRecording(path: String, seconds: Double)
     case afterInsert(text: String, raw: String)
     case audioDrop(path: String)
 
     var hook: HostHook {
         switch self {
-        case .recording: .recording
+        case .afterRecording: .afterRecording
         case .afterInsert: .afterInsert
         case .audioDrop: .audioDrop
         }
@@ -154,7 +155,7 @@ enum HostEvent: Encodable, Sendable {
     func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: Keys.self)
         switch self {
-        case .recording(let path, let seconds):
+        case .afterRecording(let path, let seconds):
             try container.encode(path, forKey: .path)
             try container.encode(seconds, forKey: .seconds)
         case .afterInsert(let text, let raw):
@@ -170,6 +171,45 @@ enum HostAction: Equatable, Sendable {
     case insert(String)
     case press(String)
     case notify(String)
+    case startActivity(ExtensionActivity)
+    case endActivity(String)
+    case addHistory(ExtensionHistoryEntry)
+    case actions([ExtensionAction])
+}
+
+struct ActionsParams: Decodable {
+    let actions: [ExtensionAction]
+}
+
+struct ExtensionActivity: Decodable, Equatable, Sendable {
+    let id: String
+    let title: String
+    let since: Date
+    let stoppable: Bool
+
+    private enum CodingKeys: String, CodingKey { case id, title, since, stoppable }
+
+    init(id: String, title: String, since: Date, stoppable: Bool) {
+        self.id = id
+        self.title = title
+        self.since = since
+        self.stoppable = stoppable
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        since = Date(timeIntervalSince1970: try container.decode(Double.self, forKey: .since) / 1000)
+        stoppable = try container.decode(Bool.self, forKey: .stoppable)
+    }
+}
+
+struct ExtensionHistoryEntry: Decodable, Equatable, Sendable {
+    let `extension`: String
+    let text: String
+    let seconds: Double
+    let file: String?
 }
 
 struct HostLaunchArguments: Encodable {
@@ -269,6 +309,15 @@ struct HostResponse<Result: Decodable>: Decodable {
 
 struct TextParams: Decodable {
     let text: String
+}
+
+struct IDParams: Decodable {
+    let id: String
+}
+
+struct StopActivityParams: Encodable {
+    let activity: String
+    let app: HostApp
 }
 
 struct PressParams: Decodable {
