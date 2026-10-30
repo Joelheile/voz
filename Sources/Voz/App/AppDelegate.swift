@@ -185,6 +185,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .dropFirst()
             .sink { [weak self] _ in self?.manageLaunchAgent() }
             .store(in: &cancellables)
+        settings.$receiveBetaUpdates
+            .dropFirst()
+            .filter { $0 }
+            .sink { [weak self] _ in self?.updater.checkForUpdatesInBackground() }
+            .store(in: &cancellables)
         settings.$analyticsEnabled.combineLatest(settings.$errorReportsEnabled)
             .dropFirst()
             .sink { [weak self] usage, errors in self?.analytics.setConsent(usage: usage, errors: errors) }

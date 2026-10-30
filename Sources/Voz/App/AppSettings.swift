@@ -184,6 +184,9 @@ enum UpdateChannel: String, Sendable {
             self = version.contains("-beta") ? .beta : .stable
         }
     }
+
+    /// Dev builds carry build number 1, so any release looks newer and would replace them.
+    var checksInBackground: Bool { self != .dev }
 }
 
 enum AppStorage {

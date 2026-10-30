@@ -28,6 +28,10 @@ final class Updater: NSObject, SPUUpdaterDelegate {
         controller?.checkForUpdates(nil)
     }
 
+    func checkForUpdatesInBackground() {
+        controller?.updater.checkForUpdatesInBackground()
+    }
+
     func resumePendingInstall() {
         guard !isBusy(), let install = pendingInstall else { return }
         pendingInstall = nil
@@ -61,6 +65,11 @@ final class Updater: NSObject, SPUUpdaterDelegate {
         return true
     }
 
+    func updater(_ updater: SPUUpdater, mayPerform updateCheck: SPUUpdateCheck) throws {
+        guard updateCheck == .updatesInBackground, !UpdateChannel(version: SystemContext.appVersion).checksInBackground else { return }
+        throw DevBuildSkipsBackgroundUpdates()
+    }
+
     func allowedChannels(for updater: SPUUpdater) -> Set<String> {
         settings.receiveBetaUpdates ? [UpdateChannel.beta.rawValue] : []
     }
@@ -68,6 +77,10 @@ final class Updater: NSObject, SPUUpdaterDelegate {
     func updaterWillRelaunchApplication(_ updater: SPUUpdater) {
         LaunchAgent.bootOut()
     }
+}
+
+struct DevBuildSkipsBackgroundUpdates: LocalizedError {
+    var errorDescription: String? { "Dev builds check for updates only when you ask." }
 }
 
 struct LaunchVersion {

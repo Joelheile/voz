@@ -101,4 +101,10 @@ struct UpdateChannelTests {
         #expect(UpdateChannel(version: "0.0.2-beta.63") == .beta)
         #expect(UpdateChannel(version: "0.0.2") == .stable)
     }
+
+    @Test func devBuildsNeverUpdateThemselves() {
+        #expect(!UpdateChannel.dev.checksInBackground)
+        #expect(UpdateChannel.beta.checksInBackground)
+        #expect(UpdateChannel.stable.checksInBackground)
+    }
 }
