@@ -108,11 +108,11 @@ Install one from the menu bar, or run `voz install voz-meeting`. [Browse extensi
 ## What's new
 
 <!-- changelog -->
+- Copy a debug log from Settings to report problems or debug an extension
 - Extensions can show a recording in the menu bar and let you stop it from the Voz panel
 - Extension actions can now record or transcribe for as long as they need
 - Extensions can add entries, such as meeting transcripts, to your Voz history
 - Transcripts from extensions use your dictionary and show progress in the notch
-- On screens without a notch, the recording pill now sits above the Dock
 
 [See everything new](CHANGELOG.md)
 <!-- /changelog -->

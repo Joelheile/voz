@@ -3,6 +3,17 @@
   <channel>
     <title>voz</title>
     <item>
+      <title>voz 0.0.5-beta.100032</title>
+      <description>&lt;ul&gt;&lt;li&gt;Copy a debug log from Settings to report problems or debug an extension&lt;/li&gt;&lt;/ul&gt;</description>
+      <link>https://github.com/Joelheile/voz/releases/tag/beta-100032</link>
+      <pubDate>Fri, 30 Oct 2026 09:05:55 GMT</pubDate>
+      <sparkle:version>100032</sparkle:version>
+      <sparkle:shortVersionString>0.0.5-beta.100032</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100032/voz-0.0.5-beta.100032.zip" length="8439899" sparkle:edSignature="v8lRMCU7jSTbZvcRxh90Anbyk7qE8wgoGE/zY3x/ua0GphXma0+vXR9hyxa9p/J4IWGnNSVzGFWuWrov+n+iAQ==" type="application/octet-stream" />
+    </item>
+    <item>
       <title>voz 0.0.5-beta.100031</title>
       <description>&lt;ul&gt;&lt;li&gt;Extensions can show a recording in the menu bar and let you stop it from the Voz panel&lt;/li&gt;&lt;li&gt;Extension actions can now record or transcribe for as long as they need&lt;/li&gt;&lt;li&gt;Extensions can add entries, such as meeting transcripts, to your Voz history&lt;/li&gt;&lt;li&gt;Transcripts from extensions use your dictionary and show progress in the notch&lt;/li&gt;&lt;/ul&gt;</description>
       <link>https://github.com/Joelheile/voz/releases/tag/beta-100031</link>
@@ -100,17 +111,6 @@
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <sparkle:channel>beta</sparkle:channel>
       <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100023/voz-0.0.5-beta.100023.zip" length="8321777" sparkle:edSignature="oEAXPUur72IGC1+bpB9eMI0Lj5IIopBQ7tJRT2ZczaFoNjE8d5PejGOblFFj+V12BYEVGP7cPt3RlVcaQplYAQ==" type="application/octet-stream" />
-    </item>
-    <item>
-      <title>voz 0.0.5-beta.100022</title>
-      <description>&lt;ul&gt;&lt;li&gt;Track your dictation streak, speaking pace and time saved in Insights&lt;/li&gt;&lt;/ul&gt;</description>
-      <link>https://github.com/Joelheile/voz/releases/tag/beta-100022</link>
-      <pubDate>Wed, 28 Oct 2026 22:43:16 GMT</pubDate>
-      <sparkle:version>100022</sparkle:version>
-      <sparkle:shortVersionString>0.0.5-beta.100022</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <sparkle:channel>beta</sparkle:channel>
-      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100022/voz-0.0.5-beta.100022.zip" length="8321346" sparkle:edSignature="eY1upZSjx/E8d6sbuHkd9WDqFCzYdgsN3tM4LJf7IcMWqg6xgkyWrbSfn6M7599fpW7ctx865KofmSR+GUxMCA==" type="application/octet-stream" />
     </item>
     <item>
       <title>voz 0.0.5</title>
