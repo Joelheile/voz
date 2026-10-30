@@ -97,6 +97,7 @@ final class ExtensionService {
     let catalog = ExtensionCatalog()
     var onFileTranscribing: () -> Void = {}
     var onFileTranscribed: (_ succeeded: Bool) -> Void = { _ in }
+    private var runningDrops = 0
     private var host: ExtensionHost?
     private var manifest: HostManifest?
     private var restarts = 0
@@ -257,6 +258,8 @@ final class ExtensionService {
 
     func dropAudio(_ file: URL) async -> Bool {
         guard let host else { return false }
+        runningDrops += 1
+        defer { runningDrops -= 1 }
         return await host.emit(.audioDrop(path: file.path), app: .current, timeout: Self.untimed)
     }
 
@@ -344,9 +347,13 @@ final class ExtensionService {
     }
 
     private func transcribe(_ params: TranscribeFileParams) async throws -> FileTranscript {
+        let transcribe = { [fileTranscriber, model = settings.localSpeechModel] in
+            try await fileTranscriber.transcribe(URL(fileURLWithPath: params.path), model: model, speakers: params.speakers)
+        }
+        guard runningDrops == 0 else { return try await transcribe() }
         onFileTranscribing()
         do {
-            let transcript = try await fileTranscriber.transcribe(URL(fileURLWithPath: params.path), model: settings.localSpeechModel, speakers: params.speakers)
+            let transcript = try await transcribe()
             onFileTranscribed(true)
             return transcript
         } catch {
