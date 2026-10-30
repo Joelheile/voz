@@ -75,8 +75,8 @@ enum PopoverPage {
     var parent: PopoverPage {
         switch self {
         case .cleanupPrompt, .cleanupSteps: .cleanup
-        case .dictionary, .cleanup, .privacy, .speechModel, .whatsNew: .settings
-        case .home, .settings, .insights, .extensions: .home
+        case .cleanup, .privacy, .speechModel, .whatsNew: .settings
+        case .home, .settings, .dictionary, .insights, .extensions: .home
         }
     }
 }

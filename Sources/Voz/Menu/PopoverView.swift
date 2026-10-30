@@ -43,7 +43,7 @@ struct PopoverView: View {
             case .home:
                 HomePage(model: model, history: sources.history, catalog: sources.catalog, extensions: sources.extensions)
             case .settings:
-                SettingsPage(model: model, settings: sources.settings, status: sources.modelStatus, vocabulary: sources.vocabulary, catalog: sources.catalog)
+                SettingsPage(model: model, settings: sources.settings, status: sources.modelStatus, catalog: sources.catalog)
             case .dictionary:
                 DictionaryPage(model: sources.vocabulary, back: model.goBack)
             case .insights:
@@ -269,6 +269,7 @@ private struct HomePage: View {
                 }
             }
             Spacer(minLength: 8)
+            IconButton(icon: .bookA, help: "Dictionary") { model.page = .dictionary }
             IconButton(icon: .chartNoAxesColumn, help: "Insights") { model.page = .insights }
             IconButton(icon: .puzzle, help: extensionsHelp) { model.page = .extensions }
                 .overlay(alignment: .topTrailing) {

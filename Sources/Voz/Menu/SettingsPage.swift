@@ -4,7 +4,6 @@ struct SettingsPage: View {
     @ObservedObject var model: PopoverModel
     @ObservedObject var settings: AppSettings
     @ObservedObject var status: ModelStatus
-    @ObservedObject var vocabulary: VocabularyModel
     @ObservedObject var catalog: ExtensionCatalog
     @StateObject private var capture: HotkeyCapture
     @State private var access: PermissionSnapshot?
@@ -14,11 +13,10 @@ struct SettingsPage: View {
         return access.microphone == .authorized && access.accessibility && access.inputMonitoring && (access.systemAudio || !settings.muteWhileRecording)
     }
 
-    init(model: PopoverModel, settings: AppSettings, status: ModelStatus, vocabulary: VocabularyModel, catalog: ExtensionCatalog) {
+    init(model: PopoverModel, settings: AppSettings, status: ModelStatus, catalog: ExtensionCatalog) {
         self.model = model
         self.settings = settings
         self.status = status
-        self.vocabulary = vocabulary
         self.catalog = catalog
         _capture = StateObject(wrappedValue: HotkeyCapture(settings: settings))
     }
@@ -72,7 +70,6 @@ struct SettingsPage: View {
                     .frame(width: 156)
             }
             LinkRow(title: "Cleanup", value: settings.cleanupEnabled ? "On" : "Off") { model.page = .cleanup }
-            LinkRow(title: "Dictionary", value: vocabulary.snapshot.words.count.formatted()) { model.page = .dictionary }
         }
         PanelGroup(title: "While recording") {
             toggle("Mute other apps", isOn: $settings.muteWhileRecording)

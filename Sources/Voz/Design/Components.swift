@@ -304,6 +304,7 @@ struct CappedScrollView<Content: View>: View {
         ScrollView {
             content.onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
         }
+        .scrollIndicators(.never)
         .scrollBounceBehavior(.basedOnSize)
         .frame(height: min(contentHeight, maxHeight))
     }
