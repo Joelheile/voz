@@ -63,6 +63,25 @@ final class HistoryStore: Sendable {
                 table.column("createdAt", .datetime).notNull()
             }
         }
+        migrator.registerMigration("v4-vocabulary-aliases") { database in
+            try database.alter(table: VocabularyWord.databaseTableName) { table in
+                table.add(column: "aliases", .text).notNull().defaults(to: "[]")
+            }
+            try database.alter(table: VocabularySuggestion.databaseTableName) { table in
+                table.add(column: "aliases", .text).notNull().defaults(to: "[]")
+            }
+        }
+        migrator.registerMigration("v5-vocabulary-replaces") { database in
+            try database.alter(table: VocabularyWord.databaseTableName) { table in
+                table.add(column: "replaces", .text).notNull().defaults(to: "[]")
+            }
+        }
+        migrator.registerMigration("v6-extension-entries") { database in
+            try database.alter(table: TranscriptRecord.databaseTableName) { table in
+                table.add(column: "source", .text)
+                table.add(column: "file", .text)
+            }
+        }
         return migrator
     }
 
@@ -103,6 +122,7 @@ final class HistoryStore: Sendable {
     private static func stats(in database: Database, now: Date, calendar: Calendar) throws -> UsageStats {
         var accumulator = StatsAccumulator(now: now, calendar: calendar)
         let rows = try TranscriptRecord
+            .filter(Column("source") == nil)
             .select(Column("createdAt"), Column("wordCount"), Column("audioSeconds"), Column("fillerWordsRemoved"), Column("appBundleID"), Column("appName"))
             .asRequest(of: StatsRow.self)
             .fetchCursor(database)
@@ -135,6 +155,8 @@ struct TranscriptRecord: Codable, FetchableRecord, PersistableRecord, Identifiab
     var fillerWordsRemoved: Int
     var cleanupMs: Int
     var cleanupTimedOut: Bool
+    var source: String?
+    var file: String?
 
     init(
         id: UUID = UUID(),
@@ -149,7 +171,9 @@ struct TranscriptRecord: Codable, FetchableRecord, PersistableRecord, Identifiab
         appName: String?,
         fillerWordsRemoved: Int = 0,
         cleanupMs: Int = 0,
-        cleanupTimedOut: Bool = false
+        cleanupTimedOut: Bool = false,
+        source: String? = nil,
+        file: String? = nil
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -165,5 +189,12 @@ struct TranscriptRecord: Codable, FetchableRecord, PersistableRecord, Identifiab
         self.fillerWordsRemoved = fillerWordsRemoved
         self.cleanupMs = cleanupMs
         self.cleanupTimedOut = cleanupTimedOut
+        self.source = source
+        self.file = file
+    }
+
+    init(_ entry: ExtensionHistoryEntry) {
+        self.init(rawText: entry.text, audioSeconds: entry.seconds, sttMs: 0, totalMs: 0, model: entry.extension,
+                  appBundleID: nil, appName: nil, source: entry.extension, file: entry.file)
     }
 }

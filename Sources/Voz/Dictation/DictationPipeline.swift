@@ -8,6 +8,7 @@ final class DictationPipeline {
     private let history: HistoryStore
     private let output: TextOutput
     private let editObserver: EditObserver
+    private let vocabularyLearner: VocabularyLearner
     private let analytics: Analytics
     private let extensions: ExtensionService
 
@@ -18,6 +19,7 @@ final class DictationPipeline {
         history: HistoryStore,
         output: TextOutput,
         editObserver: EditObserver,
+        vocabularyLearner: VocabularyLearner,
         analytics: Analytics,
         extensions: ExtensionService
     ) {
@@ -27,6 +29,7 @@ final class DictationPipeline {
         self.history = history
         self.output = output
         self.editObserver = editObserver
+        self.vocabularyLearner = vocabularyLearner
         self.analytics = analytics
         self.extensions = extensions
     }
@@ -39,7 +42,7 @@ final class DictationPipeline {
         let prompt = settings.cleanupPrompt
         let vocabulary = vocabularyWords()
         return StreamingDictation(
-            transcribe: transcriber(app: app, vocabulary: vocabulary),
+            transcribe: applying(vocabularyRules(), to: transcriber(app: app, vocabulary: vocabulary)),
             cleaner: cleaner,
             vocabulary: vocabulary,
             prompt: Task { [extensions] in await extensions.cleanupPrompt(prompt, app: app) },
@@ -47,6 +50,19 @@ final class DictationPipeline {
             steps: settings.cleanupSteps,
             extensions: extensions.cleanupExtensions(model: settings.cleanupModel, app: app)
         )
+    }
+
+    private func applying(_ rules: [VocabularyRule], to transcribe: @escaping SegmentTranscriber) -> SegmentTranscriber {
+        guard !rules.isEmpty else { return transcribe }
+        return { samples in
+            let result = try await transcribe(samples)
+            return TranscriptionResult(
+                text: VocabularyRule.apply(rules, to: result.text),
+                audioSeconds: result.audioSeconds,
+                processingSeconds: result.processingSeconds,
+                model: result.model
+            )
+        }
     }
 
     private func transcriber(app: HostApp, vocabulary: [String]) -> SegmentTranscriber {
@@ -87,11 +103,27 @@ final class DictationPipeline {
             if let command = delivery.command { extensions.run(command, app: recording.app) }
             let record = await save(transcript, finalText: delivery.text.isEmpty ? transcript.cleaned.text : delivery.text, app: recording.app, released: released)
             report(record, model: transcript.model, insertMs: insertMs, trigger: recording.trigger)
+            learnSpokenWords(in: transcript.raw)
             return .done
         } catch {
             Log.app.error("Transcription failed: \(error.localizedDescription, privacy: .private)")
             analytics.capture(.dictationFailed(stage: .transcription, errorCode: .transcriptionFailed))
             return .failed
+        }
+    }
+
+    private func learnSpokenWords(in raw: String) {
+        let candidates = SpokenCandidates.find(in: raw, isKnownWord: EditObserver.isKnownWord)
+        guard !candidates.isEmpty else { return }
+        Task { [vocabularyLearner] in await vocabularyLearner.consider(candidates) }
+    }
+
+    private func vocabularyRules() -> [VocabularyRule] {
+        do {
+            return try history.vocabulary.rules()
+        } catch {
+            Log.app.error("Vocabulary rules read failed: \(error.localizedDescription, privacy: .private)")
+            return []
         }
     }
 

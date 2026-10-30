@@ -1,4 +1,5 @@
 import AppKit
+import LucideSwift
 import SwiftUI
 
 struct LevelBars: View {
@@ -54,23 +55,31 @@ struct ProgressDots: View {
 }
 
 struct ResultSymbol: View {
-    let name: String
+    let icon: LucideIconName
     let color: Color
     let effect: Effect
     @State private var arrived = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private static let size: CGFloat = 15
 
     enum Effect {
-        case drawOn
+        case reveal
         case bounce
     }
 
     var body: some View {
-        Image(systemName: name)
-            .font(.system(size: 13, weight: .bold))
+        Icon(icon, size: Self.size, strokeWidth: 2.25)
             .foregroundStyle(color)
-            .symbolEffect(.drawOn, isActive: effect == .drawOn && !arrived)
-            .symbolEffect(.bounce, options: .nonRepeating, value: effect == .bounce && arrived)
-            .onAppear { arrived = true }
+            .mask(alignment: .leading) {
+                Rectangle().frame(width: effect == .reveal && !arrived ? 0 : Self.size)
+            }
+            .scaleEffect(effect == .bounce && !arrived ? 0.8 : 1)
+            .onAppear { withAnimation(reduceMotion ? nil : arrival) { arrived = true } }
+    }
+
+    private var arrival: Animation {
+        effect == .reveal ? .easeOut(duration: 0.2) : .spring(duration: 0.3, bounce: 0.3)
     }
 }
 

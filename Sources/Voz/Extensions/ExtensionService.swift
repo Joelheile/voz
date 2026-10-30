@@ -15,12 +15,18 @@ final class ExtensionCatalog: ObservableObject {
     @Published fileprivate(set) var cleanupModels: [HostComponent] = []
     @Published fileprivate(set) var cleanupSteps: [HostComponent] = []
     @Published fileprivate(set) var actions: [ExtensionAction] = []
+    @Published fileprivate(set) var activities: [ExtensionActivity] = []
     @Published fileprivate(set) var settings: [ExtensionSettings] = []
     @Published fileprivate(set) var hostError: String?
     fileprivate var perform: (ExtensionAction) -> Void = { _ in }
+    fileprivate var performStop: (ExtensionActivity) -> Void = { _ in }
 
     func run(_ action: ExtensionAction) {
         perform(action)
+    }
+
+    func stop(_ activity: ExtensionActivity) {
+        performStop(activity)
     }
 
     func settings(for name: String) -> [ExtensionSettings] {
@@ -79,7 +85,8 @@ final class ExtensionService {
     private static let maxRestarts = 3
     private static let watchdogInterval: Duration = .seconds(5)
     private static let pingTimeout: Duration = .seconds(2)
-    private static let eventTimeout: Duration = .seconds(30)
+    /// Actions and events that nothing waits for run until they finish. A day stands in for no limit.
+    private static let untimed: Duration = .seconds(86_400)
     private static let healthyUptime: Duration = .seconds(60)
     nonisolated private static let audioDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("voz-extension-audio", isDirectory: true)
     nonisolated static let resources = Bundle.main.resourceURL!.appendingPathComponent("Extensions", isDirectory: true)
@@ -88,7 +95,12 @@ final class ExtensionService {
     private let output: TextOutput
     private let toast: ToastController
     private let settings: AppSettings
+    private let fileTranscriber: FileTranscriber
     let catalog = ExtensionCatalog()
+    var onFileTranscribing: () -> Void = {}
+    var onFileTranscribed: (_ succeeded: Bool) -> Void = { _ in }
+    var onHistory: (ExtensionHistoryEntry) -> Void = { _ in }
+    private var runningDrops = 0
     private var host: ExtensionHost?
     private var manifest: HostManifest?
     private var restarts = 0
@@ -101,15 +113,17 @@ final class ExtensionService {
     private var watcher: FileWatcher?
     private var loadedExtensionSettings: Data?
     private lazy var hotkeys = ActionHotkeys { [weak self] id in
-        guard let action = self?.manifest?.actions.first(where: { $0.id == id }) else { return }
+        guard let action = self?.catalog.actions.first(where: { $0.id == id }) else { return }
         self?.runAction(action)
     }
 
-    init(output: TextOutput, toast: ToastController, settings: AppSettings) {
+    init(output: TextOutput, toast: ToastController, settings: AppSettings, fileTranscriber: FileTranscriber) {
         self.output = output
         self.toast = toast
         self.settings = settings
+        self.fileTranscriber = fileTranscriber
         catalog.perform = { [weak self] action in self?.runAction(action) }
+        catalog.performStop = { [weak self] activity in self?.stopActivity(activity) }
     }
 
     func start() {
@@ -150,6 +164,7 @@ final class ExtensionService {
         await host?.stop()
         host = nil
         manifest = nil
+        catalog.activities = []
         loadedExtensionSettings = try? home.extensionSettings()
         watch()
         guard home.hasEnabledExtensions else { return catalog.show(nil) }
@@ -215,7 +230,7 @@ final class ExtensionService {
     }
 
     func recorded(_ samples: [Float], app: HostApp) {
-        guard let host, manifest?.subscribes(to: .recording) == true else { return }
+        guard let host, manifest?.subscribes(to: .afterRecording) == true else { return }
         let file = Self.audioDirectory.appendingPathComponent("recording-\(UUID().uuidString).wav")
         let seconds = Double(samples.count) / RecordingFilter.sampleRate
         Task.detached {
@@ -226,7 +241,7 @@ final class ExtensionService {
                 Log.extensions.error("Recording file write failed: \(error.localizedDescription, privacy: .public)")
                 return
             }
-            await host.emit(.recording(path: file.path, seconds: seconds), app: app, timeout: Self.eventTimeout)
+            await host.emit(.afterRecording(path: file.path, seconds: seconds), app: app, timeout: Self.untimed)
         }
     }
 
@@ -239,7 +254,18 @@ final class ExtensionService {
 
     func inserted(_ text: String, raw: String, app: HostApp) {
         guard let host, manifest?.subscribes(to: .afterInsert) == true else { return }
-        Task { await host.emit(.afterInsert(text: text, raw: raw), app: app, timeout: Self.eventTimeout) }
+        Task { await host.emit(.afterInsert(text: text, raw: raw), app: app, timeout: Self.untimed) }
+    }
+
+    var acceptsAudioDrops: Bool {
+        manifest?.subscribes(to: .audioDrop) == true
+    }
+
+    func dropAudio(_ file: URL) async -> Bool {
+        guard let host else { return false }
+        runningDrops += 1
+        defer { runningDrops -= 1 }
+        return await host.emit(.audioDrop(path: file.path), app: .current, timeout: Self.untimed)
     }
 
     func run(_ command: VoiceCommandMatch, app: HostApp) {
@@ -257,7 +283,15 @@ final class ExtensionService {
         guard let host else { return }
         let app = HostApp.current
         Task {
-            if await !host.runAction(action.id, app: app, timeout: Self.commandTimeout) { toast.show("\(action.name) failed") }
+            if await !host.runAction(action.id, app: app, timeout: Self.untimed) { toast.show("\(action.name) failed") }
+        }
+    }
+
+    private func stopActivity(_ activity: ExtensionActivity) {
+        guard let host else { return }
+        let app = HostApp.current
+        Task {
+            if await !host.stopActivity(activity.id, app: app, timeout: Self.untimed) { toast.show("Could not stop \(activity.title)") }
         }
     }
 
@@ -278,6 +312,10 @@ final class ExtensionService {
                     guard let self, self.generation == generation else { return }
                     self.hostExited(status)
                 }
+            },
+            transcribeFile: { [weak self] params in
+                guard let self else { throw CancellationError() }
+                return try await self.transcribe(params)
             }
         )
         let manifest = try await host.start()
@@ -287,8 +325,7 @@ final class ExtensionService {
         self.host = host
         self.manifest = manifest
         catalog.show(manifest)
-        let unusable = hotkeys.register(manifest.actions)
-        if !unusable.isEmpty { toast.show("Could not use the hotkey for \(unusable.map(\.name).joined(separator: ", "))") }
+        show(manifest.actions)
         started = .now
         watchdog = Task { [weak self] in await self?.watch(host) }
     }
@@ -321,6 +358,22 @@ final class ExtensionService {
         }
     }
 
+    private func transcribe(_ params: TranscribeFileParams) async throws -> FileTranscript {
+        let transcribe = { [fileTranscriber, model = settings.localSpeechModel] in
+            try await fileTranscriber.transcribe(URL(fileURLWithPath: params.path), model: model, speakers: params.speakers)
+        }
+        guard runningDrops == 0 else { return try await transcribe() }
+        onFileTranscribing()
+        do {
+            let transcript = try await transcribe()
+            onFileTranscribed(true)
+            return transcript
+        } catch {
+            onFileTranscribed(false)
+            throw error
+        }
+    }
+
     private func perform(_ action: HostAction) async {
         switch action {
         case .insert(let text):
@@ -333,7 +386,21 @@ final class ExtensionService {
             }
         case .notify(let text):
             toast.show(text)
+        case .startActivity(let activity):
+            catalog.activities.append(activity)
+        case .endActivity(let id):
+            catalog.activities.removeAll { $0.id == id }
+        case .addHistory(let entry):
+            onHistory(entry)
+        case .actions(let actions):
+            show(actions)
         }
+    }
+
+    private func show(_ actions: [ExtensionAction]) {
+        catalog.actions = actions
+        let unusable = hotkeys.register(actions)
+        if !unusable.isEmpty { toast.show("Could not use the hotkey for \(unusable.map(\.name).joined(separator: ", "))") }
     }
 
     private func hostExited(_ status: Int32) {
@@ -341,6 +408,7 @@ final class ExtensionService {
         hotkeys.unregisterAll()
         host = nil
         manifest = nil
+        catalog.activities = []
         if ContinuousClock.now - started > Self.healthyUptime { restarts = 0 }
         guard restarts < Self.maxRestarts else {
             Log.extensions.error("Extension host keeps exiting, last status \(status), extensions stay off until the next change")

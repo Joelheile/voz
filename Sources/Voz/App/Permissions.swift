@@ -56,6 +56,10 @@ enum Permissions {
     static var microphoneGranted: Bool {
         AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
     }
+
+    static var microphoneUndecided: Bool {
+        AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined
+    }
 }
 
 struct PermissionSnapshot: Equatable {

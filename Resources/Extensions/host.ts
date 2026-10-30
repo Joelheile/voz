@@ -11,7 +11,10 @@ import { basename, extname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import type {
   Action,
+  ActionHandle,
+  Activity,
   AfterInsertEvent,
+  AudioDropEvent,
   Awaitable,
   App,
   BeforeCleanupEvent,
@@ -20,8 +23,8 @@ import type {
   BeforeInsertResult,
   CleanupModel,
   CleanupStep,
+  Command,
   CommandEvent,
-  CommandOptions,
   Context,
   GenerateRequest,
   Generated,
@@ -33,6 +36,8 @@ import type {
   SettingsValues,
   SettingsSchema,
   SpeechModel,
+  TranscribeOptions,
+  Transcript,
 } from "./voz.d.ts";
 
 type Launch = {
@@ -41,20 +46,21 @@ type Launch = {
   extensionsDirectory: string;
   packages: string[];
 };
-type EventName = "beforeCleanup" | "beforeInsert" | "recording" | "afterInsert";
+type EventName = "beforeCleanup" | "beforeInsert" | "afterRecording" | "afterInsert" | "audioDrop";
 type HandlerResult = BeforeInsertResult | BeforeCleanupResult;
 type HookPayload = {
   beforeCleanup: BeforeCleanupEvent;
   beforeInsert: BeforeInsertEvent;
-  recording: RecordingEvent;
+  afterRecording: RecordingEvent;
   afterInsert: AfterInsertEvent;
+  audioDrop: AudioDropEvent;
 };
 type Handler = {
   extension: string;
   run: (event: object, ctx: Context) => HandlerResult | Promise<HandlerResult>;
 };
-type CommandPosition = NonNullable<CommandOptions["at"]>;
-type Command = {
+type CommandPosition = NonNullable<Command["at"]>;
+type RegisteredCommand = {
   extension: string;
   phrase: string;
   at: CommandPosition;
@@ -71,12 +77,13 @@ type WireSchema = {
   items?: WireSchema;
   properties?: { name: string; schema: WireSchema; optional: boolean }[];
 };
-type Generation = { resolve: (value: object) => void; reject: (error: Error) => void };
-type GeneratedReply = { call: number; json?: string; error?: string };
+type PendingCall = { resolve: (value: object) => void; reject: (error: Error) => void };
+type CallReply = { call: number; json?: string; error?: string };
 type TranscribeRequest = { model: string; path: string; seconds: number; app: App };
 type CleanRequest = { model: string; text: string; prompt: string; app: App };
 type StepRequest = { step: string; text: string; app: App };
 type ActionRequest = { action: string; app: App };
+type StopActivityRequest = { activity: string; app: App };
 type Component = { id: string; name: string };
 type Entry = { name: string; path?: string; requires?: number };
 type LoadError = { extension: string; message: string };
@@ -87,6 +94,10 @@ type Config = Record<string, string | number | boolean>;
 type SettingsFile = {
   disabled?: string[];
   config?: Record<string, Config>;
+};
+type VersionChange = {
+  version: number;
+  restore: (api: ExtensionAPI, config: Config, registration: Registration) => ExtensionAPI;
 };
 type PackageManifest = {
   name?: string;
@@ -115,7 +126,7 @@ class Registration {
   }
 }
 
-const apiVersion = 2;
+const apiVersion = 4;
 const loadTimeout = 3000;
 const write = process.stdout.write.bind(process.stdout);
 const send = (message: object) => write(JSON.stringify(message) + "\n");
@@ -139,17 +150,21 @@ const launch: Launch = JSON.parse(process.argv[2]);
 const eventNames: EventName[] = [
   "beforeCleanup",
   "beforeInsert",
-  "recording",
+  "afterRecording",
   "afterInsert",
+  "audioDrop",
 ];
 const handlers = new Map<EventName, Handler[]>();
-const commands = new Map<string, Command>();
+const commands = new Map<string, RegisteredCommand>();
 const speechModels = new Map<string, SpeechModel>();
 const cleanupModels = new Map<string, CleanupModel>();
 const cleanupSteps = new Map<string, CleanupStep>();
 const actions = new Map<string, Action & { extension: string }>();
-const generations = new Map<number, Generation>();
+const activities = new Map<string, Activity>();
+let lastActivity = 0;
+const calls = new Map<number, PendingCall>();
 let lastCall = 0;
+let isReady = false;
 const settingsSchemas = new Map<string, SettingsSchema>();
 const loaded: string[] = [];
 const bus = new EventEmitter();
@@ -169,7 +184,7 @@ function context(app: App): Context {
   const scope = requestScope.getStore();
   const isLive = () => scope?.active === true && Date.now() < scope.deadline;
   const action = (method: string, params: { text: string } | { key: string }) => {
-    if (!isLive()) return;
+    if (!isLive()) return log(`Dropped ctx.${method}: it ran after its handler finished or ran out of time`);
     send({ method, params, requestID: scope!.id });
   };
   return {
@@ -180,6 +195,10 @@ function context(app: App): Context {
     generate: (request) => {
       if (!isLive()) return Promise.reject(new Error("generate only works while a handler runs"));
       return generate(request, scope!);
+    },
+    transcribe: (path, options) => {
+      if (!isLive()) return Promise.reject(new Error("transcribe only works while a handler runs"));
+      return transcribeFile(path, options, scope!);
     },
   };
 }
@@ -215,30 +234,39 @@ function wireSchema(schema: Schema): WireSchema {
 }
 
 function generate<S extends Schema>(request: GenerateRequest<S>, scope: RequestScope) {
+  const params = { prompt: request.prompt, instructions: request.instructions, schema: wireSchema(request.schema) };
+  return callSwift("generate", params, scope, "The on-device model ran out of time") as Promise<Generated<S>>;
+}
+
+function transcribeFile(path: string, options: TranscribeOptions | undefined, scope: RequestScope) {
+  const params = { path, speakers: options?.speakers ?? false };
+  return callSwift("transcribeFile", params, scope, "Transcribing the file ran out of time") as Promise<Transcript>;
+}
+
+function callSwift(method: string, params: object, scope: RequestScope, timeoutMessage: string) {
   const call = ++lastCall;
-  return new Promise<Generated<S>>((resolve, reject) => {
-    const params = { call, prompt: request.prompt, instructions: request.instructions, schema: wireSchema(request.schema), deadline: scope.deadline };
-    const timer = setTimeout(() => settle({ call, error: "The on-device model ran out of time" }), scope.deadline - Date.now());
-    generations.set(call, {
+  return new Promise<object>((resolve, reject) => {
+    const timer = setTimeout(() => settle({ call, error: timeoutMessage }), scope.deadline - Date.now());
+    calls.set(call, {
       resolve: (value) => {
         clearTimeout(timer);
-        resolve(value as Generated<S>);
+        resolve(value);
       },
       reject: (error) => {
         clearTimeout(timer);
         reject(error);
       },
     });
-    send({ method: "generate", params, requestID: scope.id });
+    send({ method, params: { ...params, call, deadline: scope.deadline }, requestID: scope.id });
   });
 }
 
-function settle({ call, json, error }: GeneratedReply) {
-  const generation = generations.get(call);
-  if (!generation) return;
-  generations.delete(call);
-  if (json === undefined) generation.reject(new Error(error ?? "The on-device model failed"));
-  else generation.resolve(JSON.parse(json));
+function settle({ call, json, error }: CallReply) {
+  const pending = calls.get(call);
+  if (!pending) return;
+  calls.delete(call);
+  if (json === undefined) pending.reject(new Error(error ?? `Voz call ${call} failed`));
+  else pending.resolve(JSON.parse(json));
 }
 
 function register<T extends Component>(
@@ -251,7 +279,29 @@ function register<T extends Component>(
   if (!component.id || !component.name)
     throw new Error(`A ${kind} needs an id and a name`);
   const id = `${extension}/${component.id}`;
-  setRegistered(registry, id, { ...component, id }, registration);
+  const registered = { ...component, id };
+  setRegistered(registry, id, registered, registration);
+  return registered;
+}
+
+function registerAction(extension: string, action: Action, registration: Registration): ActionHandle {
+  const registered = register(actions, "action", extension, { ...action, extension }, registration);
+  return {
+    update({ hidden }) {
+      registered.hidden = hidden;
+      if (isReady) send({ method: "actions", params: { actions: wireActions() } });
+    },
+  };
+}
+
+function wireActions() {
+  return [...actions.values()].map(({ id, name, hotkey, hidden, extension }) => ({
+    id,
+    name,
+    hotkey,
+    hidden: hidden === true,
+    extension,
+  }));
 }
 
 function setRegistered<Key, Value>(registry: Map<Key, Value>, key: Key, value: Value, registration: Registration) {
@@ -364,14 +414,17 @@ function api(name: string, config: Config, registration: Registration): Extensio
       });
       handlers.set(event, [...(handlers.get(event) ?? []), registered]);
     },
-    registerCommand(phrase, handler, options) {
-      const at = options?.at ?? "end";
+    registerCommand(command) {
+      if (typeof command?.phrase !== "string" || typeof command.run !== "function")
+        throw new Error("registerCommand needs { phrase, run }");
+      const { phrase, run } = command;
+      const at = command.at ?? "end";
       if (at !== "start" && at !== "end") throw new Error(`Command "${phrase}" needs at: "start" or "end"`);
       const key = commandKey(phrase, at);
       const existing = commands.get(key);
       if (existing)
         log(`${name} replaces command "${phrase}" from ${existing.extension}`);
-      setRegistered(commands, key, { extension: name, phrase, at, run: handler }, registration);
+      setRegistered(commands, key, { extension: name, phrase, at, run }, registration);
     },
     registerSpeechModel: (model) =>
       register(speechModels, "speech model", name, model, registration),
@@ -379,7 +432,18 @@ function api(name: string, config: Config, registration: Registration): Extensio
       register(cleanupModels, "cleanup model", name, model, registration),
     registerCleanupStep: (step) =>
       register(cleanupSteps, "cleanup step", name, step, registration),
-    registerAction: (action) => register(actions, "action", name, { ...action, extension: name }, registration),
+    registerAction: (action) => registerAction(name, action, registration),
+    startActivity(activity) {
+      if (!activity.title) throw new Error("An activity needs a title");
+      const id = `${name}/${++lastActivity}`;
+      activities.set(id, activity);
+      send({ method: "startActivity", params: { id, title: activity.title, since: activity.since ?? Date.now(), stoppable: !!activity.stop } });
+      return { end: () => endActivity(id) };
+    },
+    addHistory(entry) {
+      if (!entry.text) throw new Error("A history entry needs text");
+      send({ method: "addHistory", params: { extension: name, text: entry.text, seconds: entry.seconds ?? 0, file: entry.file } });
+    },
     settings<Schema extends SettingsSchema>(schema: Schema) {
       for (const [key, setting] of Object.entries(schema)) checkSetting(key, setting);
       setRegistered(settingsSchemas, name, schema, registration);
@@ -423,11 +487,31 @@ async function loadEntry(entry: Entry, config: Config = {}, registration: Regist
   const module = await import(entry.path);
   if (typeof module.default !== "function")
     throw new Error("default export is not a function");
-  const current = api(entry.name, config, registration);
-  await module.default((entry.requires ?? 1) < 2 ? withApi1Removals(current, config, registration) : current);
+  const writtenFor = entry.requires ?? 1;
+  const surface = versionChanges
+    .filter((change) => writtenFor < change.version)
+    .reduce((surface, change) => change.restore(surface, config, registration), api(entry.name, config, registration));
+  await module.default(surface);
 }
 
-function withApi1Removals(current: ExtensionAPI, config: Config, registration: Registration) {
+const versionChanges: VersionChange[] = [
+  { version: 4, restore: withApi3Forms },
+  { version: 2, restore: withApi1Removals },
+];
+
+function withApi3Forms(current: ExtensionAPI): ExtensionAPI {
+  return {
+    ...current,
+    on(event: EventName | "recording", handler: Handler["run"]) {
+      current.on((event === "recording" ? "afterRecording" : event) as never, handler as never);
+    },
+    registerCommand(command: Command | string, run?: Command["run"], options?: Pick<Command, "at">) {
+      current.registerCommand(typeof command === "string" ? { phrase: command, run: run!, at: options?.at } : command);
+    },
+  } as ExtensionAPI;
+}
+
+function withApi1Removals(current: ExtensionAPI, config: Config, registration: Registration): ExtensionAPI {
   return {
     ...current,
     config,
@@ -447,7 +531,7 @@ function withApi1Removals(current: ExtensionAPI, config: Config, registration: R
       };
       current.on(event as never, (event === "beforeInsert" ? handled : handler) as never);
     },
-  };
+  } as ExtensionAPI;
 }
 
 function withinLoadTimeout(work: Promise<void>): Promise<void> {
@@ -460,12 +544,15 @@ function withinLoadTimeout(work: Promise<void>): Promise<void> {
   return Promise.race([work, timeout]);
 }
 
+const isExpired = () => Date.now() >= requestScope.getStore()!.deadline;
+
 async function beforeCleanup({ prompt, app }: CleanupRequest) {
   const ctx = context(app);
   for (const handler of handlers.get("beforeCleanup") ?? []) {
-    if (Date.now() >= requestScope.getStore()!.deadline) break;
+    if (isExpired()) break;
     try {
       const result = (await handler.run({ prompt }, ctx)) as BeforeCleanupResult;
+      if (isExpired()) break;
       if (result && typeof result.prompt === "string") prompt = result.prompt;
     } catch (error) {
       log(`${handler.extension} beforeCleanup failed: ${describe(error)}`);
@@ -477,9 +564,10 @@ async function beforeCleanup({ prompt, app }: CleanupRequest) {
 async function beforeInsert({ text, raw, app }: InsertRequest) {
   const ctx = context(app);
   for (const handler of handlers.get("beforeInsert") ?? []) {
-    if (Date.now() >= requestScope.getStore()!.deadline) break;
+    if (isExpired()) break;
     try {
       const result = (await handler.run({ text, raw }, ctx)) as BeforeInsertResult;
+      if (isExpired()) break;
       if (result && typeof result.text === "string") text = result.text;
       if (!text) break;
     } catch (error) {
@@ -491,16 +579,18 @@ async function beforeInsert({ text, raw, app }: InsertRequest) {
 
 async function emit({ event, payload, app }: EmitRequest) {
   const ctx = context(app);
+  let failed = false;
   await Promise.all(
     (handlers.get(event) ?? []).map(async (handler) => {
       try {
         await handler.run(payload, ctx);
       } catch (error) {
+        failed = true;
         log(`${handler.extension} ${event} failed: ${describe(error)}`);
       }
     }),
   );
-  return {};
+  return { failed };
 }
 
 function commandKey(phrase: string, at: CommandPosition) {
@@ -545,9 +635,22 @@ async function action({ action, app }: ActionRequest) {
   return {};
 }
 
+function endActivity(id: string) {
+  if (activities.delete(id)) send({ method: "endActivity", params: { id } });
+}
+
+async function stopActivity({ activity, app }: StopActivityRequest) {
+  const stop = activities.get(activity)?.stop;
+  if (!stop) throw new Error(`Unknown activity ${activity}`);
+  endActivity(activity);
+  await stop(context(app));
+  return {};
+}
+
 const methods = {
   beforeCleanup,
   action,
+  stopActivity,
   beforeInsert,
   clean,
   cleanupStep,
@@ -588,7 +691,7 @@ send({
     speechModels: components(speechModels),
     cleanupModels: components(cleanupModels),
     cleanupSteps: components(cleanupSteps),
-    actions: [...actions.values()].map(({ id, name, hotkey, extension }) => ({ id, name, hotkey, extension })),
+    actions: wireActions(),
     settings: [...settingsSchemas].map(([extension, schema]) => ({
       extension,
       fields: Object.entries(schema).map(([key, setting]) => ({ key, ...setting })),
@@ -596,12 +699,13 @@ send({
     errors,
   },
 });
+isReady = true;
 
 for await (const line of createInterface({ input: process.stdin })) {
   if (!line.trim()) continue;
   const request = parseRequest(line);
   if (!request) continue;
-  if (request.method === "generated") {
+  if (request.method === "generated" || request.method === "transcribedFile") {
     settle(request.params);
     continue;
   }

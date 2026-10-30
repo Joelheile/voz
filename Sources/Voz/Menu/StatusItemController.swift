@@ -76,6 +76,7 @@ final class StatusItemController: NSObject {
     private let modelStatus: ModelStatus
     private let stats: StatsModel
     private let history: HistoryModel
+    private let catalog: ExtensionCatalog
     private let setup: SetupModel
     private let analytics: Analytics
     private let checkForUpdates: () -> Void
@@ -101,6 +102,7 @@ final class StatusItemController: NSObject {
         settings = sources.settings
         modelStatus = sources.modelStatus
         history = sources.history
+        catalog = sources.catalog
         stats = sources.stats
         setup = sources.setup
         self.analytics = analytics
@@ -136,7 +138,7 @@ final class StatusItemController: NSObject {
     }
 
     func refresh() {
-        statusItem.button?.image = MenuBarGlyph.image(for: dictation.phase)
+        statusItem.button?.image = MenuBarGlyph.image(for: dictation.phase, busy: !catalog.activities.isEmpty)
         statusItem.button?.setAccessibilityLabel("Voz")
         let status = currentStatus()
         let hint = hint(for: status)
@@ -158,9 +160,10 @@ final class StatusItemController: NSObject {
     }
 
     private func observeSources() {
-        Publishers.Merge(
+        Publishers.Merge3(
             settings.objectWillChange.map { _ in () },
-            modelStatus.objectWillChange.map { _ in () }
+            modelStatus.objectWillChange.map { _ in () },
+            catalog.$activities.map(\.isEmpty).removeDuplicates().map { _ in () }
         )
         .receive(on: DispatchQueue.main)
         .sink { [weak self] in self?.refresh() }
@@ -352,15 +355,38 @@ enum MenuBarGlyph {
             fatalError("MenuBarIcon.png missing from app bundle")
         }
         image.size = NSSize(width: (height * image.size.width / image.size.height).rounded(), height: height)
+        image.isTemplate = true
         return image
     }()
 
-    private static let dimmedIcon = NSImage(size: icon.size, flipped: false) { rect in
-        icon.draw(in: rect, from: .zero, operation: .sourceOver, fraction: transcribingOpacity)
-        return true
-    }
+    private static let dimmedIcon: NSImage = {
+        let image = NSImage(size: icon.size, flipped: false) { rect in
+            icon.draw(in: rect, from: .zero, operation: .sourceOver, fraction: transcribingOpacity)
+            return true
+        }
+        image.isTemplate = true
+        return image
+    }()
 
-    static func image(for phase: DictationPhase) -> NSImage {
-        phase == .transcribing ? dimmedIcon : icon
+    private static let badgeSize: CGFloat = 5
+
+    private static let busyIcon: NSImage = {
+        let image = NSImage(size: icon.size, flipped: false) { rect in
+            icon.draw(in: rect)
+            let badge = NSRect(x: rect.maxX - badgeSize, y: rect.maxY - badgeSize, width: badgeSize, height: badgeSize)
+            NSGraphicsContext.current?.compositingOperation = .clear
+            NSBezierPath(ovalIn: badge.insetBy(dx: -1.5, dy: -1.5)).fill()
+            NSGraphicsContext.current?.compositingOperation = .sourceOver
+            NSColor.black.setFill()
+            NSBezierPath(ovalIn: badge).fill()
+            return true
+        }
+        image.isTemplate = true
+        return image
+    }()
+
+    static func image(for phase: DictationPhase, busy: Bool) -> NSImage {
+        if phase == .transcribing { return dimmedIcon }
+        return busy ? busyIcon : icon
     }
 }

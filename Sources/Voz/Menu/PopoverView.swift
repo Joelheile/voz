@@ -42,7 +42,7 @@ struct PopoverView: View {
         } else {
             switch model.page {
             case .home:
-                HomePage(model: model, history: sources.history, settings: sources.settings, catalog: sources.catalog, extensions: sources.extensions)
+                HomePage(model: model, history: sources.history, catalog: sources.catalog, extensions: sources.extensions)
             case .settings:
                 SettingsPage(model: model, settings: sources.settings, status: sources.modelStatus, vocabulary: sources.vocabulary, catalog: sources.catalog)
             case .dictionary:
@@ -57,6 +57,8 @@ struct PopoverView: View {
                 CleanupStepsPage(settings: sources.settings, catalog: sources.catalog, back: model.goBack)
             case .speechModel:
                 SpeechModelPage(settings: sources.settings, status: sources.modelStatus, catalog: sources.catalog, back: model.goBack)
+            case .whatsNew:
+                WhatsNewPage(releases: Changelog.bundled, back: model.goBack)
             }
         }
     }
@@ -68,7 +70,6 @@ private struct HomePage: View {
 
     @ObservedObject var model: PopoverModel
     @ObservedObject var history: HistoryModel
-    @ObservedObject var settings: AppSettings
     @ObservedObject var catalog: ExtensionCatalog
     @ObservedObject var extensions: ExtensionsModel
     @FocusState private var searchFocused: Bool
@@ -91,7 +92,7 @@ private struct HomePage: View {
                 header(proxy: proxy)
                 if needsAttention { notice }
                 transcripts
-                if !catalog.actions.isEmpty { actions }
+                ForEach(catalog.activities, id: \.id, content: activityRow)
                 footer
             }
         }
@@ -241,19 +242,29 @@ private struct HomePage: View {
         .id(record.id)
     }
 
-    private var actions: some View {
-        PanelGroup(title: "Actions") {
-            ForEach(catalog.actions, id: \.id) { action in
-                ActionRow(title: action.name, value: action.hotkey.flatMap { try? KeyChord(parsing: $0).label } ?? "") {
-                    catalog.run(action)
-                }
+    private func activityRow(_ activity: ExtensionActivity) -> some View {
+        HStack(spacing: 8) {
+            Text(activity.title).font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink).lineLimit(1)
+            Text(activity.since, style: .timer).font(.meta).monospacedDigit().foregroundStyle(Theme.inkSecondary)
+            Spacer(minLength: 8)
+            if activity.stoppable {
+                Button("Stop") { catalog.stop(activity) }
+                    .buttonStyle(.pill(.quiet, .small))
+                    .fixedSize()
             }
         }
     }
 
     private var footer: some View {
         HStack(spacing: 2) {
-            KeyChip(text: DictationHint.key(settings.hotkey)).help(model.hint)
+            HStack(spacing: 6) {
+                ForEach(catalog.actions.filter { !$0.hidden }, id: \.id) { action in
+                    Button(action.name) { catalog.run(action) }
+                        .buttonStyle(.pill(.accent, .small))
+                        .fixedSize()
+                        .help(action.hotkeyLabel ?? action.name)
+                }
+            }
             Spacer(minLength: 8)
             IconButton(icon: .chartNoAxesColumn, help: "Insights") { model.page = .insights }
             IconButton(icon: .puzzle, help: extensionsHelp) { model.page = .extensions }
@@ -332,19 +343,6 @@ private struct DayHeading: View {
     }
 }
 
-private struct KeyChip: View {
-    let text: String
-
-    var body: some View {
-        Text(text)
-            .font(.ui(12, weight: .medium))
-            .foregroundStyle(Theme.inkSecondary)
-            .padding(.horizontal, 10)
-            .frame(height: 24)
-            .overlay(Capsule().strokeBorder(Theme.hairline))
-    }
-}
-
 private struct TranscriptRow: View {
     let record: TranscriptRecord
     let query: String
@@ -359,7 +357,11 @@ private struct TranscriptRow: View {
     var body: some View {
         Button(action: copy) {
             HStack(spacing: 10) {
-                AppIcon(bundleID: record.appBundleID, size: 24)
+                if record.source == nil {
+                    AppIcon(bundleID: record.appBundleID, size: 24)
+                } else {
+                    Icon(.puzzle, size: 16).foregroundStyle(Theme.inkSecondary).frame(width: 24, height: 24)
+                }
                 Text(text)
                     .font(.ui(13))
                     .foregroundStyle(Theme.ink)
@@ -375,9 +377,12 @@ private struct TranscriptRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.pressable(0.99))
-        .help(record.finalText)
+        .help(record.source.map { "From \($0)" } ?? record.finalText)
         .contextMenu {
             Button("Copy", action: copy)
+            if let file = record.file {
+                Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: file)]) }
+            }
             Button("Delete", role: .destructive, action: delete)
         }
         .onHover(perform: hover)

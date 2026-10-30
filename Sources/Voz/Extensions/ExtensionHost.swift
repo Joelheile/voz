@@ -19,6 +19,7 @@ actor ExtensionHost {
     private let onLog: @Sendable (String) -> Void
     private let onExit: @Sendable (Int32) -> Void
     private let generate: @Sendable (GenerateParams) async throws -> String
+    private let transcribeFile: @Sendable (TranscribeFileParams) async throws -> FileTranscript
     private var process: Process?
     private var input: FileHandle?
     private var buffer = Data()
@@ -34,13 +35,15 @@ actor ExtensionHost {
         onAction: @escaping @Sendable (HostAction) -> Void,
         onLog: @escaping @Sendable (String) -> Void,
         onExit: @escaping @Sendable (Int32) -> Void,
-        generate: @escaping @Sendable (GenerateParams) async throws -> String = ExtensionModel.generate
+        generate: @escaping @Sendable (GenerateParams) async throws -> String = ExtensionModel.generate,
+        transcribeFile: @escaping @Sendable (TranscribeFileParams) async throws -> FileTranscript = { _ in throw FileTranscriberError.needsParakeet }
     ) {
         self.launch = launch
         self.onAction = onAction
         self.onLog = onLog
         self.onExit = onExit
         self.generate = generate
+        self.transcribeFile = transcribeFile
     }
 
     func start(timeout: Duration = .seconds(30)) async throws -> HostManifest {
@@ -110,9 +113,15 @@ actor ExtensionHost {
         decodeResult(EmptyParams.self, from: await request("action", ActionParams(action: id, app: app), timeout: timeout)) != nil
     }
 
-    func emit(_ event: HostEvent, app: HostApp, timeout: Duration) async {
-        guard manifest?.subscribes(to: event.hook) == true else { return }
-        _ = decodeResult(EmptyParams.self, from: await request("emit", EmitParams(event: event.hook.rawValue, payload: event, app: app), timeout: timeout))
+    func stopActivity(_ id: String, app: HostApp, timeout: Duration) async -> Bool {
+        decodeResult(EmptyParams.self, from: await request("stopActivity", StopActivityParams(activity: id, app: app), timeout: timeout)) != nil
+    }
+
+    @discardableResult
+    func emit(_ event: HostEvent, app: HostApp, timeout: Duration) async -> Bool {
+        guard manifest?.subscribes(to: event.hook) == true else { return false }
+        let result = decodeResult(EmitResult.self, from: await request("emit", EmitParams(event: event.hook.rawValue, payload: event, app: app), timeout: timeout))
+        return result?.failed == false
     }
 
     func ping(timeout: Duration) async -> Bool {
@@ -216,21 +225,34 @@ actor ExtensionHost {
         case "insert": decodeNotification(TextParams.self, line).map { onAction(.insert($0.text)) }
         case "press": decodeNotification(PressParams.self, line).map { onAction(.press($0.key)) }
         case "notify": decodeNotification(TextParams.self, line).map { onAction(.notify($0.text)) }
+        case "actions": decodeNotification(ActionsParams.self, line).map { onAction(.actions($0.actions)) }
+        case "startActivity": decodeNotification(ExtensionActivity.self, line).map { onAction(.startActivity($0)) }
+        case "endActivity": decodeNotification(IDParams.self, line).map { onAction(.endActivity($0.id)) }
+        case "addHistory": decodeNotification(ExtensionHistoryEntry.self, line).map { onAction(.addHistory($0)) }
         case "log": decodeNotification(TextParams.self, line).map { onLog($0.text) }
-        case "generate": decodeNotification(GenerateParams.self, line).map(answer)
+        case "generate":
+            decodeNotification(GenerateParams.self, line).map { params in
+                reply(to: params.call, deadline: params.deadline, as: "generated") { [generate] in try await generate(params) }
+            }
+        case "transcribeFile":
+            decodeNotification(TranscribeFileParams.self, line).map { params in
+                reply(to: params.call, deadline: params.deadline, as: "transcribedFile") { [transcribeFile] in
+                    String(decoding: try JSONEncoder().encode(try await transcribeFile(params)), as: UTF8.self)
+                }
+            }
         default: onLog("Extension host sent unknown method \(envelope.method ?? "nil")")
         }
     }
 
-    private func answer(_ params: GenerateParams) {
-        Task { [generate] in
-            let reply: GeneratedParams
+    private func reply(to call: Int, deadline: Double, as method: String, with work: @escaping @Sendable () async throws -> String) {
+        Task {
+            let reply: CallReply
             do {
-                reply = GeneratedParams(call: params.call, json: try await generate(params), error: nil)
+                reply = CallReply(call: call, json: try await work(), error: nil)
             } catch {
-                reply = GeneratedParams(call: params.call, json: nil, error: error.localizedDescription)
+                reply = CallReply(call: call, json: nil, error: error.localizedDescription)
             }
-            post(HostReply(method: "generated", params: reply, deadline: params.deadline))
+            post(HostReply(method: method, params: reply, deadline: deadline))
         }
     }
 

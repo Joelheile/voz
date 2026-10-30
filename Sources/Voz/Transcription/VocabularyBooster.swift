@@ -5,7 +5,7 @@ actor VocabularyBooster {
     static let minimumSimilarity: Float = 0.6
 
     private struct Prepared {
-        let words: [String]
+        let terms: [VocabularyTerm]
         let vocabulary: CustomVocabularyContext
         let spotter: CtcKeywordSpotter
         let rescorer: VocabularyRescorer
@@ -14,15 +14,17 @@ actor VocabularyBooster {
 
     private var prepared: Prepared?
 
-    func prepare(words: [String]) async throws {
-        guard !words.isEmpty else {
+    func prepare(terms: [VocabularyTerm]) async throws {
+        guard !terms.isEmpty else {
             prepared = nil
             return
         }
-        if prepared?.words == words { return }
+        if prepared?.terms == terms { return }
         let started = Date()
         let ctcModels = try await CtcModels.downloadAndLoad()
-        let context = CustomVocabularyContext(terms: words.map { CustomVocabularyTerm(text: $0) })
+        let context = CustomVocabularyContext(terms: terms.map {
+            CustomVocabularyTerm(text: $0.word, aliases: $0.aliases.isEmpty ? nil : $0.aliases)
+        })
         let tokenized = try await VocabularyBoostingSession(vocabulary: context, ctcModels: ctcModels).vocabulary
         let spotter = CtcKeywordSpotter(models: ctcModels, blankId: ctcModels.vocabulary.count)
         let rescorer = try await VocabularyRescorer.create(
@@ -31,18 +33,18 @@ actor VocabularyBooster {
             ctcModelDirectory: CtcModels.defaultCacheDirectory(for: ctcModels.variant)
         )
         prepared = Prepared(
-            words: words,
+            terms: terms,
             vocabulary: tokenized,
             spotter: spotter,
             rescorer: rescorer,
             sizeConfig: ContextBiasingConstants.rescorerConfig(forVocabSize: tokenized.terms.count)
         )
-        Log.app.notice("Vocabulary boosting ready with \(words.count) words in \(Date().timeIntervalSince(started), format: .fixed(precision: 1))s")
+        Log.app.notice("Vocabulary boosting ready with \(terms.count) words in \(Date().timeIntervalSince(started), format: .fixed(precision: 1))s")
     }
 
     func rescore(_ result: ASRResult, samples: [Float], words: [String]) async -> String {
         guard !words.isEmpty else { return result.text }
-        guard let prepared, prepared.words == words else {
+        guard let prepared, prepared.terms.map(\.word) == words else {
             Log.app.notice("Vocabulary boosting not ready, transcribing without it")
             return result.text
         }

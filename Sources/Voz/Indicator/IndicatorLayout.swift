@@ -3,14 +3,14 @@ import CoreGraphics
 struct ScreenMetrics: Equatable, Sendable {
     let frame: CGRect
     let notchSize: CGSize?
-    let menuBarHeight: CGFloat
+    let visibleMinY: CGFloat
 
     init(
         frame: CGRect,
         safeAreaTop: CGFloat,
         leftAreaWidth: CGFloat?,
         rightAreaWidth: CGFloat?,
-        visibleMaxY: CGFloat
+        visibleMinY: CGFloat
     ) {
         var notchSize: CGSize?
         if safeAreaTop > 0, let leftAreaWidth, let rightAreaWidth {
@@ -18,7 +18,7 @@ struct ScreenMetrics: Equatable, Sendable {
         }
         self.frame = frame
         self.notchSize = notchSize
-        menuBarHeight = notchSize?.height ?? max(frame.maxY - visibleMaxY, IndicatorLayout.minimumMenuBarHeight)
+        self.visibleMinY = visibleMinY
     }
 }
 
@@ -28,12 +28,14 @@ struct IndicatorLayout: Equatable, Sendable {
         case floating
     }
 
-    static let minimumMenuBarHeight: CGFloat = 24
     static let sideWidth: CGFloat = 68
     static let seamOverlap: CGFloat = 1
     static let pillSize = CGSize(width: 108, height: 32)
     static let pillGap: CGFloat = 8
+    static let bottomGap: CGFloat = 16
     static let shadowMargin: CGFloat = 16
+    static let dropSwell: CGFloat = 6
+    static let dropShadowRoom: CGFloat = 32
 
     let style: Style
     let panelFrame: CGRect
@@ -43,10 +45,10 @@ struct IndicatorLayout: Equatable, Sendable {
     static let previewHeight: CGFloat = 120
 
     var windowFrame: CGRect {
-        let width = max(panelFrame.width, Self.previewWidth + 2 * Self.shadowMargin)
+        let width = max(panelFrame.width + 2 * (Self.dropSwell + Self.dropShadowRoom), Self.previewWidth + 2 * Self.shadowMargin)
         return CGRect(
             x: panelFrame.midX - width / 2,
-            y: panelFrame.minY - Self.previewHeight,
+            y: style == .notch ? panelFrame.minY - Self.previewHeight : panelFrame.minY,
             width: width,
             height: panelFrame.height + Self.previewHeight
         )
@@ -70,7 +72,7 @@ struct IndicatorLayout: Equatable, Sendable {
     private static func floating(screen: ScreenMetrics) -> IndicatorLayout {
         let pill = CGRect(
             x: screen.frame.midX - pillSize.width / 2,
-            y: screen.frame.maxY - screen.menuBarHeight - pillGap - pillSize.height,
+            y: screen.visibleMinY + bottomGap,
             width: pillSize.width,
             height: pillSize.height
         )

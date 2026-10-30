@@ -10,5 +10,5 @@
     "directory": "examples/launcher"
   },
   "files": ["index.ts"],
-  "voz": { "apiVersion": 1 }
+  "voz": { "apiVersion": 4 }
 }

@@ -3,6 +3,83 @@
   <channel>
     <title>voz</title>
     <item>
+      <title>voz 0.0.5-beta.100030</title>
+      <description>&lt;ul&gt;&lt;li&gt;On screens without a notch, the recording pill now sits above the Dock&lt;/li&gt;&lt;/ul&gt;</description>
+      <link>https://github.com/Joelheile/voz/releases/tag/beta-100030</link>
+      <pubDate>Fri, 30 Oct 2026 08:42:59 GMT</pubDate>
+      <sparkle:version>100030</sparkle:version>
+      <sparkle:shortVersionString>0.0.5-beta.100030</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100030/voz-0.0.5-beta.100030.zip" length="8406814" sparkle:edSignature="M7ZCQcJV6F82iXOKThr31C++0Ewp1gK9sRmT0ERJ3m84elLm7NNAYlnL911wabO0rCTjoEe7/reU9i2RQ70VDg==" type="application/octet-stream" />
+    </item>
+    <item>
+      <title>voz 0.0.5-beta.100029</title>
+      <description>&lt;ul&gt;&lt;li&gt;See what&amp;#x27;s new in each release from Settings&lt;/li&gt;&lt;/ul&gt;</description>
+      <link>https://github.com/Joelheile/voz/releases/tag/beta-100029</link>
+      <pubDate>Fri, 30 Oct 2026 08:31:03 GMT</pubDate>
+      <sparkle:version>100029</sparkle:version>
+      <sparkle:shortVersionString>0.0.5-beta.100029</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100029/voz-0.0.5-beta.100029.zip" length="8407134" sparkle:edSignature="DiN7IXXDlZJEQPdubAytcIhHeodx0nMzZmWpBw6UDVXvrGMBA9ZU3wMGcgVRP7fysyxYljMPnpTJHfWmkPDYCg==" type="application/octet-stream" />
+    </item>
+    <item>
+      <title>voz 0.0.5-beta.100028</title>
+      <description>&lt;ul&gt;&lt;li&gt;The hotkey starts recording on the first press after your Mac wakes or switches microphones&lt;/li&gt;&lt;li&gt;Show a message when Voz cannot start recording&lt;/li&gt;&lt;/ul&gt;</description>
+      <link>https://github.com/Joelheile/voz/releases/tag/beta-100028</link>
+      <pubDate>Fri, 30 Oct 2026 00:28:01 GMT</pubDate>
+      <sparkle:version>100028</sparkle:version>
+      <sparkle:shortVersionString>0.0.5-beta.100028</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100028/voz-0.0.5-beta.100028.zip" length="8402951" sparkle:edSignature="kHN9vEMLqXhJ8GpXGGhkqt54EmQVn+/j4pjVcguREtJ26SbC9QeTUTpEMc/etJNv1p0QHJiSeWdCyG9hDWQ/DA==" type="application/octet-stream" />
+    </item>
+    <item>
+      <title>voz 0.0.5-beta.100027</title>
+      <description>&lt;ul&gt;&lt;li&gt;Get new versions within an hour of release&lt;/li&gt;&lt;/ul&gt;</description>
+      <link>https://github.com/Joelheile/voz/releases/tag/beta-100027</link>
+      <pubDate>Fri, 30 Oct 2026 00:22:30 GMT</pubDate>
+      <sparkle:version>100027</sparkle:version>
+      <sparkle:shortVersionString>0.0.5-beta.100027</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100027/voz-0.0.5-beta.100027.zip" length="8401227" sparkle:edSignature="dGRnSRVaoO726o3dHcmonUt0goDmbgrdpE0f5P2cR3J8zI1lwqPFrtRA//1HMjH2SIVtfrSxj10fR2Rz0J6YAQ==" type="application/octet-stream" />
+    </item>
+    <item>
+      <title>voz 0.0.5-beta.100026</title>
+      <description>&lt;ul&gt;&lt;li&gt;Extensions that miss their deadline can no longer change your text&lt;/li&gt;&lt;li&gt;Ask once for a GitHub star after you dictate 2,000 words&lt;/li&gt;&lt;li&gt;Show small Top apps bars as rounded bars&lt;/li&gt;&lt;li&gt;Dragging a TypeScript file no longer opens the audio drop zone&lt;/li&gt;&lt;li&gt;Drop a file on the floating indicator to transcribe it, with a clearer drop target&lt;/li&gt;&lt;li&gt;Learn dictionary words from spelled-out names and spoken corrections&lt;/li&gt;&lt;li&gt;Fix words Voz keeps mishearing with rules like voss → Voz&lt;/li&gt;&lt;li&gt;Show long notifications in full&lt;/li&gt;&lt;li&gt;Run extension actions from buttons at the bottom of the panel&lt;/li&gt;&lt;li&gt;Browse and manage extensions from a simpler list with a page per extension&lt;/li&gt;&lt;li&gt;Find, add and accept dictionary words from one field&lt;/li&gt;&lt;li&gt;Drop an audio or video file on the notch to transcribe it with an extension&lt;/li&gt;&lt;li&gt;Copy a Claude Code prompt from the Extensions page to build your own extension&lt;/li&gt;&lt;li&gt;Show each installed package&amp;#x27;s description in the Extensions page&lt;/li&gt;&lt;li&gt;Bring back the Voz face in the menu bar icon&lt;/li&gt;&lt;li&gt;Show the menu bar icon in white on dark menu bars&lt;/li&gt;&lt;/ul&gt;</description>
+      <link>https://github.com/Joelheile/voz/releases/tag/beta-100026</link>
+      <pubDate>Fri, 30 Oct 2026 00:10:46 GMT</pubDate>
+      <sparkle:version>100026</sparkle:version>
+      <sparkle:shortVersionString>0.0.5-beta.100026</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100026/voz-0.0.5-beta.100026.zip" length="8400554" sparkle:edSignature="vea8qIa2QRwsMfRoOMBmTkJ/GQBEN1IDh9CrHIHkUhPbEtJq7eXQ7+8ZRqaib87ukPRy5ERfkdRIp5nisJB4CA==" type="application/octet-stream" />
+    </item>
+    <item>
+      <title>voz 0.0.5-beta.100025</title>
+      <description>&lt;ul&gt;&lt;li&gt;Extensions written for the first extension API, such as voz-autocorrect and voz-meeting, load again&lt;/li&gt;&lt;/ul&gt;</description>
+      <link>https://github.com/Joelheile/voz/releases/tag/beta-100025</link>
+      <pubDate>Thu, 29 Oct 2026 23:43:52 GMT</pubDate>
+      <sparkle:version>100025</sparkle:version>
+      <sparkle:shortVersionString>0.0.5-beta.100025</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100025/voz-0.0.5-beta.100025.zip" length="8325695" sparkle:edSignature="AxxjhYtCn9IL8xINDWmvyWEK8RGHM9AO6n8lRud/2kbrtiCy1Wf5EpRouyckb2P/ioah8RuhLj42UD9uaE4gBA==" type="application/octet-stream" />
+    </item>
+    <item>
+      <title>voz 0.0.5-beta.100024</title>
+      <description>&lt;ul&gt;&lt;li&gt;Maintenance release&lt;/li&gt;&lt;/ul&gt;</description>
+      <link>https://github.com/Joelheile/voz/releases/tag/beta-100024</link>
+      <pubDate>Thu, 29 Oct 2026 23:39:19 GMT</pubDate>
+      <sparkle:version>100024</sparkle:version>
+      <sparkle:shortVersionString>0.0.5-beta.100024</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100024/voz-0.0.5-beta.100024.zip" length="8325408" sparkle:edSignature="9uw6cN9szprm5EiVK3y6S5RACLNCL2S53Tj3o8KRLfgOic0WNYSb54Xu/AcDV7PIF+AmQ9UwQlGop2JIv3glDg==" type="application/octet-stream" />
+    </item>
+    <item>
       <title>voz 0.0.5-beta.100023</title>
       <description>&lt;ul&gt;&lt;li&gt;Maintenance release&lt;/li&gt;&lt;/ul&gt;</description>
       <link>https://github.com/Joelheile/voz/releases/tag/beta-100023</link>
@@ -34,83 +111,6 @@
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <sparkle:channel>beta</sparkle:channel>
       <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100021/voz-0.0.5-beta.100021.zip" length="8306517" sparkle:edSignature="059xn5iZU2KdoPeXw+oPxgfOE72/kxZkC1SM9v5pRlpNfKi4n8FAO3G3a5pkuLjA6QrHTIKYRRbhJkfsN3hYDA==" type="application/octet-stream" />
-    </item>
-    <item>
-      <title>voz 0.0.5-beta.100020</title>
-      <description>&lt;ul&gt;&lt;li&gt;A cleaner panel that opens and switches pages instantly&lt;/li&gt;&lt;li&gt;Turn on an extension&amp;#x27;s cleanup steps from its details in the Extensions page&lt;/li&gt;&lt;/ul&gt;</description>
-      <link>https://github.com/Joelheile/voz/releases/tag/beta-100020</link>
-      <pubDate>Tue, 27 Oct 2026 23:48:12 GMT</pubDate>
-      <sparkle:version>100020</sparkle:version>
-      <sparkle:shortVersionString>0.0.5-beta.100020</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <sparkle:channel>beta</sparkle:channel>
-      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100020/voz-0.0.5-beta.100020.zip" length="8306436" sparkle:edSignature="TL0D0SMCIOBKko4TUV28eMg/tV7nz21ekb4rj9KyC6UAguRuttyJckB9h3iD1NjFAc0A6fPwtpX946zP+9tzCg==" type="application/octet-stream" />
-    </item>
-    <item>
-      <title>voz 0.0.5-beta.100019</title>
-      <description>&lt;ul&gt;&lt;li&gt;Preview your dictation below the recording indicator while you speak&lt;/li&gt;&lt;li&gt;Text appears sooner after you stop talking&lt;/li&gt;&lt;/ul&gt;</description>
-      <link>https://github.com/Joelheile/voz/releases/tag/beta-100019</link>
-      <pubDate>Tue, 27 Oct 2026 23:42:34 GMT</pubDate>
-      <sparkle:version>100019</sparkle:version>
-      <sparkle:shortVersionString>0.0.5-beta.100019</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <sparkle:channel>beta</sparkle:channel>
-      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100019/voz-0.0.5-beta.100019.zip" length="8293054" sparkle:edSignature="BNVnwcbb3d1R22cSxYh+byG6hKJRk2wlioU6mka9htG4RA39y4qmKKfG+qNm/PQDwPUa9OAmPStXMKlDlCvGAw==" type="application/octet-stream" />
-    </item>
-    <item>
-      <title>voz 0.0.5-beta.100018</title>
-      <description>&lt;ul&gt;&lt;li&gt;Maintenance release&lt;/li&gt;&lt;/ul&gt;</description>
-      <link>https://github.com/Joelheile/voz/releases/tag/beta-100018</link>
-      <pubDate>Tue, 27 Oct 2026 23:32:17 GMT</pubDate>
-      <sparkle:version>100018</sparkle:version>
-      <sparkle:shortVersionString>0.0.5-beta.100018</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <sparkle:channel>beta</sparkle:channel>
-      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100018/voz-0.0.5-beta.100018.zip" length="8275166" sparkle:edSignature="ud+u8cKlXk2kSr83+4Z71f1iG3I7VhXD+gw7qGxaVGWYHIIiarWrgY4vWD3l5MT3pgA8WL6Qp3F0Sal4QKeSAA==" type="application/octet-stream" />
-    </item>
-    <item>
-      <title>voz 0.0.5-beta.100017</title>
-      <description>&lt;ul&gt;&lt;li&gt;Voz starts faster after an install or update&lt;/li&gt;&lt;/ul&gt;</description>
-      <link>https://github.com/Joelheile/voz/releases/tag/beta-100017</link>
-      <pubDate>Tue, 27 Oct 2026 23:27:18 GMT</pubDate>
-      <sparkle:version>100017</sparkle:version>
-      <sparkle:shortVersionString>0.0.5-beta.100017</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <sparkle:channel>beta</sparkle:channel>
-      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100017/voz-0.0.5-beta.100017.zip" length="8275166" sparkle:edSignature="NiorsVDKRVilcLl+FS65FGqbQfeBv/iU26411TUfMKMPcvlIVJ2lqlVDCEVw3WBK1t7LdNzHV9HPpWOZARdUBQ==" type="application/octet-stream" />
-    </item>
-    <item>
-      <title>voz 0.0.5-beta.100016</title>
-      <description>&lt;ul&gt;&lt;li&gt;Text appears sooner after you stop talking&lt;/li&gt;&lt;/ul&gt;</description>
-      <link>https://github.com/Joelheile/voz/releases/tag/beta-100016</link>
-      <pubDate>Tue, 27 Oct 2026 23:23:09 GMT</pubDate>
-      <sparkle:version>100016</sparkle:version>
-      <sparkle:shortVersionString>0.0.5-beta.100016</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <sparkle:channel>beta</sparkle:channel>
-      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100016/voz-0.0.5-beta.100016.zip" length="8275257" sparkle:edSignature="/VEkJMfRZm97J3l6b9C0P8cTbxSNAP00mgRubQI+S/+8w4IDFwI8IM1q5frvXqMRS3ZMZZEI2q7W3+hVE/Q1DA==" type="application/octet-stream" />
-    </item>
-    <item>
-      <title>voz 0.0.5-beta.100015</title>
-      <description>&lt;ul&gt;&lt;li&gt;Extensions can now use the on-device model and run commands you say at the start of a dictation&lt;/li&gt;&lt;/ul&gt;</description>
-      <link>https://github.com/Joelheile/voz/releases/tag/beta-100015</link>
-      <pubDate>Tue, 27 Oct 2026 10:18:08 GMT</pubDate>
-      <sparkle:version>100015</sparkle:version>
-      <sparkle:shortVersionString>0.0.5-beta.100015</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <sparkle:channel>beta</sparkle:channel>
-      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100015/voz-0.0.5-beta.100015.zip" length="8266762" sparkle:edSignature="Uosdz7VGbVx6RNl0QRIO9dV+r0temsU8mtmd8/qGMbfJfx8ctr0IYiFVBSpV6b+u0jAW0sVPCw8L8tGQU89TAg==" type="application/octet-stream" />
-    </item>
-    <item>
-      <title>voz 0.0.5-beta.100014</title>
-      <description>&lt;ul&gt;&lt;li&gt;Prepare Apple speech before dictation starts to reduce the first transcription delay&lt;/li&gt;&lt;li&gt;Clean up whole sentences instead of fragments cut at each pause&lt;/li&gt;&lt;/ul&gt;</description>
-      <link>https://github.com/Joelheile/voz/releases/tag/beta-100014</link>
-      <pubDate>Tue, 27 Oct 2026 10:09:42 GMT</pubDate>
-      <sparkle:version>100014</sparkle:version>
-      <sparkle:shortVersionString>0.0.5-beta.100014</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <sparkle:channel>beta</sparkle:channel>
-      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100014/voz-0.0.5-beta.100014.zip" length="8249431" sparkle:edSignature="zYop0I1R27HfQlCGV838AhxN8NWJoiopYCZdGgHHLcbHT0+dYyDve08sYIH2e3LkNmX3lPZQokwkM87LvfkKCA==" type="application/octet-stream" />
     </item>
     <item>
       <title>voz 0.0.5</title>

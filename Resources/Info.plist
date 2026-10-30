@@ -46,7 +46,7 @@
     <key>SUVerifyUpdateBeforeExtraction</key>
     <true/>
     <key>SUScheduledCheckInterval</key>
-    <integer>86400</integer>
+    <integer>3600</integer>
     <key>NSMicrophoneUsageDescription</key>
     <string>Voz records your voice while you dictate and transcribes it on this Mac.</string>
     <key>NSAppleEventsUsageDescription</key>

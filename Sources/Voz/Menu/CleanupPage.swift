@@ -15,7 +15,9 @@ struct CleanupStepsPage: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            PageBar(title: "Cleanup steps", back: back)
+            PageBar(title: "Cleanup steps", back: back) {
+                ResetButton(visible: settings.cleanupSteps != CleanupStep.standard) { settings.cleanupSteps = CleanupStep.standard }
+            }
             PageNote(text: "Voz runs these steps in order on each dictation. Extensions can add steps.")
             PanelGroup {
                 ForEach(settings.cleanupSteps + off, id: \.self) { step in
@@ -30,12 +32,6 @@ struct CleanupStepsPage: View {
                 }
             }
             .animation(Theme.Motion.reorder, value: settings.cleanupSteps)
-            HStack {
-                Spacer(minLength: 0)
-                Button("Reset to default") { settings.cleanupSteps = CleanupStep.standard }
-                    .buttonStyle(.pill(.quiet, .small))
-                    .disabled(settings.cleanupSteps == CleanupStep.standard)
-            }
         }
     }
 
@@ -80,7 +76,9 @@ struct CleanupPromptPage: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            PageBar(title: "Cleanup prompt", back: back)
+            PageBar(title: "Cleanup prompt", back: back) {
+                ResetButton(visible: settings.cleanupPrompt != CleanupPrompt.standard) { settings.cleanupPrompt = CleanupPrompt.standard }
+            }
             PageNote(text: "Voz cleans up each dictation with this prompt, on your Mac. Your dictionary words go at the end.")
             TextEditor(text: $settings.cleanupPrompt)
                 .font(.ui(12))
@@ -90,12 +88,23 @@ struct CleanupPromptPage: View {
                 .frame(height: 320)
                 .background(Theme.canvas, in: RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous).strokeBorder(Theme.hairline))
-            HStack {
-                Spacer(minLength: 0)
-                Button("Reset to default") { settings.cleanupPrompt = CleanupPrompt.standard }
+        }
+    }
+}
+
+private struct ResetButton: View {
+    let visible: Bool
+    let reset: () -> Void
+
+    var body: some View {
+        ZStack {
+            if visible {
+                Button("Reset", action: reset)
                     .buttonStyle(.pill(.quiet, .small))
-                    .disabled(settings.cleanupPrompt == CleanupPrompt.standard)
+                    .help("Go back to the default")
+                    .transition(.opacity)
             }
         }
+        .animation(Theme.Motion.hover, value: visible)
     }
 }

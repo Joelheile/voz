@@ -5,7 +5,7 @@
   "type": "module",
   "keywords": ["voz-package"],
   "license": "MIT",
-  "voz": { "apiVersion": 1 },
+  "voz": { "apiVersion": {{apiVersion}} },
   "files": ["index.ts"],
   "devDependencies": { "@types/bun": "latest" }
 }

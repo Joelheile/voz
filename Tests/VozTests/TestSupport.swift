@@ -74,6 +74,30 @@ final class RecordedActions: @unchecked Sendable {
     var all: [HostAction] { lock.withLock { actions } }
 }
 
+final class RecordedLogs: @unchecked Sendable {
+    private let lock = NSLock()
+    private var lines: [String] = []
+
+    func append(_ line: String) { lock.withLock { lines.append(line) } }
+
+    func waitFor(_ matches: (String) -> Bool) async throws -> Bool {
+        for _ in 0..<40 {
+            if lock.withLock({ lines.contains(where: matches) }) { return true }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        return false
+    }
+}
+
+func hostApiVersion() -> String? {
+    guard let host = fileContents(hostScript), let start = host.range(of: "const apiVersion = ")?.upperBound else { return nil }
+    return String(host[start...].prefix(while: \.isNumber))
+}
+
+func startedActivity(_ id: String, _ title: String, since seconds: Double, stoppable: Bool) -> HostAction {
+    .startActivity(ExtensionActivity(id: id, title: title, since: Date(timeIntervalSince1970: seconds), stoppable: stoppable))
+}
+
 private struct HostLaunch: Encodable {
     let home: String
     let settings: String
