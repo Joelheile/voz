@@ -219,6 +219,9 @@ private final class Fixture {
         for (index, seconds) in recent.enumerated() {
             result.append(record(text: texts[index], at: now.addingTimeInterval(-seconds), app: apps[index]))
         }
+        result.insert(TranscriptRecord(ExtensionHistoryEntry(
+            extension: "voz-meeting", text: "Speaker 1: Let's start with the release plan for Friday.", seconds: 1_800, file: "/tmp/standup.md"
+        )), at: 1)
         for day in 0..<30 where day % 5 != 3 {
             for entry in 0..<(1 + day % 3) {
                 let text = texts[(day + entry) % texts.count]

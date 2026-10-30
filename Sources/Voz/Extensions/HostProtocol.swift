@@ -173,6 +173,7 @@ enum HostAction: Equatable, Sendable {
     case notify(String)
     case startActivity(ExtensionActivity)
     case endActivity(String)
+    case addHistory(ExtensionHistoryEntry)
     case actions([ExtensionAction])
 }
 
@@ -202,6 +203,13 @@ struct ExtensionActivity: Decodable, Equatable, Sendable {
         since = Date(timeIntervalSince1970: try container.decode(Double.self, forKey: .since) / 1000)
         stoppable = try container.decode(Bool.self, forKey: .stoppable)
     }
+}
+
+struct ExtensionHistoryEntry: Decodable, Equatable, Sendable {
+    let `extension`: String
+    let text: String
+    let seconds: Double
+    let file: String?
 }
 
 struct HostLaunchArguments: Encodable {

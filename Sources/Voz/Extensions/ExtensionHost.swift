@@ -228,6 +228,7 @@ actor ExtensionHost {
         case "actions": decodeNotification(ActionsParams.self, line).map { onAction(.actions($0.actions)) }
         case "startActivity": decodeNotification(ExtensionActivity.self, line).map { onAction(.startActivity($0)) }
         case "endActivity": decodeNotification(IDParams.self, line).map { onAction(.endActivity($0.id)) }
+        case "addHistory": decodeNotification(ExtensionHistoryEntry.self, line).map { onAction(.addHistory($0)) }
         case "log": decodeNotification(TextParams.self, line).map { onLog($0.text) }
         case "generate":
             decodeNotification(GenerateParams.self, line).map { params in

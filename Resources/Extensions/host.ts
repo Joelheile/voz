@@ -440,6 +440,10 @@ function api(name: string, config: Config, registration: Registration): Extensio
       send({ method: "startActivity", params: { id, title: activity.title, since: activity.since ?? Date.now(), stoppable: !!activity.stop } });
       return { end: () => endActivity(id) };
     },
+    addHistory(entry) {
+      if (!entry.text) throw new Error("A history entry needs text");
+      send({ method: "addHistory", params: { extension: name, text: entry.text, seconds: entry.seconds ?? 0, file: entry.file } });
+    },
     settings<Schema extends SettingsSchema>(schema: Schema) {
       for (const [key, setting] of Object.entries(schema)) checkSetting(key, setting);
       setRegistered(settingsSchemas, name, schema, registration);

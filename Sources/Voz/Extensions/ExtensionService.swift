@@ -99,6 +99,7 @@ final class ExtensionService {
     let catalog = ExtensionCatalog()
     var onFileTranscribing: () -> Void = {}
     var onFileTranscribed: (_ succeeded: Bool) -> Void = { _ in }
+    var onHistory: (ExtensionHistoryEntry) -> Void = { _ in }
     private var runningDrops = 0
     private var host: ExtensionHost?
     private var manifest: HostManifest?
@@ -389,6 +390,8 @@ final class ExtensionService {
             catalog.activities.append(activity)
         case .endActivity(let id):
             catalog.activities.removeAll { $0.id == id }
+        case .addHistory(let entry):
+            onHistory(entry)
         case .actions(let actions):
             show(actions)
         }

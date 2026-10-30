@@ -111,6 +111,8 @@ export type Activity = {
 
 export type RunningActivity = { end(): void };
 
+export type HistoryEntry = { text: string; seconds?: number; file?: string };
+
 type SettingBase = { title: string; description?: string };
 
 export type Setting =
@@ -161,6 +163,7 @@ export type ExtensionAPI = {
   registerCleanupStep(step: CleanupStep): void;
   registerAction(action: Action): ActionHandle;
   startActivity(activity: Activity): RunningActivity;
+  addHistory(entry: HistoryEntry): void;
   settings<Schema extends SettingsSchema>(schema: Schema): SettingsValues<Schema>;
 };
 

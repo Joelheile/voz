@@ -62,6 +62,7 @@ The interview is done when you can state the extension in one sentence that name
 | A different speech-to-text or cleanup model                               | [`registerSpeechModel` or `registerCleanupModel`](#models-and-cleanup-steps)    |
 | A button in the Voz panel, or a global hotkey                             | [`registerAction`](#actions)                                                    |
 | Something that keeps running, such as a recording                         | [`startActivity`](#activities)                                                  |
+| Text the user should find later, such as a meeting transcript             | [`addHistory`](#history)                                                        |
 
 Put network calls and model calls in commands, actions, `afterInsert` or a registered model. `beforeCleanup`, `beforeInsert` and cleanup steps get 300 ms, enough for string work only.
 
@@ -161,6 +162,7 @@ An extension does four kinds of things. The kind sets how much time it gets:
 | `voz.registerCommand(command)`                  | Runs `command.run(event, ctx)` when a dictation ends with `command.phrase`. Voz inserts the words before the phrase, then runs the command. With `at: "start"`, it runs when a dictation starts with the phrase: Voz inserts nothing and passes the words after the phrase. |
 | `voz.registerAction(action)`                    | Adds a button to the bottom row of the Voz panel. `action` has `id`, `name`, an optional `hotkey` such as `"ctrl+opt+j"`, `hidden` and `run(ctx)`. Returns a handle with `update({ hidden })`. See [Actions](#actions).                                                                                                             |
 | `voz.startActivity(activity)`                   | Shows that something keeps running, with an optional Stop button. Returns `{ end() }`. See [Activities](#activities).                                                                                                                                 |
+| `voz.addHistory(entry)`                         | Adds an entry to the Voz history, such as a meeting transcript. See [History](#history).                                                                                                                                                              |
 | `voz.settings(schema)`                          | Adds a settings form to the extension's row in the Extensions page, and returns the values. See [Settings](#settings).                                                                                                                                |
 | `voz.name`                                      | The extension name: the file name, or the package name.                                                                                                                                                                                               |
 | `voz.paths`                                     | `data` is `~/.voz/data/<name>`, a folder for the extension's own files.                                                                                                                                                                               |
@@ -328,6 +330,19 @@ recording.end();
 - An extension can run several activities at once
 - Voz ends all activities when it reloads extensions
 
+## History
+
+`voz.addHistory` adds an entry to the Voz history, next to dictations. The user can search it, copy it, and open its file in Finder.
+
+```ts
+voz.addHistory({ text: transcript, seconds: 3600, file: "/Users/me/Meetings/standup.md" });
+```
+
+- `text` is what the history shows, searches and copies
+- `seconds` is how long the recording was. It is optional
+- `file` is the full path of a file with the same content, such as the Markdown transcript you saved. It is optional
+- Entries from extensions don't count toward Insights
+
 ## Per-app prompts
 
 You edit the cleanup prompt in Settings, under Cleanup prompt. To use a different prompt per app, add to it in `beforeCleanup`:
@@ -437,7 +452,7 @@ What each version changed, and what older packages keep:
 
 | Version | Changes                                                                                                                                          | Older packages keep                                                                       |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| 4       | Adds `voz.startActivity`, and `hidden` with `update({ hidden })` for actions. `registerCommand` takes one object. `recording` is now `afterRecording`. `ctx` in transform hooks is typed as `{ app }`. Dropped `ctx` calls are logged | `registerCommand(phrase, handler, { at })` and `on("recording")`                          |
+| 4       | Adds `voz.startActivity`, `voz.addHistory`, and `hidden` with `update({ hidden })` for actions. `registerCommand` takes one object. `recording` is now `afterRecording`. `ctx` in transform hooks is typed as `{ app }`. Dropped `ctx` calls are logged | `registerCommand(phrase, handler, { at })` and `on("recording")`                          |
 | 3       | Adds `audioDrop` and `ctx.transcribe`                                                                                                            |                                                                                           |
 | 2       | Adds `at: "start"` and `ctx.generate`. Removes `voz.config`, `voz.log`, `voz.events`, `voz.paths.home` and `{ handled: true }` from `beforeInsert` | All of them. New code uses `voz.settings`, `console.log` and `{ text: "" }`               |
 

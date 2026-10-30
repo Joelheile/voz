@@ -110,6 +110,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.indicator.showFileTranscribing()
         }
         extensions.onFileTranscribed = { [weak self] succeeded in self?.indicator.finishFile(succeeded: succeeded) }
+        extensions.onHistory = { [history] entry in
+            do {
+                try history.insert(TranscriptRecord(entry))
+            } catch {
+                Log.extensions.error("History write failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
         audioDrag.start()
         observeWake()
         OpenRequest.observe { [weak self] in self?.statusItemController?.open() }

@@ -357,7 +357,11 @@ private struct TranscriptRow: View {
     var body: some View {
         Button(action: copy) {
             HStack(spacing: 10) {
-                AppIcon(bundleID: record.appBundleID, size: 24)
+                if record.source == nil {
+                    AppIcon(bundleID: record.appBundleID, size: 24)
+                } else {
+                    Icon(.puzzle, size: 16).foregroundStyle(Theme.inkSecondary).frame(width: 24, height: 24)
+                }
                 Text(text)
                     .font(.ui(13))
                     .foregroundStyle(Theme.ink)
@@ -373,9 +377,12 @@ private struct TranscriptRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.pressable(0.99))
-        .help(record.finalText)
+        .help(record.source.map { "From \($0)" } ?? record.finalText)
         .contextMenu {
             Button("Copy", action: copy)
+            if let file = record.file {
+                Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: file)]) }
+            }
             Button("Delete", role: .destructive, action: delete)
         }
         .onHover(perform: hover)

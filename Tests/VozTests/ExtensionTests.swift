@@ -276,6 +276,18 @@ struct ExtensionHostTests {
         await host.stop()
     }
 
+    @Test func extensionsAddEntriesToTheHistory() async throws {
+        try extensionFile("meeting.ts", #"export default (voz) => { voz.addHistory({ text: "hello team", seconds: 3, file: "/tmp/meeting.md" }); voz.addHistory({ text: "short" }) }"#)
+        let actions = RecordedActions()
+        let host = makeHost(actions: actions)
+        _ = try await host.start()
+        #expect(actions.all == [
+            .addHistory(ExtensionHistoryEntry(extension: "meeting", text: "hello team", seconds: 3, file: "/tmp/meeting.md")),
+            .addHistory(ExtensionHistoryEntry(extension: "meeting", text: "short", seconds: 0, file: nil)),
+        ])
+        await host.stop()
+    }
+
     @Test func hiddenActionsLeaveThePanelAndUpdatesReachVoz() async throws {
         try extensionFile("setup.ts", #"export default (voz) => { const done = voz.registerAction({ id: "done", name: "Done", hidden: true, run() {} }); const connect = voz.registerAction({ id: "connect", name: "Connect", hotkey: "ctrl+opt+t", run() { connect.update({ hidden: true }); done.update({ hidden: false }) } }) }"#)
         let actions = RecordedActions()
