@@ -159,7 +159,7 @@ An extension does four kinds of things. The kind sets how much time it gets:
 | `voz.registerCleanupModel(model)`               | Adds a cleanup model to Settings. `model` has `id`, `name` and `clean(event, ctx)`, which returns `{ text }`.                                                                                                                                         |
 | `voz.registerCleanupStep(step)`                 | Adds a cleanup step you can turn on in the extension's details. `step` has `id`, `name` and `run(event, ctx)`, which returns `{ text }` or nothing to keep the text.                                                                                  |
 | `voz.registerCommand(command)`                  | Runs `command.run(event, ctx)` when a dictation ends with `command.phrase`. Voz inserts the words before the phrase, then runs the command. With `at: "start"`, it runs when a dictation starts with the phrase: Voz inserts nothing and passes the words after the phrase. |
-| `voz.registerAction(action)`                    | Adds a button to the bottom row of the Voz panel. `action` has `id`, `name`, an optional `hotkey` such as `"ctrl+opt+j"`, and `run(ctx)`.                                                                                                             |
+| `voz.registerAction(action)`                    | Adds a button to the bottom row of the Voz panel. `action` has `id`, `name`, an optional `hotkey` such as `"ctrl+opt+j"`, `hidden` and `run(ctx)`. Returns a handle with `update({ hidden })`. See [Actions](#actions).                                                                                                             |
 | `voz.startActivity(activity)`                   | Shows that something keeps running, with an optional Stop button. Returns `{ end() }`. See [Activities](#activities).                                                                                                                                 |
 | `voz.settings(schema)`                          | Adds a settings form to the extension's row in the Extensions page, and returns the values. See [Settings](#settings).                                                                                                                                |
 | `voz.name`                                      | The extension name: the file name, or the package name.                                                                                                                                                                                               |
@@ -294,6 +294,20 @@ voz.registerAction({
 
 The hotkey uses the same keys as `ctx.press`. If another app holds the hotkey, Voz shows a message and the button still works. An action runs until it finishes, so it can record or transcribe for as long as it needs.
 
+Every action also has a Run button in the extension's details on the Extensions page. Set `hidden: true` when the action does not apply right now, such as a setup step that is done. A hidden action leaves the panel, but stays in the details and keeps its hotkey. `registerAction` returns a handle. Call `update({ hidden })` when your state changes.
+
+```ts
+const connect = voz.registerAction({
+  id: "connect",
+  name: "Connect account",
+  hidden: await isSignedIn(),
+  run: async (ctx) => {
+    await signIn();
+    connect.update({ hidden: true });
+  },
+});
+```
+
 ## Activities
 
 An activity shows that something keeps running, such as a recording. While one runs, the Voz menu bar icon gets a dot, and the Voz panel shows its title, how long it has run and a Stop button.
@@ -423,7 +437,7 @@ What each version changed, and what older packages keep:
 
 | Version | Changes                                                                                                                                          | Older packages keep                                                                       |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| 4       | Adds `voz.startActivity`. `registerCommand` takes one object. `recording` is now `afterRecording`. `ctx` in transform hooks is typed as `{ app }`. Dropped `ctx` calls are logged | `registerCommand(phrase, handler, { at })` and `on("recording")`                          |
+| 4       | Adds `voz.startActivity`, and `hidden` with `update({ hidden })` for actions. `registerCommand` takes one object. `recording` is now `afterRecording`. `ctx` in transform hooks is typed as `{ app }`. Dropped `ctx` calls are logged | `registerCommand(phrase, handler, { at })` and `on("recording")`                          |
 | 3       | Adds `audioDrop` and `ctx.transcribe`                                                                                                            |                                                                                           |
 | 2       | Adds `at: "start"` and `ctx.generate`. Removes `voz.config`, `voz.log`, `voz.events`, `voz.paths.home` and `{ handled: true }` from `beforeInsert` | All of them. New code uses `voz.settings`, `console.log` and `{ text: "" }`               |
 

@@ -225,6 +225,7 @@ actor ExtensionHost {
         case "insert": decodeNotification(TextParams.self, line).map { onAction(.insert($0.text)) }
         case "press": decodeNotification(PressParams.self, line).map { onAction(.press($0.key)) }
         case "notify": decodeNotification(TextParams.self, line).map { onAction(.notify($0.text)) }
+        case "actions": decodeNotification(ActionsParams.self, line).map { onAction(.actions($0.actions)) }
         case "startActivity": decodeNotification(ExtensionActivity.self, line).map { onAction(.startActivity($0)) }
         case "endActivity": decodeNotification(IDParams.self, line).map { onAction(.endActivity($0.id)) }
         case "log": decodeNotification(TextParams.self, line).map { onLog($0.text) }

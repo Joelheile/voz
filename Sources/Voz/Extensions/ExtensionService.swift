@@ -112,7 +112,7 @@ final class ExtensionService {
     private var watcher: FileWatcher?
     private var loadedExtensionSettings: Data?
     private lazy var hotkeys = ActionHotkeys { [weak self] id in
-        guard let action = self?.manifest?.actions.first(where: { $0.id == id }) else { return }
+        guard let action = self?.catalog.actions.first(where: { $0.id == id }) else { return }
         self?.runAction(action)
     }
 
@@ -324,8 +324,7 @@ final class ExtensionService {
         self.host = host
         self.manifest = manifest
         catalog.show(manifest)
-        let unusable = hotkeys.register(manifest.actions)
-        if !unusable.isEmpty { toast.show("Could not use the hotkey for \(unusable.map(\.name).joined(separator: ", "))") }
+        show(manifest.actions)
         started = .now
         watchdog = Task { [weak self] in await self?.watch(host) }
     }
@@ -390,7 +389,15 @@ final class ExtensionService {
             catalog.activities.append(activity)
         case .endActivity(let id):
             catalog.activities.removeAll { $0.id == id }
+        case .actions(let actions):
+            show(actions)
         }
+    }
+
+    private func show(_ actions: [ExtensionAction]) {
+        catalog.actions = actions
+        let unusable = hotkeys.register(actions)
+        if !unusable.isEmpty { toast.show("Could not use the hotkey for \(unusable.map(\.name).joined(separator: ", "))") }
     }
 
     private func hostExited(_ status: Int32) {

@@ -46,6 +46,7 @@ struct ExtensionAction: Decodable, Equatable, Hashable, Sendable {
     let id: String
     let name: String
     let hotkey: String?
+    let hidden: Bool
     let `extension`: String
 
     var hotkeyLabel: String? { hotkey.flatMap { try? KeyChord(parsing: $0).label } }
@@ -172,6 +173,11 @@ enum HostAction: Equatable, Sendable {
     case notify(String)
     case startActivity(ExtensionActivity)
     case endActivity(String)
+    case actions([ExtensionAction])
+}
+
+struct ActionsParams: Decodable {
+    let actions: [ExtensionAction]
 }
 
 struct ExtensionActivity: Decodable, Equatable, Sendable {

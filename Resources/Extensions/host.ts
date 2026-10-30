@@ -11,6 +11,7 @@ import { basename, extname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import type {
   Action,
+  ActionHandle,
   Activity,
   AfterInsertEvent,
   AudioDropEvent,
@@ -163,6 +164,7 @@ const activities = new Map<string, Activity>();
 let lastActivity = 0;
 const calls = new Map<number, PendingCall>();
 let lastCall = 0;
+let isReady = false;
 const settingsSchemas = new Map<string, SettingsSchema>();
 const loaded: string[] = [];
 const bus = new EventEmitter();
@@ -277,7 +279,29 @@ function register<T extends Component>(
   if (!component.id || !component.name)
     throw new Error(`A ${kind} needs an id and a name`);
   const id = `${extension}/${component.id}`;
-  setRegistered(registry, id, { ...component, id }, registration);
+  const registered = { ...component, id };
+  setRegistered(registry, id, registered, registration);
+  return registered;
+}
+
+function registerAction(extension: string, action: Action, registration: Registration): ActionHandle {
+  const registered = register(actions, "action", extension, { ...action, extension }, registration);
+  return {
+    update({ hidden }) {
+      registered.hidden = hidden;
+      if (isReady) send({ method: "actions", params: { actions: wireActions() } });
+    },
+  };
+}
+
+function wireActions() {
+  return [...actions.values()].map(({ id, name, hotkey, hidden, extension }) => ({
+    id,
+    name,
+    hotkey,
+    hidden: hidden === true,
+    extension,
+  }));
 }
 
 function setRegistered<Key, Value>(registry: Map<Key, Value>, key: Key, value: Value, registration: Registration) {
@@ -408,7 +432,7 @@ function api(name: string, config: Config, registration: Registration): Extensio
       register(cleanupModels, "cleanup model", name, model, registration),
     registerCleanupStep: (step) =>
       register(cleanupSteps, "cleanup step", name, step, registration),
-    registerAction: (action) => register(actions, "action", name, { ...action, extension: name }, registration),
+    registerAction: (action) => registerAction(name, action, registration),
     startActivity(activity) {
       if (!activity.title) throw new Error("An activity needs a title");
       const id = `${name}/${++lastActivity}`;
@@ -663,7 +687,7 @@ send({
     speechModels: components(speechModels),
     cleanupModels: components(cleanupModels),
     cleanupSteps: components(cleanupSteps),
-    actions: [...actions.values()].map(({ id, name, hotkey, extension }) => ({ id, name, hotkey, extension })),
+    actions: wireActions(),
     settings: [...settingsSchemas].map(([extension, schema]) => ({
       extension,
       fields: Object.entries(schema).map(([key, setting]) => ({ key, ...setting })),
@@ -671,6 +695,7 @@ send({
     errors,
   },
 });
+isReady = true;
 
 for await (const line of createInterface({ input: process.stdin })) {
   if (!line.trim()) continue;

@@ -95,7 +95,12 @@ export type Action = {
   id: string;
   name: string;
   hotkey?: string;
+  hidden?: boolean;
   run(ctx: Context): Awaitable<void>;
+};
+
+export type ActionHandle = {
+  update(changes: { hidden?: boolean }): void;
 };
 
 export type Activity = {
@@ -154,7 +159,7 @@ export type ExtensionAPI = {
   registerSpeechModel(model: SpeechModel): void;
   registerCleanupModel(model: CleanupModel): void;
   registerCleanupStep(step: CleanupStep): void;
-  registerAction(action: Action): void;
+  registerAction(action: Action): ActionHandle;
   startActivity(activity: Activity): RunningActivity;
   settings<Schema extends SettingsSchema>(schema: Schema): SettingsValues<Schema>;
 };

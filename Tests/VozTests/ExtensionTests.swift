@@ -276,6 +276,23 @@ struct ExtensionHostTests {
         await host.stop()
     }
 
+    @Test func hiddenActionsLeaveThePanelAndUpdatesReachVoz() async throws {
+        try extensionFile("setup.ts", #"export default (voz) => { const done = voz.registerAction({ id: "done", name: "Done", hidden: true, run() {} }); const connect = voz.registerAction({ id: "connect", name: "Connect", hotkey: "ctrl+opt+t", run() { connect.update({ hidden: true }); done.update({ hidden: false }) } }) }"#)
+        let actions = RecordedActions()
+        let host = makeHost(actions: actions)
+        let manifest = try await host.start()
+        #expect(manifest.actions == [
+            ExtensionAction(id: "setup/done", name: "Done", hotkey: nil, hidden: true, extension: "setup"),
+            ExtensionAction(id: "setup/connect", name: "Connect", hotkey: "ctrl+opt+t", hidden: false, extension: "setup"),
+        ])
+        #expect(await host.runAction("setup/connect", app: app, timeout: .seconds(2)))
+        #expect(actions.all.last == .actions([
+            ExtensionAction(id: "setup/done", name: "Done", hotkey: nil, hidden: false, extension: "setup"),
+            ExtensionAction(id: "setup/connect", name: "Connect", hotkey: "ctrl+opt+t", hidden: true, extension: "setup"),
+        ]))
+        await host.stop()
+    }
+
     @Test func newExtensionTemplateLoadsAndRuns() async throws {
         let folder = try ExtensionTemplate.create(named: "voz-hello", in: home.root, from: extensionResources)
         let apiVersion = try ExtensionTemplate.apiVersion(in: extensionResources)

@@ -258,7 +258,7 @@ private struct HomePage: View {
     private var footer: some View {
         HStack(spacing: 2) {
             HStack(spacing: 6) {
-                ForEach(catalog.actions, id: \.id) { action in
+                ForEach(catalog.actions.filter { !$0.hidden }, id: \.id) { action in
                     Button(action.name) { catalog.run(action) }
                         .buttonStyle(.pill(.accent, .small))
                         .fixedSize()
