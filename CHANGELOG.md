@@ -4,6 +4,7 @@ Newest first. To get beta changes now, turn on Beta updates in Settings.
 
 ## In beta
 
+- Claude Code now reads the Voz extension guide when you build an extension in ~/.voz
 - Copy a debug log from Settings to report problems or debug an extension
 - Extensions can show a recording in the menu bar and let you stop it from the Voz panel
 - Extension actions can now record or transcribe for as long as they need
