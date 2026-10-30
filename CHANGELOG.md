@@ -4,6 +4,10 @@ Newest first. To get beta changes now, turn on Beta updates in Settings.
 
 ## In beta
 
+- Extensions can show a recording in the menu bar and let you stop it from the Voz panel
+- Extension actions can now record or transcribe for as long as they need
+- Extensions can add entries, such as meeting transcripts, to your Voz history
+- Transcripts from extensions use your dictionary and show progress in the notch
 - On screens without a notch, the recording pill now sits above the Dock
 - See what's new in each release from Settings
 - Drop an audio or video file on the indicator to transcribe it with an extension

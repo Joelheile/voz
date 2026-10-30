@@ -3,6 +3,17 @@
   <channel>
     <title>voz</title>
     <item>
+      <title>voz 0.0.5-beta.100031</title>
+      <description>&lt;ul&gt;&lt;li&gt;Extensions can show a recording in the menu bar and let you stop it from the Voz panel&lt;/li&gt;&lt;li&gt;Extension actions can now record or transcribe for as long as they need&lt;/li&gt;&lt;li&gt;Extensions can add entries, such as meeting transcripts, to your Voz history&lt;/li&gt;&lt;li&gt;Transcripts from extensions use your dictionary and show progress in the notch&lt;/li&gt;&lt;/ul&gt;</description>
+      <link>https://github.com/Joelheile/voz/releases/tag/beta-100031</link>
+      <pubDate>Fri, 30 Oct 2026 08:59:22 GMT</pubDate>
+      <sparkle:version>100031</sparkle:version>
+      <sparkle:shortVersionString>0.0.5-beta.100031</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100031/voz-0.0.5-beta.100031.zip" length="8430367" sparkle:edSignature="NwqK3g7vuICtwmiIIgEo834+gu8ScVGMMmLz29ZzISob/bk3oe1hJE20f4f+8UrWBZfAAOlIWUFq1s+GRzy8BA==" type="application/octet-stream" />
+    </item>
+    <item>
       <title>voz 0.0.5-beta.100030</title>
       <description>&lt;ul&gt;&lt;li&gt;On screens without a notch, the recording pill now sits above the Dock&lt;/li&gt;&lt;/ul&gt;</description>
       <link>https://github.com/Joelheile/voz/releases/tag/beta-100030</link>
@@ -100,17 +111,6 @@
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <sparkle:channel>beta</sparkle:channel>
       <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100022/voz-0.0.5-beta.100022.zip" length="8321346" sparkle:edSignature="eY1upZSjx/E8d6sbuHkd9WDqFCzYdgsN3tM4LJf7IcMWqg6xgkyWrbSfn6M7599fpW7ctx865KofmSR+GUxMCA==" type="application/octet-stream" />
-    </item>
-    <item>
-      <title>voz 0.0.5-beta.100021</title>
-      <description>&lt;ul&gt;&lt;li&gt;Extensions get a clear error when ctx.generate lists a required field that does not exist&lt;/li&gt;&lt;/ul&gt;</description>
-      <link>https://github.com/Joelheile/voz/releases/tag/beta-100021</link>
-      <pubDate>Tue, 27 Oct 2026 23:53:10 GMT</pubDate>
-      <sparkle:version>100021</sparkle:version>
-      <sparkle:shortVersionString>0.0.5-beta.100021</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <sparkle:channel>beta</sparkle:channel>
-      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100021/voz-0.0.5-beta.100021.zip" length="8306517" sparkle:edSignature="059xn5iZU2KdoPeXw+oPxgfOE72/kxZkC1SM9v5pRlpNfKi4n8FAO3G3a5pkuLjA6QrHTIKYRRbhJkfsN3hYDA==" type="application/octet-stream" />
     </item>
     <item>
       <title>voz 0.0.5</title>

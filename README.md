@@ -110,11 +110,11 @@ If you build something with Voz, star the repo. Stars are how other developers f
 ## What's new
 
 <!-- changelog -->
+- Extensions can show a recording in the menu bar and let you stop it from the Voz panel
+- Extension actions can now record or transcribe for as long as they need
+- Extensions can add entries, such as meeting transcripts, to your Voz history
+- Transcripts from extensions use your dictionary and show progress in the notch
 - On screens without a notch, the recording pill now sits above the Dock
-- See what's new in each release from Settings
-- Drop an audio or video file on the indicator to transcribe it with an extension
-- Track your dictation streak, speaking pace and time saved in Insights
-- Fix words Voz keeps mishearing with dictionary rules, like voss → Voz
 
 [See everything new](CHANGELOG.md)
 <!-- /changelog -->
