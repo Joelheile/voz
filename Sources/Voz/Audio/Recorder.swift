@@ -121,18 +121,33 @@ final class Recorder {
 
     func start() throws {
         if let stale = capture, !isCurrent(stale) { discard() }
-        let capture = try capture ?? makeCapture()
+        let prepared = capture
+        capture = nil
         level.store(0)
         buffer.begin(onSamples: onSamples)
         do {
-            try capture.engine.start()
+            capture = try Self.startCapture(prepared: prepared, fresh: makeCapture, start: Self.startEngine)
         } catch {
             _ = buffer.end()
-            discard()
             throw error
         }
-        self.capture = capture
         isRecording = true
+    }
+
+    /// A prepared engine can refuse to start after sleep or a device switch without posting a configuration change.
+    static func startCapture<C>(prepared: C?, fresh: () throws -> C, start: (C) throws -> Void) throws -> C {
+        if let prepared {
+            do {
+                try start(prepared)
+                return prepared
+            } catch {
+                let code = (error as NSError).code
+                Log.app.notice("Prepared engine refused to start (\(code, privacy: .public)), using a fresh one")
+            }
+        }
+        let capture = try fresh()
+        try start(capture)
+        return capture
     }
 
     func stop() -> [Float] {
@@ -156,9 +171,22 @@ final class Recorder {
     }
 
     private func discard() {
-        capture?.engine.inputNode.removeTap(onBus: 0)
-        capture?.engine.stop()
+        if let capture { Self.tearDown(capture) }
         capture = nil
+    }
+
+    private static func startEngine(_ capture: Capture) throws {
+        do {
+            try capture.engine.start()
+        } catch {
+            tearDown(capture)
+            throw error
+        }
+    }
+
+    private static func tearDown(_ capture: Capture) {
+        capture.engine.inputNode.removeTap(onBus: 0)
+        capture.engine.stop()
     }
 
     private func makeCapture() throws -> Capture {
