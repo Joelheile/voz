@@ -41,7 +41,7 @@ struct PopoverView: View {
         } else {
             switch model.page {
             case .home:
-                HomePage(model: model, history: sources.history, catalog: sources.catalog, extensions: sources.extensions)
+                HomePage(model: model, history: sources.history, settings: sources.settings, catalog: sources.catalog, extensions: sources.extensions)
             case .settings:
                 SettingsPage(model: model, settings: sources.settings, status: sources.modelStatus, catalog: sources.catalog)
             case .dictionary:
@@ -73,10 +73,14 @@ private struct HomePage: View {
 
     @ObservedObject var model: PopoverModel
     @ObservedObject var history: HistoryModel
+    @ObservedObject var settings: AppSettings
     @ObservedObject var catalog: ExtensionCatalog
     @ObservedObject var extensions: ExtensionsModel
     @FocusState private var searchFocused: Bool
     @State private var selectedID: UUID?
+    @State private var totalWords = 0
+
+    private var showsStar: Bool { !settings.starPromptDismissed && totalWords >= StarButton.milestoneWords }
 
     private var records: [TranscriptRecord] { history.records }
     private var isSearching: Bool { !history.query.isEmpty }
@@ -99,7 +103,10 @@ private struct HomePage: View {
                 footer
             }
         }
-        .onAppear { searchFocused = showsSearch }
+        .onAppear {
+            searchFocused = showsSearch
+            totalWords = history.totalWords()
+        }
         .onChange(of: history.query) { selectedID = nil }
     }
 
@@ -266,6 +273,9 @@ private struct HomePage: View {
                         .buttonStyle(.pill(.accent, .small))
                         .fixedSize()
                         .help(action.hotkeyLabel ?? action.name)
+                }
+                if showsStar {
+                    StarButton(title: "Star on GitHub") { settings.starPromptDismissed = true }
                 }
             }
             Spacer(minLength: 8)

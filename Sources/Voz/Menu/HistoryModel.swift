@@ -26,6 +26,15 @@ final class HistoryModel: ObservableObject {
             )
     }
 
+    func totalWords() -> Int {
+        do {
+            return try store.totalWords()
+        } catch {
+            Log.app.error("History word count failed: \(error.localizedDescription, privacy: .private)")
+            return 0
+        }
+    }
+
     func delete(_ record: TranscriptRecord) {
         do {
             try store.delete(id: record.id)

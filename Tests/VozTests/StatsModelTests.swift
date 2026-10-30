@@ -34,3 +34,12 @@ import Testing
         try await waitForStats(model) { $0[.day].words == 0 && $0[.all].words == 2 }
     }
 }
+
+@Suite struct PaceVerdictTests {
+    @Test func comparesPaceWithHowPeopleTalk() {
+        #expect(PeriodStats.paceVerdict(100) == "Calmer than most people talk")
+        #expect(PeriodStats.paceVerdict(150) == "About as fast as most people talk")
+        #expect(PeriodStats.paceVerdict(180) == "Faster than most people talk")
+        #expect(PeriodStats.paceVerdict(PeriodStats.fastSpeakingWordsPerMinute) == "One of the fastest talkers")
+    }
+}
