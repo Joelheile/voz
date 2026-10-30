@@ -108,11 +108,11 @@ Install one from the menu bar, or run `voz install voz-meeting`. [Browse extensi
 ## What's new
 
 <!-- changelog -->
+- Choose which microphone Voz records from in Settings
 - Drop audio files on the notch again, with a glow showing where they go
 - Pick Light cleanup to keep every word when you think out loud
 - Voz sends one anonymous ping on days you dictate, never what you said
 - Transcribe dropped files about four times faster, and hover the progress ring to cancel
-- Your last word no longer gets cut off when you release the hotkey early
 
 [See everything new](CHANGELOG.md)
 <!-- /changelog -->

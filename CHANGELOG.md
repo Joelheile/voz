@@ -4,6 +4,7 @@ Newest first. To get beta changes now, turn on Beta updates under What's new in 
 
 ## In beta
 
+- Choose which microphone Voz records from in Settings
 - Drop audio files on the notch again, with a glow showing where they go
 - Pick Light cleanup to keep every word when you think out loud
 - Voz sends one anonymous ping on days you dictate, never what you said
