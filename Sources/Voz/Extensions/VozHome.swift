@@ -242,31 +242,42 @@ struct VozHome: Sendable {
 enum ExtensionTemplateError: Error, Equatable, CustomStringConvertible {
     case invalidName(String)
     case exists(String)
+    case missingApiVersion
 
     var description: String {
         switch self {
         case .invalidName(let name): "\(name) is not a valid npm package name. Use lowercase letters, digits and dashes, such as voz-jira."
         case .exists(let path): "\(path) already exists."
+        case .missingApiVersion: "voz.d.ts does not declare apiVersion."
         }
     }
 }
 
 enum ExtensionTemplate {
-    private static let placeholder = "{{name}}"
     private static var validName: Regex<(Substring, Substring?)> { /^(@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/ }
 
     static func create(named name: String, in parent: URL, from resources: URL) throws -> URL {
         guard name.wholeMatch(of: validName) != nil else { throw ExtensionTemplateError.invalidName(name) }
+        let apiVersion = try apiVersion(in: resources)
         let folder = parent.appendingPathComponent(String(name.split(separator: "/").last!), isDirectory: true)
         guard !FileManager.default.fileExists(atPath: folder.path) else { throw ExtensionTemplateError.exists(folder.path) }
         try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
         try FileManager.default.copyItem(at: resources.appendingPathComponent("template", isDirectory: true), to: folder)
         for file in try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) {
             let text = try String(contentsOf: file, encoding: .utf8)
-            try text.replacingOccurrences(of: placeholder, with: name).write(to: file, atomically: true, encoding: .utf8)
+            try text
+                .replacingOccurrences(of: "{{name}}", with: name)
+                .replacingOccurrences(of: "{{apiVersion}}", with: apiVersion)
+                .write(to: file, atomically: true, encoding: .utf8)
         }
         try VozHome.writeTypes(into: folder, from: resources)
         return folder
+    }
+
+    static func apiVersion(in resources: URL) throws -> String {
+        let types = try String(contentsOf: resources.appendingPathComponent("voz.d.ts"), encoding: .utf8)
+        guard let match = types.firstMatch(of: /export const apiVersion: (\d+);/) else { throw ExtensionTemplateError.missingApiVersion }
+        return String(match.1)
     }
 
     static func mapsTypes(in folder: URL) -> Bool {

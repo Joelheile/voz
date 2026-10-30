@@ -126,7 +126,7 @@ enum SettingValue: Codable, Equatable, Sendable {
 enum HostHook: String, Sendable {
     case beforeInsert
     case beforeCleanup
-    case recording
+    case afterRecording
     case afterInsert
     case audioDrop
 }
@@ -137,13 +137,13 @@ struct LoadError: Decodable, Equatable, Sendable {
 }
 
 enum HostEvent: Encodable, Sendable {
-    case recording(path: String, seconds: Double)
+    case afterRecording(path: String, seconds: Double)
     case afterInsert(text: String, raw: String)
     case audioDrop(path: String)
 
     var hook: HostHook {
         switch self {
-        case .recording: .recording
+        case .afterRecording: .afterRecording
         case .afterInsert: .afterInsert
         case .audioDrop: .audioDrop
         }
@@ -154,7 +154,7 @@ enum HostEvent: Encodable, Sendable {
     func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: Keys.self)
         switch self {
-        case .recording(let path, let seconds):
+        case .afterRecording(let path, let seconds):
             try container.encode(path, forKey: .path)
             try container.encode(seconds, forKey: .seconds)
         case .afterInsert(let text, let raw):

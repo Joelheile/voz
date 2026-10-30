@@ -21,8 +21,8 @@ import type {
   BeforeInsertResult,
   CleanupModel,
   CleanupStep,
+  Command,
   CommandEvent,
-  CommandOptions,
   Context,
   GenerateRequest,
   Generated,
@@ -44,12 +44,12 @@ type Launch = {
   extensionsDirectory: string;
   packages: string[];
 };
-type EventName = "beforeCleanup" | "beforeInsert" | "recording" | "afterInsert" | "audioDrop";
+type EventName = "beforeCleanup" | "beforeInsert" | "afterRecording" | "afterInsert" | "audioDrop";
 type HandlerResult = BeforeInsertResult | BeforeCleanupResult;
 type HookPayload = {
   beforeCleanup: BeforeCleanupEvent;
   beforeInsert: BeforeInsertEvent;
-  recording: RecordingEvent;
+  afterRecording: RecordingEvent;
   afterInsert: AfterInsertEvent;
   audioDrop: AudioDropEvent;
 };
@@ -57,8 +57,8 @@ type Handler = {
   extension: string;
   run: (event: object, ctx: Context) => HandlerResult | Promise<HandlerResult>;
 };
-type CommandPosition = NonNullable<CommandOptions["at"]>;
-type Command = {
+type CommandPosition = NonNullable<Command["at"]>;
+type RegisteredCommand = {
   extension: string;
   phrase: string;
   at: CommandPosition;
@@ -92,6 +92,10 @@ type SettingsFile = {
   disabled?: string[];
   config?: Record<string, Config>;
 };
+type VersionChange = {
+  version: number;
+  restore: (api: ExtensionAPI, config: Config, registration: Registration) => ExtensionAPI;
+};
 type PackageManifest = {
   name?: string;
   voz?: { apiVersion?: number; extensions?: string[] };
@@ -119,7 +123,7 @@ class Registration {
   }
 }
 
-const apiVersion = 3;
+const apiVersion = 4;
 const loadTimeout = 3000;
 const write = process.stdout.write.bind(process.stdout);
 const send = (message: object) => write(JSON.stringify(message) + "\n");
@@ -143,12 +147,12 @@ const launch: Launch = JSON.parse(process.argv[2]);
 const eventNames: EventName[] = [
   "beforeCleanup",
   "beforeInsert",
-  "recording",
+  "afterRecording",
   "afterInsert",
   "audioDrop",
 ];
 const handlers = new Map<EventName, Handler[]>();
-const commands = new Map<string, Command>();
+const commands = new Map<string, RegisteredCommand>();
 const speechModels = new Map<string, SpeechModel>();
 const cleanupModels = new Map<string, CleanupModel>();
 const cleanupSteps = new Map<string, CleanupStep>();
@@ -174,7 +178,7 @@ function context(app: App): Context {
   const scope = requestScope.getStore();
   const isLive = () => scope?.active === true && Date.now() < scope.deadline;
   const action = (method: string, params: { text: string } | { key: string }) => {
-    if (!isLive()) return;
+    if (!isLive()) return log(`Dropped ctx.${method}: it ran after its handler finished or ran out of time`);
     send({ method, params, requestID: scope!.id });
   };
   return {
@@ -382,14 +386,17 @@ function api(name: string, config: Config, registration: Registration): Extensio
       });
       handlers.set(event, [...(handlers.get(event) ?? []), registered]);
     },
-    registerCommand(phrase, handler, options) {
-      const at = options?.at ?? "end";
+    registerCommand(command) {
+      if (typeof command?.phrase !== "string" || typeof command.run !== "function")
+        throw new Error("registerCommand needs { phrase, run }");
+      const { phrase, run } = command;
+      const at = command.at ?? "end";
       if (at !== "start" && at !== "end") throw new Error(`Command "${phrase}" needs at: "start" or "end"`);
       const key = commandKey(phrase, at);
       const existing = commands.get(key);
       if (existing)
         log(`${name} replaces command "${phrase}" from ${existing.extension}`);
-      setRegistered(commands, key, { extension: name, phrase, at, run: handler }, registration);
+      setRegistered(commands, key, { extension: name, phrase, at, run }, registration);
     },
     registerSpeechModel: (model) =>
       register(speechModels, "speech model", name, model, registration),
@@ -441,11 +448,31 @@ async function loadEntry(entry: Entry, config: Config = {}, registration: Regist
   const module = await import(entry.path);
   if (typeof module.default !== "function")
     throw new Error("default export is not a function");
-  const current = api(entry.name, config, registration);
-  await module.default((entry.requires ?? 1) < 2 ? withApi1Removals(current, config, registration) : current);
+  const writtenFor = entry.requires ?? 1;
+  const surface = versionChanges
+    .filter((change) => writtenFor < change.version)
+    .reduce((surface, change) => change.restore(surface, config, registration), api(entry.name, config, registration));
+  await module.default(surface);
 }
 
-function withApi1Removals(current: ExtensionAPI, config: Config, registration: Registration) {
+const versionChanges: VersionChange[] = [
+  { version: 4, restore: withApi3Forms },
+  { version: 2, restore: withApi1Removals },
+];
+
+function withApi3Forms(current: ExtensionAPI): ExtensionAPI {
+  return {
+    ...current,
+    on(event: EventName | "recording", handler: Handler["run"]) {
+      current.on((event === "recording" ? "afterRecording" : event) as never, handler as never);
+    },
+    registerCommand(command: Command | string, run?: Command["run"], options?: Pick<Command, "at">) {
+      current.registerCommand(typeof command === "string" ? { phrase: command, run: run!, at: options?.at } : command);
+    },
+  } as ExtensionAPI;
+}
+
+function withApi1Removals(current: ExtensionAPI, config: Config, registration: Registration): ExtensionAPI {
   return {
     ...current,
     config,
@@ -465,7 +492,7 @@ function withApi1Removals(current: ExtensionAPI, config: Config, registration: R
       };
       current.on(event as never, (event === "beforeInsert" ? handled : handler) as never);
     },
-  };
+  } as ExtensionAPI;
 }
 
 function withinLoadTimeout(work: Promise<void>): Promise<void> {

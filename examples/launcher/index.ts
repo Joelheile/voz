@@ -5,23 +5,18 @@ export default defineExtension((voz) => {
     trigger: { type: "string", title: "Trigger word", description: "Start a dictation with it to run it", default: "computer" },
     searchURL: { type: "string", title: "Search URL", default: "https://www.google.com/search?q=" },
   });
-  const pattern = new RegExp(`^${trigger.toLowerCase()},?\\s+(open|search for)\\s+(.+?)[.!?]*$`, "i");
+  const pattern = /^(open|search for)\s+(.+?)[.!?]*$/i;
 
-  const spawn = (command: string[], ctx: { notify(text: string): void }, failure: string) =>
-    Bun.spawn(command).exited.then((code) => code !== 0 && ctx.notify(failure));
-
-  voz.on("beforeInsert", (event, ctx) => {
-    const match = event.text.trim().match(pattern);
-    if (!match) return;
-    const [, verb, target] = match;
-    switch (verb.toLowerCase()) {
-      case "open":
-        spawn(["open", "-a", target], ctx, `No app named ${target}`);
-        break;
-      case "search for":
-        spawn(["open", searchURL + encodeURIComponent(target)], ctx, "Search failed");
-        break;
-    }
-    return { text: "" };
+  voz.registerCommand({
+    phrase: trigger,
+    at: "start",
+    async run(event, ctx) {
+      const match = event.text.match(pattern);
+      if (!match) return ctx.notify(`Say "${trigger}, open" or "${trigger}, search for"`);
+      const [, verb, target] = match;
+      const isOpen = verb.toLowerCase() === "open";
+      const code = await Bun.spawn(isOpen ? ["open", "-a", target] : ["open", searchURL + encodeURIComponent(target)]).exited;
+      if (code !== 0) ctx.notify(isOpen ? `No app named ${target}` : "Search failed");
+    },
   });
 });

@@ -82,7 +82,7 @@ Instead of a setting for each wish, Voz has extensions: small TypeScript files i
 import { defineExtension } from "voz";
 
 export default defineExtension((voz) => {
-  voz.registerCommand("send it", (event, ctx) => ctx.press("return"));
+  voz.registerCommand({ phrase: "send it", run: (event, ctx) => ctx.press("return") });
 });
 ```
 

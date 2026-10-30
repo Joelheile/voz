@@ -218,7 +218,7 @@ final class ExtensionService {
     }
 
     func recorded(_ samples: [Float], app: HostApp) {
-        guard let host, manifest?.subscribes(to: .recording) == true else { return }
+        guard let host, manifest?.subscribes(to: .afterRecording) == true else { return }
         let file = Self.audioDirectory.appendingPathComponent("recording-\(UUID().uuidString).wav")
         let seconds = Double(samples.count) / RecordingFilter.sampleRate
         Task.detached {
@@ -229,7 +229,7 @@ final class ExtensionService {
                 Log.extensions.error("Recording file write failed: \(error.localizedDescription, privacy: .public)")
                 return
             }
-            await host.emit(.recording(path: file.path, seconds: seconds), app: app, timeout: Self.eventTimeout)
+            await host.emit(.afterRecording(path: file.path, seconds: seconds), app: app, timeout: Self.eventTimeout)
         }
     }
 
