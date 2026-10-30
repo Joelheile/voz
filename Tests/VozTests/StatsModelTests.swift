@@ -35,15 +35,6 @@ import Testing
     }
 }
 
-@Suite struct PaceVerdictTests {
-    @Test func comparesPaceWithHowPeopleTalk() {
-        #expect(PeriodStats.paceVerdict(100) == "Calmer than most people talk")
-        #expect(PeriodStats.paceVerdict(150) == "About as fast as most people talk")
-        #expect(PeriodStats.paceVerdict(180) == "Faster than most people talk")
-        #expect(PeriodStats.paceVerdict(PeriodStats.fastSpeakingWordsPerMinute) == "One of the fastest talkers")
-    }
-}
-
 @Suite struct MilestoneTests {
     private func usage(words: Int, streak: Int = 0) -> UsageStats {
         var stats = UsageStats()

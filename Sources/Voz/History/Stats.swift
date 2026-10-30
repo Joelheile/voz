@@ -23,17 +23,6 @@ struct AppUsage: Hashable, Sendable, Identifiable {
 
 struct PeriodStats: Equatable, Sendable {
     static let typingWordsPerMinute = 40.0
-    static let averageSpeakingWordsPerMinute = 150.0
-    static let fastSpeakingWordsPerMinute = 190.0
-
-    static func paceVerdict(_ wordsPerMinute: Double) -> String {
-        switch wordsPerMinute {
-        case ..<120: "Calmer than most people talk"
-        case ..<170: "About as fast as most people talk"
-        case ..<fastSpeakingWordsPerMinute: "Faster than most people talk"
-        default: "One of the fastest talkers"
-        }
-    }
 
     var words = 0
     var speakingSeconds = 0.0
