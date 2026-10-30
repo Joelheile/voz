@@ -27,7 +27,7 @@ struct SettingsPage: View {
                 Button("What's new") { model.page = .whatsNew }
                     .buttonStyle(.pill(.quiet, .small))
             }
-            CappedScrollView(maxHeight: 520) {
+            CappedScrollView(maxHeight: 640) {
                 VStack(alignment: .leading, spacing: 16) {
                     if !allGranted { permissions }
                     dictation
@@ -116,6 +116,7 @@ struct SettingsPage: View {
         PanelGroup(title: "App") {
             toggle("Launch at login", isOn: $settings.launchAtLogin)
             LinkRow(title: "Privacy and debug log", value: "") { model.page = .privacy }
+            ActionRow(title: "Quit Voz", value: "", action: model.actions.quit)
         }
     }
 

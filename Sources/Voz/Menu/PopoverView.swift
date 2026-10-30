@@ -279,7 +279,6 @@ private struct HomePage: View {
                 }
             IconButton(icon: .settings, help: "Settings") { model.page = .settings }
                 .keyboardShortcut(",", modifiers: .command)
-            IconButton(icon: .power, help: "Quit Voz", action: model.actions.quit)
         }
         .padding(.trailing, -8)
     }
