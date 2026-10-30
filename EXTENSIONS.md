@@ -93,7 +93,7 @@ voz new voz-hello
 voz dev voz-hello
 ```
 
-`voz new` creates a package in `./voz-hello` with `index.ts`, `package.json`, a README and the Voz types in `voz.d.ts`. `voz dev` loads it, reloads it when you save and prints its logs, including `console.log`. Say "say hello" at the end of a dictation to run its command. Press Ctrl-C to unload it.
+`voz new` creates a package in `./voz-hello` with `index.ts`, `package.json`, a README and the Voz types in `voz.d.ts`. `voz dev` loads it, reloads it when you save and prints its logs, including `console.log`. Voz also writes them to `~/Library/Logs/Voz/voz-logs.jsonl`, which you copy under Settings, Debug log. Say "say hello" at the end of a dictation to run its command. Press Ctrl-C to unload it.
 
 The template adds a setting and a command:
 

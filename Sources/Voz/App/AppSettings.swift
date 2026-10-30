@@ -17,6 +17,7 @@ private enum SettingsKey {
     static let errorReportsEnabled = "errorReportsEnabled"
     static let cleanupPrompt = "cleanupPrompt"
     static let starPromptDismissed = "starPromptDismissed"
+    static let logIncludesText = "logIncludesText"
 }
 
 @MainActor
@@ -75,6 +76,9 @@ final class AppSettings: ObservableObject {
     @Published var errorReportsEnabled: Bool {
         didSet { defaults.set(errorReportsEnabled, forKey: SettingsKey.errorReportsEnabled) }
     }
+    @Published var logIncludesText: Bool {
+        didSet { defaults.set(logIncludesText, forKey: SettingsKey.logIncludesText) }
+    }
     @Published var cleanupPrompt: String {
         didSet {
             if cleanupPrompt == CleanupPrompt.standard {
@@ -128,6 +132,7 @@ final class AppSettings: ObservableObject {
         analyticsEnabled = defaults.bool(forKey: SettingsKey.analyticsEnabled)
         receiveBetaUpdates = defaults.bool(forKey: SettingsKey.receiveBetaUpdates)
         errorReportsEnabled = defaults.bool(forKey: SettingsKey.errorReportsEnabled)
+        logIncludesText = defaults.bool(forKey: SettingsKey.logIncludesText)
         cleanupPrompt = defaults.string(forKey: SettingsKey.cleanupPrompt) ?? CleanupPrompt.standard
         let choices = PipelineChoices.standard
         speechModel = choices.speechModel

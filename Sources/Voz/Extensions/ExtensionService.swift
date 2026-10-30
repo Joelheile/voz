@@ -306,7 +306,10 @@ final class ExtensionService {
                     await self.perform(action)
                 }
             },
-            onLog: { message in Log.extensions.notice("\(message, privacy: .public)") },
+            onLog: { message in
+                Log.extensions.notice("\(message, privacy: .public)")
+                DebugLog.shared.write("extension", ["message": message])
+            },
             onExit: { [weak self] status in
                 Task { @MainActor in
                     guard let self, self.generation == generation else { return }
@@ -359,8 +362,20 @@ final class ExtensionService {
     }
 
     private func transcribe(_ params: TranscribeFileParams) async throws -> FileTranscript {
-        let transcribe = { [fileTranscriber, model = settings.localSpeechModel] in
-            try await fileTranscriber.transcribe(URL(fileURLWithPath: params.path), model: model, speakers: params.speakers)
+        let transcribe = { [fileTranscriber, model = settings.localSpeechModel, includesText = settings.logIncludesText] in
+            let started = ContinuousClock.now
+            var fields: [String: Any] = ["model": model.rawValue, "speakers_requested": params.speakers]
+            do {
+                let transcript = try await fileTranscriber.transcribe(URL(fileURLWithPath: params.path), model: model, speakers: params.speakers)
+                fields.merge(["outcome": "transcribed", "audio_s": transcript.seconds, "speakers": transcript.speakers, "ms": (ContinuousClock.now - started).wholeMilliseconds]) { $1 }
+                if includesText { fields["text"] = transcript.text }
+                DebugLog.shared.write("file", fields)
+                return transcript
+            } catch {
+                fields.merge(["outcome": "failed", "error": error.localizedDescription, "ms": (ContinuousClock.now - started).wholeMilliseconds]) { $1 }
+                DebugLog.shared.write("file", fields)
+                throw error
+            }
         }
         guard runningDrops == 0 else { return try await transcribe() }
         onFileTranscribing()
