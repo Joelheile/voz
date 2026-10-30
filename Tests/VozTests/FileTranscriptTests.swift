@@ -1,3 +1,4 @@
+import Synchronization
 import Testing
 @testable import Voz
 
@@ -75,5 +76,17 @@ struct MediaFileTests {
         try writeFile("export const voz = 1\n", named: "voz.mts", in: directory)
         #expect(MediaFile.isSupported(directory.appendingPathComponent("clip.mts")))
         #expect(!MediaFile.isSupported(directory.appendingPathComponent("voz.mts")))
+    }
+}
+
+struct ProgressMeterTests {
+    @Test func reportsTheMeanOfPartsAndNeverGoesBack() {
+        let reported = Mutex<[Double]>([])
+        let meter = ProgressMeter(parts: 2) { fraction in reported.withLock { $0.append(fraction) } }
+        meter.update(part: 0, to: 0.5)
+        meter.update(part: 1, to: 1)
+        meter.update(part: 0, to: 0.25)
+        meter.update(part: 0, to: 2)
+        #expect(reported.withLock { $0 } == [0.25, 0.75, 0.75, 1])
     }
 }

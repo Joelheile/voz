@@ -1,5 +1,6 @@
 import AVFoundation
 import FluidAudio
+import Synchronization
 import UniformTypeIdentifiers
 
 struct TimedWord: Equatable, Sendable {
@@ -77,6 +78,38 @@ enum MediaFile {
         return !type.conforms(to: .mpeg2TransportStream) || startsWithTransportStreamPacket(file)
     }
 
+    static func samples(of file: URL) async throws -> [Float] {
+        let asset = AVURLAsset(url: file)
+        guard let track = try await asset.loadTracks(withMediaType: .audio).first else {
+            throw FileTranscriberError.unsupported(file.lastPathComponent)
+        }
+        let reader = try AVAssetReader(asset: asset)
+        let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVSampleRateKey: RecordingFilter.sampleRate,
+            AVNumberOfChannelsKey: 1,
+            AVLinearPCMBitDepthKey: 32,
+            AVLinearPCMIsFloatKey: true,
+            AVLinearPCMIsNonInterleaved: false,
+            AVLinearPCMIsBigEndianKey: false,
+        ])
+        reader.add(output)
+        guard reader.startReading() else { throw reader.error ?? FileTranscriberError.unsupported(file.lastPathComponent) }
+        var samples: [Float] = []
+        while let buffer = output.copyNextSampleBuffer(), let block = CMSampleBufferGetDataBuffer(buffer) {
+            try Task.checkCancellation()
+            let bytes = CMBlockBufferGetDataLength(block)
+            let start = samples.count
+            samples += repeatElement(0, count: bytes / MemoryLayout<Float>.size)
+            let status = samples.withUnsafeMutableBytes { raw in
+                CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: bytes, destination: raw.baseAddress! + start * MemoryLayout<Float>.size)
+            }
+            guard status == kCMBlockBufferNoErr else { throw FileTranscriberError.unsupported(file.lastPathComponent) }
+        }
+        if reader.status == .failed { throw reader.error ?? FileTranscriberError.unsupported(file.lastPathComponent) }
+        return samples
+    }
+
     // MPEG-TS packets start with the sync byte; AVCHD packets put a 4-byte timestamp before it
     private static func startsWithTransportStreamPacket(_ file: URL) -> Bool {
         guard let handle = try? FileHandle(forReadingFrom: file) else { return false }
@@ -101,16 +134,25 @@ enum FileTranscriberError: Error, LocalizedError {
 struct FileTranscriber: Sendable {
     let transcriber: Transcriber
     let vocabulary: VocabularyStore?
+    let diarizer = SpeakerDiarizer()
 
-    func transcribe(_ url: URL, model: SpeechModel, speakers: Bool) async throws -> FileTranscript {
+    func transcribe(
+        _ url: URL,
+        model: SpeechModel,
+        speakers: Bool,
+        progress: @escaping @Sendable (Double) -> Void = { _ in }
+    ) async throws -> FileTranscript {
         guard MediaFile.isSupported(url) else { throw FileTranscriberError.unsupported(url.lastPathComponent) }
         guard model.modelVersion != nil else { throw FileTranscriberError.needsParakeet }
-        let result = try await transcriber.recognize(url, model: model)
+        let samples = try await MediaFile.samples(of: url)
+        let meter = ProgressMeter(parts: speakers ? 2 : 1, report: progress)
+        async let recognized = transcriber.recognize(samples, model: model) { meter.update(part: 0, to: $0) }
+        async let spans = speakers ? diarizer.spans(in: samples) { meter.update(part: 1, to: $0) } : []
+        let result = try await recognized
         let words = buildWordTimings(from: result.tokenTimings ?? []).map {
             TimedWord(text: $0.word, start: $0.startTime, end: $0.endTime)
         }
-        let spans = speakers ? try await Self.speakerSpans(in: url) : []
-        let turns = SpeakerTurns.make(words: words, spans: spans)
+        let turns = SpeakerTurns.make(words: words, spans: try await spans)
         return FileTranscript(
             text: result.text,
             seconds: result.duration,
@@ -118,16 +160,58 @@ struct FileTranscriber: Sendable {
             turns: turns
         ).applying((try? vocabulary?.rules()) ?? [], words: (try? vocabulary?.words()) ?? [])
     }
+}
 
-    private static let diarizerConfig = Nemotron3Config(
-        chunkLen: 128, chunkRightContext: 4, fifoLen: 40, spkcacheUpdatePeriod: 40,
-        modelFileName: "Nemotron3Diarizer_c128_split_w8a8.mlmodelc", splitGraph: true
-    )
+// Reports the mean of parts that run in parallel, so the total only moves forward
+final class ProgressMeter: Sendable {
+    private let fractions: Mutex<[Double]>
+    private let report: @Sendable (Double) -> Void
 
-    private static func speakerSpans(in url: URL) async throws -> [SpeakerSpan] {
-        let models = try await Nemotron3Models.loadFromHuggingFace(config: diarizerConfig)
-        let samples = try AudioConverter().resampleAudioFile(url)
-        let (probabilities, frames) = try Nemotron3Diarizer(config: diarizerConfig, models: models).processComplete(samples)
+    init(parts: Int, report: @escaping @Sendable (Double) -> Void) {
+        fractions = Mutex(Array(repeating: 0, count: parts))
+        self.report = report
+    }
+
+    func update(part: Int, to fraction: Double) {
+        let total = fractions.withLock { fractions in
+            fractions[part] = max(fractions[part], min(fraction, 1))
+            return fractions.reduce(0, +) / Double(fractions.count)
+        }
+        report(total)
+    }
+}
+
+actor SpeakerDiarizer {
+    private static let config = Nemotron3Config.offline
+    private static let blockSamples = 30 * Int(RecordingFilter.sampleRate)
+    private var models: Nemotron3Models?
+
+    // Runs on the GPU so it doesn't wait for the Neural Engine, which Parakeet uses at the same time
+    private func loadedModels() async throws -> Nemotron3Models {
+        if let models { return models }
+        let loaded = try await Nemotron3Models.loadFromHuggingFace(config: Self.config, computeUnits: .cpuAndGPU)
+        models = loaded
+        return loaded
+    }
+
+    func spans(in samples: [Float], progress: @Sendable (Double) -> Void) async throws -> [SpeakerSpan] {
+        let diarizer = Nemotron3Diarizer(config: Self.config, models: try await loadedModels())
+        var probabilities: [Float] = []
+        var frames = 0
+        let collect = { (results: [Nemotron3ChunkResult]) in
+            for result in results {
+                probabilities += result.probabilities
+                frames += result.frameCount
+            }
+        }
+        for start in stride(from: 0, to: samples.count, by: Self.blockSamples) {
+            try Task.checkCancellation()
+            let end = min(start + Self.blockSamples, samples.count)
+            diarizer.appendAudio(Array(samples[start..<end]))
+            collect(try diarizer.processBufferedAudio())
+            progress(Double(end) / Double(samples.count))
+        }
+        collect(try diarizer.finishStream())
         return Nemotron3Diarizer.segments(probabilities: probabilities, frameCount: frames).map {
             SpeakerSpan(speaker: String($0.speakerIndex), start: Double($0.startSeconds), end: Double($0.endSeconds))
         }

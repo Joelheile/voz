@@ -9,6 +9,7 @@ final class IndicatorController {
     private static let closeDuration = Duration.milliseconds(300)
     private static let dropGrace = Duration.milliseconds(200)
     private static let sampleInterval = 1.0 / 120
+    private static let hoverInterval = 1.0 / 30
 
     private let model = IndicatorModel()
     private let panel = IndicatorPanel()
@@ -17,6 +18,8 @@ final class IndicatorController {
     private var observers: [NSObjectProtocol] = []
     private var lastPhase = Dictation.Phase.idle
     private var sampler: Timer?
+    private var hoverTracker: Timer?
+    private var cancelledFile = false
     private var smoother = LevelSmoother()
     private var lastSampleTime = 0.0
     var levelSource: () -> Float = { 0 }
@@ -24,8 +27,10 @@ final class IndicatorController {
         get { model.onDrop }
         set { model.onDrop = newValue }
     }
+    var onCancelFile: () -> Void = {}
 
     init() {
+        model.onCancel = { [weak self] in self?.cancelFile() }
         let reposition: @Sendable (Notification) -> Void = { [weak self] _ in
             MainActor.assumeIsolated { self?.repositionIfVisible() }
         }
@@ -40,6 +45,8 @@ final class IndicatorController {
         clearPreview()
         if !panel.isVisible { present() }
         model.levels.reset()
+        model.canCancel = false
+        stopHoverTracking()
         startSampling()
         model.recordingStart = .now
         model.recordingEnd = nil
@@ -51,6 +58,7 @@ final class IndicatorController {
         guard panel.isVisible else { return }
         lifecycle?.cancel()
         stopTimer()
+        model.canCancel = false
         model.state = .transcribing
         model.isExpanded = true
     }
@@ -97,13 +105,29 @@ final class IndicatorController {
         model.isDropTargeted = false
         model.recordingStart = .now
         model.recordingEnd = nil
+        model.progress = nil
+        model.canCancel = true
+        cancelledFile = false
         model.state = .transcribing
         model.isExpanded = true
+        trackHover()
+    }
+
+    func showFileProgress(_ fraction: Double) {
+        guard model.state == .transcribing, model.canCancel else { return }
+        model.progress = fraction
     }
 
     func finishFile(succeeded: Bool) {
-        guard lastPhase == .idle, model.state == .transcribing else { return }
+        guard lastPhase == .idle, model.state == .transcribing, !cancelledFile else { return }
         showOutcome(succeeded ? .done : .failed)
+    }
+
+    private func cancelFile() {
+        guard model.state == .transcribing, model.canCancel else { return }
+        cancelledFile = true
+        onCancelFile()
+        hide()
     }
 
     func shake() {
@@ -176,9 +200,32 @@ final class IndicatorController {
         return onScreen.contains(NSEvent.mouseLocation)
     }
 
+    private func trackHover() {
+        hoverTracker?.invalidate()
+        let timer = Timer(timeInterval: Self.hoverInterval, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.updateHover() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        hoverTracker = timer
+    }
+
+    // The panel lets clicks through except over the indicator, so it never blocks the menu bar
+    private func updateHover() {
+        let hovering = model.canCancel && layout?.panelFrame.contains(NSEvent.mouseLocation) == true
+        if model.isHovering != hovering { model.isHovering = hovering }
+        panel.ignoresMouseEvents = !hovering
+    }
+
+    private func stopHoverTracking() {
+        hoverTracker?.invalidate()
+        hoverTracker = nil
+        model.isHovering = false
+    }
+
     private func stopTimer() {
         sampler?.invalidate()
         sampler = nil
+        stopHoverTracking()
         panel.ignoresMouseEvents = true
         if model.recordingEnd == nil { model.recordingEnd = .now }
     }

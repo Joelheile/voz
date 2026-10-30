@@ -145,3 +145,82 @@ private struct VisualEffectBackground: NSViewRepresentable {
 
     func updateNSView(_ view: NSVisualEffectView, context: Context) {}
 }
+
+struct FileProgress: View {
+    let model: IndicatorModel
+    let style: IndicatorLayout.Style
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Button(action: model.onCancel) {
+            ZStack {
+                if let progress = model.progress {
+                    switch style {
+                    case .notch: ProgressRing(progress: progress, showsCancel: model.isHovering)
+                    case .floating: ProgressBar(progress: progress, showsCancel: model.isHovering)
+                    }
+                } else {
+                    ProgressDots().opacity(model.isHovering ? 0 : 1)
+                    CancelMark().opacity(model.isHovering ? 1 : 0)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: style == .notch ? .leading : .trailing)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.pressable(0.92))
+        .accessibilityLabel("Cancel transcription")
+        .animation(reduceMotion ? nil : .linear(duration: 0.2), value: model.progress)
+        .animation(.easeOut(duration: 0.15), value: model.isHovering)
+    }
+}
+
+struct CancelMark: View {
+    var body: some View {
+        Icon(.x, size: 11, strokeWidth: 2.25).foregroundStyle(.primary)
+    }
+}
+
+struct ProgressRing: View {
+    private static let size: CGFloat = 16
+    private static let lineWidth: CGFloat = 2
+
+    let progress: Double
+    let showsCancel: Bool
+
+    var body: some View {
+        ZStack {
+            Circle().stroke(.primary.opacity(0.2), lineWidth: Self.lineWidth)
+            Circle()
+                .trim(from: 0, to: progress)
+                .stroke(.primary.opacity(0.9), style: StrokeStyle(lineWidth: Self.lineWidth, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+            Icon(.x, size: 8, strokeWidth: 2.5)
+                .foregroundStyle(.primary)
+                .opacity(showsCancel ? 1 : 0)
+        }
+        .frame(width: Self.size, height: Self.size)
+    }
+}
+
+struct ProgressBar: View {
+    private static let height: CGFloat = 4
+
+    let progress: Double
+    let showsCancel: Bool
+
+    var body: some View {
+        ZStack {
+            Capsule()
+                .fill(.primary.opacity(0.2))
+                .overlay(alignment: .leading) {
+                    Capsule()
+                        .fill(.primary.opacity(0.9))
+                        .frame(width: max(Self.height, LevelBarsGeometry.visibleWidth * progress))
+                }
+                .frame(width: LevelBarsGeometry.visibleWidth, height: Self.height)
+                .opacity(showsCancel ? 0 : 1)
+            CancelMark().opacity(showsCancel ? 1 : 0)
+        }
+        .padding(.trailing, LevelBarsGeometry.trailingInset)
+    }
+}
