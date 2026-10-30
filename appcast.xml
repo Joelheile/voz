@@ -3,6 +3,17 @@
   <channel>
     <title>voz</title>
     <item>
+      <title>voz 0.0.5-beta.100037</title>
+      <description>&lt;ul&gt;&lt;li&gt;Your last word no longer gets cut off when you release the hotkey early&lt;/li&gt;&lt;/ul&gt;</description>
+      <link>https://github.com/Joelheile/voz/releases/tag/beta-100037</link>
+      <pubDate>Fri, 30 Oct 2026 14:31:31 GMT</pubDate>
+      <sparkle:version>100037</sparkle:version>
+      <sparkle:shortVersionString>0.0.5-beta.100037</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100037/voz-0.0.5-beta.100037.zip" length="8454966" sparkle:edSignature="0TZQyrZbMRsdIhoRWmCvclOfWs+uOivf3ou7acsmHaw8wRRx9MSNQaKRc0ISZak1aFAtme+pk5PDZItyALX2AQ==" type="application/octet-stream" />
+    </item>
+    <item>
       <title>voz 0.0.5-beta.100035</title>
       <description>&lt;ul&gt;&lt;li&gt;Find settings faster, with release notes one click away at the top&lt;/li&gt;&lt;li&gt;Open your dictionary straight from the main panel&lt;/li&gt;&lt;li&gt;Quit Voz from the bottom of Settings&lt;/li&gt;&lt;li&gt;See how your speaking pace compares with typing and with most people&lt;/li&gt;&lt;li&gt;See your word, streak and time-saved milestones right in the panel&lt;/li&gt;&lt;/ul&gt;</description>
       <link>https://github.com/Joelheile/voz/releases/tag/beta-100035</link>
@@ -100,17 +111,6 @@
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <sparkle:channel>beta</sparkle:channel>
       <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100027/voz-0.0.5-beta.100027.zip" length="8401227" sparkle:edSignature="dGRnSRVaoO726o3dHcmonUt0goDmbgrdpE0f5P2cR3J8zI1lwqPFrtRA//1HMjH2SIVtfrSxj10fR2Rz0J6YAQ==" type="application/octet-stream" />
-    </item>
-    <item>
-      <title>voz 0.0.5-beta.100026</title>
-      <description>&lt;ul&gt;&lt;li&gt;Extensions that miss their deadline can no longer change your text&lt;/li&gt;&lt;li&gt;Ask once for a GitHub star after you dictate 2,000 words&lt;/li&gt;&lt;li&gt;Show small Top apps bars as rounded bars&lt;/li&gt;&lt;li&gt;Dragging a TypeScript file no longer opens the audio drop zone&lt;/li&gt;&lt;li&gt;Drop a file on the floating indicator to transcribe it, with a clearer drop target&lt;/li&gt;&lt;li&gt;Learn dictionary words from spelled-out names and spoken corrections&lt;/li&gt;&lt;li&gt;Fix words Voz keeps mishearing with rules like voss → Voz&lt;/li&gt;&lt;li&gt;Show long notifications in full&lt;/li&gt;&lt;li&gt;Run extension actions from buttons at the bottom of the panel&lt;/li&gt;&lt;li&gt;Browse and manage extensions from a simpler list with a page per extension&lt;/li&gt;&lt;li&gt;Find, add and accept dictionary words from one field&lt;/li&gt;&lt;li&gt;Drop an audio or video file on the notch to transcribe it with an extension&lt;/li&gt;&lt;li&gt;Copy a Claude Code prompt from the Extensions page to build your own extension&lt;/li&gt;&lt;li&gt;Show each installed package&amp;#x27;s description in the Extensions page&lt;/li&gt;&lt;li&gt;Bring back the Voz face in the menu bar icon&lt;/li&gt;&lt;li&gt;Show the menu bar icon in white on dark menu bars&lt;/li&gt;&lt;/ul&gt;</description>
-      <link>https://github.com/Joelheile/voz/releases/tag/beta-100026</link>
-      <pubDate>Fri, 30 Oct 2026 00:10:46 GMT</pubDate>
-      <sparkle:version>100026</sparkle:version>
-      <sparkle:shortVersionString>0.0.5-beta.100026</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <sparkle:channel>beta</sparkle:channel>
-      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100026/voz-0.0.5-beta.100026.zip" length="8400554" sparkle:edSignature="vea8qIa2QRwsMfRoOMBmTkJ/GQBEN1IDh9CrHIHkUhPbEtJq7eXQ7+8ZRqaib87ukPRy5ERfkdRIp5nisJB4CA==" type="application/octet-stream" />
     </item>
     <item>
       <title>voz 0.0.5</title>

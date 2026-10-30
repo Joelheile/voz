@@ -4,6 +4,7 @@ Newest first. To get beta changes now, turn on Beta updates under What's new in 
 
 ## In beta
 
+- Your last word no longer gets cut off when you release the hotkey early
 - Find settings faster, with release notes one click away at the top
 - Open your dictionary straight from the main panel
 - Quit Voz from the bottom of Settings
