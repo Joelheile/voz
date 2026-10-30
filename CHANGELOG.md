@@ -4,6 +4,11 @@ Newest first. To get beta changes now, turn on Beta updates under What's new in 
 
 ## In beta
 
+- Find settings faster, with release notes one click away at the top
+- Open your dictionary straight from the main panel
+- Quit Voz from the bottom of Settings
+- See how your speaking pace compares with typing and with most people
+- See your word, streak and time-saved milestones right in the panel
 - Claude Code now reads the Voz extension guide when you build an extension in ~/.voz
 - Copy a debug log from Privacy in Settings to report problems or debug an extension
 - Extensions can show a recording in the menu bar and let you stop it from the Voz panel

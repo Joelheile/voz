@@ -3,6 +3,17 @@
   <channel>
     <title>voz</title>
     <item>
+      <title>voz 0.0.5-beta.100035</title>
+      <description>&lt;ul&gt;&lt;li&gt;Find settings faster, with release notes one click away at the top&lt;/li&gt;&lt;li&gt;Open your dictionary straight from the main panel&lt;/li&gt;&lt;li&gt;Quit Voz from the bottom of Settings&lt;/li&gt;&lt;li&gt;See how your speaking pace compares with typing and with most people&lt;/li&gt;&lt;li&gt;See your word, streak and time-saved milestones right in the panel&lt;/li&gt;&lt;/ul&gt;</description>
+      <link>https://github.com/Joelheile/voz/releases/tag/beta-100035</link>
+      <pubDate>Fri, 30 Oct 2026 11:18:14 GMT</pubDate>
+      <sparkle:version>100035</sparkle:version>
+      <sparkle:shortVersionString>0.0.5-beta.100035</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100035/voz-0.0.5-beta.100035.zip" length="8455306" sparkle:edSignature="wZ0NF66yvJlN+f29YGN3jEZPoQdKhfanpeaVCuMWjtoYuCaDps31/s3q9iW1Cbpj177o2WPSnIlVG5AcFk/tAA==" type="application/octet-stream" />
+    </item>
+    <item>
       <title>voz 0.0.5-beta.100034</title>
       <description>&lt;ul&gt;&lt;li&gt;Maintenance release&lt;/li&gt;&lt;/ul&gt;</description>
       <link>https://github.com/Joelheile/voz/releases/tag/beta-100034</link>
@@ -100,17 +111,6 @@
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <sparkle:channel>beta</sparkle:channel>
       <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100026/voz-0.0.5-beta.100026.zip" length="8400554" sparkle:edSignature="vea8qIa2QRwsMfRoOMBmTkJ/GQBEN1IDh9CrHIHkUhPbEtJq7eXQ7+8ZRqaib87ukPRy5ERfkdRIp5nisJB4CA==" type="application/octet-stream" />
-    </item>
-    <item>
-      <title>voz 0.0.5-beta.100025</title>
-      <description>&lt;ul&gt;&lt;li&gt;Extensions written for the first extension API, such as voz-autocorrect and voz-meeting, load again&lt;/li&gt;&lt;/ul&gt;</description>
-      <link>https://github.com/Joelheile/voz/releases/tag/beta-100025</link>
-      <pubDate>Thu, 29 Oct 2026 23:43:52 GMT</pubDate>
-      <sparkle:version>100025</sparkle:version>
-      <sparkle:shortVersionString>0.0.5-beta.100025</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <sparkle:channel>beta</sparkle:channel>
-      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100025/voz-0.0.5-beta.100025.zip" length="8325695" sparkle:edSignature="AxxjhYtCn9IL8xINDWmvyWEK8RGHM9AO6n8lRud/2kbrtiCy1Wf5EpRouyckb2P/ioah8RuhLj42UD9uaE4gBA==" type="application/octet-stream" />
     </item>
     <item>
       <title>voz 0.0.5</title>
