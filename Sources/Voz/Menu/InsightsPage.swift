@@ -19,8 +19,10 @@ struct InsightsPage: View {
             VStack(alignment: .leading, spacing: 16) {
                 TabBar(tabs: StatsPeriod.allCases, selection: $period)
                 WordsHeadline(stats: stats)
-                PaceScale(wordsPerMinute: stats.wordsPerMinute, revealed: revealed)
-                TimeSaved(stats: stats, revealed: revealed)
+                HStack(alignment: .top, spacing: Theme.Spacing.item) {
+                    PaceGauge(wordsPerMinute: stats.wordsPerMinute, revealed: revealed)
+                    TimeSaved(stats: stats, revealed: revealed)
+                }
                 if !stats.topApps.isEmpty { TopApps(apps: stats.topApps) }
             }
             .animation(Theme.Motion.section, value: period)
@@ -175,13 +177,9 @@ private struct WordsHeadline: View {
     }
 }
 
-private struct PaceScale: View {
-    private static let maximum = 220.0
-    private static let marks: [(label: String, wordsPerMinute: Double)] = [
-        ("Typing", PeriodStats.typingWordsPerMinute),
-        ("Average", PeriodStats.averageSpeakingWordsPerMinute),
-        ("Fast", PeriodStats.fastSpeakingWordsPerMinute),
-    ]
+private struct PaceGauge: View {
+    private static let maximum = 200.0
+    private static let lineWidth: CGFloat = 7
 
     let wordsPerMinute: Double?
     let revealed: Bool
@@ -192,53 +190,46 @@ private struct PaceScale: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "Speaking pace")
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(wordsPerMinute.map { Int($0.rounded()).formatted() } ?? "–")
-                    .font(.display(22))
-                    .foregroundStyle(Theme.ink)
-                    .contentTransition(.numericText())
-                Text("wpm")
-                    .font(.meta)
-                    .foregroundStyle(Theme.inkTertiary)
-                Spacer(minLength: 8)
-                Text(wordsPerMinute.map(PeriodStats.paceVerdict) ?? "Measured after you dictate")
-                    .font(.meta)
-                    .foregroundStyle(Theme.inkSecondary)
-            }
-            GeometryReader { proxy in
-                let width = proxy.size.width
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Theme.selected).frame(height: 4)
-                    Capsule().fill(Theme.accent).frame(width: width * (revealed ? fraction : 0), height: 4)
-                    ForEach(Self.marks, id: \.label) { mark in
-                        Capsule()
-                            .fill(Theme.inkTertiary)
-                            .frame(width: 1.5, height: 10)
-                            .position(x: width * mark.wordsPerMinute / Self.maximum, y: 6)
-                    }
-                    if wordsPerMinute != nil {
-                        Circle()
-                            .fill(Theme.accent)
-                            .overlay(Circle().strokeBorder(Theme.surface, lineWidth: 2))
-                            .frame(width: 12, height: 12)
-                            .position(x: width * (revealed ? fraction : 0), y: 6)
-                    }
-                }
-            }
-            .frame(height: 12)
-            GeometryReader { proxy in
-                ForEach(Self.marks, id: \.label) { mark in
-                    Text(mark.label)
+            ZStack(alignment: .bottom) {
+                HalfArc().stroke(Theme.selected, style: StrokeStyle(lineWidth: Self.lineWidth, lineCap: .round))
+                HalfArc()
+                    .trim(from: 0, to: revealed ? fraction : 0)
+                    .stroke(Theme.accent, style: StrokeStyle(lineWidth: Self.lineWidth, lineCap: .round))
+                VStack(spacing: 0) {
+                    Text(wordsPerMinute.map { Int($0.rounded()).formatted() } ?? "–")
+                        .font(.display(22))
+                        .foregroundStyle(Theme.ink)
+                        .contentTransition(.numericText())
+                    Text("wpm")
                         .font(.ui(11))
                         .foregroundStyle(Theme.inkTertiary)
-                        .fixedSize()
-                        .position(x: proxy.size.width * mark.wordsPerMinute / Self.maximum, y: 7)
-                        .help("About \(Int(mark.wordsPerMinute)) wpm")
                 }
+                .offset(y: 4)
             }
-            .frame(height: 14)
+            .padding(.horizontal, Self.lineWidth / 2)
+            .aspectRatio(2, contentMode: .fit)
+            Text(comparison)
+                .font(.meta)
+                .monospacedDigit()
+                .foregroundStyle(Theme.inkSecondary)
+                .contentTransition(.numericText())
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .animation(reduceMotion ? nil : .reveal, value: revealed)
+    }
+
+    private var comparison: String {
+        guard let wordsPerMinute else { return "Measured after you dictate" }
+        let ratio = wordsPerMinute / PeriodStats.typingWordsPerMinute
+        return "\(ratio.formatted(.number.precision(.fractionLength(1))))× typing speed"
+    }
+}
+
+private struct HalfArc: Shape {
+    func path(in rect: CGRect) -> Path {
+        Path { path in
+            path.addArc(center: CGPoint(x: rect.midX, y: rect.maxY), radius: rect.width / 2, startAngle: .degrees(180), endAngle: .degrees(360), clockwise: false)
+        }
     }
 }
 
