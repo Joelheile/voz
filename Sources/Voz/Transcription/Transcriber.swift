@@ -30,8 +30,8 @@ actor Transcriber {
         loaded?.model == model
     }
 
-    func prepareVocabulary(_ words: [String]) async throws {
-        try await booster.prepare(words: words)
+    func prepareVocabulary(_ terms: [VocabularyTerm]) async throws {
+        try await booster.prepare(terms: terms)
     }
 
     func prepare(_ model: SpeechModel) async throws {
@@ -66,6 +66,12 @@ actor Transcriber {
         let result = try await manager.transcribe(samples, decoderState: &decoderState)
         let text = await booster.rescore(result, samples: samples, words: vocabulary)
         return TranscriptionResult(text: text, audioSeconds: result.duration, processingSeconds: result.processingTime, model: model.rawValue)
+    }
+
+    func recognize(_ url: URL, model: SpeechModel) async throws -> ASRResult {
+        let manager = try await manager(for: model)
+        var decoderState = TdtDecoderState.make()
+        return try await manager.transcribe(url, decoderState: &decoderState)
     }
 
     private func manager(for model: SpeechModel) async throws -> AsrManager {

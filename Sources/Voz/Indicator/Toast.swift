@@ -23,10 +23,10 @@ final class ToastController {
         guard !trimmed.isEmpty, let screen = ScreenResolver.targetScreen() else { return }
         lifecycle?.cancel()
         model.text = trimmed
-        let hosting = NSHostingView(rootView: ToastView(model: model, maxWidth: Self.maxWidth))
-        let size = hosting.fittingSize
-        hosting.frame = NSRect(origin: .zero, size: size)
-        panel.contentView = hosting
+        let hosting = NSHostingController(rootView: ToastView(model: model))
+        let size = hosting.sizeThatFits(in: NSSize(width: Self.maxWidth, height: .infinity))
+        hosting.view.frame = NSRect(origin: .zero, size: size)
+        panel.contentView = hosting.view
         panel.setFrame(NSRect(
             x: screen.frame.midX - size.width / 2,
             y: screen.visibleFrame.maxY - Self.gapBelowMenuBar - size.height,
@@ -54,7 +54,6 @@ final class ToastController {
 
 private struct ToastView: View {
     let model: ToastModel
-    let maxWidth: CGFloat
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -63,14 +62,11 @@ private struct ToastView: View {
             .foregroundStyle(.primary)
             .multilineTextAlignment(.center)
             .lineLimit(3)
-            .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
-            .frame(maxWidth: maxWidth)
-            .hud(Capsule())
+            .hud(RoundedRectangle(cornerRadius: 17, style: .continuous))
             .scaleEffect(reduceMotion || model.isShown ? 1 : 0.9, anchor: .top)
             .opacity(model.isShown ? 1 : 0)
             .animation(reduceMotion ? IndicatorMotion.reducedMotion : IndicatorMotion.open, value: model.isShown)
-            .fixedSize()
     }
 }

@@ -61,7 +61,7 @@ enum PermissionTile {
         return (cocoaFrame(fromTopLeft: topLeftFrame, primaryScreenHeight: NSScreen.screens.first?.frame.height ?? 0), number)
     }
 
-    static func cocoaFrame(fromTopLeft frame: CGRect, primaryScreenHeight: CGFloat) -> CGRect {
+    private static func cocoaFrame(fromTopLeft frame: CGRect, primaryScreenHeight: CGFloat) -> CGRect {
         CGRect(x: frame.minX, y: primaryScreenHeight - frame.maxY, width: frame.width, height: frame.height)
     }
 }

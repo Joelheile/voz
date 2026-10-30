@@ -1,34 +1,86 @@
 import CoreGraphics
 
+struct ScreenMetrics: Equatable, Sendable {
+    let frame: CGRect
+    let notchSize: CGSize?
+    let visibleMinY: CGFloat
+
+    init(
+        frame: CGRect,
+        safeAreaTop: CGFloat,
+        leftAreaWidth: CGFloat?,
+        rightAreaWidth: CGFloat?,
+        visibleMinY: CGFloat
+    ) {
+        var notchSize: CGSize?
+        if safeAreaTop > 0, let leftAreaWidth, let rightAreaWidth {
+            notchSize = CGSize(width: frame.width - leftAreaWidth - rightAreaWidth, height: safeAreaTop)
+        }
+        self.frame = frame
+        self.notchSize = notchSize
+        self.visibleMinY = visibleMinY
+    }
+}
+
 struct IndicatorLayout: Equatable, Sendable {
+    enum Style: Equatable, Sendable {
+        case notch
+        case floating
+    }
+
+    static let sideWidth: CGFloat = 68
+    static let seamOverlap: CGFloat = 1
     static let pillSize = CGSize(width: 108, height: 32)
     static let pillGap: CGFloat = 8
     static let bottomGap: CGFloat = 16
     static let shadowMargin: CGFloat = 16
+    static let dropSwell: CGFloat = 6
+    static let dropShadowRoom: CGFloat = 32
+
+    let style: Style
+    let panelFrame: CGRect
+    let collapsedWidth: CGFloat
+
     static let previewWidth: CGFloat = 320
     static let previewHeight: CGFloat = 120
 
-    let panelFrame: CGRect
-
     var windowFrame: CGRect {
-        let width = max(panelFrame.width, Self.previewWidth + 2 * Self.shadowMargin)
+        let width = max(panelFrame.width + 2 * (Self.dropSwell + Self.dropShadowRoom), Self.previewWidth + 2 * Self.shadowMargin)
         return CGRect(
             x: panelFrame.midX - width / 2,
-            y: panelFrame.minY,
+            y: style == .notch ? panelFrame.minY - Self.previewHeight : panelFrame.minY,
             width: width,
             height: panelFrame.height + Self.previewHeight
         )
     }
 
-    /// Centers the pill just above the Dock, like Wispr Flow. The preview grows upward.
-    static func make(visibleFrame: CGRect) -> IndicatorLayout {
+    static func make(screen: ScreenMetrics) -> IndicatorLayout {
+        guard let notch = screen.notchSize else { return floating(screen: screen) }
+        let size = CGSize(width: notch.width + 2 * sideWidth, height: notch.height)
+        return IndicatorLayout(
+            style: .notch,
+            panelFrame: CGRect(
+                x: screen.frame.midX - size.width / 2,
+                y: screen.frame.maxY - size.height,
+                width: size.width,
+                height: size.height
+            ),
+            collapsedWidth: notch.width + 2 * seamOverlap
+        )
+    }
+
+    private static func floating(screen: ScreenMetrics) -> IndicatorLayout {
         let pill = CGRect(
-            x: visibleFrame.midX - pillSize.width / 2,
-            y: visibleFrame.minY + bottomGap,
+            x: screen.frame.midX - pillSize.width / 2,
+            y: screen.visibleMinY + bottomGap,
             width: pillSize.width,
             height: pillSize.height
         )
-        return IndicatorLayout(panelFrame: pill.insetBy(dx: -shadowMargin, dy: -shadowMargin))
+        return IndicatorLayout(
+            style: .floating,
+            panelFrame: pill.insetBy(dx: -shadowMargin, dy: -shadowMargin),
+            collapsedWidth: 0
+        )
     }
 }
 

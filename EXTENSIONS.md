@@ -58,6 +58,7 @@ The interview is done when you can state the extension in one sentence that name
 | The final say over what gets typed, or to type nothing                    | `beforeInsert`                                                                  |
 | Dictations saved or sent somewhere after they are typed                   | `afterInsert`                                                                   |
 | The audio itself                                                          | `recording`                                                                     |
+| Audio or video files the user drops on the notch                          | `audioDrop` and [`ctx.transcribe`](#audio-files)                                |
 | A different speech-to-text or cleanup model                               | [`registerSpeechModel` or `registerCleanupModel`](#models-and-cleanup-steps)    |
 | A button in the Voz panel, or a global hotkey                             | [`registerAction`](#actions)                                                    |
 
@@ -132,11 +133,12 @@ Voz reloads extensions when you save a file in `~/.voz/extensions`, a local pack
 | `voz.on("beforeInsert", handler)`               | Runs before Voz inserts text. Return `{ text }` to replace it. Return `{ text: "" }` to insert nothing and skip the remaining handlers. Handlers run in load order, and each one gets the previous one's text.                                        |
 | `voz.on("recording", handler)`                  | Runs after each recording with a 16 kHz mono WAV file. Voz deletes the file after all handlers finish. Voz does not wait for it.                                                                                                                      |
 | `voz.on("afterInsert", handler)`                | Runs after Voz inserts text. Voz does not wait for it.                                                                                                                                                                                                |
+| `voz.on("audioDrop", handler)`                  | Runs when the user drops an audio or video file on the notch. While any extension listens, dragging such a file opens a drop zone in the notch. Without one, the notch ignores drags. See [Audio files](#audio-files).                                                                            |
 | `voz.registerSpeechModel(model)`                | Adds a speech model to Settings. `model` has `id`, `name` and `transcribe(event, ctx)`, which returns `{ text }`.                                                                                                                                     |
 | `voz.registerCleanupModel(model)`               | Adds a cleanup model to Settings. `model` has `id`, `name` and `clean(event, ctx)`, which returns `{ text }`.                                                                                                                                         |
 | `voz.registerCleanupStep(step)`                 | Adds a cleanup step you can turn on in the extension's details. `step` has `id`, `name` and `run(event, ctx)`, which returns `{ text }` or nothing to keep the text.                                                                                  |
 | `voz.registerCommand(phrase, handler, options)` | Runs `handler` when a dictation ends with `phrase`. Voz inserts the words before the phrase, then runs the command. With `{ at: "start" }`, it runs when a dictation starts with `phrase`: Voz inserts nothing and passes the words after the phrase. Packages that use `at` set `"voz": { "apiVersion": 2 }`. |
-| `voz.registerAction(action)`                    | Adds a button to the Actions group in the Voz panel. `action` has `id`, `name`, an optional `hotkey` such as `"ctrl+opt+j"`, and `run(ctx)`.                                                                                                          |
+| `voz.registerAction(action)`                    | Adds a button to the bottom row of the Voz panel. `action` has `id`, `name`, an optional `hotkey` such as `"ctrl+opt+j"`, and `run(ctx)`.                                                                                                             |
 | `voz.settings(schema)`                          | Adds a settings form to the extension's row in the Extensions page, and returns the values. See [Settings](#settings).                                                                                                                                |
 | `voz.name`                                      | The extension name: the file name, or the package name.                                                                                                                                                                                               |
 | `voz.paths`                                     | `data` is `~/.voz/data/<name>`, a folder for the extension's own files.                                                                                                                                                                               |
@@ -147,6 +149,7 @@ Every handler gets `(event, ctx)`.
 - The `beforeInsert` event has `text` (cleaned) and `raw` (before cleanup)
 - The `recording` event has `path` and `seconds`
 - The `afterInsert` event has `text` (what Voz inserted) and `raw`
+- The `audioDrop` event has `path`, the dropped file
 - The command event has `text`, the words before the phrase, or after it for a start command
 - The `transcribe` event has `path`, a 16 kHz mono WAV of one stretch of speech, and `seconds`
 - The `clean` event has `text` and `prompt`, the cleanup prompt with your dictionary words
@@ -159,6 +162,7 @@ Every handler gets `(event, ctx)`.
 - `ctx.press(key)`: presses a key, such as `"return"`, `"cmd+return"` or `"shift+tab"`. Modifiers: `cmd`, `shift`, `opt`, `ctrl`
 - `ctx.notify(text)`: shows a short message under the menu bar
 - `ctx.generate({ prompt, instructions, schema })`: asks Apple's on-device model for JSON that fits `schema`. See [On-device model](#on-device-model)
+- `ctx.transcribe(path, { speakers })`: transcribes an audio or video file with Parakeet. See [Audio files](#audio-files)
 
 The types are in [`Resources/Extensions/voz.d.ts`](Resources/Extensions/voz.d.ts).
 
@@ -197,6 +201,25 @@ voz.registerCommand(
 - The model is small. Give it the facts it can't know, such as today's date or the list of valid names, and use `enum` for fixed choices. Do date math in code
 - It takes one to three seconds, so call it in a command, an action or `afterInsert`. It fails if the handler's time runs out, or if Apple Intelligence is off
 - Packages that call it set `"voz": { "apiVersion": 2 }`
+
+## Audio files
+
+`ctx.transcribe(path, { speakers: true })` transcribes a whole audio or video file on the Mac with the Parakeet model picked in Settings. With `speakers`, Voz also finds who speaks when, with NVIDIA's Nemotron 3 diarization model, and splits the text into turns. It counts the speakers itself, up to 8.
+
+```ts
+voz.on("audioDrop", async ({ path }, ctx) => {
+  const transcript = await ctx.transcribe(path, { speakers: true });
+  for (const turn of transcript.turns) console.log(`${turn.start}s Speaker ${turn.speaker}: ${turn.text}`);
+  ctx.notify(`${transcript.speakers} speakers, ${Math.round(transcript.seconds)} seconds`);
+});
+```
+
+- The result has `text`, `seconds`, `speakers` and `turns`. Each turn has `speaker` (1 is the first to talk), `start` and `end` in seconds, and `text`. Without `speakers`, all text is one turn
+- Voz reads the formats AVFoundation reads: audio such as MP3, M4A, WAV, AIFF and FLAC, and video such as MP4, MOV and M4V, where it uses only the sound. It rejects MKV and WebM
+- It takes about a second per minute of audio, plus a few seconds the first time to load the models. The first diarization downloads a 95 MB model
+- It fails when the user picked Apple speech in Settings
+- Call it in `audioDrop`, a command or an action. An `audioDrop` handler has 30 minutes. If it throws, the notch shows an error
+- Packages that call it set `"voz": { "apiVersion": 3 }`
 
 ## Settings
 
@@ -308,7 +331,7 @@ Voz splits a dictation at pauses and transcribes and cleans up each part while y
 - A cleanup model shares the cleanup budget with the other steps: Voz waits at most 1.5 seconds after you stop talking. If it fails, runs over or changes the meaning, Voz uses the text from the other steps
 - A cleanup step has 300 ms, or less if the 1.5 second cleanup budget runs out first. If it fails or runs over, Voz keeps the text from the step before
 - If the cleanup budget runs out before a part is done, Voz uses the built-in steps only for that part
-- A command has 10 seconds, including the time `ctx.generate` takes. `recording` and `afterInsert` handlers have 30 seconds
+- A command has 10 seconds, including the time `ctx.generate` takes. `recording` and `afterInsert` handlers have 30 seconds, `audioDrop` handlers 30 minutes
 - Each extension has 3 seconds to load. After that, Voz reports it as failed and loads the next one
 - If a handler throws or a promise rejects unhandled, Voz logs the error and skips that handler
 - If the extension process exits or stops answering for 2 seconds, Voz restarts it, up to 3 times in a row
@@ -341,7 +364,7 @@ voz remove voz-jira
 - Packages only change when you run `voz update`. Voz never updates them on its own
 - Voz never runs install scripts
 - Installed packages are listed in `~/.voz/settings.json`
-- A package that needs a newer Voz sets `"voz": { "apiVersion": 2 }` in its `package.json`. Older Voz versions show "Update Voz" instead of loading it. Within one API version, Voz only adds to the API and never changes or removes what is there. `import { apiVersion } from "voz"` gives the version that runs
+- A package that needs a newer Voz sets `"voz": { "apiVersion": 2 }` in its `package.json`. Older Voz versions show "Update Voz" instead of loading it. Within one API version, Voz only adds to the API and never changes or removes what is there. Packages that declare API 1, or no version, still get what API 2 removed: `voz.config`, `voz.log`, `voz.events`, `voz.paths.home` and `{ handled: true }` from `beforeInsert`. New code uses `voz.settings`, `console.log` and `{ text: "" }`. `import { apiVersion } from "voz"` gives the version that runs
 
 ## Settings file
 

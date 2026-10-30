@@ -15,8 +15,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var output = TextOutput(settings: settings)
     private let cleaner = TextCleaner()
     private let toast = ToastController()
-    private lazy var extensions = ExtensionService(output: output, toast: toast, settings: settings)
+    private lazy var extensions = ExtensionService(
+        output: output,
+        toast: toast,
+        settings: settings,
+        fileTranscriber: FileTranscriber(transcriber: transcriber)
+    )
     private var vocabularyWords: [String] = []
+    private lazy var vocabularyLearner = VocabularyLearner(
+        store: history.vocabulary,
+        hear: { [transcriber, settings] in await SpokenWord.hear($0, transcriber: transcriber, settings: settings) }
+    )
     private lazy var dictation = Dictation(
         pipeline: DictationPipeline(
             engine: speechEngine,
@@ -24,7 +33,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             settings: settings,
             history: history,
             output: output,
-            editObserver: EditObserver(vocabulary: history.vocabulary),
+            editObserver: EditObserver(learner: vocabularyLearner),
+            vocabularyLearner: vocabularyLearner,
             analytics: analytics,
             extensions: extensions
         ),
@@ -41,6 +51,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotkeyMonitor: HotkeyMonitor?
     private var quitRequested = false
     private let indicator = IndicatorController()
+    private lazy var audioDrag = MediaDragMonitor(
+        isEnabled: { [weak self] in self?.acceptsAudioDrop ?? false },
+        onStart: { [weak self] in self?.indicator.showDropTarget() },
+        onEnd: { [weak self] in self?.indicator.endDropTarget() }
+    )
     private let uninstallWatcher = UninstallWatcher()
     private lazy var updater = Updater(settings: settings, isBusy: { [weak self] in self?.dictation.phase != .idle })
 
@@ -77,6 +92,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.indicator.sync(phase: self.dictation.phase)
             self.updater.resumePendingInstall()
         }
+        dictation.onStartFailed = { [toast] in toast.show($0) }
         hotkeyMonitor = HotkeyMonitor(
             hotkey: settings.hotkey,
             holdToTalk: settings.holdToTalk,
@@ -88,6 +104,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         indicator.attach(to: dictation)
+        indicator.onDrop = { [weak self] file in self?.transcribeDropped(file) }
+        audioDrag.start()
         observeWake()
         OpenRequest.observe { [weak self] in self?.statusItemController?.open() }
         observeSettings()
@@ -119,6 +137,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let name = urls.lazy.compactMap(ExtensionLink.packageName(in:)).first else { return }
         statusItemController?.open(.extensions)
         Task { await extensionsModel.reveal(name) }
+    }
+
+    private var acceptsAudioDrop: Bool {
+        extensions.acceptsAudioDrops && dictation.phase == .idle
+    }
+
+    private func transcribeDropped(_ file: URL) {
+        indicator.showFileTranscribing()
+        Task {
+            let succeeded = await extensions.dropAudio(file)
+            indicator.finishFile(succeeded: succeeded)
+        }
     }
 
     private func manageLaunchAgent() {
@@ -185,6 +215,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .dropFirst()
             .sink { [weak self] _ in self?.manageLaunchAgent() }
             .store(in: &cancellables)
+        settings.$receiveBetaUpdates
+            .dropFirst()
+            .filter { $0 }
+            .sink { [weak self] _ in self?.updater.checkForUpdatesInBackground() }
+            .store(in: &cancellables)
         settings.$analyticsEnabled.combineLatest(settings.$errorReportsEnabled)
             .dropFirst()
             .sink { [weak self] usage, errors in self?.analytics.setConsent(usage: usage, errors: errors) }
@@ -222,18 +257,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func syncVocabulary() {
-        let words: [String]
+        let terms: [VocabularyTerm]
         do {
-            words = try history.vocabulary.words()
+            terms = try history.vocabulary.terms()
         } catch {
             Log.app.error("Vocabulary read failed: \(error.localizedDescription, privacy: .private)")
             return
         }
+        let words = terms.map(\.word)
         vocabularyWords = words
         cleaner.prewarm(prompt: settings.cleanupPrompt, vocabulary: words)
         Task {
             do {
-                try await transcriber.prepareVocabulary(words)
+                try await transcriber.prepareVocabulary(terms)
             } catch {
                 Log.app.error("Vocabulary boosting setup failed: \(error.localizedDescription, privacy: .private)")
             }

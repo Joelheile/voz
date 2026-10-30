@@ -1,4 +1,5 @@
 import Combine
+import FluidAudio
 import Foundation
 import GRDB
 
@@ -14,12 +15,16 @@ struct VocabularyWord: Codable, FetchableRecord, PersistableRecord, Identifiable
     var word: String
     var createdAt: Date
     var source: VocabularySource
+    var aliases: [String]
+    var replaces: [String]
 
-    init(id: UUID = UUID(), word: String, createdAt: Date = Date(), source: VocabularySource) {
+    init(id: UUID = UUID(), word: String, createdAt: Date = Date(), source: VocabularySource, aliases: [String] = [], replaces: [String] = []) {
         self.id = id
         self.word = word
         self.createdAt = createdAt
         self.source = source
+        self.aliases = aliases
+        self.replaces = replaces
     }
 }
 
@@ -28,11 +33,34 @@ struct VocabularySuggestion: Codable, FetchableRecord, PersistableRecord, Identi
 
     var word: String
     var createdAt: Date
+    var aliases: [String]
     var id: String { word }
 
-    init(word: String, createdAt: Date = Date()) {
+    init(word: String, createdAt: Date = Date(), aliases: [String] = []) {
         self.word = word
         self.createdAt = createdAt
+        self.aliases = aliases
+    }
+}
+
+struct VocabularyTerm: Equatable, Sendable {
+    let word: String
+    let aliases: [String]
+}
+
+struct VocabularyRule: Equatable, Sendable {
+    let heard: String
+    let word: String
+
+    static func apply(_ rules: [VocabularyRule], to text: String) -> String {
+        rules.reduce(text) { VocabularyCasing.replaceWholeWord($1.heard, with: $1.word, in: $0) }
+    }
+
+    static func parse(_ entry: String) -> (heard: String?, word: String) {
+        let parts = entry.components(separatedBy: "->").flatMap { $0.components(separatedBy: "→") }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        let heard = parts.count == 2 && !parts[0].isEmpty ? parts[0] : nil
+        return (heard, parts.last ?? "")
     }
 }
 
@@ -54,33 +82,84 @@ final class VocabularyStore: Sendable {
         }
     }
 
-    func add(_ word: String, source: VocabularySource) throws {
-        let trimmed = word.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        try queue.write { database in
-            let exists = try VocabularyWord.filter(Column("word") == trimmed).fetchCount(database) > 0
-            if !exists { try VocabularyWord(word: trimmed, source: source).insert(database) }
-            _ = try VocabularySuggestion.deleteOne(database, key: trimmed)
+    func terms() throws -> [VocabularyTerm] {
+        try queue.read { database in
+            try VocabularyWord.order(Column("word").collating(.nocase)).fetchAll(database).map {
+                VocabularyTerm(word: $0.word, aliases: $0.aliases)
+            }
         }
+    }
+
+    func rules() throws -> [VocabularyRule] {
+        try queue.read { database in
+            try VocabularyWord.order(Column("word").collating(.nocase)).fetchAll(database).flatMap { word in
+                word.replaces.map { VocabularyRule(heard: $0, word: word.word) }
+            }
+        }
+    }
+
+    func add(_ entry: String, source: VocabularySource, aliases: [String] = []) throws {
+        let (heard, word) = VocabularyRule.parse(entry)
+        guard !word.isEmpty else { return }
+        try queue.write { database in
+            let exists = try VocabularyWord.filter(Column("word") == word).fetchCount(database) > 0
+            if !exists { try VocabularyWord(word: word, source: source, aliases: aliases).insert(database) }
+            _ = try VocabularySuggestion.deleteOne(database, key: word)
+        }
+        if let heard { try addRule(VocabularyRule(heard: heard, word: word)) }
+    }
+
+    func addRule(_ rule: VocabularyRule) throws {
+        guard rule.heard.caseInsensitiveCompare(rule.word) != .orderedSame else { return }
+        try update(rule.word) { word in
+            if !word.replaces.contains(where: { $0.caseInsensitiveCompare(rule.heard) == .orderedSame }) { word.replaces.append(rule.heard) }
+            if !word.aliases.contains(where: { $0.caseInsensitiveCompare(rule.heard) == .orderedSame }) { word.aliases.append(rule.heard) }
+        }
+    }
+
+    func removeRule(_ rule: VocabularyRule) throws {
+        try update(rule.word) { word in
+            word.replaces.removeAll { $0.caseInsensitiveCompare(rule.heard) == .orderedSame }
+            word.aliases.removeAll { $0.caseInsensitiveCompare(rule.heard) == .orderedSame }
+        }
+    }
+
+    func contains(_ word: String) throws -> Bool {
+        try queue.read { try VocabularyWord.filter(Column("word") == word).fetchCount($0) > 0 }
     }
 
     func remove(id: UUID) throws {
         _ = try queue.write { try VocabularyWord.deleteOne($0, key: id) }
     }
 
-    func suggest(_ word: String) throws {
+    private func update(_ word: String, _ change: (inout VocabularyWord) -> Void) throws {
+        try queue.write { database in
+            guard var record = try VocabularyWord.filter(Column("word") == word).fetchOne(database) else { return }
+            change(&record)
+            try record.update(database)
+        }
+    }
+
+    func knows(_ word: String) throws -> Bool {
+        try queue.read { database in
+            try VocabularyWord.filter(Column("word") == word).fetchCount(database) > 0
+                || VocabularySuggestion.filter(Column("word") == word).fetchCount(database) > 0
+        }
+    }
+
+    func suggest(_ word: String, aliases: [String] = []) throws {
         let trimmed = word.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         try queue.write { database in
             let known = try VocabularyWord.filter(Column("word") == trimmed).fetchCount(database) > 0
             let pending = try VocabularySuggestion.filter(Column("word") == trimmed).fetchCount(database) > 0
             guard !known, !pending else { return }
-            try VocabularySuggestion(word: trimmed).insert(database)
+            try VocabularySuggestion(word: trimmed, aliases: aliases).insert(database)
         }
     }
 
     func accept(_ suggestion: VocabularySuggestion) throws {
-        try add(suggestion.word, source: .learned)
+        try add(suggestion.word, source: .learned, aliases: suggestion.aliases)
     }
 
     func dismiss(_ suggestion: VocabularySuggestion) throws {
@@ -108,36 +187,50 @@ final class VocabularyStore: Sendable {
 
 enum VocabularyCasing {
     static func apply(_ vocabulary: [String], to text: String) -> String {
-        vocabulary.reduce(text) { current, word in
-            let escaped = NSRegularExpression.escapedPattern(for: word)
-            let pattern = "(?<![\\p{L}\\p{N}])\(escaped)(?![\\p{L}\\p{N}])"
-            return current.replacingOccurrences(
-                of: pattern,
-                with: NSRegularExpression.escapedTemplate(for: word),
-                options: [.regularExpression, .caseInsensitive]
-            )
-        }
+        vocabulary.reduce(text) { replaceWholeWord($1, with: $1, in: $0) }
     }
+
+    static func replaceWholeWord(_ find: String, with replacement: String, in text: String) -> String {
+        let escaped = NSRegularExpression.escapedPattern(for: find)
+        let pattern = "(?<![\\p{L}\\p{N}])\(escaped)(?![\\p{L}\\p{N}])"
+        return text.replacingOccurrences(
+            of: pattern,
+            with: NSRegularExpression.escapedTemplate(for: replacement),
+            options: [.regularExpression, .caseInsensitive]
+        )
+    }
+}
+
+struct VocabularyCandidate: Equatable {
+    let word: String
+    let heardAs: String
 }
 
 enum EditLearner {
     static let maxWords = 400
+    static let minimumSimilarity = 0.5
 
     static func suggestions(
         inserted: String,
         current: String,
         isKnownWord: (String) -> Bool
-    ) -> [String] {
+    ) -> [VocabularyCandidate] {
+        edits(inserted: inserted, current: current)
+            .filter { isWorthLearning($0, isKnownWord: isKnownWord) }
+            .reduce(into: [VocabularyCandidate]()) { unique, candidate in
+                if !unique.contains(where: { $0.word == candidate.word }) { unique.append(candidate) }
+            }
+    }
+
+    static func edits(inserted: String, current: String) -> [VocabularyCandidate] {
         let before = WordTokens.split(inserted)
         let after = WordTokens.split(current)
         guard !before.isEmpty, before.count <= maxWords, after.count <= maxWords * 4 else { return [] }
-        return replacements(from: before, to: after)
-            .filter { $0.original != $0.replacement }
-            .filter { looksLikeTermWorthLearning($0.replacement, isKnownWord: isKnownWord) }
-            .map(\.replacement)
-            .reduce(into: [String]()) { unique, word in
-                if !unique.contains(word) { unique.append(word) }
-            }
+        return replacements(from: before, to: after).map { VocabularyCandidate(word: $0.replacement, heardAs: $0.original) }
+    }
+
+    static func isWorthLearning(_ candidate: VocabularyCandidate, isKnownWord: (String) -> Bool) -> Bool {
+        candidate.word != candidate.heardAs && looksMisheard(candidate) && looksLikeTermWorthLearning(candidate.word, isKnownWord: isKnownWord)
     }
 
     private struct Replacement {
@@ -186,11 +279,17 @@ enum EditLearner {
         return table
     }
 
+    private static func looksMisheard(_ candidate: VocabularyCandidate) -> Bool {
+        let original = candidate.heardAs.lowercased()
+        let corrected = candidate.word.lowercased()
+        let distance = StringUtils.levenshteinDistance(original, corrected)
+        return 1 - Double(distance) / Double(max(original.count, corrected.count)) >= minimumSimilarity
+    }
+
     private static func looksLikeTermWorthLearning(_ word: String, isKnownWord: (String) -> Bool) -> Bool {
         guard word.count >= 2, word.contains(where: \.isLetter) else { return false }
-        let startsCapitalized = word.first?.isUppercase ?? false
         let hasDigit = word.contains(where: \.isNumber)
         let isCamelCase = zip(word, word.dropFirst()).contains { $0.isLowercase && $1.isUppercase }
-        return startsCapitalized || hasDigit || isCamelCase || !isKnownWord(word)
+        return hasDigit || isCamelCase || !isKnownWord(word)
     }
 }

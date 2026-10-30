@@ -3,6 +3,10 @@ import SwiftUI
 
 @MainActor
 final class ExtensionsModel: ObservableObject {
+    enum Tab: String, CaseIterable {
+        case installed = "Installed", browse = "Browse"
+    }
+
     enum Stage: Equatable {
         case gettingBun(Double), installing, updating, removing
 
@@ -18,6 +22,15 @@ final class ExtensionsModel: ObservableObject {
 
     private static let search = URL(string: "https://registry.npmjs.org/-/v1/search?text=keywords:voz-package&size=250")!
     private static let undoWindow: Duration = .seconds(5)
+    nonisolated static let claudeCommand = """
+    cd ~ && claude 'I want to build a Voz extension. Voz is a Mac dictation app. An extension is a TypeScript npm package that Voz runs with Bun, and it can change or act on what I dictate.
+
+    1. Read https://raw.githubusercontent.com/Joelheile/voz/main/EXTENSIONS.md first. It is the API reference, and its first table maps ideas to the primitive that fits.
+    2. Interview me with multiple-choice questions until you can say in one sentence what the extension does: what I say, what happens, and what it needs, such as an app, a setting or the on-device model. Write no code before that.
+    3. Run voz new with a name that starts with voz-, then work in the folder it creates. Read voz.d.ts there for the exact types. Copy the style of https://github.com/Joelheile/voz/tree/main/examples.
+    4. Put the logic that decides things in plain functions with bun test tests. Keep index.ts thin. Fix causes: no empty catch blocks or made-up fallback values.
+    5. Done means bun test passes and voz dev . loads it with no errors in its log. Run voz dev in the background, because it keeps running. Show me the commands you ran and their output, then give me one sentence to dictate to try it.'
+    """
     private let home: VozHome
     private let analytics: Analytics
     private let cache: URL?
@@ -38,11 +51,12 @@ final class ExtensionsModel: ObservableObject {
         listings = cached
         loading = cached.isEmpty
         refreshInstalled()
+        tab = installed.isEmpty ? .browse : .installed
     }
 
     @Published var query = ""
-    @Published var confirming: String?
-    @Published var expanded: String?
+    @Published var tab = Tab.installed
+    @Published var selected: String?
     @Published private(set) var listings: [PackageListing]
     @Published private(set) var installed: [InstalledExtension] = []
     @Published private(set) var disabled: [String] = []
@@ -52,7 +66,7 @@ final class ExtensionsModel: ObservableObject {
     @Published private(set) var message: String?
 
     var installedRows: [InstalledExtension] {
-        installed.filter { matches($0.name, summary(for: $0.source)) }
+        installed.filter { matches($0.name, summary(for: $0)) }
     }
 
     var browseRows: [PackageListing] {
@@ -60,12 +74,20 @@ final class ExtensionsModel: ObservableObject {
         return listings.filter { !installedFromNpm.contains($0.name) && matches($0.name, $0.summary, $0.publisher) }.ordered(by: .popular)
     }
 
+    var selectedInstalled: InstalledExtension? {
+        installed.first { $0.name == selected }
+    }
+
+    var selectedListing: PackageListing? {
+        listings.first { $0.name == selected }
+    }
+
     var updateCount: Int {
         installed.filter { latestVersion(for: $0) != nil }.count
     }
 
-    func summary(for source: PackageSource?) -> String? {
-        listing(for: source)?.summary
+    func summary(for item: InstalledExtension) -> String? {
+        item.description ?? listing(for: item.source)?.summary
     }
 
     func latestVersion(for item: InstalledExtension) -> String? {
@@ -83,7 +105,7 @@ final class ExtensionsModel: ObservableObject {
         do {
             let data = try await fetch(Self.search)
             let found = try PackageListing.decodeSearch(data)
-            let pending = listings.filter { listing in listing.name == confirming && !found.contains { $0.name == listing.name } }
+            let pending = listings.filter { listing in listing.name == selected && !found.contains { $0.name == listing.name } }
             listings = found + pending
             message = nil
             if let cache { try? data.write(to: cache) }
@@ -95,9 +117,10 @@ final class ExtensionsModel: ObservableObject {
     }
 
     func reveal(_ name: String) async {
-        query = name
+        query = ""
         if installed.contains(where: { $0.name == name }) {
-            expanded = name
+            tab = .installed
+            selected = name
             return
         }
         if !listings.contains(where: { $0.name == name }) {
@@ -109,13 +132,13 @@ final class ExtensionsModel: ObservableObject {
                 return
             }
         }
-        confirming = name
+        tab = .browse
+        selected = name
     }
 
     func install(_ listing: PackageListing) async {
-        confirming = nil
         await install(.npm(name: listing.name, spec: listing.name), name: listing.name)
-        expanded = listing.name
+        if installed.contains(where: { $0.name == listing.name }) { tab = .installed }
     }
 
     func update(_ item: InstalledExtension) async {
@@ -125,9 +148,9 @@ final class ExtensionsModel: ObservableObject {
 
     func remove(_ item: InstalledExtension) async {
         guard let source = item.source else { return }
-        if expanded == item.name { expanded = nil }
         await run(item.name, .removing, change: .remove, source: source) { _ in try await PackageCLI.remove(source.name) }
         guard message == nil else { return }
+        selected = nil
         removed = source
         undoExpiry?.cancel()
         undoExpiry = Task { [weak self] in
@@ -158,7 +181,7 @@ final class ExtensionsModel: ObservableObject {
         do {
             return try home.config(for: name)
         } catch {
-            message = "\(error)"
+            Log.app.error("Could not read extension settings: \(String(describing: error), privacy: .private)")
             return [:]
         }
     }
@@ -176,10 +199,6 @@ final class ExtensionsModel: ObservableObject {
         !disabled.contains(name)
     }
 
-    func toggleExpanded(_ name: String) {
-        expanded = expanded == name ? nil : name
-    }
-
     func openExtensionsFolder() {
         do {
             try home.writeAuthoringFiles(from: ExtensionService.resources)
@@ -189,29 +208,20 @@ final class ExtensionsModel: ObservableObject {
         }
     }
 
-    func createExtension() {
+    func copyClaudeCommand() -> Bool {
         do {
             try CommandLineTool.install()
-            try openNewExtensionPrompt()
-            message = nil
         } catch CommandLineToolError.cancelled {
             message = nil
+            return false
         } catch {
             message = "\(error)"
+            return false
         }
-    }
-
-    private func openNewExtensionPrompt() throws {
-        let script = FileManager.default.temporaryDirectory.appendingPathComponent("voz-new.command")
-        try """
-        #!/bin/zsh
-        cd ~
-        read "name?Name your extension: "
-        \(CommandLineTool.link.path) new "$name" && cd "$name"
-        exec $SHELL -l
-        """.write(to: script, atomically: true, encoding: .utf8)
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
-        NSWorkspace.shared.open([script], withApplicationAt: URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"), configuration: NSWorkspace.OpenConfiguration())
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(Self.claudeCommand, forType: .string)
+        message = nil
+        return true
     }
 
     func matches(_ fields: String?...) -> Bool {
@@ -272,6 +282,14 @@ final class ExtensionsModel: ObservableObject {
     private func listing(for source: PackageSource?) -> PackageListing? {
         guard let name = source.flatMap(Self.npmName(of:)) else { return nil }
         return listings.first { $0.name == name }
+    }
+
+    nonisolated static func displayName(_ name: String) -> String {
+        let base = name.split(separator: "/").last.map(String.init) ?? name
+        let words = (base.hasPrefix("voz-") ? String(base.dropFirst(4)) : base).split(separator: "-")
+        return words.map { word in
+            word.contains(where: "aeiouy".contains) ? word.prefix(1).uppercased() + word.dropFirst() : word.uppercased()
+        }.joined(separator: " ")
     }
 
     private static func npmName(of source: PackageSource) -> String? {

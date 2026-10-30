@@ -66,11 +66,11 @@ final class EditObserver {
         let timer: Task<Void, Never>
     }
 
-    private let vocabulary: VocabularyStore
+    private let learner: VocabularyLearner
     private var pending: Observation?
 
-    init(vocabulary: VocabularyStore) {
-        self.vocabulary = vocabulary
+    init(learner: VocabularyLearner) {
+        self.learner = learner
     }
 
     func observe(inserted: String) {
@@ -99,14 +99,12 @@ final class EditObserver {
             Log.app.debug("Edit learning skipped, field unavailable")
             return
         }
-        let words = EditLearner.suggestions(inserted: observation.inserted, current: current, isKnownWord: Self.isKnownWord)
-        for word in words {
-            do {
-                try vocabulary.suggest(word)
-                Log.app.notice("Vocabulary suggestion added from an edit")
-            } catch {
-                Log.app.error("Vocabulary suggestion failed: \(error.localizedDescription, privacy: .private)")
-            }
+        let edits = EditLearner.edits(inserted: observation.inserted, current: current)
+        let candidates = EditLearner.suggestions(inserted: observation.inserted, current: current, isKnownWord: Self.isKnownWord)
+        guard !edits.isEmpty else { return }
+        Task { [learner] in
+            await learner.forget(edits)
+            await learner.consider(candidates)
         }
     }
 
@@ -137,7 +135,7 @@ final class EditObserver {
         return value as? String
     }
 
-    private static func isKnownWord(_ word: String) -> Bool {
+    static func isKnownWord(_ word: String) -> Bool {
         let checker = NSSpellChecker.shared
         checker.automaticallyIdentifiesLanguages = true
         return checker.checkSpelling(of: word, startingAt: 0).location == NSNotFound

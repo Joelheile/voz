@@ -1,4 +1,5 @@
 import AppKit
+import LucideSwift
 import SwiftUI
 
 struct LevelBars: View {
@@ -54,23 +55,74 @@ struct ProgressDots: View {
 }
 
 struct ResultSymbol: View {
-    let name: String
+    let icon: LucideIconName
     let color: Color
     let effect: Effect
     @State private var arrived = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private static let size: CGFloat = 15
 
     enum Effect {
-        case drawOn
+        case reveal
         case bounce
     }
 
     var body: some View {
-        Image(systemName: name)
-            .font(.system(size: 13, weight: .bold))
+        Icon(icon, size: Self.size, strokeWidth: 2.25)
             .foregroundStyle(color)
-            .symbolEffect(.drawOn, isActive: effect == .drawOn && !arrived)
-            .symbolEffect(.bounce, options: .nonRepeating, value: effect == .bounce && arrived)
-            .onAppear { arrived = true }
+            .mask(alignment: .leading) {
+                Rectangle().frame(width: effect == .reveal && !arrived ? 0 : Self.size)
+            }
+            .scaleEffect(effect == .bounce && !arrived ? 0.8 : 1)
+            .onAppear { withAnimation(reduceMotion ? nil : arrival) { arrived = true } }
+    }
+
+    private var arrival: Animation {
+        effect == .reveal ? .easeOut(duration: 0.2) : .spring(duration: 0.3, bounce: 0.3)
+    }
+}
+
+struct NotchShape: Shape {
+    var topRadius: CGFloat
+    var bottomRadius: CGFloat
+
+    var animatableData: AnimatablePair<CGFloat, CGFloat> {
+        get { AnimatablePair(topRadius, bottomRadius) }
+        set {
+            topRadius = newValue.first
+            bottomRadius = newValue.second
+        }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let top = min(topRadius, rect.width / 4)
+        let bottom = min(bottomRadius, rect.width / 4, rect.height - top)
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.minX + top, y: rect.minY + top),
+            control: CGPoint(x: rect.minX + top, y: rect.minY)
+        )
+        path.addLine(to: CGPoint(x: rect.minX + top, y: rect.maxY - bottom))
+        path.addArc(
+            tangent1End: CGPoint(x: rect.minX + top, y: rect.maxY),
+            tangent2End: CGPoint(x: rect.minX + top + bottom, y: rect.maxY),
+            radius: bottom
+        )
+        path.addLine(to: CGPoint(x: rect.maxX - top - bottom, y: rect.maxY))
+        path.addArc(
+            tangent1End: CGPoint(x: rect.maxX - top, y: rect.maxY),
+            tangent2End: CGPoint(x: rect.maxX - top, y: rect.maxY - bottom),
+            radius: bottom
+        )
+        path.addLine(to: CGPoint(x: rect.maxX - top, y: rect.minY + top))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.maxX, y: rect.minY),
+            control: CGPoint(x: rect.maxX - top, y: rect.minY)
+        )
+        path.closeSubpath()
+        return path
     }
 }
 

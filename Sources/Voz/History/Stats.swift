@@ -14,25 +14,35 @@ struct WordBucket: Equatable, Sendable, Identifiable {
     var id: Date { start }
 }
 
-struct AppUsage: Hashable, Sendable {
+struct AppUsage: Hashable, Sendable, Identifiable {
     let bundleID: String?
     let name: String
     let words: Int
+    var id: String { bundleID ?? name }
 }
 
 struct PeriodStats: Equatable, Sendable {
+    static let typingWordsPerMinute = 40.0
+
     var words = 0
     var speakingSeconds = 0.0
     var fixes = 0
     var wordsPerMinute: Double?
-    var buckets: [WordBucket] = []
     var topApps: [AppUsage] = []
 
     init() {}
+
+    var typingSeconds: Double { Double(words) / Self.typingWordsPerMinute * 60 }
+    var savedSeconds: Double { max(typingSeconds - speakingSeconds, 0) }
 }
 
 struct UsageStats: Equatable, Sendable {
+    static let activityWeeks = 25
+
     var periods: [StatsPeriod: PeriodStats] = [:]
+    var days: [WordBucket] = []
+    var streak = 0
+    var longestStreak = 0
 
     init() {}
 
@@ -54,7 +64,7 @@ struct StatsAccumulator {
     private let calendar: Calendar
     private let now: Date
     private var tallies: [StatsPeriod: PeriodTally] = [:]
-    private var firstDate: Date?
+    private var wordsByDay: [Date: Int] = [:]
 
     init(now: Date, calendar: Calendar) {
         self.calendar = calendar
@@ -63,17 +73,52 @@ struct StatsAccumulator {
 
     mutating func add(_ row: StatsRow) {
         for period in StatsPeriod.allCases where row.createdAt >= start(of: period) {
-            tallies[period, default: PeriodTally()].add(row, bucket: bucketStart(for: row.createdAt, in: period))
+            tallies[period, default: PeriodTally()].add(row)
         }
-        firstDate = min(firstDate ?? row.createdAt, row.createdAt)
+        wordsByDay[calendar.startOfDay(for: row.createdAt), default: 0] += row.wordCount
     }
 
     func finish() -> UsageStats {
         var stats = UsageStats()
         for period in StatsPeriod.allCases {
-            stats.periods[period] = tallies[period, default: PeriodTally()].finish(buckets: bucketStarts(for: period))
+            stats.periods[period] = tallies[period, default: PeriodTally()].finish()
         }
+        stats.days = activityDays().map { WordBucket(start: $0, words: wordsByDay[$0] ?? 0) }
+        stats.streak = currentStreak()
+        stats.longestStreak = longestStreak()
         return stats
+    }
+
+    private func activityDays() -> [Date] {
+        let today = calendar.startOfDay(for: now)
+        let thisWeek = calendar.dateInterval(of: .weekOfYear, for: today)?.start ?? today
+        guard let first = calendar.date(byAdding: .weekOfYear, value: 1 - UsageStats.activityWeeks, to: thisWeek) else { return [] }
+        let count = (calendar.dateComponents([.day], from: first, to: today).day ?? 0) + 1
+        return (0..<count).compactMap { calendar.date(byAdding: .day, value: $0, to: first) }
+    }
+
+    private func currentStreak() -> Int {
+        let today = calendar.startOfDay(for: now)
+        guard var day = wordsByDay[today] == nil ? calendar.date(byAdding: .day, value: -1, to: today) : today else { return 0 }
+        var count = 0
+        while wordsByDay[day] != nil, let previous = calendar.date(byAdding: .day, value: -1, to: day) {
+            count += 1
+            day = previous
+        }
+        return count
+    }
+
+    private func longestStreak() -> Int {
+        var longest = 0
+        var run = 0
+        var previous: Date?
+        for day in wordsByDay.keys.sorted() {
+            let followsPrevious = previous.flatMap { calendar.date(byAdding: .day, value: 1, to: $0) } == day
+            run = followsPrevious ? run + 1 : 1
+            longest = max(longest, run)
+            previous = day
+        }
+        return longest
     }
 
     private func start(of period: StatsPeriod) -> Date {
@@ -85,30 +130,6 @@ struct StatsAccumulator {
         case .all: return .distantPast
         }
     }
-
-    private func bucketStarts(for period: StatsPeriod) -> [Date] {
-        let unit = bucketUnit(of: period)
-        let first = period == .all ? bucketStart(for: firstDate ?? now, in: .all) : start(of: period)
-        let count = switch period {
-        case .day: 24
-        case .week: 7
-        case .month: 30
-        case .all: (calendar.dateComponents([.month], from: first, to: bucketStart(for: now, in: .all)).month ?? 0) + 1
-        }
-        return (0..<count).compactMap { calendar.date(byAdding: unit, value: $0, to: first) }
-    }
-
-    private func bucketStart(for date: Date, in period: StatsPeriod) -> Date {
-        calendar.dateInterval(of: bucketUnit(of: period), for: date)?.start ?? date
-    }
-
-    private func bucketUnit(of period: StatsPeriod) -> Calendar.Component {
-        switch period {
-        case .day: .hour
-        case .week, .month: .day
-        case .all: .month
-        }
-    }
 }
 
 private struct PeriodTally {
@@ -116,26 +137,23 @@ private struct PeriodTally {
     private static let topAppCount = 5
 
     private var stats = PeriodStats()
-    private var wordsByBucket: [Date: Int] = [:]
     private var apps: [String: AppUsage] = [:]
     private var paceWords = 0
     private var paceSeconds = 0.0
 
-    mutating func add(_ row: StatsRow, bucket: Date) {
+    mutating func add(_ row: StatsRow) {
         stats.words += row.wordCount
         stats.speakingSeconds += row.audioSeconds
         stats.fixes += row.fillerWordsRemoved
-        wordsByBucket[bucket, default: 0] += row.wordCount
         addApp(of: row)
         guard row.audioSeconds > Self.minimumSecondsForPace else { return }
         paceWords += row.wordCount
         paceSeconds += row.audioSeconds
     }
 
-    func finish(buckets: [Date]) -> PeriodStats {
+    func finish() -> PeriodStats {
         var result = stats
         if paceSeconds > 0 { result.wordsPerMinute = Double(paceWords) / (paceSeconds / 60) }
-        result.buckets = buckets.map { WordBucket(start: $0, words: wordsByBucket[$0] ?? 0) }
         result.topApps = Array(apps.values.sorted { ($0.words, $1.name) > ($1.words, $0.name) }.prefix(Self.topAppCount))
         return result
     }

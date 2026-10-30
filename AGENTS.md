@@ -16,10 +16,19 @@ One SwiftPM executable target, `Sources/Voz`, grouped by feature. `Tests/VozTest
 
 - Builds must work with the Command Line Tools on Apple Silicon and macOS 26. Xcode-only tools are not available locally.
 - Extension failures must not block dictation. Text-changing hooks have deadlines. Observation hooks do not delay delivery.
+- Never remove or change extension API within one `apiVersion`. Bump `apiVersion` in `host.ts` and keep the old surface for older packages, as `withApi1Removals` in `host.ts` does, with a test that loads a package declaring the old version. An API with "no users" can still have published ones: search npm for the `voz-package` keyword first.
 - Without installed extensions, Bun stays absent. Extensions run unsandboxed in a separate process. Read `EXTENSIONS.md` before you change their interface.
 - Keep transcript text, vocabulary and app names out of telemetry. Usage analytics require opt-in. Read the README privacy section before you change privacy behavior.
 - Keep the native menu bar UI and its theme. Add optional behavior through extension primitives.
 - Test files cannot import `Testing` and `Foundation` together under the Command Line Tools. Put Foundation helpers in `Tests/VozTests/TestSupport.swift`.
+
+## Design
+
+- Every element earns its place. Signal only states that need attention, such as recording. Keep nav icons visible.
+- Use Lucide icons through `Icon`, not SF Symbols. Use stroke 1.25 in the popover and 2 to 2.25 in the indicator.
+- Take colors, radii and motion from `Theme`. Reuse `PanelGroup`, `PanelRow`, `IconButton` and the `.pill` and `.pressable` styles before you add a component.
+- Motion gives feedback or shows a state change, never decoration. Keep it under 300ms and use ease-out or a spring with bounce 0.3 or less. Don't move anything on hover; change only color or background. Under Reduce Motion, keep opacity changes and drop movement.
+- Check UI changes with `.build/debug/Voz --render-design <new dir>` in light and dark.
 
 ## Verify
 

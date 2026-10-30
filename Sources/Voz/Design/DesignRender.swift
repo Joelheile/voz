@@ -21,18 +21,41 @@ enum DesignRender {
             for (title, page) in pages {
                 try write(fixture.popover(page: page), to: outputDirectory, name: "popover-\(title)-\(suffix)", appearance: appearance)
             }
+            fixture.sources.extensions.selected = "voz-tone"
+            try write(fixture.popover(page: .extensions), to: outputDirectory, name: "popover-extension-detail-\(suffix)", appearance: appearance)
+            fixture.sources.extensions.selected = nil
+            fixture.sources.vocabulary.draft = "Kowalski"
+            try write(fixture.popover(page: .dictionary), to: outputDirectory, name: "popover-dictionary-adding-\(suffix)", appearance: appearance)
+            fixture.sources.vocabulary.draft = ""
             try write(PermissionTileView(close: {}), to: outputDirectory, name: "permission-tile-\(suffix)", appearance: appearance)
             for (title, settled, latest) in previewTexts {
-                let model = IndicatorModel()
-                model.isExpanded = true
-                model.preview = settled + latest
-                try write(
-                    IndicatorView(model: model, layout: previewLayout)
-                        .environment(\.colorScheme, name == .darkAqua ? .dark : .light),
-                    to: outputDirectory,
-                    name: "live-preview-\(title)-\(suffix)",
-                    appearance: appearance
-                )
+                for (style, hasNotch) in [("notch", true), ("floating", false)] {
+                    let model = IndicatorModel()
+                    model.isExpanded = true
+                    model.preview = settled + latest
+                    try write(
+                        IndicatorView(model: model, layout: previewLayout(hasNotch: hasNotch))
+                            .environment(\.colorScheme, hasNotch || name == .darkAqua ? .dark : .light),
+                        to: outputDirectory,
+                        name: "live-preview-\(style)-\(title)-\(suffix)",
+                        appearance: appearance
+                    )
+                }
+            }
+            for (title, state, targeted) in indicatorStates {
+                for (style, hasNotch) in [("notch", true), ("floating", false)] {
+                    let model = IndicatorModel()
+                    model.isExpanded = true
+                    model.state = state
+                    model.isDropTargeted = targeted
+                    try write(
+                        IndicatorView(model: model, layout: previewLayout(hasNotch: hasNotch))
+                            .environment(\.colorScheme, hasNotch || name == .darkAqua ? .dark : .light),
+                        to: outputDirectory,
+                        name: "indicator-\(style)-\(title)-\(suffix)",
+                        appearance: appearance
+                    )
+                }
             }
             for step in SetupStep.allCases {
                 fixture.sources.setup.step = step
@@ -56,7 +79,22 @@ enum DesignRender {
         ("multilingual", "Morgen besprechen wir Voz und die nächsten Schritte. ", "然后继续讨论我们的计划。"),
     ]
 
-    private static let previewLayout = IndicatorLayout.make(visibleFrame: CGRect(x: 0, y: 70, width: 1512, height: 888))
+    private static let indicatorStates: [(String, IndicatorState, Bool)] = [
+        ("done", .done, false),
+        ("failed", .failed, false),
+        ("drop", .dropTarget, false),
+        ("drop-targeted", .dropTarget, true),
+    ]
+
+    private static func previewLayout(hasNotch: Bool) -> IndicatorLayout {
+        IndicatorLayout.make(screen: ScreenMetrics(
+            frame: CGRect(x: 0, y: 0, width: 1512, height: 982),
+            safeAreaTop: hasNotch ? 32 : 0,
+            leftAreaWidth: hasNotch ? 662 : nil,
+            rightAreaWidth: hasNotch ? 662 : nil,
+            visibleMinY: 0
+        ))
+    }
 
     private static let pages: [(String, PopoverPage)] = [
         ("settings", .settings),
@@ -77,7 +115,7 @@ enum DesignRender {
         let window = NSWindow(contentRect: host.frame, styleMask: .borderless, backing: .buffered, defer: false)
         window.appearance = appearance
         window.contentView = host
-        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
         host.layoutSubtreeIfNeeded()
         guard let rep = NSBitmapImageRep(
             bitmapDataPlanes: nil,
@@ -118,7 +156,8 @@ private final class Fixture {
         records = Self.makeRecords()
         for record in records { try history.insert(record) }
         for word in ["Joel", "Parakeet", "GRDB", "Sparkle", "Wispr Flow", "Heil-Escobar"] { try history.vocabulary.add(word, source: .manual) }
-        for word in ["Voz", "FluidAudio"] { try history.vocabulary.suggest(word) }
+        try history.vocabulary.add("superbass -> Supabase", source: .manual)
+        for (word, heard) in [("Voz", "voss"), ("FluidAudio", "fluid audio")] { try history.vocabulary.suggest(word, aliases: [heard]) }
         sources = PopoverSources(
             settings: settings,
             modelStatus: status,

@@ -42,13 +42,13 @@ struct PopoverView: View {
         } else {
             switch model.page {
             case .home:
-                HomePage(model: model, history: sources.history, settings: sources.settings, catalog: sources.catalog, extensions: sources.extensions)
+                HomePage(model: model, history: sources.history, catalog: sources.catalog, extensions: sources.extensions)
             case .settings:
                 SettingsPage(model: model, settings: sources.settings, status: sources.modelStatus, vocabulary: sources.vocabulary, catalog: sources.catalog)
             case .dictionary:
                 DictionaryPage(model: sources.vocabulary, back: model.goBack)
             case .insights:
-                InsightsPage(model: sources.stats, back: model.goBack)
+                InsightsPage(model: sources.stats, settings: sources.settings, back: model.goBack)
             case .extensions:
                 ExtensionsPage(model: sources.extensions, catalog: sources.catalog, settings: sources.settings, back: model.goBack)
             case .cleanupPrompt:
@@ -68,7 +68,6 @@ private struct HomePage: View {
 
     @ObservedObject var model: PopoverModel
     @ObservedObject var history: HistoryModel
-    @ObservedObject var settings: AppSettings
     @ObservedObject var catalog: ExtensionCatalog
     @ObservedObject var extensions: ExtensionsModel
     @FocusState private var searchFocused: Bool
@@ -91,7 +90,6 @@ private struct HomePage: View {
                 header(proxy: proxy)
                 if needsAttention { notice }
                 transcripts
-                if !catalog.actions.isEmpty { actions }
                 footer
             }
         }
@@ -241,19 +239,16 @@ private struct HomePage: View {
         .id(record.id)
     }
 
-    private var actions: some View {
-        PanelGroup(title: "Actions") {
-            ForEach(catalog.actions, id: \.id) { action in
-                ActionRow(title: action.name, value: action.hotkey.flatMap { try? KeyChord(parsing: $0).label } ?? "") {
-                    catalog.run(action)
-                }
-            }
-        }
-    }
-
     private var footer: some View {
         HStack(spacing: 2) {
-            KeyChip(text: DictationHint.key(settings.hotkey)).help(model.hint)
+            HStack(spacing: 6) {
+                ForEach(catalog.actions, id: \.id) { action in
+                    Button(action.name) { catalog.run(action) }
+                        .buttonStyle(.pill(.accent, .small))
+                        .fixedSize()
+                        .help(action.hotkeyLabel ?? action.name)
+                }
+            }
             Spacer(minLength: 8)
             IconButton(icon: .chartNoAxesColumn, help: "Insights") { model.page = .insights }
             IconButton(icon: .puzzle, help: extensionsHelp) { model.page = .extensions }
@@ -329,19 +324,6 @@ private struct DayHeading: View {
             .padding(.horizontal, 8)
             .padding(.top, 10)
             .padding(.bottom, 4)
-    }
-}
-
-private struct KeyChip: View {
-    let text: String
-
-    var body: some View {
-        Text(text)
-            .font(.ui(12, weight: .medium))
-            .foregroundStyle(Theme.inkSecondary)
-            .padding(.horizontal, 10)
-            .frame(height: 24)
-            .overlay(Capsule().strokeBorder(Theme.hairline))
     }
 }
 

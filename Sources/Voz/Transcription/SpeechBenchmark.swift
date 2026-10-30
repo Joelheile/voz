@@ -39,7 +39,7 @@ enum SpeechBenchmark {
             let preparationStart = ContinuousClock.now
             try await engine.prepare(model)
             if model != .appleSpeech {
-                try await parakeet.prepareVocabulary(vocabulary)
+                try await parakeet.prepareVocabulary(vocabulary.map { VocabularyTerm(word: $0, aliases: []) })
             }
             let preparationMs = (ContinuousClock.now - preparationStart).wholeMilliseconds
             var runs: [Run] = []
