@@ -91,13 +91,16 @@ final class Recorder {
     private var capture: Capture?
     private let buffer = SampleBuffer()
     private var configurationObserver: NSObjectProtocol?
+    private let preferredInput: @MainActor () -> String
 
     private(set) var isRecording = false
     let level = LiveLevel()
     var onSamples: (@Sendable ([Float]) -> Void)?
     var onInterrupted: (@MainActor () -> Void)?
 
-    init() {
+    /// `preferredInput` returns the UID of the mic to record from, or an empty string for the system default.
+    init(preferredInput: @escaping @MainActor () -> String = { "" }) {
+        self.preferredInput = preferredInput
         // The engine posts this on its own queue and waits for observers. Releasing an engine also waits
         // for that queue, so observing on the main queue deadlocks. Hop to the main actor without waiting.
         configurationObserver = NotificationCenter.default.addObserver(
@@ -111,7 +114,9 @@ final class Recorder {
     }
 
     func prepare() {
-        guard !isRecording, capture == nil else { return }
+        guard !isRecording else { return }
+        if let stale = capture, !isCurrent(stale) { discard() }
+        guard capture == nil else { return }
         do {
             capture = try makeCapture()
         } catch {
@@ -167,7 +172,7 @@ final class Recorder {
     }
 
     private func isCurrent(_ capture: Capture) -> Bool {
-        capture.device == InputDevice.defaultInput() && capture.engine.inputNode.outputFormat(forBus: 0) == capture.format
+        capture.device == selectedInput() && capture.engine.inputNode.outputFormat(forBus: 0) == capture.format
     }
 
     private func discard() {
@@ -191,8 +196,11 @@ final class Recorder {
 
     private func makeCapture() throws -> Capture {
         let engine = AVAudioEngine()
-        let device = InputDevice.defaultInput()
-        selectBuiltInMicIfDefaultIsBluetooth(engine)
+        let chosen = InputDevice.connected(uid: preferredInput())
+        let device = chosen ?? InputDevice.defaultInput()
+        if let override = chosen ?? InputDevice.builtInIfDefaultIsBluetooth() {
+            use(override, on: engine)
+        }
         let input = engine.inputNode
         let inputFormat = input.outputFormat(forBus: 0)
         guard inputFormat.channelCount > 0, inputFormat.sampleRate > 0 else {
@@ -236,8 +244,13 @@ final class Recorder {
         }
     }
 
-    private func selectBuiltInMicIfDefaultIsBluetooth(_ engine: AVAudioEngine) {
-        guard var device = InputDevice.builtInIfDefaultIsBluetooth(), let unit = engine.inputNode.audioUnit else { return }
+    private func selectedInput() -> AudioDeviceID? {
+        InputDevice.connected(uid: preferredInput()) ?? InputDevice.defaultInput()
+    }
+
+    private func use(_ device: AudioDeviceID, on engine: AVAudioEngine) {
+        guard let unit = engine.inputNode.audioUnit else { return }
+        var device = device
         let status = AudioUnitSetProperty(
             unit,
             kAudioOutputUnitProperty_CurrentDevice,
@@ -247,7 +260,7 @@ final class Recorder {
             UInt32(MemoryLayout<AudioDeviceID>.size)
         )
         if status != noErr {
-            Log.app.error("Selecting built-in mic failed: \(status)")
+            Log.app.error("Selecting mic failed: \(status)")
         }
     }
 }

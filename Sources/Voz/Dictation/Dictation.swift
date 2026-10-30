@@ -16,7 +16,7 @@ final class Dictation {
         case failed
     }
 
-    private let recorder = Recorder()
+    private let recorder: Recorder
     private let muter = OutputMuter()
     private let pipeline: DictationPipeline
     private let settings: AppSettings
@@ -45,6 +45,7 @@ final class Dictation {
         self.pipeline = pipeline
         self.settings = settings
         self.analytics = analytics
+        recorder = Recorder { settings.microphone }
         recorder.onInterrupted = { [weak self] in
             analytics.capture(.dictationFailed(stage: .recording, errorCode: .recorderInterrupted))
             self?.stopIfRecording()

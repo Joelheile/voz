@@ -20,6 +20,7 @@ private enum SettingsKey {
     static let milestonesSeen = "milestonesSeen"
     static let milestoneShows = "milestoneShows"
     static let logIncludesText = "logIncludesText"
+    static let microphone = "microphone"
 }
 
 @MainActor
@@ -71,6 +72,10 @@ final class AppSettings: ObservableObject {
     }
     @Published var milestoneShows: Int {
         didSet { defaults.set(milestoneShows, forKey: SettingsKey.milestoneShows) }
+    }
+    /// The UID of the mic to record from. Empty means the system default.
+    @Published var microphone: String {
+        didSet { defaults.set(microphone, forKey: SettingsKey.microphone) }
     }
     @Published var cleanupEnabled: Bool {
         didSet { defaults.set(cleanupEnabled, forKey: SettingsKey.cleanupEnabled) }
@@ -138,6 +143,7 @@ final class AppSettings: ObservableObject {
         starPromptDismissed = defaults.bool(forKey: SettingsKey.starPromptDismissed)
         milestoneShows = defaults.integer(forKey: SettingsKey.milestoneShows)
         milestonesSeen = defaults.dictionary(forKey: SettingsKey.milestonesSeen) as? [String: Int] ?? [:]
+        microphone = defaults.string(forKey: SettingsKey.microphone) ?? MicrophoneOptions.systemDefault
         cleanupEnabled = defaults.bool(forKey: SettingsKey.cleanupEnabled)
         analyticsEnabled = defaults.bool(forKey: SettingsKey.analyticsEnabled)
         receiveBetaUpdates = defaults.bool(forKey: SettingsKey.receiveBetaUpdates)
