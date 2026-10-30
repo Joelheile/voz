@@ -92,7 +92,7 @@ enum DesignRender {
             safeAreaTop: hasNotch ? 32 : 0,
             leftAreaWidth: hasNotch ? 662 : nil,
             rightAreaWidth: hasNotch ? 662 : nil,
-            visibleMaxY: 958
+            visibleMinY: 0
         ))
     }
 
@@ -103,6 +103,7 @@ enum DesignRender {
         ("extensions", .extensions),
         ("cleanup-prompt", .cleanupPrompt),
         ("cleanup-steps", .cleanupSteps),
+        ("whats-new", .whatsNew),
     ]
 
     private static func write(_ view: some View, to directory: URL, name: String, appearance: NSAppearance) throws {

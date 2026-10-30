@@ -55,7 +55,9 @@ One SwiftPM executable target, `Sources/Voz`, grouped by feature. `Tests/VozTest
 - Do not change the signing identity, Sparkle key, bundle identifier or appcast URL. Changes break permissions or updates.
 - Pushes to `main` publish a beta. Tags `vX.Y.Z` publish a stable release. Both run `.github/workflows/release.yml`. Build numbers must keep increasing.
 - Changes reach `main` only through a pull request that passes CI. Agents open the pull request. Only the maintainer merges it.
-- Release notes list only `Changelog:` commit trailers. Add one per change users notice, written for them, such as `Changelog: Show the time left while a model downloads`. Leave it off internal changes.
+- Release notes and `CHANGELOG.md` list only `Changelog:` commit trailers. Add one per change users notice, such as `Changelog: See the time left while a speech model downloads`. Leave it off refactors, tests, dependency bumps and fixes to unreleased features.
+- Write each trailer as one line under 15 words: what the user can now do, or the symptom that went away. Use "you", plain words and the place to find it. No PR numbers, file names, hype, emojis or exclamation marks. One warm or specific detail beats a joke.
+- CI adds new trailers to the top of the "In beta" section of `CHANGELOG.md` and renames that section to the version at a stable tag. The menu and README show the file. If your change makes an "In beta" entry wrong or redundant, edit or remove that entry in the same pull request. Your edits stick.
 - `install.sh` and `appcast.xml` stay at the repo root. The landing page and shipped apps link to them.
 - Keep `disable-library-validation` until every release is notarized with a Developer ID.
 

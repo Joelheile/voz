@@ -276,7 +276,7 @@ enum ScreenResolver {
             safeAreaTop: screen.safeAreaInsets.top,
             leftAreaWidth: screen.auxiliaryTopLeftArea?.width,
             rightAreaWidth: screen.auxiliaryTopRightArea?.width,
-            visibleMaxY: screen.visibleFrame.maxY
+            visibleMinY: screen.visibleFrame.minY
         )
     }
 

@@ -17,7 +17,7 @@ enum IndicatorMotion {
     static let hiddenScaleY: CGFloat = 0.85
     static let pillExit = Animation.easeOut(duration: 0.15)
     static let pillHiddenScale: CGFloat = 0.9
-    static let pillHiddenOffset: CGFloat = -6
+    static let pillHiddenOffset: CGFloat = 6
     static let swell = Animation.spring(duration: 0.3, bounce: 0.25)
     static let settle = Animation.spring(duration: 0.25, bounce: 0)
 }
@@ -56,7 +56,7 @@ extension AnyTransition {
     }
 
     static var pill: AnyTransition {
-        let hidden = AnyTransition.scale(scale: IndicatorMotion.pillHiddenScale, anchor: .top)
+        let hidden = AnyTransition.scale(scale: IndicatorMotion.pillHiddenScale, anchor: .bottom)
             .combined(with: .offset(y: IndicatorMotion.pillHiddenOffset))
             .combined(with: .opacity)
         return .asymmetric(
@@ -78,7 +78,7 @@ struct IndicatorView: View {
 
     var body: some View {
         indicator
-            .frame(width: layout.windowFrame.width, height: layout.windowFrame.height, alignment: .top)
+            .frame(width: layout.windowFrame.width, height: layout.windowFrame.height, alignment: layout.style == .notch ? .top : .bottom)
             .keyframeAnimator(initialValue: 0.0, trigger: model.shakeCount) { view, offset in
                 view.offset(x: offset)
             } keyframes: { _ in
@@ -192,7 +192,6 @@ struct IndicatorView: View {
 
     private var pill: some View {
         VStack(spacing: IndicatorLayout.pillGap) {
-            if model.state != .dropTarget { pillBody }
             if showsPreview {
                 preview
                     .padding(14)
@@ -200,8 +199,9 @@ struct IndicatorView: View {
                     .background { floatingSurface(RoundedRectangle(cornerRadius: 16)) }
                     .transition(reduceMotion ? .opacity.animation(IndicatorMotion.reducedMotion) : .pill)
             }
+            if model.state != .dropTarget { pillBody }
         }
-        .padding(.top, IndicatorLayout.shadowMargin)
+        .padding(.bottom, IndicatorLayout.shadowMargin)
         .dropDestination(for: URL.self) { files, _ in acceptsDrop(files) } isTargeted: { model.isDropTargeted = $0 }
         .animation(previewAnimation, value: model.preview)
         .animation(swellAnimation, value: model.isDropTargeted)
