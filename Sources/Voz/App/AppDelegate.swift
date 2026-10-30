@@ -51,10 +51,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotkeyMonitor: HotkeyMonitor?
     private var quitRequested = false
     private let indicator = IndicatorController()
-    private lazy var audioDrag = MediaDragMonitor(
-        isEnabled: { [weak self] in self?.acceptsAudioDrop ?? false },
-        onStart: { [weak self] in self?.indicator.showDropTarget() },
-        onEnd: { [weak self] in self?.indicator.endDropTarget() }
+    private lazy var dropSensor = DropSensor(
+        onInvite: { [weak self] screen in self?.inviteDrop(on: screen) },
+        onEnter: { [weak self] screen in self?.offerDrop(on: screen) ?? false },
+        onDrop: { [weak self] file in self?.transcribeDropped(file) }
     )
     private let uninstallWatcher = UninstallWatcher()
     private lazy var updater = Updater(settings: settings, isBusy: { [weak self] in self?.dictation.phase != .idle })
@@ -104,7 +104,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         indicator.attach(to: dictation)
-        indicator.onDrop = { [weak self] file in self?.transcribeDropped(file) }
         indicator.onCancelFile = { [weak self] in self?.extensions.cancelFileTranscriptions() }
         extensions.onFileProgress = { [weak self] fraction in self?.indicator.showFileProgress(fraction) }
         extensions.onFileTranscribing = { [weak self] in
@@ -119,7 +118,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 Log.extensions.error("History write failed: \(error.localizedDescription, privacy: .public)")
             }
         }
-        audioDrag.start()
+        dropSensor.start()
         observeWake()
         OpenRequest.observe { [weak self] in self?.statusItemController?.open() }
         observeSettings()
@@ -154,6 +153,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var acceptsAudioDrop: Bool {
         extensions.acceptsAudioDrops && dictation.phase == .idle
+    }
+
+    private func inviteDrop(on screen: NSScreen) {
+        guard acceptsAudioDrop else { return }
+        indicator.inviteDrop(on: screen)
+    }
+
+    private func offerDrop(on screen: NSScreen) -> Bool {
+        acceptsAudioDrop && indicator.showDropTarget(on: screen)
     }
 
     private func transcribeDropped(_ file: URL) {
