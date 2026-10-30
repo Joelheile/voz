@@ -105,6 +105,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         indicator.attach(to: dictation)
         indicator.onDrop = { [weak self] file in self?.transcribeDropped(file) }
+        indicator.onCancelFile = { [weak self] in self?.extensions.cancelFileTranscriptions() }
+        extensions.onFileProgress = { [weak self] fraction in self?.indicator.showFileProgress(fraction) }
         extensions.onFileTranscribing = { [weak self] in
             guard let self, self.dictation.phase == .idle else { return }
             self.indicator.showFileTranscribing()

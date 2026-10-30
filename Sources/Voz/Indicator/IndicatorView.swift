@@ -153,7 +153,7 @@ struct IndicatorView: View {
                     }
                     Spacer(minLength: layout.collapsedWidth)
                     wing(alignment: .leading, anchor: .leading, delay: IndicatorMotion.trailingDelay) {
-                        IndicatorTrailing(model: model)
+                        IndicatorTrailing(model: model, style: layout.style)
                     }
                 }
                 .frame(height: layout.panelFrame.height)
@@ -226,7 +226,7 @@ struct IndicatorView: View {
                 }
                 Spacer(minLength: 0)
                 revealed(anchor: .leading, delay: IndicatorMotion.trailingDelay) {
-                    IndicatorTrailing(model: model)
+                    IndicatorTrailing(model: model, style: layout.style)
                 }
                 .frame(width: LevelBarsGeometry.visibleWidth + LevelBarsGeometry.trailingInset)
             }
@@ -280,8 +280,12 @@ final class IndicatorModel {
     var recordingEnd: Date?
     var preview = ""
     var isDropTargeted = false
+    var progress: Double?
+    var canCancel = false
+    var isHovering = false
     @ObservationIgnored var previewFrame = CGRect.zero
     @ObservationIgnored var onDrop: (URL) -> Void = { _ in }
+    @ObservationIgnored var onCancel: () -> Void = {}
     @ObservationIgnored var levels = LevelHistory()
 }
 
@@ -313,6 +317,7 @@ struct IndicatorLeading: View {
 
 struct IndicatorTrailing: View {
     let model: IndicatorModel
+    let style: IndicatorLayout.Style
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -321,7 +326,11 @@ struct IndicatorTrailing: View {
             case .recording, .discarded:
                 LevelBars(model: model).transition(swap)
             case .transcribing:
-                ProgressDots().transition(swap)
+                if model.canCancel {
+                    FileProgress(model: model, style: style).transition(swap)
+                } else {
+                    ProgressDots().transition(swap)
+                }
             case .done:
                 ResultSymbol(icon: .check, color: .primary, effect: .reveal).transition(swap)
             case .failed:

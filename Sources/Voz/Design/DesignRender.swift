@@ -57,6 +57,23 @@ enum DesignRender {
                     )
                 }
             }
+            for (title, progress, hovering) in fileProgressStates {
+                for (style, hasNotch) in [("notch", true), ("floating", false)] {
+                    let model = IndicatorModel()
+                    model.isExpanded = true
+                    model.state = .transcribing
+                    model.canCancel = true
+                    model.progress = progress
+                    model.isHovering = hovering
+                    try write(
+                        IndicatorView(model: model, layout: previewLayout(hasNotch: hasNotch))
+                            .environment(\.colorScheme, hasNotch || name == .darkAqua ? .dark : .light),
+                        to: outputDirectory,
+                        name: "indicator-\(style)-\(title)-\(suffix)",
+                        appearance: appearance
+                    )
+                }
+            }
             for step in SetupStep.allCases {
                 fixture.sources.setup.step = step
                 try write(fixture.popover(needsSetup: true), to: outputDirectory, name: "popover-setup-\(step)-\(suffix)", appearance: appearance)
@@ -84,6 +101,12 @@ enum DesignRender {
         ("failed", .failed, false),
         ("drop", .dropTarget, false),
         ("drop-targeted", .dropTarget, true),
+    ]
+
+    private static let fileProgressStates: [(String, Double?, Bool)] = [
+        ("file-starting", nil, false),
+        ("file-progress", 0.42, false),
+        ("file-cancel", 0.42, true),
     ]
 
     private static func previewLayout(hasNotch: Bool) -> IndicatorLayout {

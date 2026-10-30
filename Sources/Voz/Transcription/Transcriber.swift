@@ -68,10 +68,15 @@ actor Transcriber {
         return TranscriptionResult(text: text, audioSeconds: result.duration, processingSeconds: result.processingTime, model: model.rawValue)
     }
 
-    func recognize(_ url: URL, model: SpeechModel) async throws -> ASRResult {
+    func recognize(_ samples: [Float], model: SpeechModel, progress: @escaping @Sendable (Double) -> Void) async throws -> ASRResult {
         let manager = try await manager(for: model)
+        let fractions = await manager.transcriptionProgressStream
+        let reporter = Task {
+            for try await fraction in fractions { progress(fraction) }
+        }
+        defer { reporter.cancel() }
         var decoderState = TdtDecoderState.make()
-        return try await manager.transcribe(url, decoderState: &decoderState)
+        return try await manager.transcribe(samples, decoderState: &decoderState)
     }
 
     private func manager(for model: SpeechModel) async throws -> AsrManager {

@@ -99,8 +99,10 @@ final class ExtensionService {
     let catalog = ExtensionCatalog()
     var onFileTranscribing: () -> Void = {}
     var onFileTranscribed: (_ succeeded: Bool) -> Void = { _ in }
+    var onFileProgress: (Double) -> Void = { _ in }
     var onHistory: (ExtensionHistoryEntry) -> Void = { _ in }
     private var runningDrops = 0
+    private var fileTranscriptions: [UUID: Task<FileTranscript, any Error>] = [:]
     private var host: ExtensionHost?
     private var manifest: HostManifest?
     private var restarts = 0
@@ -361,32 +363,48 @@ final class ExtensionService {
         }
     }
 
+    func cancelFileTranscriptions() {
+        for task in fileTranscriptions.values { task.cancel() }
+    }
+
     private func transcribe(_ params: TranscribeFileParams) async throws -> FileTranscript {
+        let progress: @Sendable (Double) -> Void = { fraction in
+            Task { @MainActor [weak self] in self?.onFileProgress(fraction) }
+        }
         let transcribe = { [fileTranscriber, model = settings.localSpeechModel, includesText = settings.logIncludesText] in
             let started = ContinuousClock.now
             var fields: [String: Any] = ["model": model.rawValue, "speakers_requested": params.speakers]
             do {
-                let transcript = try await fileTranscriber.transcribe(URL(fileURLWithPath: params.path), model: model, speakers: params.speakers)
+                let transcript = try await fileTranscriber.transcribe(URL(fileURLWithPath: params.path), model: model, speakers: params.speakers, progress: progress)
                 fields.merge(["outcome": "transcribed", "audio_s": transcript.seconds, "speakers": transcript.speakers, "ms": (ContinuousClock.now - started).wholeMilliseconds]) { $1 }
                 if includesText { fields["text"] = transcript.text }
                 DebugLog.shared.write("file", fields)
                 return transcript
             } catch {
-                fields.merge(["outcome": "failed", "error": error.localizedDescription, "ms": (ContinuousClock.now - started).wholeMilliseconds]) { $1 }
+                let outcome = error is CancellationError ? "cancelled" : "failed"
+                fields.merge(["outcome": outcome, "error": error.localizedDescription, "ms": (ContinuousClock.now - started).wholeMilliseconds]) { $1 }
                 DebugLog.shared.write("file", fields)
                 throw error
             }
         }
-        guard runningDrops == 0 else { return try await transcribe() }
+        guard runningDrops == 0 else { return try await cancellable(transcribe) }
         onFileTranscribing()
         do {
-            let transcript = try await transcribe()
+            let transcript = try await cancellable(transcribe)
             onFileTranscribed(true)
             return transcript
         } catch {
             onFileTranscribed(false)
             throw error
         }
+    }
+
+    private func cancellable(_ work: @escaping () async throws -> FileTranscript) async throws -> FileTranscript {
+        let id = UUID()
+        let task = Task { try await work() }
+        fileTranscriptions[id] = task
+        defer { fileTranscriptions[id] = nil }
+        return try await withTaskCancellationHandler { try await task.value } onCancel: { task.cancel() }
     }
 
     private func perform(_ action: HostAction) async {
