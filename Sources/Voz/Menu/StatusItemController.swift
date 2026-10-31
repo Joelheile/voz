@@ -67,7 +67,7 @@ final class StatusItemController: NSObject {
     private static let anchorRetry: TimeInterval = 0.1
     private static let shrinkDelay: TimeInterval = 0.35
 
-    private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+    private let statusItem: NSStatusItem
     private let model = PopoverModel()
     private let panel = PopoverPanel()
     private let hosting: PopoverHostingView
@@ -108,6 +108,8 @@ final class StatusItemController: NSObject {
         self.analytics = analytics
         self.checkForUpdates = checkForUpdates
         quitApp = quit
+        MenuBarNotch.placeIconBesideNotch()
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         hosting = PopoverHostingView(rootView: PopoverView(model: model, sources: sources))
         super.init()
         hosting.sizingOptions = []

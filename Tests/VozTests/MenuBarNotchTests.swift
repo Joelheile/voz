@@ -18,3 +18,18 @@ private let screen = CGRect(x: 0, y: 0, width: 1800, height: 1169)
     #expect(MenuBarNotch.hides(CGRect(x: 2680, y: 1131, width: 36, height: 38), screen: right, leftWidth: 790, rightWidth: 790))
     #expect(!MenuBarNotch.hides(CGRect(x: 880, y: 1131, width: 36, height: 38), screen: right, leftWidth: 790, rightWidth: 790))
 }
+
+@Test func savedPositionUnderTheNotchMovesTheIcon() {
+    #expect(MenuBarNotch.hides(savedPosition: 756, rightWidth: 790))
+    #expect(MenuBarNotch.hides(savedPosition: nil, rightWidth: 790))
+}
+
+@Test func savedPositionBesideTheNotchStays() {
+    #expect(!MenuBarNotch.hides(savedPosition: 0, rightWidth: 790))
+    #expect(!MenuBarNotch.hides(savedPosition: 600, rightWidth: 790))
+}
+
+@Test func savedPositionLeavesRoomForTheMicIndicator() {
+    #expect(MenuBarNotch.hides(savedPosition: 700, rightWidth: 790))
+    #expect(!MenuBarNotch.hides(savedPosition: MenuBarNotch.positionBesideNotch(rightWidth: 790), rightWidth: 790))
+}
