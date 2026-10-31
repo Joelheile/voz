@@ -2,6 +2,10 @@
 
 Newest first. To get beta changes now, turn on Beta updates under What's new in Settings.
 
+## In beta
+
+- Your Voz icon no longer hides behind the notch when your menu bar is full
+
 ## 0.1.0 (October 31, 2026)
 
 - Extension entries in your history show the icon their package picks

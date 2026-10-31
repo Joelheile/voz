@@ -106,11 +106,7 @@ Install one from the menu bar, or run `voz install voz-meeting`. [Browse extensi
 ## What's new
 
 <!-- changelog -->
-- Extension entries in your history show the icon their package picks
-- Settings groups are easier to scan, with Live preview under While recording
-- A broken extension package no longer stops your other extensions from loading
-- With Reduce Motion on, the indicator stops shaking and icons fade in
-- Choose which microphone Voz records from in Settings
+- Your Voz icon no longer hides behind the notch when your menu bar is full
 
 [See everything new](CHANGELOG.md)
 <!-- /changelog -->

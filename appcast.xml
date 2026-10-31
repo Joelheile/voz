@@ -3,6 +3,17 @@
   <channel>
     <title>voz</title>
     <item>
+      <title>voz 0.1.0-beta.100047</title>
+      <description>&lt;ul&gt;&lt;li&gt;Your Voz icon no longer hides behind the notch when your menu bar is full&lt;/li&gt;&lt;/ul&gt;</description>
+      <link>https://github.com/Joelheile/voz/releases/tag/beta-100047</link>
+      <pubDate>Sat, 31 Oct 2026 12:58:17 GMT</pubDate>
+      <sparkle:version>100047</sparkle:version>
+      <sparkle:shortVersionString>0.1.0-beta.100047</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100047/voz-0.1.0-beta.100047.zip" length="8492561" sparkle:edSignature="SCV2r38DKWXo7gIDueuzV9rwTjBnaTqlHzgD8LDhx0biGmrphWDw0UyKif5ZqVzPVCgMEOzW8hy9PAizvdclBw==" type="application/octet-stream" />
+    </item>
+    <item>
       <title>voz 0.1.0-beta.100046</title>
       <description>&lt;ul&gt;&lt;li&gt;Maintenance release&lt;/li&gt;&lt;/ul&gt;</description>
       <link>https://github.com/Joelheile/voz/releases/tag/beta-100046</link>
@@ -110,17 +121,6 @@
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <sparkle:channel>beta</sparkle:channel>
       <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100037/voz-0.0.5-beta.100037.zip" length="8454966" sparkle:edSignature="0TZQyrZbMRsdIhoRWmCvclOfWs+uOivf3ou7acsmHaw8wRRx9MSNQaKRc0ISZak1aFAtme+pk5PDZItyALX2AQ==" type="application/octet-stream" />
-    </item>
-    <item>
-      <title>voz 0.0.5-beta.100035</title>
-      <description>&lt;ul&gt;&lt;li&gt;Find settings faster, with release notes one click away at the top&lt;/li&gt;&lt;li&gt;Open your dictionary straight from the main panel&lt;/li&gt;&lt;li&gt;Quit Voz from the bottom of Settings&lt;/li&gt;&lt;li&gt;See how your speaking pace compares with typing and with most people&lt;/li&gt;&lt;li&gt;See your word, streak and time-saved milestones right in the panel&lt;/li&gt;&lt;/ul&gt;</description>
-      <link>https://github.com/Joelheile/voz/releases/tag/beta-100035</link>
-      <pubDate>Fri, 30 Oct 2026 11:18:14 GMT</pubDate>
-      <sparkle:version>100035</sparkle:version>
-      <sparkle:shortVersionString>0.0.5-beta.100035</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <sparkle:channel>beta</sparkle:channel>
-      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100035/voz-0.0.5-beta.100035.zip" length="8455306" sparkle:edSignature="wZ0NF66yvJlN+f29YGN3jEZPoQdKhfanpeaVCuMWjtoYuCaDps31/s3q9iW1Cbpj177o2WPSnIlVG5AcFk/tAA==" type="application/octet-stream" />
     </item>
     <item>
       <title>voz 0.0.5</title>
