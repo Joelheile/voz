@@ -232,7 +232,7 @@ struct PanelGroup<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 4) {
             if let title { SectionLabel(text: title) }
             VStack(spacing: 0) { content }
         }
@@ -260,7 +260,7 @@ struct PanelRow<Control: View>: View {
             control
         }
         .frame(minHeight: Theme.Size.row)
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
     }
 }
 
@@ -293,7 +293,7 @@ struct ActionRow<Trailing: View>: View {
                 trailing(hovering)
             }
             .frame(minHeight: Theme.Size.row)
-            .padding(.vertical, 4)
+            .padding(.vertical, 2)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

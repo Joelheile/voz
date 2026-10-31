@@ -1,3 +1,4 @@
+import LucideSwift
 import SwiftUI
 
 struct PopoverSources {
@@ -235,6 +236,7 @@ private struct HomePage: View {
     private func row(for record: TranscriptRecord, now: Date) -> some View {
         TranscriptRow(
             record: record,
+            icon: record.source.map { ExtensionsModel.historyIcon(for: $0, in: extensions.installed) } ?? .puzzle,
             query: history.query,
             time: RecentTime.label(for: record.createdAt, now: now),
             height: Self.rowHeight,
@@ -316,6 +318,8 @@ private struct HomePage: View {
                 .keyboardShortcut(",", modifiers: .command)
         }
         .padding(.trailing, -8)
+        .padding(.top, -4)
+        .padding(.bottom, -8)
     }
 
     @ViewBuilder
@@ -383,6 +387,7 @@ private struct DayHeading: View {
 
 private struct TranscriptRow: View {
     let record: TranscriptRecord
+    let icon: LucideIconName
     let query: String
     let time: String
     let height: CGFloat
@@ -398,7 +403,7 @@ private struct TranscriptRow: View {
                 if record.source == nil {
                     AppIcon(bundleID: record.appBundleID, size: 24)
                 } else {
-                    Icon(.puzzle, size: 16).foregroundStyle(Theme.inkSecondary).frame(width: 24, height: 24)
+                    Icon(icon, size: 16).foregroundStyle(Theme.inkSecondary).frame(width: 24, height: 24)
                 }
                 Text(text)
                     .font(.ui(13))

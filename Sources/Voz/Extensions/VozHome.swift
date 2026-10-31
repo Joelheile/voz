@@ -27,6 +27,7 @@ struct InstalledExtension: Equatable, Sendable {
     let source: PackageSource?
     var version: String? = nil
     var description: String? = nil
+    var icon: String? = nil
 }
 
 struct VozHome: Sendable {
@@ -58,7 +59,7 @@ struct VozHome: Sendable {
             let source = try PackageSource(parsing: raw, relativeTo: root)
             let directory = source.directory(in: self)
             let manifest = Self.manifest(in: directory)
-            return InstalledExtension(name: manifest.name ?? directory.lastPathComponent, source: source, version: manifest.version, description: manifest.description)
+            return InstalledExtension(name: manifest.name ?? directory.lastPathComponent, source: source, version: manifest.version, description: manifest.description, icon: manifest.icon)
         }
         return try looseExtensionNames().map { InstalledExtension(name: $0, source: nil) } + packages
     }
@@ -77,9 +78,10 @@ struct VozHome: Sendable {
         .sorted()
     }
 
-    private static func manifest(in directory: URL) -> (name: String?, version: String?, description: String?) {
+    private static func manifest(in directory: URL) -> (name: String?, version: String?, description: String?, icon: String?) {
         let manifest = (try? Data(contentsOf: directory.appendingPathComponent("package.json"))).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
-        return (manifest?["name"] as? String, manifest?["version"] as? String, manifest?["description"] as? String)
+        let voz = manifest?["voz"] as? [String: Any]
+        return (manifest?["name"] as? String, manifest?["version"] as? String, manifest?["description"] as? String, voz?["icon"] as? String)
     }
 
     func writeAuthoringFiles(from resources: URL) throws {

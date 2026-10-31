@@ -1,4 +1,5 @@
 import AppKit
+import LucideSwift
 import SwiftUI
 
 @MainActor
@@ -282,6 +283,17 @@ final class ExtensionsModel: ObservableObject {
     private func listing(for source: PackageSource?) -> PackageListing? {
         guard let name = source.flatMap(Self.npmName(of:)) else { return nil }
         return listings.first { $0.name == name }
+    }
+
+    nonisolated static func historyIcon(for source: String, in installed: [InstalledExtension]) -> LucideIconName {
+        let package = installed.first { source == $0.name || source.hasPrefix("\($0.name)/") }
+        return package?.icon.flatMap(lucideIcon(named:)) ?? .puzzle
+    }
+
+    private nonisolated static func lucideIcon(named kebabName: String) -> LucideIconName? {
+        let words = kebabName.split(separator: "-")
+        let camelName = words.prefix(1).joined() + words.dropFirst().map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined()
+        return LucideIconName(rawValue: camelName)
     }
 
     nonisolated static func displayName(_ name: String) -> String {

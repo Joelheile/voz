@@ -26,7 +26,7 @@ struct SettingsPage: View {
                     .buttonStyle(.pill(.quiet, .small))
             }
             CappedScrollView(maxHeight: 640) {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 24) {
                     if !allGranted { permissions }
                     dictation
                     general
@@ -58,9 +58,6 @@ struct SettingsPage: View {
                     .frame(width: 120)
             }
             LinkRow(title: "Speech model", value: speechModelName) { model.page = .speechModel }
-            PanelRow(title: "Live preview", detail: "Draft text under the indicator") {
-                Toggle("Live preview", isOn: $settings.livePreviewEnabled).labelsHidden()
-            }
         }
         PanelGroup(title: "Text") {
             PanelRow(title: "Output") {
@@ -71,6 +68,9 @@ struct SettingsPage: View {
         }
         PanelGroup(title: "While recording") {
             MicrophonePicker(selection: $settings.microphone)
+            PanelRow(title: "Live preview", detail: "Draft text under the indicator") {
+                Toggle("Live preview", isOn: $settings.livePreviewEnabled).labelsHidden()
+            }
             toggle("Mute other apps", isOn: $settings.muteWhileRecording)
             toggle("Sound cues", isOn: $settings.soundCues)
         }
