@@ -23,7 +23,6 @@ enum InputDevice {
         string(kAudioObjectPropertyName, of: device)
     }
 
-    /// The device with this UID, or nil when it is unplugged or the UID is empty.
     static func connected(uid: String) -> AudioDeviceID? {
         guard !uid.isEmpty else { return nil }
         var address = AudioObjectPropertyAddress(

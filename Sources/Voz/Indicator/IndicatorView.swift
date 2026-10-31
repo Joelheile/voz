@@ -253,7 +253,6 @@ struct IndicatorView: View {
     }
 }
 
-// The accent glow invites the drag to the notch and fades as the notch opens, then a black shadow lifts the open drop target
 struct DropGlow {
     static let hidden = DropGlow(rim: 0, accent: 0, accentRadius: 0, depth: 0, depthRadius: 0, depthY: 0)
     static let invited = DropGlow(rim: 1, accent: 1, accentRadius: 20, depth: 0, depthRadius: 0, depthY: 0)

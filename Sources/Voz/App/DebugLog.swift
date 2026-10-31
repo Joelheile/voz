@@ -1,6 +1,5 @@
 import Foundation
 
-/// One JSON line per dictation, transcribed file and extension message, kept on this Mac for debugging.
 struct DebugLog: Sendable {
     static let shared = DebugLog(file: URL.homeDirectory.appending(path: "Library/Logs/Voz/voz-logs.jsonl"))
     static let maxBytes = 5_000_000

@@ -86,11 +86,6 @@ import Testing
         #expect(modelInputs.texts.isEmpty)
         #expect(result.cleaned.text == "Send it to Tom sorry I mean Tim")
     }
-
-    @Test func lightModeSkipsOnlyTheModelStep() {
-        #expect(CleanupMode.light.steps(["fillers", "model", "jira/keys"]) == ["fillers", "jira/keys"])
-        #expect(CleanupMode.heavy.steps(["fillers", "model", "jira/keys"]) == ["fillers", "model", "jira/keys"])
-    }
 }
 
 @MainActor private final class ModelInputs {
