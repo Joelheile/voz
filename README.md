@@ -29,8 +29,6 @@ macOS 26 on Apple Silicon:
 curl -fsSL https://voz.joels.tech/install | bash
 ```
 
-Current builds use a project signing certificate and are not notarized by Apple.
-
 If Voz saves you some typing, click **Star** at the top of [the repo page](https://github.com/Joelheile/voz). Stars are how other developers find Voz.
 
 ## Why I built Voz
