@@ -282,26 +282,12 @@ private struct HomePage: View {
 
     private var footer: some View {
         HStack(spacing: 2) {
-            HStack(spacing: 6) {
-                ForEach(catalog.actions.filter { !$0.hidden }, id: \.id) { action in
-                    Button(action.name) { catalog.run(action) }
-                        .buttonStyle(.pill(.accent, .small))
-                        .fixedSize()
-                        .help(action.hotkeyLabel ?? action.name)
-                }
-                if let milestone {
-                    MilestoneBadge(milestone: milestone) {
-                        markMilestonesSeen()
-                        model.page = .insights
-                    }
-                    if !settings.starPromptDismissed {
-                        StarButton(title: "Star") {
-                            settings.starPromptDismissed = true
-                            markMilestonesSeen()
-                        }
-                    }
-                }
+            ViewThatFits(in: .horizontal) {
+                footerLeading(milestone: milestone, star: !settings.starPromptDismissed)
+                footerLeading(milestone: milestone, star: false)
+                footerLeading(milestone: nil, star: false)
             }
+            .layoutPriority(1)
             Spacer(minLength: 8)
             IconButton(icon: .bookA, help: "Dictionary") { model.page = .dictionary }
             IconButton(icon: .chartNoAxesColumn, help: "Insights") {
@@ -320,6 +306,29 @@ private struct HomePage: View {
         .padding(.trailing, -8)
         .padding(.top, -4)
         .padding(.bottom, -8)
+    }
+
+    private func footerLeading(milestone: Milestone?, star: Bool) -> some View {
+        HStack(spacing: 6) {
+            ForEach(catalog.actions.filter { !$0.hidden }, id: \.id) { action in
+                Button(action.name) { catalog.run(action) }
+                    .buttonStyle(.pill(.accent, .small))
+                    .fixedSize()
+                    .help(action.hotkeyLabel ?? action.name)
+            }
+            if let milestone {
+                MilestoneBadge(milestone: milestone) {
+                    markMilestonesSeen()
+                    model.page = .insights
+                }
+                if star {
+                    StarButton(title: "Star") {
+                        settings.starPromptDismissed = true
+                        markMilestonesSeen()
+                    }
+                }
+            }
+        }
     }
 
     @ViewBuilder
