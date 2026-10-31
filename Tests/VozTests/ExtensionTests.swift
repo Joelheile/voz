@@ -477,6 +477,20 @@ struct ExtensionHostTests {
         try home.setPackageSources([package.path])
         #expect(try home.installedExtensions() == [InstalledExtension(name: "voz-things3", source: localSource(package.path), version: "0.1.0", description: "Say todo to add a to-do")])
     }
+
+    @Test func historyShowsTheIconAPackageDeclares() throws {
+        let home = temporaryHome()
+        let meeting = home.root.appendingPathComponent("voz-meeting")
+        let broken = home.root.appendingPathComponent("voz-broken")
+        try writeFile(#"{"name":"voz-meeting","voz":{"icon":"file-volume"}}"#, named: "package.json", in: meeting)
+        try writeFile(#"{"name":"voz-broken","voz":{"icon":"not-an-icon"}}"#, named: "package.json", in: broken)
+        try home.setPackageSources([meeting.path, broken.path])
+        let installed = try home.installedExtensions()
+        #expect(ExtensionsModel.historyIcon(for: "voz-meeting", in: installed) == .fileVolume)
+        #expect(ExtensionsModel.historyIcon(for: "voz-meeting/record", in: installed) == .fileVolume)
+        #expect(ExtensionsModel.historyIcon(for: "voz-meetings", in: installed) == .puzzle)
+        #expect(ExtensionsModel.historyIcon(for: "voz-broken", in: installed) == .puzzle)
+    }
 }
 
 @Test func typesDeclareTheApiVersionTheHostRuns() throws {

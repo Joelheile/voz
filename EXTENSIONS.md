@@ -344,6 +344,7 @@ voz.addHistory({ text: transcript, seconds: 3600, file: "/Users/me/Meetings/stan
 - `seconds` is how long the recording was. It is optional
 - `file` is the full path of a file with the same content, such as the Markdown transcript you saved. It is optional
 - Entries from extensions don't count toward Insights
+- Entries show a puzzle icon. To pick your own, set a [Lucide](https://lucide.dev/icons) name in `package.json`, such as `{ "voz": { "icon": "file-volume" } }`. Loose files keep the puzzle
 
 ## Per-app prompts
 
