@@ -2,7 +2,7 @@
 
 Newest first. To get beta changes now, turn on Beta updates under What's new in Settings.
 
-## In beta
+## 0.1.0 (October 31, 2026)
 
 - Extension entries in your history show the icon their package picks
 - Settings groups are easier to scan, with Live preview under While recording
