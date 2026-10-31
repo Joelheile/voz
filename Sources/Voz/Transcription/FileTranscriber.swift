@@ -158,7 +158,7 @@ struct FileTranscriber: Sendable {
             seconds: result.duration,
             speakers: Set(turns.map(\.speaker)).count,
             turns: turns
-        ).applying((try? vocabulary?.rules()) ?? [], words: (try? vocabulary?.words()) ?? [])
+        ).applying(vocabulary?.rulesOrLogged() ?? [], words: vocabulary?.wordsOrLogged() ?? [])
     }
 }
 

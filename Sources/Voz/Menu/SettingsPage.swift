@@ -179,11 +179,11 @@ struct PermissionRow: View {
                 Icon(.circleCheck, size: 16)
                     .foregroundStyle(Theme.accent)
                     .help("Allowed")
-                    .transition(.scale(scale: 0.6).combined(with: .opacity))
+                    .popIn()
             } else {
                 Button("Allow", action: fix)
                     .buttonStyle(.pill(.accent, .small))
-                    .transition(.scale(scale: 0.9).combined(with: .opacity))
+                    .popIn(from: 0.9)
             }
         }
         .animation(.spring(duration: 0.3, bounce: 0.15), value: granted)

@@ -34,8 +34,8 @@ struct InsightsPage: View {
 }
 
 private extension Animation {
-    static let reveal = Animation.timingCurve(0.23, 1, 0.32, 1, duration: 0.45)
-    static let revealColumn = Animation.timingCurve(0.23, 1, 0.32, 1, duration: 0.3)
+    static let reveal = Animation.timingCurve(0.23, 1, 0.32, 1, duration: 0.28)
+    static let revealColumn = Animation.timingCurve(0.23, 1, 0.32, 1, duration: 0.22)
 }
 
 private struct StreakSection: View {

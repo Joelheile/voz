@@ -457,10 +457,14 @@ function api(name: string, config: Config, registration: Registration): Extensio
 
 async function load() {
   const settings = readJSON<SettingsFile>(launch.settings) ?? {};
-  const entries = [
-    ...looseEntries(launch.extensionsDirectory),
-    ...launch.packages.flatMap(packageEntries),
-  ];
+  const entries = looseEntries(launch.extensionsDirectory);
+  for (const directory of launch.packages) {
+    try {
+      entries.push(...packageEntries(directory));
+    } catch (error) {
+      errors.push({ extension: basename(directory), message: describe(error) });
+    }
+  }
   const disabled: string[] = settings.disabled ?? [];
   for (const entry of entries) {
     if (isDisabled(entry.name, disabled)) continue;

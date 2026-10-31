@@ -35,7 +35,6 @@ enum CleanupStep: String, CaseIterable, Sendable {
     }
 }
 
-/// How much cleanup may rewrite. Light keeps every spoken word that is not an obvious filler.
 enum CleanupMode: String, CaseIterable, Codable, Sendable {
     case light
     case heavy

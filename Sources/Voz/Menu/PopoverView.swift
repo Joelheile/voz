@@ -331,7 +331,7 @@ private struct HomePage: View {
             .padding(.horizontal, 10)
             .frame(height: 24)
             .background(Theme.recording.opacity(0.12), in: Capsule())
-            .transition(.opacity.combined(with: .scale(scale: 0.9)))
+            .popIn(from: 0.9)
         default:
             Text(model.status.title).font(.meta).foregroundStyle(Theme.inkSecondary)
         }

@@ -248,10 +248,10 @@ final class ExtensionService {
     }
 
     nonisolated private static func writeAudio(_ samples: [Float], to file: URL) throws {
-        try FileManager.default.createDirectory(at: audioDirectory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: audioDirectory.path)
+        try FileManager.default.createDirectory(at: audioDirectory, withIntermediateDirectories: true, attributes: [.posixPermissions: AppStorage.directoryPermissions])
+        try FileManager.default.setAttributes([.posixPermissions: AppStorage.directoryPermissions], ofItemAtPath: audioDirectory.path)
         try WAVEncoder.encode(samples, sampleRate: Int(RecordingFilter.sampleRate)).write(to: file)
-        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
+        try FileManager.default.setAttributes([.posixPermissions: AppStorage.filePermissions], ofItemAtPath: file.path)
     }
 
     func inserted(_ text: String, raw: String, app: HostApp) {

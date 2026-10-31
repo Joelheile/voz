@@ -79,13 +79,13 @@ struct IndicatorView: View {
         indicator
             .frame(width: layout.windowFrame.width, height: layout.windowFrame.height, alignment: layout.style == .notch ? .top : .bottom)
             .keyframeAnimator(initialValue: 0.0, trigger: model.shakeCount) { view, offset in
-                view.offset(x: offset)
+                view.offset(x: reduceMotion ? 0 : offset)
             } keyframes: { _ in
                 KeyframeTrack {
-                    CubicKeyframe(-5, duration: 0.07)
-                    CubicKeyframe(5, duration: 0.1)
-                    CubicKeyframe(-3, duration: 0.1)
-                    CubicKeyframe(0, duration: 0.13)
+                    CubicKeyframe(-5, duration: 0.05)
+                    CubicKeyframe(5, duration: 0.08)
+                    CubicKeyframe(-3, duration: 0.08)
+                    CubicKeyframe(0, duration: 0.08)
                 }
             }
     }
@@ -253,7 +253,6 @@ struct IndicatorView: View {
     }
 }
 
-// The accent glow invites the drag to the notch and fades as the notch opens, then a black shadow lifts the open drop target
 struct DropGlow {
     static let hidden = DropGlow(rim: 0, accent: 0, accentRadius: 0, depth: 0, depthRadius: 0, depthY: 0)
     static let invited = DropGlow(rim: 1, accent: 1, accentRadius: 20, depth: 0, depthRadius: 0, depthY: 0)
@@ -349,7 +348,7 @@ struct IndicatorTrailing: View {
             case .done:
                 ResultSymbol(icon: .check, color: .primary, effect: .reveal).transition(swap)
             case .failed:
-                ResultSymbol(icon: .triangleAlert, color: .orange, effect: .bounce).transition(swap)
+                ResultSymbol(icon: .triangleAlert, color: Theme.failure, effect: .bounce).transition(swap)
             case .dropTarget:
                 DropArrow(isTargeted: model.isDropTargeted).transition(swap)
             }

@@ -98,6 +98,25 @@ final class VocabularyStore: Sendable {
         }
     }
 
+    // A failed read costs one transcript its vocabulary, which beats failing the transcript
+    func rulesOrLogged() -> [VocabularyRule] {
+        do {
+            return try rules()
+        } catch {
+            Log.app.error("Vocabulary rules read failed: \(error.localizedDescription, privacy: .private)")
+            return []
+        }
+    }
+
+    func wordsOrLogged() -> [String] {
+        do {
+            return try words()
+        } catch {
+            Log.app.error("Vocabulary read failed: \(error.localizedDescription, privacy: .private)")
+            return []
+        }
+    }
+
     func add(_ entry: String, source: VocabularySource, aliases: [String] = []) throws {
         let (heard, word) = VocabularyRule.parse(entry)
         guard !word.isEmpty else { return }

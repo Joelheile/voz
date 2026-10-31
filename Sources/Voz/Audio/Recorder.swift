@@ -98,7 +98,6 @@ final class Recorder {
     var onSamples: (@Sendable ([Float]) -> Void)?
     var onInterrupted: (@MainActor () -> Void)?
 
-    /// `preferredInput` returns the UID of the mic to record from, or an empty string for the system default.
     init(preferredInput: @escaping @MainActor () -> String = { "" }) {
         self.preferredInput = preferredInput
         // The engine posts this on its own queue and waits for observers. Releasing an engine also waits

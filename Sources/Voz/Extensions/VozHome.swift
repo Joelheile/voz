@@ -211,10 +211,10 @@ struct VozHome: Sendable {
 
     private func writeSettings(_ settings: [String: Any]) throws {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: root.path)
+        try FileManager.default.setAttributes([.posixPermissions: AppStorage.directoryPermissions], ofItemAtPath: root.path)
         let data = try JSONSerialization.data(withJSONObject: settings, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
         try data.write(to: self.settings, options: .atomic)
-        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: self.settings.path)
+        try FileManager.default.setAttributes([.posixPermissions: AppStorage.filePermissions], ofItemAtPath: self.settings.path)
     }
 
     private func updateSettings(_ update: (inout [String: Any]) throws -> Void) throws {

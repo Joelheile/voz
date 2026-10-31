@@ -1,6 +1,5 @@
 import AppKit
 
-/// Invisible drop targets over each notch, or over the pill on screens without one.
 /// Finder gives every drag its own pasteboard, so only a real drop target sees the files.
 /// A full-screen probe peeks at each drag as it starts, then lets it pass through to the apps below.
 /// Once a drag enters, the sensor grows over the open drop zone, so one window takes the drag from entry to drop.

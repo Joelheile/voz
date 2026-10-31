@@ -12,6 +12,7 @@ enum Theme {
     static let selected = Color(light: 0xE9E6DF, dark: 0xFFFFFF, lightAlpha: 1, darkAlpha: 0.09)
     static let accent = Color(light: 0x0057FF, dark: 0x2E6BFF)
     static let recording = Color(light: 0xFF3B30, dark: 0xFF453A)
+    static let failure = Color(nsColor: .systemOrange)
     static let onInk = Color(light: 0xFFFFFF, dark: 0x141414)
 
     enum Radius {

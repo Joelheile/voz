@@ -113,6 +113,19 @@ extension View {
             .background(Theme.canvas, in: Capsule())
             .overlay(Capsule().strokeBorder(Theme.hairline))
     }
+
+    func popIn(from scale: CGFloat = 0.6) -> some View {
+        modifier(PopIn(scale: scale))
+    }
+}
+
+private struct PopIn: ViewModifier {
+    let scale: CGFloat
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content.transition(reduceMotion ? .opacity : .scale(scale: scale).combined(with: .opacity))
+    }
 }
 
 struct SearchField: View {
@@ -314,6 +327,7 @@ struct TabBar<Tab: Hashable & RawRepresentable<String>>: View {
     let tabs: [Tab]
     @Binding var selection: Tab
     @Namespace private var pill
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 2) {
@@ -338,7 +352,7 @@ struct TabBar<Tab: Hashable & RawRepresentable<String>>: View {
         }
         .padding(2)
         .background(Theme.selected, in: RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous))
-        .animation(.spring(duration: 0.25, bounce: 0), value: selection)
+        .animation(reduceMotion ? nil : .spring(duration: 0.25, bounce: 0), value: selection)
     }
 }
 
