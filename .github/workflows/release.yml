@@ -16,13 +16,44 @@ concurrency:
   queue: max
 
 jobs:
-  release:
+  test:
     runs-on: macos-26
     timeout-minutes: 45
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Record Swift version
+        run: echo "SWIFT_VERSION=$(swift --version 2>&1 | head -1 | shasum | cut -c1-12)" >> "$GITHUB_ENV"
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .build/test
+          key: spm-test-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.SWIFT_VERSION }}-${{ hashFiles('Package.swift', 'Package.resolved') }}
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        id: bun
+        with:
+          bun-version: "1.4.3"
+
+      - name: Test
+        env:
+          BUN_PATH: ${{ steps.bun.outputs.bun-path }}
+        run: scripts/test.sh release
+
+  build:
+    runs-on: macos-26
+    timeout-minutes: 45
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      appcast-base: ${{ steps.package.outputs.appcast-base }}
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
       KEYCHAIN_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}-keychain
-      GH_TOKEN: ${{ github.token }}
       CHANNEL: ${{ github.ref_type == 'tag' && 'stable' || 'beta' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -36,13 +67,13 @@ jobs:
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .build
-          key: spm-v3-${{ runner.os }}-${{ runner.arch }}-${{ env.SWIFT_VERSION }}-${{ hashFiles('Package.swift', 'Package.resolved') }}-${{ github.sha }}
-          restore-keys: spm-v3-${{ runner.os }}-${{ runner.arch }}-${{ env.SWIFT_VERSION }}-${{ hashFiles('Package.swift', 'Package.resolved') }}-
+          key: spm-app-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.SWIFT_VERSION }}-${{ hashFiles('Package.swift', 'Package.resolved') }}
 
       - name: Set keychain path
         run: echo "KEYCHAIN=$RUNNER_TEMP/voz.keychain-db" >> "$GITHUB_ENV"
 
       - name: Compute version
+        id: version
         run: |
           build=$((100000 + GITHUB_RUN_NUMBER))
           if [[ "$CHANNEL" == stable ]]; then
@@ -56,23 +87,15 @@ jobs:
             version=$base-beta.$build
             tag=beta-$build
           fi
-          { echo "VERSION=$version"; echo "BUILD=$build"; echo "TAG=$tag"; echo "NOTES=$RUNNER_TEMP/notes.md"; } >> "$GITHUB_ENV"
+          { echo "VERSION=$version"; echo "BUILD=$build"; echo "TAG=$tag"; echo "RELEASE=$RUNNER_TEMP/release"; } >> "$GITHUB_ENV"
+          { echo "version=$version"; echo "tag=$tag"; } >> "$GITHUB_OUTPUT"
+          mkdir -p "$RUNNER_TEMP/release"
 
       - name: Write release notes
         run: |
-          scripts/release-notes.sh "$CHANNEL" > "$NOTES"
-          cat "$NOTES"
+          scripts/release-notes.sh "$CHANNEL" > "$RELEASE/notes.md"
+          cat "$RELEASE/notes.md"
           python3 scripts/changelog.py "$CHANNEL" "$VERSION"
-
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
-        id: bun
-        with:
-          bun-version: "1.4.3"
-
-      - name: Test
-        env:
-          BUN_PATH: ${{ steps.bun.outputs.bun-path }}
-        run: scripts/test.sh release
 
       - name: Import signing identity
         env:
@@ -118,6 +141,7 @@ jobs:
             --release-name com.joelheile.voz --release-version "$VERSION" --build "$BUILD"
 
       - name: Package and sign update
+        id: package
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
@@ -125,20 +149,57 @@ jobs:
           git fetch origin main
           git worktree add -B appcast "$RUNNER_TEMP/appcast" origin/main
           (cd "$RUNNER_TEMP/appcast" && python3 scripts/changelog.py "$CHANNEL" "$VERSION" "$GITHUB_SHA")
-          scripts/package-release.sh "$VERSION" "$BUILD" "$CHANNEL" "$TAG" "$NOTES" "$RUNNER_TEMP/appcast/appcast.xml"
+          scripts/package-release.sh "$VERSION" "$BUILD" "$CHANNEL" "$TAG" "$RELEASE/notes.md" "$RUNNER_TEMP/appcast/appcast.xml"
+          mv "build/voz-$VERSION.zip" "$RELEASE/"
+          cd "$RUNNER_TEMP/appcast"
+          echo "appcast-base=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          git add appcast.xml CHANGELOG.md README.md
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "Update appcast and changelog for $VERSION"
+          git format-patch -1 --stdout > "$RELEASE/appcast.patch"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release
+          path: ${{ runner.temp }}/release
+          retention-days: 7
+
+      - name: Remove signing keychain
+        if: always()
+        run: security delete-keychain "$KEYCHAIN" || true
+
+  publish:
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CHANNEL: ${{ github.ref_type == 'tag' && 'stable' || 'beta' }}
+      VERSION: ${{ needs.build.outputs.version }}
+      TAG: ${{ needs.build.outputs.tag }}
+      RELEASE: release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.build.outputs.appcast-base }}
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+          path: release
 
       - name: Create GitHub release
         run: |
-          archive=build/voz-$VERSION.zip
+          archive=$RELEASE/voz-$VERSION.zip
           if [[ "$CHANNEL" == stable ]]; then
-            gh release create "$TAG" "$archive" --title "voz $VERSION" --notes-file "$NOTES" --verify-tag
+            gh release create "$TAG" "$archive" --title "voz $VERSION" --notes-file "$RELEASE/notes.md" --verify-tag
           else
-            gh release create "$TAG" "$archive" --title "voz $VERSION" --notes-file "$NOTES" \
+            gh release create "$TAG" "$archive" --title "voz $VERSION" --notes-file "$RELEASE/notes.md" \
               --target "$GITHUB_SHA" --prerelease
           fi
 
       - name: Publish appcast
-        working-directory: ${{ runner.temp }}/appcast
         env:
           RELEASE_DEPLOY_KEY: ${{ secrets.RELEASE_DEPLOY_KEY }}
         run: |
@@ -152,8 +213,7 @@ jobs:
           remote="git@github.com:$GITHUB_REPOSITORY.git"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add appcast.xml CHANGELOG.md README.md
-          git commit -m "Update appcast and changelog for $VERSION"
+          git am "$RELEASE/appcast.patch"
           git pull --rebase "$remote" main
           git push "$remote" HEAD:main
 
@@ -163,7 +223,3 @@ jobs:
           gh release list --limit 100 --json tagName,isPrerelease \
             --jq '[.[] | select(.isPrerelease and (.tagName | startswith("beta-")))] | .[10:] | .[].tagName' |
             xargs -I{} gh release delete {} --cleanup-tag --yes
-
-      - name: Remove signing keychain
-        if: always()
-        run: security delete-keychain "$KEYCHAIN" || true
