@@ -4,6 +4,8 @@ Newest first. To get beta changes now, turn on Beta updates under What's new in 
 
 ## In beta
 
+- A broken extension package no longer stops your other extensions from loading
+- With Reduce Motion on, the indicator stops shaking and icons fade in
 - Choose which microphone Voz records from in Settings
 - Drop audio files on the notch again, with a glow showing where they go
 - Pick Light cleanup to keep every word when you think out loud

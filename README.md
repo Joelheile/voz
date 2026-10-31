@@ -108,11 +108,11 @@ Install one from the menu bar, or run `voz install voz-meeting`. [Browse extensi
 ## What's new
 
 <!-- changelog -->
+- A broken extension package no longer stops your other extensions from loading
+- With Reduce Motion on, the indicator stops shaking and icons fade in
 - Choose which microphone Voz records from in Settings
 - Drop audio files on the notch again, with a glow showing where they go
 - Pick Light cleanup to keep every word when you think out loud
-- Voz sends one anonymous ping on days you dictate, never what you said
-- Transcribe dropped files about four times faster, and hover the progress ring to cancel
 
 [See everything new](CHANGELOG.md)
 <!-- /changelog -->
