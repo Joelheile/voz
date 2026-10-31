@@ -3,6 +3,17 @@
   <channel>
     <title>voz</title>
     <item>
+      <title>voz 0.0.5-beta.100044</title>
+      <description>&lt;ul&gt;&lt;li&gt;Extension entries in your history show the icon their package picks&lt;/li&gt;&lt;li&gt;Settings groups are easier to scan, with Live preview under While recording&lt;/li&gt;&lt;/ul&gt;</description>
+      <link>https://github.com/Joelheile/voz/releases/tag/beta-100044</link>
+      <pubDate>Sat, 31 Oct 2026 07:45:52 GMT</pubDate>
+      <sparkle:version>100044</sparkle:version>
+      <sparkle:shortVersionString>0.0.5-beta.100044</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100044/voz-0.0.5-beta.100044.zip" length="8494155" sparkle:edSignature="FaaTJ3An8gLkcvb65PxF6h4dINZS/1zebIAuN+sOuVD+AlRoafYEq8to8EoJL2sML1qqiUBXfS6kU1eF7KrmDQ==" type="application/octet-stream" />
+    </item>
+    <item>
       <title>voz 0.0.5-beta.100043</title>
       <description>&lt;ul&gt;&lt;li&gt;A broken extension package no longer stops your other extensions from loading&lt;/li&gt;&lt;li&gt;With Reduce Motion on, the indicator stops shaking and icons fade in&lt;/li&gt;&lt;/ul&gt;</description>
       <link>https://github.com/Joelheile/voz/releases/tag/beta-100043</link>
@@ -100,17 +111,6 @@
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <sparkle:channel>beta</sparkle:channel>
       <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100034/voz-0.0.5-beta.100034.zip" length="8440527" sparkle:edSignature="4ZdM0xJv0CjgKc3fjkjhQB3+oRB8DFyioMkgTANLOGuionNf/A0Wrt0Sok9LwukeNa3ArHMJ11FsqIeVmYUgBQ==" type="application/octet-stream" />
-    </item>
-    <item>
-      <title>voz 0.0.5-beta.100033</title>
-      <description>&lt;ul&gt;&lt;li&gt;Claude Code now reads the Voz extension guide when you build an extension in ~/.voz&lt;/li&gt;&lt;/ul&gt;</description>
-      <link>https://github.com/Joelheile/voz/releases/tag/beta-100033</link>
-      <pubDate>Fri, 30 Oct 2026 09:18:29 GMT</pubDate>
-      <sparkle:version>100033</sparkle:version>
-      <sparkle:shortVersionString>0.0.5-beta.100033</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <sparkle:channel>beta</sparkle:channel>
-      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100033/voz-0.0.5-beta.100033.zip" length="8440877" sparkle:edSignature="ac7XhCuQ8nf/DlNGdmid8DMtELPUZGt/rOkMnm3gaB/Tk75URM5WC3eKzrG2T30nN8TvRusVY3NmwPdd5FSKBg==" type="application/octet-stream" />
     </item>
     <item>
       <title>voz 0.0.5</title>

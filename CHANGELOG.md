@@ -4,6 +4,8 @@ Newest first. To get beta changes now, turn on Beta updates under What's new in 
 
 ## In beta
 
+- Extension entries in your history show the icon their package picks
+- Settings groups are easier to scan, with Live preview under While recording
 - A broken extension package no longer stops your other extensions from loading
 - With Reduce Motion on, the indicator stops shaking and icons fade in
 - Choose which microphone Voz records from in Settings
