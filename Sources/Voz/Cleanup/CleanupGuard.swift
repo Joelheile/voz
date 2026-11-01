@@ -5,71 +5,50 @@ enum CleanupRejection: String, Sendable, Equatable {
     case refusal
     case leakedTags
     case tooLong
-    case lowOverlap
-    case droppedWords
-    case changedMeaning
+    case changedWords
 }
 
 enum CleanupGuard {
     static let maxLengthRatio = 1.3
-    static let minSharedVocabulary = 0.6
-    static let minCoverageWithCorrections = 0.5
-    static let minCoverageWithoutCorrections = 0.7
-    static let correctionCountThatSkipsCoverage = 3
 
     private static let refusalPrefixes: [[String]] = [
         ["i'm", "sorry"], ["i", "am", "sorry"], ["i", "can't"], ["i", "cannot"], ["sure"], ["here", "is"], ["here's"],
         ["please", "provide"], ["entschuldigung"], ["ich", "kann"],
     ]
     private static let outputLabels = ["output:", "cleaned:"]
-    static let fillerAndCorrectionWords: Set<String> = [
-        "um", "uh", "uhm", "umm", "erm", "ähm", "äh", "öhm", "like", "halt", "also", "sozusagen", "quasi",
-        "no", "nein", "nee", "wait", "warte", "sorry", "mean",
-    ]
 
-    private static let negations: Set<String> = [
-        "not", "never", "nothing", "nobody", "nowhere", "cannot", "nicht", "nie", "niemals", "nichts", "niemand",
-        "kein", "keine", "keinen", "keinem", "keiner", "keines",
-    ]
-    private static let clockFractions: Set<String> = ["halb", "viertel", "dreiviertel"]
-
-    static let spokenSymbolWords: Set<String> = ["dot", "at", "slash", "underscore", "dash", "colon"]
-
-    static func rejection(raw: String, cleaned: String) -> CleanupRejection? {
+    static func rejection(raw: String, cleaned: String, mode: CleanupMode, vocabulary: [String] = []) -> CleanupRejection? {
         let rawWords = WordTokens.alphanumeric(raw)
         let cleanedWords = WordTokens.alphanumeric(cleaned)
         guard !cleanedWords.isEmpty, !rawWords.isEmpty else { return .empty }
         if isRefusal(raw: raw, cleaned: cleaned) { return .refusal }
         if hasLeakedMarkup(raw: raw, cleaned: cleaned) { return .leakedTags }
         guard Double(cleanedWords.count) <= Double(rawWords.count) * maxLengthRatio else { return .tooLong }
-        if changesMeaning(raw: raw, cleaned: cleaned) { return .changedMeaning }
-        let rawVocabulary = Set(rawWords)
-        let cleanedVocabulary = Set(cleanedWords)
-        let comparable = cleanedWords.filter { !$0.contains(where: \.isNumber) }
-        let shared = comparable.filter { rawVocabulary.contains($0) }.count
-        if !comparable.isEmpty, Double(shared) / Double(comparable.count) < minSharedVocabulary { return .lowOverlap }
-        let corrections = rawWords.filter { fillerAndCorrectionWords.contains($0) }.count
-        guard corrections < correctionCountThatSkipsCoverage else { return nil }
-        let expected = rawWords.filter { !fillerAndCorrectionWords.contains($0) && !spokenSymbolWords.contains($0) && !NumberWords.isNumber($0) }
-        guard !expected.isEmpty else { return nil }
-        let kept = expected.filter { cleanedVocabulary.contains($0) }.count
-        let minimum = corrections == 0 ? minCoverageWithoutCorrections : minCoverageWithCorrections
-        return Double(kept) / Double(expected.count) < minimum ? .droppedWords : nil
+        let preferred = Set(WordTokens.alphanumeric(vocabulary.joined(separator: " ")))
+        if mode == .light, !onlyDeletes(raw: rawWords, cleaned: cleanedWords.filter { !preferred.contains($0) }) { return .changedWords }
+        return nil
     }
 
-    private static func changesMeaning(raw: String, cleaned: String) -> Bool {
-        let rawWords = meaningWords(raw)
-        let cleanedWords = meaningWords(cleaned)
-        return Set(rawWords).contains { word in
-            cleanedWords.filter { $0 == word }.count < rawWords.filter { $0 == word }.count
+    /// Each cleaned word appears in the raw words, in order. One cleaned word may join neighbors, as in "chat GPT" to "ChatGPT".
+    static func onlyDeletes(raw: [String], cleaned: [String]) -> Bool {
+        var next = raw.startIndex
+        for word in cleaned {
+            guard let end = end(of: word, in: raw, from: next) else { return false }
+            next = end
         }
+        return true
     }
 
-    private static func meaningWords(_ text: String) -> [String] {
-        WordTokens.normalized(text).compactMap { word in
-            if negations.contains(word) || word.hasSuffix("n't") || word.hasSuffix("n\u{2019}t") { return "not" }
-            return clockFractions.contains(word) ? word : nil
+    private static func end(of word: String, in raw: [String], from start: Int) -> Int? {
+        for first in start..<raw.endIndex {
+            var joined = ""
+            for index in first..<raw.endIndex {
+                joined += raw[index]
+                if joined == word { return index + 1 }
+                guard word.hasPrefix(joined) else { break }
+            }
         }
+        return nil
     }
 
     private static func isRefusal(raw: String, cleaned: String) -> Bool {
@@ -89,24 +68,5 @@ enum CleanupGuard {
         let lowered = cleaned.lowercased()
         let rawLowered = raw.lowercased()
         return outputLabels.contains { lowered.hasPrefix($0) && !rawLowered.hasPrefix($0) }
-    }
-}
-
-enum CleanupWork {
-    private static let cues: Set<String> = ["actually", "eigentlich", "meine", "scratch"]
-    private static let sentenceEnders: Set<Character> = [".", "!", "?"]
-
-    static func needsModel(_ text: String) -> Bool {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let first = trimmed.first, let last = trimmed.last else { return false }
-        let isFinishedSentence = first.isUppercase && sentenceEnders.contains(last)
-        let words = WordTokens.alphanumeric(trimmed)
-        let hasCue = words.contains { word in
-            CleanupGuard.fillerAndCorrectionWords.contains(word) || CleanupGuard.spokenSymbolWords.contains(word)
-                || NumberWords.isNumber(word) || cues.contains(word)
-        }
-        let hasRepeat = zip(words, words.dropFirst()).contains { $0 == $1 }
-        let hasYouKnow = zip(words, words.dropFirst()).contains { $0 == "you" && $1 == "know" }
-        return !isFinishedSentence || hasCue || hasRepeat || hasYouKnow
     }
 }

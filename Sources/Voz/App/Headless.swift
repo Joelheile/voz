@@ -21,7 +21,7 @@ enum Headless {
             return await SpeechBenchmark.run(path: path, model: model, repeats: repeats, vocabulary: vocabulary(in: arguments))
         }
         if let text = value(of: "--clean", in: arguments) {
-            return await clean(text, vocabulary: vocabulary(in: arguments))
+            return await clean(text, plan: cleanupPlan(in: arguments), vocabulary: vocabulary(in: arguments), languages: languages(in: arguments))
         }
         if let directory = value(of: "--render-design", in: arguments) {
             do {
@@ -40,7 +40,7 @@ enum Headless {
                 printError("Evaluation requires 1...1000 repeats and a 1...60000 ms budget")
                 return 64
             }
-            return await CleanupEval.run(path: path, repeats: repeats, budget: .milliseconds(budget))
+            return await CleanupEval.run(path: path, repeats: repeats, budget: .milliseconds(budget), plan: cleanupPlan(in: arguments), languages: languages(in: arguments))
         }
         if let path = value(of: "--transcribe", in: arguments) {
             let url = URL(fileURLWithPath: path)
@@ -54,7 +54,7 @@ enum Headless {
             return await simulateDictation(URL(fileURLWithPath: path), arguments: arguments)
         }
         let models = SpeechModel.allCases.map(\.rawValue).joined(separator: "|")
-        printError("usage: voz --transcribe <audio file> [--model \(models)] [--vocab a,b] [--speakers]\n       voz --benchmark-speech <audio file> [--model \(models)] [--repeat 2...1000] [--vocab a,b]\n       voz --clean <text> [--vocab a,b]\n       voz --eval <cases.json> [--repeat n] [--budget-ms n]\n       voz --simulate-dictation <audio file> [--model \(models)] [--speed n] [--no-cleanup]\n       voz --measure-recorder <seconds>\n       voz --render-design <directory>")
+        printError("usage: voz --transcribe <audio file> [--model \(models)] [--vocab a,b] [--speakers]\n       voz --benchmark-speech <audio file> [--model \(models)] [--repeat 2...1000] [--vocab a,b]\n       voz --clean <text> [--vocab a,b] [--mode light|heavy] [--languages de,en]\n       voz --eval <cases.json> [--repeat n] [--budget-ms n] [--mode light|heavy] [--languages de,en]\n       voz --simulate-dictation <audio file> [--model \(models)] [--speed n] [--no-cleanup]\n       voz --measure-recorder <seconds>\n       voz --render-design <directory>")
         return 64
     }
 
@@ -105,21 +105,25 @@ enum Headless {
             return 64
         }
         let cleanupEnabled = !arguments.contains("--no-cleanup")
+        let plan = cleanupPlan(in: arguments)
+        let languages = languages(in: arguments)
         let transcriber = Transcriber()
         let engine = SpeechEngine(parakeet: transcriber)
         let cleaner = TextCleaner()
         do {
             try await engine.prepare(model)
             try await transcriber.prepareVocabulary([])
+            await transcriber.setLanguages(languages)
             let samples = try AudioConverter().resampleAudioFile(url)
-            cleaner.prewarm(prompt: CleanupPrompt.standard, vocabulary: [])
+            cleaner.prewarm(CleanupSetup(plan: plan, vocabulary: [], languages: languages))
             try? await Task.sleep(for: .seconds(1))
-            _ = await cleaner.clean("Warm up the cleanup model before we start timing anything.", prompt: CleanupPrompt.standard, vocabulary: [])
+            _ = await cleaner.clean("Warm up the cleanup model before we start timing anything.", plan: plan, vocabulary: [], languages: languages)
             let session = StreamingDictation(
                 transcribe: { try await engine.transcribe($0, model: model, vocabulary: []) },
                 cleaner: cleaner,
                 vocabulary: [],
-                plan: Task { CleanupPlan(prompt: CleanupPrompt.standard, mode: .heavy) },
+                plan: Task { plan },
+                languages: languages,
                 cleanupEnabled: cleanupEnabled
             )
             let clock = ContinuousClock()
@@ -185,14 +189,24 @@ enum Headless {
         return 0
     }
 
-    private static func clean(_ text: String, vocabulary: [String]) async -> Int32 {
+    private static func clean(_ text: String, plan: CleanupPlan, vocabulary: [String], languages: [SpeechLanguage]) async -> Int32 {
         let cleaner = TextCleaner()
-        cleaner.prewarm(prompt: CleanupPrompt.standard, vocabulary: vocabulary)
+        cleaner.prewarm(CleanupSetup(plan: plan, vocabulary: vocabulary, languages: languages))
         try? await Task.sleep(for: .seconds(1))
-        let result = await cleaner.clean(text, prompt: CleanupPrompt.standard, vocabulary: vocabulary)
+        let result = await cleaner.clean(text, plan: plan, vocabulary: vocabulary, languages: languages)
         print(result.text)
-        print("cleanup \(result.milliseconds) ms, fillers removed \(result.fillerWordsRemoved), timed out \(result.timedOut)")
+        print("cleanup \(result.milliseconds) ms, fillers removed \(result.fillerWordsRemoved), timed out \(result.timedOut), rejected \(result.rejection?.rawValue ?? "no")")
         return 0
+    }
+
+    private static func cleanupPlan(in arguments: [String]) -> CleanupPlan {
+        let mode = value(of: "--mode", in: arguments).flatMap(CleanupMode.init) ?? .heavy
+        return CleanupPlan(prompt: CleanupPrompt.standard, mode: mode)
+    }
+
+    private static func languages(in arguments: [String]) -> [SpeechLanguage] {
+        guard let codes = value(of: "--languages", in: arguments) else { return SpeechLanguage.defaults() }
+        return codes.split(separator: ",").compactMap { SpeechLanguage(rawValue: String($0)) }
     }
 
     private static func value(of flag: String, in arguments: [String]) -> String? {

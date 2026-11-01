@@ -20,6 +20,7 @@ actor Transcriber {
     private var loading: (model: SpeechModel, task: Task<AsrManager, Error>)?
     private let report: StatusReport
     private let booster = VocabularyBooster()
+    private var scriptFilter: Language?
     private static let downloadableVersions: [AsrModelVersion] = [.ultra, .redux, .v2, .v3]
 
     init(report: @escaping StatusReport = { _, _ in }) {
@@ -32,6 +33,10 @@ actor Transcriber {
 
     func prepareVocabulary(_ terms: [VocabularyTerm]) async throws {
         try await booster.prepare(terms: terms)
+    }
+
+    func setLanguages(_ languages: [SpeechLanguage]) {
+        scriptFilter = SpeechLanguage.scriptFilter(for: languages)
     }
 
     func prepare(_ model: SpeechModel) async throws {
@@ -63,7 +68,7 @@ actor Transcriber {
     func transcribe(_ samples: [Float], model: SpeechModel, vocabulary: [String]) async throws -> TranscriptionResult {
         let manager = try await manager(for: model)
         var decoderState = TdtDecoderState.make()
-        let result = try await manager.transcribe(samples, decoderState: &decoderState)
+        let result = try await manager.transcribe(samples, decoderState: &decoderState, language: scriptFilter)
         let text = await booster.rescore(result, samples: samples, words: vocabulary)
         return TranscriptionResult(text: text, audioSeconds: result.duration, processingSeconds: result.processingTime, model: model.rawValue)
     }
@@ -76,7 +81,7 @@ actor Transcriber {
         }
         defer { reporter.cancel() }
         var decoderState = TdtDecoderState.make()
-        return try await manager.transcribe(samples, decoderState: &decoderState)
+        return try await manager.transcribe(samples, decoderState: &decoderState, language: scriptFilter)
     }
 
     private func manager(for model: SpeechModel) async throws -> AsrManager {

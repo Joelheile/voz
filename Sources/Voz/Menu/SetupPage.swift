@@ -26,6 +26,7 @@ struct SetupPage: View {
     private var page: some View {
         switch model.step {
         case .access: AccessStep(model: model)
+        case .languages: LanguagesStep(settings: settings)
         case .model: ModelStep(settings: settings)
         case .tryIt: TryStep(settings: settings, history: history, status: status, retryModel: retryModel, tried: $model.triedDictation)
         }
@@ -62,7 +63,7 @@ struct SetupPage: View {
     private var primaryTitle: String {
         switch model.step {
         case .access: model.allGranted ? "Continue" : "Skip for now"
-        case .model: "Continue"
+        case .languages, .model: "Continue"
         case .tryIt: "Start using Voz"
         }
     }
@@ -131,6 +132,19 @@ private struct AccessStep: View {
                 PermissionRow(title: "System Audio", detail: "To mute music while you talk", granted: model.systemAudioGranted, fix: model.requestSystemAudio)
             }
             .controlSize(.small)
+        }
+    }
+}
+
+private struct LanguagesStep: View {
+    @ObservedObject var settings: AppSettings
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            StepHeader(title: "What do you speak?", detail: "Pick every language you dictate in. Voz keeps your words in them.")
+            CappedScrollView(maxHeight: 440) {
+                LanguagePicker(selection: $settings.languages)
+            }
         }
     }
 }

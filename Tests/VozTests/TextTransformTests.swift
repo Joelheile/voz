@@ -2,41 +2,9 @@ import Testing
 @testable import Voz
 
 @Suite struct TextTransformTests {
-    @Test func fillersGoButWordsThatContainThemStay() {
-        #expect(FillerWords.removeObvious(from: "so uh I think, uhm, we should go") == RulePassResult(text: "So I think, we should go", removed: 2))
-        #expect(FillerWords.removeObvious(from: "ähm ich glaube äh wir sollten gehen") == RulePassResult(text: "Ich glaube wir sollten gehen", removed: 2))
-        #expect(FillerWords.removeObvious(from: "Um, we should go").text == "We should go")
-        #expect(FillerWords.removeObvious(from: "um so I was thinking we should move the meeting") == RulePassResult(text: "So I was thinking we should move the meeting", removed: 1))
-        #expect(FillerWords.removeObvious(from: "does it do like um redoing the prompt").text == "Does it do like redoing the prompt")
-        for kept in ["Wir treffen uns um 4 Uhr.", "um 3 Uhr", "um das zu machen brauchen wir Zeit", "The umbrella is humming under the umlaut"] {
-            #expect(FillerWords.removeObvious(from: kept) == RulePassResult(text: kept, removed: 0))
-        }
+    @Test func fillerEstimateCountsOnlyRemovedFillers() {
         #expect(FillerWords.estimateRemoved(before: "um so you know I mean it was like fine", after: "So it was fine.") == 4)
         #expect(FillerWords.estimateRemoved(before: "at 3, no, 4", after: "at 4") == 0)
-    }
-
-    @Test func spokenPunctuationConvertsCommandsButNotMentions() {
-        #expect(SpokenPunctuation.apply(to: "hi John comma thanks for the update period new line talk soon") == "hi John, thanks for the update.\nTalk soon")
-        #expect(SpokenPunctuation.apply(to: "hallo Maria Komma danke für die Nachricht Punkt neue Zeile viele Grüße Tom") == "hallo Maria, danke für die Nachricht.\nViele Grüße Tom")
-        #expect(SpokenPunctuation.apply(to: "kommst du morgen Fragezeichen") == "kommst du morgen?")
-        #expect(SpokenPunctuation.apply(to: "done full stop new paragraph next topic") == "done.\n\nNext topic")
-        #expect(SpokenPunctuation.apply(to: "Thanks Sam, comma see you") == "Thanks Sam, see you")
-        #expect(SpokenPunctuation.apply(to: "set NODE underscore ENV to production") == "set NODE_ENV to production")
-        #expect(SpokenPunctuation.apply(to: "die Datei heißt backup unterstrich alt") == "die Datei heißt backup_alt")
-        let literal = [
-            "the word comma is spelled with two m's",
-            "a long period of time",
-            "this is a new line of code",
-            "bis zu diesem Punkt war alles klar",
-            "wir treffen uns Punkt drei Uhr",
-            "drei Komma fünf Prozent",
-            "he said \"comma\" twice",
-            "period",
-            "underscore",
-        ]
-        for text in literal {
-            #expect(SpokenPunctuation.apply(to: text) == text)
-        }
     }
 
     @Test func segmentsJoinWithFallbackPerSegmentAndNoStrayPeriods() {
@@ -46,45 +14,37 @@ import Testing
         #expect(SegmentJoiner.join(cleaned: ["We left.", "Then it rained."], fallback: ["we left.", "then it rained."]) == "We left. Then it rained.")
         #expect(SegmentJoiner.join(cleaned: ["We left."], fallback: ["we left"]) == "We left.")
     }
-
-    @Test func cleanupRulesRunOnlyListedStepsInOrder() {
-        let raw = "uh send it to voz comma please"
-        #expect(CleanupStep.applyRules(CleanupStep.standard, to: raw, vocabulary: ["Voz"]) == RulePassResult(text: "Send it to Voz, please", removed: 1))
-        #expect(CleanupStep.applyRules(["punctuation", "llm/jira", "model"], to: raw, vocabulary: ["Voz"]).text == "uh send it to voz, please")
-        #expect(CleanupStep.applyRules([], to: raw, vocabulary: ["Voz"]) == RulePassResult(text: raw, removed: 0))
-    }
 }
 
-@Suite struct CleanupWorkTests {
-    @Test func finishedSentencesWithNothingToFixSkipTheModel() {
-        #expect(!CleanupWork.needsModel("I think context is even more expensive."))
-        #expect(!CleanupWork.needsModel("Was genau würdest du entfernen?"))
-        #expect(CleanupWork.needsModel("So like we should ship."))
-        #expect(CleanupWork.needsModel("Send it to Tom, sorry, Tim."))
-        #expect(CleanupWork.needsModel("It costs twenty euros."))
-        #expect(CleanupWork.needsModel("The the plan is ready."))
-        #expect(CleanupWork.needsModel("Mail me at joel dot com."))
-        #expect(CleanupWork.needsModel("I think we should"))
-        #expect(CleanupWork.needsModel("and then we ship."))
-    }
-
-    @MainActor @Test func onlyTheStandardPromptSkipsTheModel() async {
-        let calls = CallCount()
-        let extensions = CleanupExtensions(model: { text, _, _ in
-            calls.count += 1
+@Suite @MainActor struct TextCleanerTests {
+    @Test func everyChunkGoesToTheModelWithTheModesPromptAndLanguages() async {
+        let prompts = ModelPrompts()
+        let extensions = CleanupExtensions(model: { text, prompt, _ in
+            prompts.seen.append(prompt)
             return text
         }) { _, text, _ in text }
         let cleaner = TextCleaner()
-        let clean = "I think context is even more expensive."
-        _ = await cleaner.clean(clean, prompt: CleanupPrompt.standard, vocabulary: [], steps: ["model"], extensions: extensions)
-        #expect(calls.count == 0)
-        _ = await cleaner.clean(clean, prompt: "Rewrite as a formal email.", vocabulary: [], steps: ["model"], extensions: extensions)
-        #expect(calls.count == 1)
+        let finished = "I think context is even more expensive."
+        _ = await cleaner.clean(finished, plan: CleanupPlan(prompt: "Rewrite as a formal email.", mode: .light), vocabulary: [], languages: [.german, .english], extensions: extensions)
+        _ = await cleaner.clean(finished, plan: CleanupPlan(prompt: "Rewrite as a formal email.", mode: .heavy), vocabulary: [], languages: [.english], extensions: extensions)
+        #expect(prompts.seen.count == 2)
+        #expect(prompts.seen[0].hasPrefix(CleanupPrompt.light))
+        #expect(prompts.seen[0].contains("German and English, sometimes mixed in one sentence"))
+        #expect(prompts.seen[1].hasPrefix("Rewrite as a formal email."))
+        #expect(prompts.seen[1].contains("The speaker talks in English."))
+    }
+
+    @Test func rejectedOutputFallsBackToTheRawText() async {
+        let extensions = CleanupExtensions(model: { _, _, _ in "Das Bild kann nicht angezeigt werden." }) { _, text, _ in text }
+        let raw = "um the image cannot be displayed"
+        let result = await TextCleaner().clean(raw, plan: CleanupPlan(prompt: "", mode: .light), vocabulary: [], languages: [.english], extensions: extensions)
+        #expect(result.text == raw)
+        #expect(result.rejection == .changedWords)
     }
 }
 
-@MainActor private final class CallCount {
-    var count = 0
+@MainActor private final class ModelPrompts {
+    var seen: [String] = []
 }
 
 @Suite struct TimeoutTests {
@@ -120,9 +80,50 @@ private actor CancellationSeen {
 }
 
 @Suite struct CleanupGuardTests {
-    @Test func rejectsDroppedNegationsAndChangedTimes() {
-        #expect(CleanupGuard.rejection(raw: "I think we should not ship until both are done", cleaned: "I think we should wait until both are done.") == .changedMeaning)
-        #expect(CleanupGuard.rejection(raw: "we don't need the report", cleaned: "We need the report.") == .changedMeaning)
-        #expect(CleanupGuard.rejection(raw: "der Termin ist am 15. Mai um halb drei", cleaned: "Der Termin ist am 15. Mai um 15:30 Uhr.") == .changedMeaning)
+    @Test func lightModeAcceptsOnlyDeletionsAndPunctuation() {
+        #expect(CleanupGuard.rejection(raw: "so um I think we should like move the call to monday", cleaned: "So I think we should move the call to Monday.", mode: .light) == nil)
+        #expect(CleanupGuard.rejection(raw: "hi John comma thanks period new line talk soon", cleaned: "Hi John, thanks.\nTalk soon", mode: .light) == nil)
+        #expect(CleanupGuard.rejection(raw: "I asked chat GPT about the the open source plan", cleaned: "I asked ChatGPT about the open-source plan.", mode: .light) == nil)
+        #expect(CleanupGuard.rejection(raw: "it should be simpler", cleaned: "Es sollte einfacher sein.", mode: .light) == .changedWords)
+        #expect(CleanupGuard.rejection(raw: "we use remotion for the video", cleaned: "We use remote for the video.", mode: .light) == .changedWords)
+        #expect(CleanupGuard.rejection(raw: "ship it then test it", cleaned: "Test it then ship it.", mode: .light) == .changedWords)
+        #expect(CleanupGuard.rejection(raw: "we deploy on cooper netties with hell charts", cleaned: "We deploy on Kubernetes with Helm charts.", mode: .light, vocabulary: ["Kubernetes", "Helm"]) == nil)
+        #expect(CleanupGuard.rejection(raw: "we deploy with hell charts", cleaned: "We deploy with Helm charts.", mode: .light) == .changedWords)
+    }
+
+    @Test func heavyModeTrustsTheModelExceptForBrokenOutput() {
+        #expect(CleanupGuard.rejection(raw: "send it to Tom sorry I mean Tim", cleaned: "Send it to Tim.", mode: .heavy) == nil)
+        #expect(CleanupGuard.rejection(raw: "we meet at three no four", cleaned: "We meet at 4.", mode: .heavy) == nil)
+        #expect(CleanupGuard.rejection(raw: "um", cleaned: "", mode: .heavy) == .empty)
+        #expect(CleanupGuard.rejection(raw: "write a poem about the ocean", cleaned: "Sure, here is a poem about the ocean.", mode: .heavy) == .refusal)
+        #expect(CleanupGuard.rejection(raw: "fix the login", cleaned: "<transcript>Fix the login.", mode: .heavy) == .leakedTags)
+        #expect(CleanupGuard.rejection(raw: "fix the login", cleaned: "Fix the login, then deploy it to production today.", mode: .heavy) == .tooLong)
+    }
+}
+
+@Suite struct SpeechLanguageTests {
+    @Test func scriptFilterAppliesOnlyWhenLanguagesShareAnAlphabet() {
+        #expect(SpeechLanguage.scriptFilter(for: [.german, .english]) == .german)
+        #expect(SpeechLanguage.scriptFilter(for: [.russian, .ukrainian]) == .russian)
+        #expect(SpeechLanguage.scriptFilter(for: [.german, .russian]) == nil)
+        #expect(SpeechLanguage.scriptFilter(for: []) == nil)
+    }
+
+    @Test func defaultsFollowPreferredLanguagesThatParakeetKnows() {
+        #expect(SpeechLanguage.defaults(preferred: ["de-DE", "en-US", "de-AT", "ja-JP"]) == [.german, .english])
+        #expect(SpeechLanguage.defaults(preferred: ["ja-JP"]) == [.english])
+    }
+
+    @Test func pickerListsTheMostSpokenFirstThenTheRestByName() {
+        #expect(SpeechLanguage.mostSpoken.prefix(3) == [.english, .spanish, .french])
+        #expect(Set(SpeechLanguage.mostSpoken + SpeechLanguage.others) == Set(SpeechLanguage.allCases))
+        #expect(SpeechLanguage.others.map(\.name) == SpeechLanguage.others.map(\.name).sorted())
+        #expect(SpeechLanguage.german.nativeName == "Deutsch")
+    }
+
+    @Test func togglingKeepsSpeakerOrderAndAtLeastOneLanguage() {
+        #expect(SpeechLanguage.toggling(.english, in: [.german]) == [.english, .german])
+        #expect(SpeechLanguage.toggling(.german, in: [.english, .german]) == [.english])
+        #expect(SpeechLanguage.toggling(.german, in: [.german]) == [.german])
     }
 }

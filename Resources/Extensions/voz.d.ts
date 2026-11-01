@@ -52,7 +52,7 @@ export type Context = TransformContext & {
 };
 
 
-/** `light` keeps every spoken word except obvious fillers. `heavy` also runs the cleanup model. */
+/** `light` only removes fillers and fixes punctuation. `heavy` also applies the prompt, self-corrections, numbers and lists. */
 export type CleanupMode = "light" | "heavy";
 export type BeforeCleanupEvent = { prompt: string; mode: CleanupMode };
 export type BeforeCleanupResult = { prompt?: string; mode?: CleanupMode } | void;

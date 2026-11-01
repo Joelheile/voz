@@ -4,12 +4,14 @@ import Foundation
 
 enum SetupStep: Int, CaseIterable {
     case access
+    case languages
     case model
     case tryIt
 
     var stage: SetupStage {
         switch self {
         case .access: .access
+        case .languages: .languages
         case .model: .model
         case .tryIt: .tryIt
         }

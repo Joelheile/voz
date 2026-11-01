@@ -171,7 +171,7 @@ An extension does four kinds of things. The kind sets how much time it gets:
 
 Every handler gets `(event, ctx)`.
 
-- The `beforeCleanup` event has `prompt`, the prompt from Settings, and `mode`, `"light"` or `"heavy"`. Light skips the cleanup model, so every spoken word stays except obvious fillers
+- The `beforeCleanup` event has `prompt`, the prompt from Settings, and `mode`, `"light"` or `"heavy"`. Light tells the cleanup model to only remove fillers and fix punctuation, so every other spoken word stays
 - The `beforeInsert` event has `text` (cleaned) and `raw` (before cleanup)
 - The `afterRecording` event has `path` and `seconds`
 - The `afterInsert` event has `text` (what Voz inserted) and `raw`
@@ -361,7 +361,7 @@ export default defineExtension((voz) => {
 });
 ```
 
-Settings has a cleanup mode. Heavy runs the cleanup model. Light runs no model, neither Apple's nor one from an extension, so your words stay as you said them and the prompt has no effect. To keep your words in some apps only, return a mode:
+Settings has a cleanup mode. Both modes run the cleanup model. Heavy uses the prompt and also applies self-corrections, numbers and lists. Light uses a fixed prompt that only removes fillers and fixes punctuation and capitalization. If the model changes any other word, Voz inserts the raw transcript. To keep your words in some apps only, return a mode:
 
 ```ts
 import { defineExtension } from "voz";
@@ -375,7 +375,7 @@ export default defineExtension((voz) => {
 });
 ```
 
-A prompt only applies when the model runs. If your extension needs its prompt, return `mode: "heavy"` with it, for the apps it handles:
+A prompt only applies in Heavy mode. If your extension needs its prompt, return `mode: "heavy"` with it, for the apps it handles:
 
 ```ts
 voz.on("beforeCleanup", (event, ctx) => {
@@ -386,7 +386,7 @@ voz.on("beforeCleanup", (event, ctx) => {
 
 ## Models and cleanup steps
 
-Voz runs each dictation through a speech model, then through cleanup steps in order. The built-in steps are `fillers`, `punctuation`, `dictionary` and `model`. The `model` step uses the cleanup model.
+Voz runs each dictation through a speech model, then through cleanup steps in order. The built-in step is `model`, which uses the cleanup model. Voz ignores the retired steps `fillers`, `punctuation` and `dictionary` in older settings files.
 
 An extension that registers a model or step only makes it available. You turn on a model in Settings and a step in the extension's details under Extensions, or either one in `~/.voz/settings.json`. Settings shows the step order once an extension adds a step. Voz names it `<extension name>/<id>`.
 
@@ -495,9 +495,6 @@ What each version changed, and what older packages keep:
   "speechModel": "parakeet-ultra",
   "cleanupModel": "voz-ollama/llama",
   "cleanupSteps": [
-    "fillers",
-    "punctuation",
-    "dictionary",
     "model",
     "voz-jira/jira"
   ]
