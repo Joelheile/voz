@@ -127,7 +127,10 @@ private final class SensorView: NSView {
     }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        guard isAccepting, let media = media(in: sender) else { return false }
+        guard isAccepting, let media = media(in: sender) else {
+            Log.app.notice("Drop on the notch ignored: accepting \(self.isAccepting)")
+            return false
+        }
         onDrop(media)
         return true
     }
