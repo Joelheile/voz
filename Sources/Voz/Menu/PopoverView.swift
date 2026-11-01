@@ -24,6 +24,7 @@ struct PopoverView: View {
             .id(model.needsSetup ? nil : model.page)
             .padding(Theme.Spacing.item)
             .frame(width: Self.width)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous))
             .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous).strokeBorder(Theme.hairline))
             .toggleStyle(.accentSwitch)
@@ -63,6 +64,8 @@ struct PopoverView: View {
                 PrivacyPage(settings: sources.settings, back: model.goBack)
             case .whatsNew:
                 WhatsNewPage(settings: sources.settings, releases: Changelog.bundled, checkForUpdates: model.actions.checkForUpdates, back: model.goBack)
+            case .tour:
+                TourPage(settings: sources.settings, open: { model.page = $0 }, finish: { withAnimation(Theme.Motion.section) { model.page = .home } })
             }
         }
     }

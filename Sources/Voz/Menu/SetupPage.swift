@@ -12,11 +12,11 @@ struct SetupPage: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            StepProgress(current: model.step)
+            StepProgress(count: SetupStep.allCases.count, current: model.step.rawValue)
             ZStack(alignment: .topLeading) {
                 page
                     .id(model.step)
-                    .transition(pageTransition)
+                    .transition(.page(forward: forward, reduceMotion: reduceMotion))
             }
             footer
         }
@@ -31,22 +31,11 @@ struct SetupPage: View {
         }
     }
 
-    private var pageTransition: AnyTransition {
-        guard !reduceMotion else { return .opacity }
-        let distance: CGFloat = forward ? 24 : -24
-        return .asymmetric(
-            insertion: .offset(x: distance).combined(with: .opacity),
-            removal: .offset(x: -distance).combined(with: .opacity)
-        )
-    }
-
     private var footer: some View {
         HStack(spacing: 8) {
             if model.step != .access {
                 Button("Back") { go(to: model.step.rawValue - 1) }
-                    .font(.ui(13, weight: .medium))
-                    .foregroundStyle(Theme.inkSecondary)
-                    .buttonStyle(.pressable(0.97))
+                    .buttonStyle(.quietText)
                     .transition(.opacity)
             }
             Spacer(minLength: 0)
@@ -83,24 +72,25 @@ struct SetupPage: View {
     }
 }
 
-private struct StepProgress: View {
-    let current: SetupStep
+struct StepProgress: View {
+    let count: Int
+    let current: Int
 
     var body: some View {
         HStack(spacing: 4) {
-            ForEach(SetupStep.allCases, id: \.self) { step in
+            ForEach(0 ..< count, id: \.self) { step in
                 Capsule()
-                    .fill(step.rawValue <= current.rawValue ? Theme.ink : Theme.hairline)
+                    .fill(step <= current ? Theme.ink : Theme.hairline)
                     .frame(width: 20, height: 3)
             }
         }
         .animation(.spring(duration: 0.28, bounce: 0), value: current)
         .accessibilityElement()
-        .accessibilityLabel("Step \(current.rawValue + 1) of \(SetupStep.allCases.count)")
+        .accessibilityLabel("Step \(current + 1) of \(count)")
     }
 }
 
-private struct StepHeader: View {
+struct StepHeader: View {
     let title: String
     let detail: String
 

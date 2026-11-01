@@ -138,6 +138,7 @@ enum DesignRender {
         ("cleanup-prompt", .cleanupPrompt),
         ("cleanup-steps", .cleanupSteps),
         ("whats-new", .whatsNew),
+        ("tour", .tour),
     ]
 
     private static func write(_ view: some View, to directory: URL, name: String, appearance: NSAppearance) throws {
