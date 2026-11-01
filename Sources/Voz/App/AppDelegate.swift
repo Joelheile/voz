@@ -161,13 +161,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func offerDrop(on screen: NSScreen) -> Bool {
-        acceptsAudioDrop && indicator.showDropTarget(on: screen)
+        guard acceptsAudioDrop else {
+            Log.app.notice("Drop refused: extension listens \(self.extensions.acceptsAudioDrops), dictation idle \(self.dictation.phase == .idle)")
+            return false
+        }
+        return indicator.showDropTarget(on: screen)
     }
 
     private func transcribeDropped(_ file: URL) {
         indicator.showFileTranscribing()
         Task {
             let succeeded = await extensions.dropAudio(file)
+            if !succeeded { Log.app.error("Dropped .\(file.pathExtension, privacy: .public) file failed in the extension") }
             indicator.finishFile(succeeded: succeeded)
         }
     }
