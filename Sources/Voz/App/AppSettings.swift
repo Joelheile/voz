@@ -22,6 +22,7 @@ private enum SettingsKey {
     static let milestoneShows = "milestoneShows"
     static let logIncludesText = "logIncludesText"
     static let microphone = "microphone"
+    static let languages = "languages"
 }
 
 @MainActor
@@ -77,6 +78,9 @@ final class AppSettings: ObservableObject {
     /// The UID of the mic to record from. Empty means the system default.
     @Published var microphone: String {
         didSet { defaults.set(microphone, forKey: SettingsKey.microphone) }
+    }
+    @Published var languages: [SpeechLanguage] {
+        didSet { defaults.set(languages.map(\.rawValue), forKey: SettingsKey.languages) }
     }
     @Published var cleanupEnabled: Bool {
         didSet { defaults.set(cleanupEnabled, forKey: SettingsKey.cleanupEnabled) }
@@ -148,6 +152,8 @@ final class AppSettings: ObservableObject {
         milestoneShows = defaults.integer(forKey: SettingsKey.milestoneShows)
         milestonesSeen = defaults.dictionary(forKey: SettingsKey.milestonesSeen) as? [String: Int] ?? [:]
         microphone = defaults.string(forKey: SettingsKey.microphone) ?? MicrophoneOptions.systemDefault
+        let storedLanguages = defaults.stringArray(forKey: SettingsKey.languages)?.compactMap(SpeechLanguage.init) ?? []
+        languages = storedLanguages.isEmpty ? SpeechLanguage.defaults() : storedLanguages
         cleanupEnabled = defaults.bool(forKey: SettingsKey.cleanupEnabled)
         cleanupMode = defaults.string(forKey: SettingsKey.cleanupMode).flatMap(CleanupMode.init) ?? .heavy
         analyticsEnabled = defaults.bool(forKey: SettingsKey.analyticsEnabled)

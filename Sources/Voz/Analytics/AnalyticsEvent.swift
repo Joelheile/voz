@@ -170,6 +170,7 @@ enum DeliveryOutput: String, Sendable {
 
 enum SetupStage: String, Sendable {
     case access
+    case languages
     case model
     case tryIt = "try_it"
 }

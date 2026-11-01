@@ -517,6 +517,12 @@ struct ExtensionHostTests {
         #expect(try home.extensionSettings() == before)
     }
 
+    @Test func retiredRuleStepsDropOutOfOlderSettings() throws {
+        let home = temporaryHome()
+        try writeFile(#"{"cleanupSteps":["fillers","punctuation","llm/jira","dictionary","model"]}"#, named: "settings.json", in: home.root)
+        #expect(try home.pipelineChoices().cleanupSteps == ["llm/jira", "model"])
+    }
+
     @Test func configRoundTripsTypedValuesAndKeepsOtherSettings() throws {
         let home = temporaryHome()
         try writeFile(#"{"packages":["npm:voz-jira"],"config":{"jira":{"project":"VOZ","nested":{"a":1}},"other":{"x":1}}}"#, named: "settings.json", in: home.root)

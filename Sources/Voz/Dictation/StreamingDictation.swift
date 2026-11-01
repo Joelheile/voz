@@ -58,6 +58,7 @@ final class StreamingDictation {
     private let cleaner: TextCleaner
     private let vocabulary: [String]
     private let plan: Task<CleanupPlan, Never>
+    private let languages: [SpeechLanguage]
     private let cleanupEnabled: Bool
     private let steps: [String]
     private let extensions: CleanupExtensions
@@ -82,6 +83,7 @@ final class StreamingDictation {
         cleaner: TextCleaner,
         vocabulary: [String],
         plan: Task<CleanupPlan, Never>,
+        languages: [SpeechLanguage] = [],
         cleanupEnabled: Bool,
         steps: [String] = CleanupStep.standard,
         extensions: CleanupExtensions = .none
@@ -90,6 +92,7 @@ final class StreamingDictation {
         self.cleaner = cleaner
         self.vocabulary = vocabulary
         self.plan = plan
+        self.languages = languages
         self.cleanupEnabled = cleanupEnabled
         self.steps = steps
         self.extensions = extensions
@@ -191,25 +194,21 @@ final class StreamingDictation {
         let uncollected = SegmentJoiner.join([openText] + raws.dropFirst(collectedSegments))
         let pieces = units + (uncollected.isEmpty ? [] : [CleanupUnit(raw: uncollected)])
         var cleanedTexts: [String?] = []
-        var fallbacks: [String] = []
         var fillersRemoved = 0
         var timedOut = false
         var cleanedInTime = 0
         for piece in pieces {
-            let rules = cleanupEnabled ? CleanupStep.applyRules(steps, to: piece.raw, vocabulary: vocabulary) : RulePassResult(text: piece.raw, removed: 0)
-            fallbacks.append(rules.text)
             cleanedTexts.append(piece.cleaned?.text)
             if let cleaned = piece.cleaned {
                 cleanedInTime += 1
                 fillersRemoved += cleaned.fillerWordsRemoved
                 timedOut = timedOut || cleaned.timedOut
             } else {
-                fillersRemoved += rules.removed
                 timedOut = true
             }
         }
         let cleaned = CleanedText(
-            text: SegmentJoiner.join(cleaned: cleanedTexts, fallback: fallbacks),
+            text: SegmentJoiner.join(cleaned: cleanedTexts, fallback: pieces.map(\.raw)),
             fillerWordsRemoved: fillersRemoved,
             milliseconds: cleanupWait.wholeMilliseconds,
             timedOut: timedOut,
@@ -304,7 +303,7 @@ final class StreamingDictation {
         }
         let deadline = releaseDeadline ?? ContinuousClock.now + CleanupBudget.segmentTimeout
         let plan = await plan.value
-        return await cleaner.clean(raw, prompt: plan.prompt, vocabulary: vocabulary, steps: plan.mode.steps(steps), extensions: extensions, deadline: deadline)
+        return await cleaner.clean(raw, plan: plan, vocabulary: vocabulary, languages: languages, steps: steps, extensions: extensions, deadline: deadline)
     }
 
     private func wait(for task: Task<Void, Never>, until deadline: ContinuousClock.Instant) async {

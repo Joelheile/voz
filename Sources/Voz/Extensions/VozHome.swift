@@ -150,7 +150,7 @@ struct VozHome: Sendable {
         guard let speechModel = speechModel as? String, let cleanupModel = cleanupModel as? String, let cleanupSteps = cleanupSteps as? [String] else {
             throw VozHomeError.malformedPipeline(self.settings)
         }
-        return PipelineChoices(speechModel: speechModel, cleanupModel: cleanupModel, cleanupSteps: cleanupSteps)
+        return PipelineChoices(speechModel: speechModel, cleanupModel: cleanupModel, cleanupSteps: cleanupSteps.filter { !CleanupStep.retired.contains($0) })
     }
 
     func setPipelineChoices(_ choices: PipelineChoices) throws {

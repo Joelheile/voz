@@ -297,6 +297,21 @@ func audioConfigurationChangeReturnsWhileMainThreadIsBlocked() -> Bool {
     return posted.wait(timeout: .now() + 1) == .success
 }
 
+@MainActor
+func capturesBuiltAfterIdleConfigurationChange() -> Int {
+    var builds = 0
+    let engine = AVAudioEngine()
+    let recorder = Recorder()
+    recorder.buildCapture = {
+        builds += 1
+        let format = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 1)!
+        return Recorder.Capture(engine: engine, device: nil, format: format)
+    }
+    recorder.prepare()
+    recorder.configurationChanged(engine: ObjectIdentifier(engine))
+    return builds
+}
+
 func blockCurrentThread(seconds: Double) {
     Thread.sleep(forTimeInterval: seconds)
 }

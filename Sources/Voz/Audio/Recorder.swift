@@ -78,7 +78,7 @@ final class Resampler: @unchecked Sendable {
 
 @MainActor
 final class Recorder {
-    private struct Capture {
+    struct Capture {
         let engine: AVAudioEngine
         let device: AudioDeviceID?
         let format: AVAudioFormat
@@ -95,6 +95,7 @@ final class Recorder {
     private let buffer = SampleBuffer()
     private var configurationObserver: NSObjectProtocol?
     private let preferredInput: @MainActor () -> String
+    var buildCapture: (() throws -> Capture)!
 
     private(set) var isRecording = false
     let level = LiveLevel()
@@ -103,6 +104,7 @@ final class Recorder {
 
     init(preferredInput: @escaping @MainActor () -> String = { "" }) {
         self.preferredInput = preferredInput
+        buildCapture = { [unowned self] in try makeCapture() }
         // The engine posts this on its own queue and waits for observers. Releasing an engine also waits
         // for that queue, so observing on the main queue deadlocks. Hop to the main actor without waiting.
         configurationObserver = NotificationCenter.default.addObserver(
@@ -120,7 +122,7 @@ final class Recorder {
         if let stale = capture, !isCurrent(stale) { discard() }
         guard capture == nil else { return }
         do {
-            capture = try makeCapture()
+            capture = try buildCapture()
         } catch {
             Log.app.error("Recorder prepare failed: \(error.localizedDescription, privacy: .private)")
         }
@@ -133,7 +135,7 @@ final class Recorder {
         level.store(0)
         buffer.begin(onSamples: onSamples)
         do {
-            capture = try Self.startCapture(prepared: prepared, fresh: makeCapture, start: Self.startEngine)
+            capture = try Self.startCapture(prepared: prepared, fresh: buildCapture, start: Self.startEngine)
         } catch {
             _ = buffer.end()
             throw error
@@ -163,13 +165,14 @@ final class Recorder {
         return buffer.end()
     }
 
-    private func configurationChanged(engine: ObjectIdentifier?) {
+    func configurationChanged(engine: ObjectIdentifier?) {
         guard let capture, ObjectIdentifier(capture.engine) == engine else { return }
         if isRecording {
             rebuildWhileRecording()
         } else {
+            // Building an engine posts another change while the devices settle, so rebuilding here loops on
+            // the main thread. The next prepare() or start() builds a fresh one.
             discard()
-            prepare()
         }
     }
 
@@ -237,7 +240,7 @@ final class Recorder {
         discard()
         level.store(0)
         do {
-            let capture = try makeCapture()
+            let capture = try buildCapture()
             try capture.engine.start()
             self.capture = capture
         } catch {
