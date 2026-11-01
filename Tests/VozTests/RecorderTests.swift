@@ -33,3 +33,8 @@ private struct EngineRefused: Error {}
     }
     #expect(attempts == 1)
 }
+
+@MainActor
+@Test func idleConfigurationChangeDiscardsTheEngineWithoutBuildingAnother() {
+    #expect(capturesBuiltAfterIdleConfigurationChange() == 1)
+}
