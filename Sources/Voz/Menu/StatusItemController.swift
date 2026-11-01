@@ -128,7 +128,7 @@ final class StatusItemController: NSObject {
             retryModel: retryModel,
             checkForUpdates: { [weak self] in self?.dismissThen(checkForUpdates) },
             finishSetup: { [weak self] in
-                self?.closePanel()
+                self?.model.page = .tour
                 finishSetup()
             },
             resize: { [weak self] in self?.resize(to: $0) },
@@ -153,7 +153,7 @@ final class StatusItemController: NSObject {
         let needsSetup = !settings.onboardingCompleted
         if model.status != status { model.status = status }
         if model.hint != hint { model.hint = hint }
-        if model.needsSetup != needsSetup { model.needsSetup = needsSetup }
+        if model.needsSetup != needsSetup { withAnimation(Theme.Motion.section) { model.needsSetup = needsSetup } }
         if model.needsSetup, let permissions { setup.apply(permissions) }
     }
 
@@ -198,12 +198,11 @@ final class StatusItemController: NSObject {
         }
         if permissions?.accessibility == false { return .permissionNeeded(.accessibility) }
         switch modelStatus.state(for: settings.localSpeechModel) {
-        case .ready: return .ready
+        case .ready, .compiling: return .ready
         case .notLoaded: return .loadingModel(detail: "Starting", progress: nil)
         case let .downloading(fraction):
             let detail = DownloadEstimate.detail(fraction: fraction, elapsed: modelStatus.downloadElapsed(for: settings.localSpeechModel))
             return .loadingModel(detail: detail, progress: fraction)
-        case .compiling: return .loadingModel(detail: "Optimizing for this Mac, about 20 seconds", progress: nil)
         case let .failed(message): return .modelFailed(message)
         }
     }

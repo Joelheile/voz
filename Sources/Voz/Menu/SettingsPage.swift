@@ -115,6 +115,7 @@ struct SettingsPage: View {
     private var general: some View {
         PanelGroup(title: "App") {
             toggle("Launch at login", isOn: $settings.launchAtLogin)
+            LinkRow(title: "Product tour", value: "") { model.page = .tour }
             LinkRow(title: "Privacy and debug log", value: "") { model.page = .privacy }
             ActionRow(title: "Quit Voz", value: "", action: model.actions.quit)
         }
