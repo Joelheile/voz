@@ -137,6 +137,7 @@ enum DesignRender {
         ("privacy", .privacy),
         ("cleanup-prompt", .cleanupPrompt),
         ("cleanup-steps", .cleanupSteps),
+        ("languages", .languages),
         ("whats-new", .whatsNew),
     ]
 

@@ -17,11 +17,11 @@ import Testing
         let stream = StreamingDictation(
             transcribe: { _ in TranscriptionResult(text: "um keep these words", audioSeconds: 1, processingSeconds: 0, model: "test") },
             cleaner: cleaner, vocabulary: [], plan: Task { CleanupPlan(prompt: "", mode: .heavy) }, cleanupEnabled: true,
-            steps: ["fillers", "slow"], extensions: extensions
+            steps: ["slow"], extensions: extensions
         )
         let result = try #require(await stream.finish(samples: [0.5], released: started))
         #expect(ContinuousClock.now - started < .seconds(2.5))
-        #expect(result.cleaned.text == "Keep these words")
+        #expect(result.cleaned.text == "um keep these words")
         #expect(result.cleaned.timedOut)
         stream.cancel()
     }
@@ -40,13 +40,13 @@ import Testing
         let stream = StreamingDictation(
             transcribe: { TranscriptionResult(text: fragment($0), audioSeconds: 1, processingSeconds: 0, model: "test") },
             cleaner: TextCleaner(), vocabulary: [], plan: Task { CleanupPlan(prompt: "", mode: .heavy) }, cleanupEnabled: true,
-            steps: ["fillers", "model"], extensions: extensions
+            steps: ["model"], extensions: extensions
         )
         stream.feed(first)
         stream.feed(second)
         let result = try #require(await stream.finish(samples: first + second, released: .now))
-        #expect(modelInputs.texts.last == "So I think we should. move the call to monday")
-        #expect(result.cleaned.text == "So I think we should. move the call to monday")
+        #expect(modelInputs.texts.last == "so uh I think we should. uh move the call to monday")
+        #expect(result.cleaned.text == "so uh I think we should. uh move the call to monday")
     }
 
     @Test func releaseAfterAPauseReusesTheCleanupStartedDuringThePause() async throws {
@@ -75,16 +75,17 @@ import Testing
         let modelInputs = ModelInputs()
         let extensions = CleanupExtensions(model: { text, _, _ in
             modelInputs.texts.append(text)
-            return "Send it to Tim."
+            return "Send it to Timothy."
         }) { _, text, _ in text }
         let stream = StreamingDictation(
             transcribe: { _ in TranscriptionResult(text: "um send it to Tom sorry I mean Tim", audioSeconds: 1, processingSeconds: 0, model: "test") },
             cleaner: TextCleaner(), vocabulary: [], plan: Task { CleanupPlan(prompt: "", mode: .light) }, cleanupEnabled: true,
-            steps: ["fillers", "model"], extensions: extensions
+            steps: ["model"], extensions: extensions
         )
         let result = try #require(await stream.finish(samples: [0.5], released: .now))
-        #expect(modelInputs.texts.isEmpty)
-        #expect(result.cleaned.text == "Send it to Tom sorry I mean Tim")
+        #expect(modelInputs.texts == ["um send it to Tom sorry I mean Tim"])
+        #expect(result.cleaned.text == "um send it to Tom sorry I mean Tim")
+        #expect(result.cleaned.rejection == .changedWords)
     }
 }
 

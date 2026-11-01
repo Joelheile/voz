@@ -62,7 +62,8 @@ import Testing
         var previews: [String] = []
         let stream = StreamingDictation(
             transcribe: { _ in TranscriptionResult(text: "um ship it", audioSeconds: 1, processingSeconds: 0, model: "test") },
-            cleaner: TextCleaner(), vocabulary: [], plan: Task { CleanupPlan(prompt: "", mode: .heavy) }, cleanupEnabled: true, steps: ["fillers"]
+            cleaner: TextCleaner(), vocabulary: [], plan: Task { CleanupPlan(prompt: "", mode: .heavy) }, cleanupEnabled: true, steps: ["tidy"],
+            extensions: CleanupExtensions(model: nil) { _, _, _ in "Ship it" }
         )
         stream.onPreview = { previews.append($0) }
         let result = try #require(await stream.finish(samples: [0.5], released: .now))

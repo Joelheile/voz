@@ -262,14 +262,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .dropFirst()
             .sink { [weak self] model in self?.warmUpModel(model) }
             .store(in: &cancellables)
-        settings.$cleanupPrompt
+        settings.$languages
+            .removeDuplicates()
+            .sink { [transcriber] languages in Task { await transcriber.setLanguages(languages) } }
+            .store(in: &cancellables)
+        Publishers.CombineLatest3(settings.$cleanupPrompt, settings.$cleanupMode, settings.$languages)
             .dropFirst()
             .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
-            .sink { [weak self] prompt in
-                guard let self else { return }
-                self.cleaner.prewarm(prompt: prompt, vocabulary: self.vocabularyWords)
-            }
+            .sink { [weak self] _ in self?.prewarmCleanup() }
             .store(in: &cancellables)
+    }
+
+    private func prewarmCleanup() {
+        let plan = CleanupPlan(prompt: settings.cleanupPrompt, mode: settings.cleanupMode)
+        cleaner.prewarm(CleanupSetup(plan: plan, vocabulary: vocabularyWords, languages: settings.languages))
     }
 
     private func observeVocabulary() {
@@ -298,7 +304,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let words = terms.map(\.word)
         vocabularyWords = words
-        cleaner.prewarm(prompt: settings.cleanupPrompt, vocabulary: words)
+        prewarmCleanup()
         Task {
             do {
                 try await transcriber.prepareVocabulary(terms)

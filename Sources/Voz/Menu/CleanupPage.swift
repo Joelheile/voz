@@ -17,7 +17,7 @@ struct CleanupPage: View {
                         TabBar(tabs: CleanupModeTab.allCases, selection: settings.cleanupModeTab)
                             .frame(width: 120)
                     }
-                    if settings.cleanupMode == .heavy, !catalog.cleanupModels.isEmpty || settings.cleanupModel != CleanupModelID.apple {
+                    if !catalog.cleanupModels.isEmpty || settings.cleanupModel != CleanupModelID.apple {
                         ModelPicker(title: "Model", selection: $settings.cleanupModel, options: [ModelOption(id: CleanupModelID.apple, name: "Apple", detail: "On device")] + ModelOption.extensions(catalog.cleanupModels))
                     }
                     LinkRow(title: "Steps", value: edited(settings.cleanupSteps != CleanupStep.standard)) { model.page = .cleanupSteps }
@@ -36,8 +36,8 @@ struct CleanupPage: View {
 
     private var modeDetail: String {
         switch settings.cleanupMode {
-        case .light: "Keeps every word you said"
-        case .heavy: "Rewrites corrections and lists"
+        case .light: "Removes fillers, keeps your words"
+        case .heavy: "Also fixes corrections, numbers and lists"
         }
     }
 
