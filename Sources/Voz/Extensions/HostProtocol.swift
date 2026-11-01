@@ -3,11 +3,23 @@ import AppKit
 struct HostApp: Codable, Equatable, Sendable {
     let bundleID: String?
     let name: String?
+    let website: String?
 
+    init(bundleID: String?, name: String?, website: String? = nil) {
+        self.bundleID = bundleID
+        self.name = name
+        self.website = website
+    }
+
+    /// Reads the website off the main thread, because Accessibility can take tens of milliseconds
     @MainActor
-    static var current: HostApp {
+    static func front() -> Task<HostApp, Never> {
         let app = NSWorkspace.shared.frontmostApplication
-        return HostApp(bundleID: app?.bundleIdentifier, name: app?.localizedName)
+        let bundleID = app?.bundleIdentifier, name = app?.localizedName
+        guard let pid = app?.processIdentifier, let bundleID, FocusedWebsite.browsers.contains(bundleID), AXIsProcessTrusted() else {
+            return Task { HostApp(bundleID: bundleID, name: name) }
+        }
+        return Task.detached { HostApp(bundleID: bundleID, name: name, website: FocusedWebsite.hostname(pid: pid)) }
     }
 }
 
@@ -19,6 +31,7 @@ struct HostManifest: Decodable, Equatable, Sendable {
     let cleanupModels: [HostComponent]
     let cleanupSteps: [HostComponent]
     let actions: [ExtensionAction]
+    let tools: [ExtensionTool]
     let settings: [ExtensionSettings]
     let errors: [LoadError]
 
@@ -50,6 +63,16 @@ struct ExtensionAction: Decodable, Equatable, Hashable, Sendable {
     let `extension`: String
 
     var hotkeyLabel: String? { hotkey.flatMap { try? KeyChord(parsing: $0).label } }
+}
+
+struct ExtensionTool: Decodable, Equatable, Sendable {
+    let id: String
+    let description: String
+    let input: GenerationSpec
+    let readOnly: Bool
+    /// Inputs you can type without a flag, in order: `voz jira issue PROJ-1`
+    let positional: [String]?
+    let `extension`: String
 }
 
 struct ExtensionSettings: Decodable, Equatable, Sendable {
@@ -173,6 +196,8 @@ enum HostAction: Equatable, Sendable {
     case notify(String)
     case startActivity(ExtensionActivity)
     case endActivity(String)
+    case openNote(ExtensionNote)
+    case closeNote(String)
     case addHistory(ExtensionHistoryEntry)
     case actions([ExtensionAction])
 }
@@ -186,14 +211,16 @@ struct ExtensionActivity: Decodable, Equatable, Sendable {
     let title: String
     let since: Date
     let stoppable: Bool
+    let openable: Bool
 
-    private enum CodingKeys: String, CodingKey { case id, title, since, stoppable }
+    private enum CodingKeys: String, CodingKey { case id, title, since, stoppable, openable }
 
-    init(id: String, title: String, since: Date, stoppable: Bool) {
+    init(id: String, title: String, since: Date, stoppable: Bool, openable: Bool) {
         self.id = id
         self.title = title
         self.since = since
         self.stoppable = stoppable
+        self.openable = openable
     }
 
     init(from decoder: Decoder) throws {
@@ -202,7 +229,14 @@ struct ExtensionActivity: Decodable, Equatable, Sendable {
         title = try container.decode(String.self, forKey: .title)
         since = Date(timeIntervalSince1970: try container.decode(Double.self, forKey: .since) / 1000)
         stoppable = try container.decode(Bool.self, forKey: .stoppable)
+        openable = try container.decode(Bool.self, forKey: .openable)
     }
+}
+
+struct ExtensionNote: Decodable, Equatable, Sendable {
+    let id: String
+    let title: String
+    let text: String
 }
 
 struct ExtensionHistoryEntry: Decodable, Equatable, Sendable {
@@ -245,6 +279,31 @@ struct TranscribeFileParams: Decodable, Sendable {
     let deadline: Double
 }
 
+struct LiveStartParams: Decodable, Sendable {
+    let call: Int
+    let session: String
+    let activity: String
+    let speakers: Bool
+    let systemAudio: Bool
+    let deadline: Double
+}
+
+struct LiveStopParams: Decodable, Sendable {
+    let call: Int
+    let session: String
+    let deadline: Double
+}
+
+struct LiveTranscriptParams: Encodable {
+    let session: String
+    let transcript: FileTranscript
+}
+
+struct NoteChangeParams: Encodable {
+    let note: String
+    let text: String
+}
+
 struct InsertParams: Encodable {
     let text: String
     let raw: String
@@ -282,6 +341,17 @@ struct ActionParams: Encodable {
     let app: HostApp
 }
 
+struct ToolParams: Encodable {
+    let tool: String
+    let input: [String: JSONValue]
+    let app: HostApp
+}
+
+struct ToolResult: Decodable {
+    let result: JSONValue?
+    let error: String?
+}
+
 struct CommandParams: Encodable {
     let phrase: String
     let at: CommandPosition
@@ -312,7 +382,7 @@ struct IDParams: Decodable {
     let id: String
 }
 
-struct StopActivityParams: Encodable {
+struct ActivityParams: Encodable {
     let activity: String
     let app: HostApp
 }

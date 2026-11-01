@@ -34,14 +34,17 @@ final class Resampler: @unchecked Sendable {
     private var converter: AVAudioConverter?
     private let targetFormat: AVAudioFormat
     private var output: AVAudioPCMBuffer?
+    private let downmix: Bool
 
-    init(to targetFormat: AVAudioFormat) {
+    init(to targetFormat: AVAudioFormat, downmix: Bool = false) {
         self.targetFormat = targetFormat
+        self.downmix = downmix
     }
 
     func convert(_ input: AVAudioPCMBuffer) -> [Float]? {
         if converter?.inputFormat != input.format {
             converter = AVAudioConverter(from: input.format, to: targetFormat)
+            converter?.downmix = downmix
         }
         guard let converter else {
             Log.app.error("No converter from \(input.format.description, privacy: .public)")
@@ -201,7 +204,7 @@ final class Recorder {
         let chosen = InputDevice.connected(uid: preferredInput())
         let device = chosen ?? InputDevice.defaultInput()
         if let override = chosen ?? InputDevice.builtInIfDefaultIsBluetooth() {
-            use(override, on: engine)
+            Self.use(override, on: engine)
         }
         let input = engine.inputNode
         let inputFormat = input.outputFormat(forBus: 0)
@@ -250,7 +253,7 @@ final class Recorder {
         InputDevice.connected(uid: preferredInput()) ?? InputDevice.defaultInput()
     }
 
-    private func use(_ device: AudioDeviceID, on engine: AVAudioEngine) {
+    nonisolated static func use(_ device: AudioDeviceID, on engine: AVAudioEngine) {
         guard let unit = engine.inputNode.audioUnit else { return }
         var device = device
         let status = AudioUnitSetProperty(

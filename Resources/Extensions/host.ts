@@ -31,13 +31,18 @@ import type {
   Generated,
   Extension,
   ExtensionAPI,
+  LiveTranscribeOptions,
+  LiveTranscription,
+  NoteOptions,
   RecordingEvent,
+  ObjectSchema,
   Schema,
   Setting,
   SettingsValues,
   SettingsSchema,
   SpeechModel,
   TranscribeOptions,
+  Tool,
   Transcript,
 } from "./voz.d.ts";
 
@@ -84,7 +89,10 @@ type TranscribeRequest = { model: string; path: string; seconds: number; app: Ap
 type CleanRequest = { model: string; text: string; prompt: string; app: App };
 type StepRequest = { step: string; text: string; app: App };
 type ActionRequest = { action: string; app: App };
-type StopActivityRequest = { activity: string; app: App };
+type ToolRequest = { tool: string; input: never; app: App };
+type ActivityRequest = { activity: string; app: App };
+type NoteChange = { note: string; text: string };
+type LiveUpdate = { session: string; transcript: Transcript };
 type Component = { id: string; name: string };
 type Entry = { name: string; path?: string; requires?: number };
 type LoadError = { extension: string; message: string };
@@ -127,7 +135,7 @@ class Registration {
   }
 }
 
-const apiVersion = 5;
+const apiVersion = 6;
 const loadTimeout = 3000;
 const write = process.stdout.write.bind(process.stdout);
 const send = (message: object) => write(JSON.stringify(message) + "\n");
@@ -161,8 +169,13 @@ const speechModels = new Map<string, SpeechModel>();
 const cleanupModels = new Map<string, CleanupModel>();
 const cleanupSteps = new Map<string, CleanupStep>();
 const actions = new Map<string, Action & { extension: string }>();
+const tools = new Map<string, Tool & { extension: string }>();
 const activities = new Map<string, Activity>();
 let lastActivity = 0;
+let openedNote: { id: string; onChange: NoteOptions["onChange"] } | undefined;
+let lastNote = 0;
+const liveSessions = new Map<string, LiveTranscribeOptions["onTranscript"]>();
+let lastSession = 0;
 const calls = new Map<number, PendingCall>();
 let lastCall = 0;
 let isReady = false;
@@ -201,7 +214,56 @@ function context(app: App): Context {
       if (!isLive()) return Promise.reject(new Error("transcribe only works while a handler runs"));
       return transcribeFile(path, options, scope!);
     },
+    openNote: (note) => {
+      if (!isLive()) throw new Error("openNote only works while a handler runs");
+      return openNote(note);
+    },
   };
+}
+
+// Voz shows one note at a time, so a new note replaces the open one
+function openNote({ title, text, onChange }: NoteOptions) {
+  const id = `note/${++lastNote}`;
+  openedNote = { id, onChange };
+  send({ method: "openNote", params: { id, title: title ?? "", text: text ?? "" } });
+  return {
+    close() {
+      if (openedNote?.id !== id) return;
+      openedNote = undefined;
+      send({ method: "closeNote", params: { id } });
+    },
+  };
+}
+
+async function transcribeLive(activity: string, options: LiveTranscribeOptions = {}): Promise<LiveTranscription> {
+  if (!activities.has(activity)) throw new Error("transcribeLive only works while its activity runs");
+  const session = `live/${++lastSession}`;
+  const params = { session, activity, speakers: options.speakers ?? false, systemAudio: options.systemAudio ?? false };
+  // Updates can arrive before Voz confirms the start
+  liveSessions.set(session, options.onTranscript);
+  try {
+    await callSwift("startLive", params, untimed(), "Starting live transcription ran out of time");
+  } catch (error) {
+    liveSessions.delete(session);
+    throw error;
+  }
+  return {
+    stop: async () => {
+      try {
+        return (await callSwift("stopLive", { session }, untimed(), "Stopping live transcription ran out of time")) as Transcript;
+      } finally {
+        liveSessions.delete(session);
+      }
+    },
+  };
+}
+
+function receiveTranscript({ session, transcript }: LiveUpdate) {
+  try {
+    liveSessions.get(session)?.(transcript);
+  } catch (error) {
+    log(`onTranscript failed: ${describe(error)}`);
+  }
 }
 
 function wireSchema(schema: Schema): WireSchema {
@@ -244,7 +306,10 @@ function transcribeFile(path: string, options: TranscribeOptions | undefined, sc
   return callSwift("transcribeFile", params, scope, "Transcribing the file ran out of time") as Promise<Transcript>;
 }
 
-function callSwift(method: string, params: object, scope: RequestScope, timeoutMessage: string) {
+// Work that outlives a handler, such as a meeting, has no handler deadline. A day stands in for no limit.
+const untimed = () => ({ deadline: Date.now() + 86_400_000 });
+
+function callSwift(method: string, params: object, scope: Pick<RequestScope, "id" | "deadline">, timeoutMessage: string) {
   const call = ++lastCall;
   return new Promise<object>((resolve, reject) => {
     const timer = setTimeout(() => settle({ call, error: timeoutMessage }), scope.deadline - Date.now());
@@ -301,6 +366,29 @@ function wireActions() {
     name,
     hotkey,
     hidden: hidden === true,
+    extension,
+  }));
+}
+
+function registerTool(extension: string, tool: Tool, registration: Registration) {
+  if (!tool.id || !tool.description) throw new Error("A tool needs an id and a description");
+  const input = tool.input ?? emptyInput;
+  wireSchema(input);
+  const unknown = tool.positional?.find((name) => !(name in input.properties));
+  if (unknown) throw new Error(`Tool ${tool.id} lists positional "${unknown}", which is not in its input`);
+  const id = `${extension}/${tool.id}`;
+  setRegistered(tools, id, { ...tool, id, extension }, registration);
+}
+
+const emptyInput: ObjectSchema = { type: "object", properties: {} };
+
+function wireTools() {
+  return [...tools.values()].map(({ id, description, input, positional, readOnly, extension }) => ({
+    id,
+    description,
+    input: wireSchema(input ?? emptyInput),
+    positional: positional ?? [],
+    readOnly: readOnly === true,
     extension,
   }));
 }
@@ -434,12 +522,13 @@ function api(name: string, config: Config, registration: Registration): Extensio
     registerCleanupStep: (step) =>
       register(cleanupSteps, "cleanup step", name, step, registration),
     registerAction: (action) => registerAction(name, action, registration),
+    registerTool: (tool) => registerTool(name, tool as Tool, registration),
     startActivity(activity) {
       if (!activity.title) throw new Error("An activity needs a title");
       const id = `${name}/${++lastActivity}`;
       activities.set(id, activity);
-      send({ method: "startActivity", params: { id, title: activity.title, since: activity.since ?? Date.now(), stoppable: !!activity.stop } });
-      return { end: () => endActivity(id) };
+      send({ method: "startActivity", params: { id, title: activity.title, since: activity.since ?? Date.now(), stoppable: !!activity.stop, openable: !!activity.open } });
+      return { end: () => endActivity(id), transcribeLive: (options) => transcribeLive(id, options) };
     },
     addHistory(entry) {
       if (!entry.text) throw new Error("A history entry needs text");
@@ -643,11 +732,32 @@ async function action({ action, app }: ActionRequest) {
   return {};
 }
 
+async function tool({ tool, input, app }: ToolRequest) {
+  try {
+    return { result: (await find(tools, "tool", tool).run(input, context(app))) ?? null };
+  } catch (error) {
+    log(`${tool} failed: ${describe(error)}`);
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 function endActivity(id: string) {
   if (activities.delete(id)) send({ method: "endActivity", params: { id } });
 }
 
-async function stopActivity({ activity, app }: StopActivityRequest) {
+async function openActivity({ activity, app }: ActivityRequest) {
+  const open = activities.get(activity)?.open;
+  if (!open) throw new Error(`Unknown activity ${activity}`);
+  await open(context(app));
+  return {};
+}
+
+async function noteChanged({ note, text }: NoteChange) {
+  if (openedNote?.id === note) await openedNote.onChange?.(text);
+  return {};
+}
+
+async function stopActivity({ activity, app }: ActivityRequest) {
   const stop = activities.get(activity)?.stop;
   if (!stop) throw new Error(`Unknown activity ${activity}`);
   endActivity(activity);
@@ -658,7 +768,10 @@ async function stopActivity({ activity, app }: StopActivityRequest) {
 const methods = {
   beforeCleanup,
   action,
+  tool,
+  openActivity,
   stopActivity,
+  noteChanged,
   beforeInsert,
   clean,
   cleanupStep,
@@ -700,6 +813,7 @@ send({
     cleanupModels: components(cleanupModels),
     cleanupSteps: components(cleanupSteps),
     actions: wireActions(),
+    tools: wireTools(),
     settings: [...settingsSchemas].map(([extension, schema]) => ({
       extension,
       fields: Object.entries(schema).map(([key, setting]) => ({ key, ...setting })),
@@ -713,8 +827,12 @@ for await (const line of createInterface({ input: process.stdin })) {
   if (!line.trim()) continue;
   const request = parseRequest(line);
   if (!request) continue;
-  if (request.method === "generated" || request.method === "transcribedFile") {
+  if (["generated", "transcribedFile", "liveStarted", "liveStopped"].includes(request.method)) {
     settle(request.params);
+    continue;
+  }
+  if (request.method === "liveTranscript") {
+    receiveTranscript(request.params);
     continue;
   }
   const method = Object.hasOwn(methods, request.method)

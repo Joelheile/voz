@@ -101,6 +101,14 @@ final class HistoryStore: Sendable {
         try queue.read { try Self.request(matching: query).fetchAll($0) }
     }
 
+    func recent(matching query: String = "", app: String? = nil, since: Date? = nil, limit: Int) throws -> [TranscriptRecord] {
+        var request = TranscriptRecord.order(Column("createdAt").desc)
+        if !query.isEmpty { request = request.filter(Self.containsIgnoringCase(Column("finalText"), query)) }
+        if let app { request = request.filter(Self.containsIgnoringCase(Column("appName"), app)) }
+        if let since { request = request.filter(Column("createdAt") >= since) }
+        return try queue.read { try request.limit(limit).fetchAll($0) }
+    }
+
     func observeSearch(_ query: String) -> AnyPublisher<[TranscriptRecord], Error> {
         ValueObservation
             .tracking { try Self.request(matching: query).fetchAll($0) }

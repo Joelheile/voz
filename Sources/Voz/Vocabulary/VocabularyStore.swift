@@ -151,6 +151,11 @@ final class VocabularyStore: Sendable {
         _ = try queue.write { try VocabularyWord.deleteOne($0, key: id) }
     }
 
+    /// Returns false when the word wasn't there
+    func remove(word: String) throws -> Bool {
+        try queue.write { try VocabularyWord.filter(Column("word") == word).deleteAll($0) } > 0
+    }
+
     private func update(_ word: String, _ change: (inout VocabularyWord) -> Void) throws {
         try queue.write { database in
             guard var record = try VocabularyWord.filter(Column("word") == word).fetchOne(database) else { return }

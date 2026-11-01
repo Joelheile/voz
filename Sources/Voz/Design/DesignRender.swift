@@ -83,6 +83,17 @@ enum DesignRender {
                     )
                 }
             }
+            for (title, text) in [("empty", ""), ("written", "Ask Luca about the API bump\nShip the notch note on Friday")] {
+                let note = NoteModel()
+                note.title = "Weekly sync"
+                note.text = text
+                try write(
+                    NoteView(model: note, onEdit: {}, onClose: {}).frame(width: NoteController.size.width, height: NoteController.size.height),
+                    to: outputDirectory,
+                    name: "note-\(title)-\(suffix)",
+                    appearance: appearance
+                )
+            }
             for step in SetupStep.allCases {
                 fixture.sources.setup.step = step
                 try write(fixture.popover(needsSetup: true), to: outputDirectory, name: "popover-setup-\(step)-\(suffix)", appearance: appearance)
@@ -110,6 +121,7 @@ enum DesignRender {
         ("failed", .failed, false),
         ("drop", .dropTarget, false),
         ("drop-targeted", .dropTarget, true),
+        ("activity", .activity, false),
     ]
 
     private static let fileProgressStates: [(String, Double?, Bool)] = [

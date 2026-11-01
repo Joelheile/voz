@@ -28,9 +28,10 @@ final class ExtensionsModel: ObservableObject {
 
     1. Read https://raw.githubusercontent.com/Joelheile/voz/main/EXTENSIONS.md first. It is the API reference, and its first table maps ideas to the primitive that fits.
     2. Interview me with multiple-choice questions until you can say in one sentence what the extension does: what I say, what happens, and what it needs, such as an app, a setting or the on-device model. Write no code before that.
-    3. Run voz new with a name that starts with voz-, then work in the folder it creates. Read voz.d.ts there for the exact types. Copy the style of https://github.com/Joelheile/voz/tree/main/examples.
+    3. Run voz new with a name that starts with voz-, then work in the folder it creates. Follow AGENTS.md there, and read voz.d.ts for the exact types. Copy the style of https://github.com/Joelheile/voz/tree/main/examples.
     4. Put the logic that decides things in plain functions with bun test tests. Keep index.ts thin. Fix causes: no empty catch blocks or made-up fallback values.
-    5. Done means bun test passes and voz dev . loads it with no errors in its log. Run voz dev in the background, because it keeps running. Show me the commands you ran and their output, then give me one sentence to dictate to try it.'
+    5. Drive Voz with its CLI, and run voz help to see every command. If it says Voz is not running, run voz start. voz extensions shows what loaded and any error, voz config <name> <key> <value> fills in settings, voz enable and voz disable turn extensions on and off, and voz <name> <id> runs a tool or action.
+    6. Done means bun test passes and voz dev . loads it with no errors in voz logs --extensions. Run voz dev in the background, because it keeps running. Show me the commands you ran and their output, then give me one sentence to dictate to try it.'
     """
     private let home: VozHome
     private let analytics: Analytics
@@ -144,12 +145,12 @@ final class ExtensionsModel: ObservableObject {
 
     func update(_ item: InstalledExtension) async {
         guard let source = item.source else { return }
-        await run(item.name, .updating, change: .update, source: source) { _ in try await PackageCLI.update(source) }
+        await run(item.name, .updating, change: .update, source: source) { _ in try await Packages.update(source) }
     }
 
     func remove(_ item: InstalledExtension) async {
         guard let source = item.source else { return }
-        await run(item.name, .removing, change: .remove, source: source) { _ in try await PackageCLI.remove(source.name) }
+        await run(item.name, .removing, change: .remove, source: source) { _ in try await Packages.remove(source.name) }
         guard message == nil else { return }
         selected = nil
         removed = source
@@ -238,7 +239,7 @@ final class ExtensionsModel: ObservableObject {
                 Task { @MainActor in model?.showBunProgress(fraction, for: name) }
             }
             await MainActor.run { model?.working = (name, .installing) }
-            try await PackageCLI.install(source.description)
+            _ = try await Packages.install(source.description)
         }
     }
 

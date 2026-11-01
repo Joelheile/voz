@@ -38,14 +38,14 @@ final class DictationPipeline {
         editObserver.collect()
     }
 
-    func makeStreaming(app: HostApp) -> StreamingDictation {
+    func makeStreaming(app: Task<HostApp, Never>) -> StreamingDictation {
         let plan = CleanupPlan(prompt: settings.cleanupPrompt, mode: settings.cleanupMode)
         let vocabulary = history.vocabulary.wordsOrLogged()
         return StreamingDictation(
             transcribe: applying(history.vocabulary.rulesOrLogged(), to: transcriber(app: app, vocabulary: vocabulary)),
             cleaner: cleaner,
             vocabulary: vocabulary,
-            plan: Task { [extensions] in await extensions.cleanupPlan(plan, app: app) },
+            plan: Task { [extensions] in await extensions.cleanupPlan(plan, app: await app.value) },
             languages: settings.languages,
             cleanupEnabled: settings.cleanupEnabled,
             steps: settings.cleanupSteps,
@@ -66,7 +66,7 @@ final class DictationPipeline {
         }
     }
 
-    private func transcriber(app: HostApp, vocabulary: [String]) -> SegmentTranscriber {
+    private func transcriber(app: Task<HostApp, Never>, vocabulary: [String]) -> SegmentTranscriber {
         let selected = settings.speechModel
         let local = settings.localSpeechModel
         return { [engine, extensions] samples in
@@ -74,7 +74,7 @@ final class DictationPipeline {
                 return try await engine.transcribe(samples, model: local, vocabulary: vocabulary)
             }
             let started = ContinuousClock.now
-            guard let text = await extensions.transcribe(samples, model: selected, app: app) else {
+            guard let text = await extensions.transcribe(samples, model: selected, app: await app.value) else {
                 Log.extensions.error("Speech model \(selected, privacy: .public) failed, using \(local.rawValue, privacy: .public)")
                 Analytics.report(.speechExtensionFailed)
                 return try await engine.transcribe(samples, model: local, vocabulary: vocabulary)
@@ -96,13 +96,13 @@ final class DictationPipeline {
             Log.app.notice("Transcribed \(transcript.audioSeconds, format: .fixed(precision: 1))s with \(transcript.model): \(transcript.segmentCount) segments, \(transcript.cleanedInTime) of \(transcript.unitCount) sentence groups cleaned in time, tail STT \(transcript.sttMs) ms, cleanup wait \(transcript.cleaned.milliseconds) ms")
             let delivery = await extensions.prepare(transcript.cleaned.text, raw: transcript.raw, app: recording.app)
             let insertStarted = ContinuousClock.now
-            if !delivery.text.isEmpty {
+            if recording.inserts, !delivery.text.isEmpty {
                 await output.deliver(delivery.text)
                 if settings.insertIntoApp { editObserver.observe(inserted: delivery.text) }
+                extensions.inserted(delivery.text, raw: transcript.raw, app: recording.app)
             }
             let insertMs = (ContinuousClock.now - insertStarted).wholeMilliseconds
-            if !delivery.text.isEmpty { extensions.inserted(delivery.text, raw: transcript.raw, app: recording.app) }
-            if let command = delivery.command { extensions.run(command, app: recording.app) }
+            if recording.inserts, let command = delivery.command { extensions.run(command, app: recording.app) }
             let record = await save(transcript, finalText: delivery.text.isEmpty ? transcript.cleaned.text : delivery.text, app: recording.app, released: released)
             report(record, model: transcript.model, insertMs: insertMs, trigger: recording.trigger)
             logDebug(record, transcript, insertMs: insertMs)

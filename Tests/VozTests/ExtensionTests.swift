@@ -16,7 +16,9 @@ struct ExtensionHostTests {
         actions: RecordedActions = RecordedActions(),
         logs: RecordedLogs = RecordedLogs(),
         generate: @escaping @Sendable (GenerateParams) async throws -> String = { _ in throw ExtensionModelError.unavailable("not in tests") },
-        transcribeFile: @escaping @Sendable (TranscribeFileParams) async throws -> FileTranscript = { _ in throw FileTranscriberError.needsParakeet }
+        transcribeFile: @escaping @Sendable (TranscribeFileParams) async throws -> FileTranscript = { _ in throw FileTranscriberError.needsParakeet },
+        startLive: @escaping @Sendable (LiveStartParams, @escaping @Sendable (FileTranscript) async -> Void) async throws -> Void = { _, _ in throw FileTranscriberError.needsParakeet },
+        stopLive: @escaping @Sendable (LiveStopParams) async throws -> FileTranscript = { throw LiveSessionError.unknown($0.session) }
     ) -> ExtensionHost {
         ExtensionHost(
             launch: .init(bun: installedBun!, script: hostScript, home: home, packageDirectories: packages.map(fileURL)),
@@ -24,7 +26,9 @@ struct ExtensionHostTests {
             onLog: { logs.append($0) },
             onExit: { _ in },
             generate: generate,
-            transcribeFile: transcribeFile
+            transcribeFile: transcribeFile,
+            startLive: startLive,
+            stopLive: stopLive
         )
     }
 
@@ -275,6 +279,25 @@ struct ExtensionHostTests {
         await host.stop()
     }
 
+    @Test func toolsTakeTypedInputAndReturnJSON() async throws {
+        try extensionFile("jira.ts", #"export default (voz) => { voz.registerTool({ id: "issues", description: "List issues", readOnly: true, input: { type: "object", properties: { project: { type: "string" }, limit: { type: "integer" } }, required: ["project"] }, positional: ["project"], run: (input, ctx) => ({ issues: [`${input.project}-${input.limit ?? 1}`], app: ctx.app.name }) }); voz.registerTool({ id: "ping", description: "Ping", run: () => {} }); voz.registerTool({ id: "boom", description: "Fails", run: () => { throw new Error("Jira is down") } }) }"#)
+        try extensionFile("bad.ts", #"export default (voz) => voz.registerTool({ id: "x", description: "Bad", input: { type: "object", properties: {}, required: ["missing"] }, run: () => 1 })"#)
+        try extensionFile("typo.ts", #"export default (voz) => voz.registerTool({ id: "x", description: "Typo", input: { type: "object", properties: { key: { type: "string" } } }, positional: ["kee"], run: () => 1 })"#)
+        let host = makeHost()
+        let manifest = try await host.start()
+        #expect(manifest.tools.map(\.id) == ["jira/issues", "jira/ping", "jira/boom"])
+        #expect(manifest.tools.first?.readOnly == true)
+        #expect(manifest.tools.first?.input.properties?.map(\.name) == ["project", "limit"])
+        #expect(manifest.tools.first?.positional == ["project"])
+        #expect(manifest.tools.last?.positional == [])
+        #expect(manifest.errors.map(\.extension).sorted() == ["bad", "typo"])
+        let issues = try await host.runTool("jira/issues", input: ["project": "VOZ", "limit": 3], app: app, timeout: .seconds(2))
+        #expect(issues == .object(["issues": .array(["VOZ-3"]), "app": "Slack"]))
+        #expect(try await host.runTool("jira/ping", input: [:], app: app, timeout: .seconds(2)) == .null)
+        await #expect(throws: ControlError.failed("Jira is down")) { try await host.runTool("jira/boom", input: [:], app: app, timeout: .seconds(2)) }
+        await host.stop()
+    }
+
     @Test func activitiesShowUntilTheyEndOrTheUserStopsThem() async throws {
         try extensionFile("meeting.ts", #"export default (voz) => { voz.startActivity({ title: "Sync", since: 500 }).end(); voz.startActivity({ title: "Recording meeting", since: 1000, stop: (ctx) => ctx.notify("stopped") }) }"#)
         let actions = RecordedActions()
@@ -288,6 +311,49 @@ struct ExtensionHostTests {
             startedActivity("meeting/2", "Recording meeting", since: 1, stoppable: true),
             .endActivity("meeting/2"),
             .notify("stopped"),
+        ])
+        await host.stop()
+    }
+
+    @Test func openingAnActivityShowsANoteThatReportsEdits() async throws {
+        try extensionFile("meeting.ts", #"export default (voz) => { voz.startActivity({ title: "Meeting", since: 1000, open(ctx) { const note = ctx.openNote({ title: "Meeting", text: "Agenda", onChange(text) { voz.addHistory({ text }); note.close() } }) } }) }"#)
+        let actions = RecordedActions()
+        let host = makeHost(actions: actions)
+        _ = try await host.start()
+        #expect(await host.openActivity("meeting/1", app: app, timeout: .seconds(2)))
+        #expect(await host.noteChanged("note/1", text: "Ship it", timeout: .seconds(2)))
+        #expect(await host.noteChanged("note/1", text: "Closed", timeout: .seconds(2)))
+        #expect(await host.openActivity("meeting/2", app: app, timeout: .seconds(2)) == false)
+        #expect(actions.all == [
+            startedActivity("meeting/1", "Meeting", since: 1, stoppable: false, openable: true),
+            .openNote(ExtensionNote(id: "note/1", title: "Meeting", text: "Agenda")),
+            .addHistory(ExtensionHistoryEntry(extension: "meeting", text: "Ship it", seconds: 0, file: nil)),
+            .closeNote("note/1"),
+        ])
+        await host.stop()
+    }
+
+    @Test func activitiesTranscribeLiveUntilTheyStop() async throws {
+        try extensionFile("meeting.ts", #"export default (voz) => { let live; const activity = voz.startActivity({ title: "Meeting", since: 1000, async stop(ctx) { const t = await live.stop(); ctx.notify(`${t.speakers} ${t.text}`) } }); voz.registerAction({ id: "listen", name: "Listen", async run() { live = await activity.transcribeLive({ systemAudio: true, speakers: true, onTranscript: (t) => voz.addHistory({ text: `${t.speakers}:${t.text}` }) }) } }) }"#)
+        let actions = RecordedActions()
+        let started = Mutex<LiveStartParams?>(nil)
+        let host = makeHost(
+            actions: actions,
+            startLive: { params, onTranscript in
+                started.withLock { $0 = params }
+                await onTranscript(FileTranscript(text: "Hi.", seconds: 1, speakers: 1, turns: [SpeakerTurn(speaker: 1, start: 0, end: 1, text: "Hi.")]))
+            },
+            stopLive: { _ in FileTranscript(text: "Hi.", seconds: 1, speakers: 1, turns: [SpeakerTurn(speaker: 1, start: 0, end: 1, text: "Hi.")]) }
+        )
+        _ = try await host.start()
+        #expect(await host.runAction("meeting/listen", app: app, timeout: .seconds(2)))
+        #expect(await host.stopActivity("meeting/1", app: app, timeout: .seconds(2)))
+        #expect(started.withLock { $0 }.map { [$0.session, $0.activity, "\($0.speakers)", "\($0.systemAudio)"] } == ["live/1", "meeting/1", "true", "true"])
+        #expect(actions.all == [
+            startedActivity("meeting/1", "Meeting", since: 1, stoppable: true),
+            .addHistory(ExtensionHistoryEntry(extension: "meeting", text: "1:Hi.", seconds: 0, file: nil)),
+            .endActivity("meeting/1"),
+            .notify("1 Hi."),
         ])
         await host.stop()
     }
@@ -325,6 +391,8 @@ struct ExtensionHostTests {
         let folder = try ExtensionTemplate.create(named: "voz-hello", in: home.root, from: extensionResources)
         let apiVersion = try ExtensionTemplate.apiVersion(in: extensionResources)
         #expect(fileContents(folder.appendingPathComponent("package.json"))?.contains(#""apiVersion": \#(apiVersion) }"#) == true)
+        #expect(fileContents(folder.appendingPathComponent("AGENTS.md"))?.hasPrefix("# Writing Voz extensions") == true)
+        #expect(fileContents(folder.appendingPathComponent("CLAUDE.md")) == "@AGENTS.md\n")
         let actions = RecordedActions()
         let host = makeHost(packages: [folder.path], actions: actions)
         let manifest = try await host.start()
@@ -343,13 +411,13 @@ struct ExtensionHostTests {
         try writeFile(#"{"name":"pack"}"#, named: "package.json", in: pack)
         try writeFile(#"export default (voz) => voz.on("beforeInsert", () => ({ text: "pack ran" }))"#, named: "index.ts", in: pack.appendingPathComponent("extensions/a"))
         let future = home.packages.appendingPathComponent("node_modules/future")
-        try writeFile(#"{"name":"future","voz":{"apiVersion":6}}"#, named: "package.json", in: future)
+        try writeFile(#"{"name":"future","voz":{"apiVersion":7}}"#, named: "package.json", in: future)
         try writeFile("export default () => {}", named: "index.ts", in: future)
         let host = makeHost(packages: [pack.path, future.path])
         let manifest = try await host.start()
         #expect(manifest.extensions == ["on"])
         #expect(manifest.errors.first?.message.contains("Update Voz") == true)
-        #expect(await host.beforeInsert(text: "hi", raw: "hi", app: app, timeout: .seconds(2)) == "hi 5")
+        #expect(await host.beforeInsert(text: "hi", raw: "hi", app: app, timeout: .seconds(2)) == "hi 6")
         await host.stop()
     }
 
@@ -530,5 +598,23 @@ struct ExtensionHostTests {
     #expect(try parseSource("git:github.com/me/repo") == .git(host: "github.com", path: "me/repo", ref: nil))
     for raw in ["git:../me/repo", "git:./me/repo", "https://../me/repo"] {
         #expect(throws: PackageSourceError.unrecognized(raw)) { try parseSource(raw) }
+    }
+}
+
+struct FocusedWebsiteTests {
+    @Test func keepsOnlyTheHostnameOfWebPages() {
+        #expect(FocusedWebsite.hostname(from: "https://GitHub.com/Joelheile/voz/pull/52?tab=files") == "github.com")
+        #expect(FocusedWebsite.hostname(from: "http://localhost:3000/") == "localhost")
+        #expect(FocusedWebsite.hostname(from: "file:///Users/me/notes.html") == nil)
+        #expect(FocusedWebsite.hostname(from: "about:blank") == nil)
+        #expect(FocusedWebsite.hostname(from: nil) == nil)
+        #expect(FocusedWebsite.hostname(from: "https://example.com./") == "example.com")
+    }
+
+    @Test func outermostPageWinsOverItsIframes() {
+        // Focus in an embedded widget, inside a typing iframe like Google Docs uses, inside the page
+        let chain: [String?] = ["https://widget.example.net/embed", "about:blank", nil, "https://docs.google.com/document/d/1", nil]
+        #expect(FocusedWebsite.hostname(from: 0, parent: { $0 + 1 < chain.count ? $0 + 1 : nil }, webAreaURL: { chain[$0] }) == "docs.google.com")
+        #expect(FocusedWebsite.hostname(from: 0, parent: { _ in nil }, webAreaURL: { _ in nil }) == nil)
     }
 }

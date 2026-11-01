@@ -103,6 +103,51 @@ Publish it to npm with the `voz-package` keyword and it shows up in Extensions f
 
 Install one from the menu bar, or run `voz install voz-meeting`. [Browse extensions](https://voz.joels.tech/extensions/) or [build your first one](https://voz.joels.tech/build-extension/).
 
+## Control Voz from the terminal and AI apps
+
+Voz works the same from the menu, a terminal and an AI app. Every setting and action in the menu is a `voz` command, and commands that extensions add join the same list. Your coding agent can dictate, search your history or set up an extension, and you don't write an integration.
+
+### The voz command
+
+```
+voz start                         # open Voz in the background
+voz status                        # permissions, model and extensions
+voz dictation start               # record, then voz dictation stop
+voz dictation stop --print        # print the text instead of typing it
+voz logs --extensions --since 5m  # what extensions logged
+voz history invoice --limit 5     # find what you dictated
+voz vocabulary add Kubernetes     # teach Voz a word
+voz config voz-jira token -       # set a token from stdin
+voz disable voz-jira              # turn an extension off
+voz jira issues VOZ               # run a tool an extension adds
+voz help calendar                 # find a command
+voz guide                         # how to build an extension
+```
+
+- `voz help <words>` finds a command. `voz <command> --help` lists its flags.
+- You get readable text. Add `--json` for JSON. Coding agents get JSON on their own.
+- Repeating a command is safe: `voz enable voz-jira` twice reports that it is already on and still succeeds.
+- Most commands talk to the running app. When Voz is closed, they exit with code 3 and ask you to run `voz start`. `voz install`, `voz list`, `voz new`, `voz dev`, `voz logs` and `voz guide` work without it.
+
+| Exit code | Meaning |
+|---|---|
+| 0 | Done, or it already was |
+| 1 | The command failed |
+| 2 | Wrong command or flag |
+| 3 | Voz is not running |
+| 4 | Voz heard no speech |
+
+### Connect AI apps with MCP
+
+`voz mcp` serves the same commands to Claude, Codex and other MCP apps, and opens Voz if it is closed. Add it once:
+
+```
+claude mcp add voz -- /Applications/voz.app/Contents/MacOS/voz mcp
+codex mcp add voz -- /Applications/voz.app/Contents/MacOS/voz mcp
+```
+
+Each command becomes a tool, such as `history`, `vocabulary_add` or `voz-jira_issues`. Commands that only read are marked, so the app can run them without asking you. Commands that install code or need a terminal, such as `voz install` and `voz dev`, stay off MCP.
+
 ## What's new
 
 <!-- changelog -->
@@ -119,7 +164,9 @@ Built-in dictation processes audio and transcripts on your Mac. Extensions can s
 
 For debugging, Voz keeps a log on your Mac at `~/Library/Logs/Voz/voz-logs.jsonl`, with one line per dictation: timings, model and app names. It includes what you said only when you turn on Include text under Privacy in Settings. It never leaves your Mac unless you copy it.
 
-To mute other apps while you dictate, Voz asks for System Audio Recording access. It silences their sound and does not save their audio.
+To mute other apps while you dictate, Voz asks for System Audio Recording access. It silences their sound and does not save their audio. An extension you install can also ask Voz to transcribe what your Mac plays, such as a call, while the notch shows its timer. Voz transcribes it on your Mac and keeps no audio. The extension gets the text. Extensions also see the name of the app you dictate into and, in web browsers, the website's hostname, such as github.com, never the full address.
+
+The `voz` command and `voz mcp` talk to the app through a socket only your user account can open, and nothing listens on the network. An AI app you connect with `voz mcp` can read your history, so connect only apps you trust with it.
 
 Found a vulnerability? Open a [private advisory](https://github.com/Joelheile/voz/security/advisories/new), not a public issue.
 

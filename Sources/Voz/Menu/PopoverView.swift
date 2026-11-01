@@ -265,6 +265,11 @@ private struct HomePage: View {
             Text(activity.title).font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink).lineLimit(1)
             Text(activity.since, style: .timer).font(.meta).monospacedDigit().foregroundStyle(Theme.inkSecondary)
             Spacer(minLength: 8)
+            if activity.openable {
+                Button("Open") { catalog.open(activity) }
+                    .buttonStyle(.pill(.quiet, .small))
+                    .fixedSize()
+            }
             if activity.stoppable {
                 Button("Stop") { catalog.stop(activity) }
                     .buttonStyle(.pill(.quiet, .small))
