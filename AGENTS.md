@@ -21,6 +21,7 @@ One SwiftPM executable target, `Sources/Voz`, grouped by feature. `Tests/VozTest
 - `Dictation`: one dictation from hotkey to inserted text. `DictationPipeline` orders the steps.
 - `Audio`, `Transcription`, `Cleanup`, `Text`: capture, speech to text, on-device model cleanup, deterministic text rules.
 - `Extensions`: Bun host process, JSON protocol, npm packages, `~/.voz`. `Resources/Extensions` holds the TypeScript side.
+- `Control`: the `voz` CLI and `voz mcp`. One command table in `ControlCommands` serves both through a Unix socket in the running app. Extension tools and actions join as `<extension>/<id>`, typed as words: `voz jira issues`. See CLI and MCP below.
 - `History`, `Vocabulary`, `Analytics`, `Hotkey`, `Indicator`, `Menu`, `Design`: what the names say. `Design/Components.swift` holds the shared controls and panel views.
 - `Support`: small concurrency and `Duration` helpers shared across features.
 
@@ -33,6 +34,22 @@ One SwiftPM executable target, `Sources/Voz`, grouped by feature. `Tests/VozTest
 - Keep transcript text, vocabulary and app names out of telemetry. Usage analytics require opt-in. Read the README privacy section before you change privacy behavior.
 - Keep the native menu bar UI and its theme. Add optional behavior through extension primitives.
 - Test files cannot import `Testing` and `Foundation` together under the Command Line Tools. Put Foundation helpers in `Tests/VozTests/TestSupport.swift`.
+
+## CLI and MCP
+
+Voz is a dictation app that people and agents drive the same way. Everything you can do in the menu is a `voz` command, and `voz mcp` offers the same commands to AI apps. Extensions add commands through `voz.registerTool`, so the CLI grows with them instead of through a second interface. An agent should be able to dictate, search history, set up an extension or debug one without help from you.
+
+- Keep one command table. A command is a `ControlCommand` in `ControlCommands` (served by the app) or `LocalCommands` (run in the terminal), or a tool an extension registers. Help, flags, JSON, search and MCP all come from it. Don't add a second parser or a special case in `main.swift`.
+- Names are paths you also type as words: `vocabulary/add` is `voz vocabulary add`. Extension commands are `<extension>/<id>`, and the `voz-` prefix is optional.
+- Each command declares typed input and returns a `ControlOutput`: a JSON value for `--json` and agents, and text for people. Agents get JSON without the flag.
+- Exit codes: 0 ok, 1 failed, 2 usage, 3 Voz not running, 4 no speech. Each error says what to run next.
+- Repeating a command is safe. When nothing changes, report `changed: false` and exit 0.
+- Mark commands that only read as `readOnly`, so agents can call them without asking.
+- Only `voz start` and `voz mcp` open the app. Other app commands fail fast with exit 3.
+- Put commands that work without the app in `LocalCommands`. Mark commands that stream, wait for Ctrl-C or install code `terminalOnly`, so MCP doesn't offer them.
+- Never remove or rename a command or flag. Scripts and agents depend on them, so add new ones instead. Bump `ControlProtocol.version` only when the request or reply shape changes.
+- Extension tools have 60 seconds. Commands follow the privacy rules: no transcript text in logs unless the user turns it on.
+- Test commands through `ControlCenter.handle` in `ControlTests` and `ControlCommandsTests`.
 
 ## Design
 

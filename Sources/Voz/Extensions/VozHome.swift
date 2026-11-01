@@ -90,8 +90,13 @@ struct VozHome: Sendable {
         try FileManager.default.createDirectory(at: types, withIntermediateDirectories: true)
         try Self.replace(types.appendingPathComponent("index.d.ts"), with: resources.appendingPathComponent("voz.d.ts"))
         try Data(#"{"name":"voz","private":true,"types":"index.d.ts"}"#.utf8).write(to: types.appendingPathComponent("package.json"))
-        try Self.replace(root.appendingPathComponent("AGENTS.md"), with: resources.appendingPathComponent("AGENTS.md"))
-        try Data("@AGENTS.md\n".utf8).write(to: root.appendingPathComponent("CLAUDE.md"))
+        try Self.writeGuide(into: root, from: resources)
+    }
+
+    /// The extension guide as `AGENTS.md`, and a `CLAUDE.md` that points Claude Code at it
+    static func writeGuide(into folder: URL, from resources: URL) throws {
+        try replace(folder.appendingPathComponent("AGENTS.md"), with: resources.appendingPathComponent("AGENTS.md"))
+        try Data("@AGENTS.md\n".utf8).write(to: folder.appendingPathComponent("CLAUDE.md"))
     }
 
     static func writeTypes(into folder: URL, from resources: URL) throws {
@@ -274,6 +279,7 @@ enum ExtensionTemplate {
                 .write(to: file, atomically: true, encoding: .utf8)
         }
         try VozHome.writeTypes(into: folder, from: resources)
+        try VozHome.writeGuide(into: folder, from: resources)
         return folder
     }
 

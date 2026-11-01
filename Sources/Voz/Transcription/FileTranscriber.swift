@@ -20,6 +20,10 @@ struct SpeakerTurn: Codable, Equatable, Sendable {
     let start: Double
     let end: Double
     let text: String
+
+    func applying(_ rules: [VocabularyRule], words: [String]) -> SpeakerTurn {
+        SpeakerTurn(speaker: speaker, start: start, end: end, text: VocabularyCasing.apply(words, to: VocabularyRule.apply(rules, to: text)))
+    }
 }
 
 struct FileTranscript: Codable, Equatable, Sendable {
@@ -29,12 +33,11 @@ struct FileTranscript: Codable, Equatable, Sendable {
     let turns: [SpeakerTurn]
 
     func applying(_ rules: [VocabularyRule], words: [String]) -> FileTranscript {
-        let fix = { VocabularyCasing.apply(words, to: VocabularyRule.apply(rules, to: $0)) }
-        return FileTranscript(
-            text: fix(text),
+        FileTranscript(
+            text: VocabularyCasing.apply(words, to: VocabularyRule.apply(rules, to: text)),
             seconds: seconds,
             speakers: speakers,
-            turns: turns.map { SpeakerTurn(speaker: $0.speaker, start: $0.start, end: $0.end, text: fix($0.text)) }
+            turns: turns.map { $0.applying(rules, words: words) }
         )
     }
 }
@@ -42,6 +45,11 @@ struct FileTranscript: Codable, Equatable, Sendable {
 enum SpeakerTurns {
     static func make(words: [TimedWord], spans: [SpeakerSpan]) -> [SpeakerTurn] {
         var numbers: [String: Int] = [:]
+        return make(words: words, spans: spans, numbers: &numbers)
+    }
+
+    /// Keeps `numbers` so a speaker keeps their number across calls
+    static func make(words: [TimedWord], spans: [SpeakerSpan], numbers: inout [String: Int]) -> [SpeakerTurn] {
         var turns: [SpeakerTurn] = []
         for word in words {
             let label = speaker(of: word, in: spans)

@@ -54,6 +54,6 @@
     <key>NSCalendarsFullAccessUsageDescription</key>
     <string>Your Voz extensions use this to add and move events when you ask them to.</string>
     <key>NSAudioCaptureUsageDescription</key>
-    <string>Voz silences other apps while you dictate. It does not record or keep their audio.</string>
+    <string>Voz silences other apps while you dictate. Meeting extensions you install can also transcribe a call on your Mac. Voz keeps no audio.</string>
 </dict>
 </plist>

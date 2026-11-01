@@ -57,6 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         onDrop: { [weak self] file in self?.transcribeDropped(file) }
     )
     private let uninstallWatcher = UninstallWatcher()
+    private var controlServer: ControlServer?
     private lazy var updater = Updater(settings: settings, isBusy: { [weak self] in self?.dictation.phase != .idle })
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -66,6 +67,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         uninstallWatcher.start()
         extensions.start()
+        startControlServer()
         let statusItemController = StatusItemController(
             dictation: dictation,
             sources: PopoverSources(
@@ -105,6 +107,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         indicator.attach(to: dictation)
         indicator.onCancelFile = { [weak self] in self?.extensions.cancelFileTranscriptions() }
+        indicator.onOpenActivity = { [catalog = extensions.catalog] in catalog.open($0) }
+        extensions.catalog.$activities
+            .map { $0.first(where: \.openable) }
+            .removeDuplicates()
+            .sink { [indicator] in indicator.show($0) }
+            .store(in: &cancellables)
         extensions.onFileProgress = { [weak self] fraction in self?.indicator.showFileProgress(fraction) }
         extensions.onFileTranscribing = { [weak self] in
             guard let self, self.dictation.phase == .idle else { return }
@@ -202,7 +210,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.terminate(nil)
     }
 
+    private func startControlServer() {
+        let commands = ControlCommands(
+            history: history, settings: settings, extensions: extensionsModel, catalog: extensions.catalog,
+            dictation: .init(
+                phase: { [dictation] in dictation.phase },
+                handle: { [dictation] in dictation.handle($0) },
+                stopWithoutInserting: { [dictation] in dictation.stopWithoutInserting() }
+            )
+        )
+        let server = ControlServer(center: ControlCenter(commands: commands.all))
+        do {
+            try server.start()
+            controlServer = server
+        } catch {
+            Log.app.error("Could not start the control socket: \(String(describing: error), privacy: .public)")
+        }
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
+        controlServer?.stop()
         if quitRequested { LaunchAgent.bootOut() }
     }
 

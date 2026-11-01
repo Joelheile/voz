@@ -2,10 +2,13 @@ import AppKit
 
 let arguments = CommandLine.arguments
 
-if PackageCLI.handles(arguments) || Headless.handles(arguments) {
-    Task {
-        exit(PackageCLI.handles(arguments) ? await PackageCLI.run(arguments) : await Headless.run(arguments))
-    }
+if Headless.handles(arguments) {
+    Task { exit(await Headless.run(arguments)) }
+    RunLoop.main.run()
+}
+
+if ControlCLI.handles(arguments) {
+    Task { exit(await ControlCLI.run(arguments)) }
     RunLoop.main.run()
 }
 

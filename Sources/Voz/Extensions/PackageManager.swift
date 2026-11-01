@@ -1,7 +1,6 @@
 import Foundation
 
-enum PackageCLIError: Error, CustomStringConvertible {
-    case usage
+enum PackagesError: Error, CustomStringConvertible {
     case alreadyInstalled(String)
     case notInstalled(String)
     case missing(URL)
@@ -10,9 +9,8 @@ enum PackageCLIError: Error, CustomStringConvertible {
 
     var description: String {
         switch self {
-        case .usage: "usage: voz install <name | git:host/owner/repo[@ref] | https URL | path>\n       voz remove <source or name>\n       voz list\n       voz update\n       voz new <name>\n       voz dev <path>"
         case .alreadyInstalled(let path): "Already installed at \(path). Run voz update or voz remove first."
-        case .notInstalled(let name): "No installed package matches \(name)."
+        case .notInstalled(let name): "No installed package matches \(name). Run voz list to see them."
         case .missing(let url): "No package at \(url.path)."
         case .notAFolder(let url): "\(url.path) is not a folder. Put the extension in a folder as index.ts, then run voz dev on the folder."
         case .failed(let command, let status, let reason?): "\(command) failed with status \(status): \(reason)"
@@ -21,43 +19,22 @@ enum PackageCLIError: Error, CustomStringConvertible {
     }
 }
 
-enum PackageCLI {
+/// Installs, updates and removes extension packages in `~/.voz`, for the terminal and the Extensions page
+enum Packages {
+    static let warning = "Packages run code on your Mac with your permissions and can read your transcripts. Review the source before you install."
     private static let home = VozHome()
     private static let git = "/usr/bin/git"
 
-    static func handles(_ arguments: [String]) -> Bool {
-        arguments.count > 1 && ["install", "remove", "list", "update", "new", "dev"].contains(arguments[1])
-    }
-
-    static func run(_ arguments: [String]) async -> Int32 {
-        do {
-            switch (arguments[1], arguments.dropFirst(2).first) {
-            case ("install", let source?): try await install(source)
-            case ("remove", let target?): try await remove(target)
-            case ("list", nil): try list()
-            case ("update", nil): try await update()
-            case ("new", let name?): try create(name)
-            case ("dev", let path?): try develop(path)
-            default: throw PackageCLIError.usage
-            }
-            return 0
-        } catch {
-            FileHandle.standardError.write(Data("\(error)\n".utf8))
-            return 1
-        }
-    }
-
-    static func install(_ raw: String) async throws {
+    static func install(_ raw: String) async throws -> PackageSource {
         let source = try PackageSource(parsing: raw, relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
         let directory = source.directory(in: home)
-        print("Packages run code on your Mac with your permissions and can read your transcripts. Review the source before you install.")
         switch source {
         case .npm(_, let spec):
             let bun = try await BunRuntime.ensure()
             try preparePackagesManifest()
             try execute(bun.path, ["add", "--ignore-scripts", "--exact", spec], in: home.packages)
         case .git(_, _, let ref):
-            guard !FileManager.default.fileExists(atPath: directory.path) else { throw PackageCLIError.alreadyInstalled(directory.path) }
+            guard !FileManager.default.fileExists(atPath: directory.path) else { throw PackagesError.alreadyInstalled(directory.path) }
             let bun = try await BunRuntime.ensure()
             let staging = FileManager.default.temporaryDirectory.appendingPathComponent("voz-clone-\(UUID().uuidString)")
             defer { try? FileManager.default.removeItem(at: staging) }
@@ -67,17 +44,19 @@ enum PackageCLI {
             try FileManager.default.createDirectory(at: directory.deletingLastPathComponent(), withIntermediateDirectories: true)
             try FileManager.default.moveItem(at: staging, to: directory)
         case .local(let url):
-            guard FileManager.default.fileExists(atPath: url.path) else { throw PackageCLIError.missing(url) }
+            guard FileManager.default.fileExists(atPath: url.path) else { throw PackagesError.missing(url) }
         }
         let others = try installed().filter { $0.source.name != source.name }.map(\.raw)
         try home.setPackageSources(others + [source.description])
         notifyApp()
-        print("Installed \(source.description)")
+        return source
     }
 
-    static func remove(_ target: String) async throws {
+    /// Returns the source it removed, as it was written in settings
+    @discardableResult
+    static func remove(_ target: String) async throws -> String {
         let packages = try installed()
-        guard let match = packages.first(where: { $0.raw == target || $0.source.name == target }) else { throw PackageCLIError.notInstalled(target) }
+        guard let match = packages.first(where: { $0.raw == target || $0.source.name == target }) else { throw PackagesError.notInstalled(target) }
         switch match.source {
         case .npm(let name, _):
             try execute(try await BunRuntime.ensure().path, ["remove", name], in: home.packages)
@@ -88,22 +67,15 @@ enum PackageCLI {
         }
         try home.setPackageSources(packages.filter { $0.raw != match.raw }.map(\.raw))
         notifyApp()
-        print("Removed \(match.raw)")
+        return match.raw
     }
 
-    private static func list() throws {
-        let packages = try home.packageSources()
-        if packages.isEmpty { print("No packages installed.") }
-        for package in packages { print(package) }
-        let loose = (try? FileManager.default.contentsOfDirectory(atPath: home.extensions.path))?.filter { !$0.hasPrefix(".") }.sorted() ?? []
-        for file in loose { print("\(home.extensions.path)/\(file)") }
-    }
-
-    private static func update() async throws {
+    /// Updates every package that isn't pinned to a version or ref, and returns how many
+    static func updateAll() async throws -> Int {
         let packages = try installed().filter { !$0.source.isPinned }
         for package in packages { try await pull(package.source) }
         notifyApp()
-        print("Updated \(packages.count) package\(packages.count == 1 ? "" : "s")")
+        return packages.count
     }
 
     static func update(_ source: PackageSource) async throws {
@@ -125,35 +97,18 @@ enum PackageCLI {
         }
     }
 
-    private static func create(_ name: String) throws {
-        let folder = try ExtensionTemplate.create(named: name, in: URL(fileURLWithPath: FileManager.default.currentDirectoryPath), from: ExtensionService.resources)
-        print("Created \(folder.path). Next:\n  voz dev \(folder.lastPathComponent)\n  dictate \"say hello\" in any app\n  npm publish when it works")
-    }
-
-    private static func develop(_ raw: String) throws {
-        let source = try PackageSource(parsing: raw, relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
-        guard case .local(let url) = source else { throw PackageCLIError.usage }
-        var isFolder: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isFolder) else { throw PackageCLIError.missing(url) }
-        guard isFolder.boolValue else { throw PackageCLIError.notAFolder(url) }
-        try VozHome.writeTypes(into: url, from: ExtensionService.resources)
-        if !ExtensionTemplate.mapsTypes(in: url) {
-            print(#"Add "paths": { "voz": ["./voz.d.ts"] } to compilerOptions in tsconfig.json to get types for "voz"."#)
-        }
-        let logs = Process()
-        logs.executableURL = URL(fileURLWithPath: "/usr/bin/log")
-        logs.arguments = ["stream", "--style", "compact", "--predicate", "subsystem == \"\(Log.subsystem)\" AND category == \"extensions\""]
-        try logs.run()
+    /// Loads a folder until `stop` returns, then unloads it, unless it was already installed
+    static func develop(_ url: URL, while stop: () throws -> Void) throws {
+        let source = PackageSource.local(url)
         let sources = try home.packageSources()
         let added = !sources.contains(source.description)
         if added { try home.setPackageSources(sources + [source.description]) }
         notifyApp()
-        print("Loaded \(url.path). Voz reloads it when you save. Press Ctrl-C to stop.")
-        signal(SIGINT) { _ in }
-        logs.waitUntilExit()
-        if added { try home.setPackageSources(try home.packageSources().filter { $0 != source.description }) }
-        notifyApp()
-        print("\nUnloaded \(url.path)")
+        defer {
+            if added { try? home.setPackageSources((try? home.packageSources())?.filter { $0 != source.description } ?? []) }
+            notifyApp()
+        }
+        try stop()
     }
 
     private static func installed() throws -> [(raw: String, source: PackageSource)] {
@@ -185,7 +140,7 @@ enum PackageCLI {
         let result = try BunRuntime.run(executable, arguments, in: directory)
         guard result.status == 0 else {
             let reason = result.errorOutput.split(whereSeparator: \.isNewline).last.map(String.init)
-            throw PackageCLIError.failed(command: URL(fileURLWithPath: executable).lastPathComponent, status: result.status, reason: reason)
+            throw PackagesError.failed(command: URL(fileURLWithPath: executable).lastPathComponent, status: result.status, reason: reason)
         }
     }
 

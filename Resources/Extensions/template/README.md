@@ -1,6 +1,10 @@
 # {{name}}
 
-A [Voz](https://github.com/Joelheile/voz) extension. Say "say hello" at the end of a dictation and Voz shows the greeting from its settings.
+A [Voz](https://github.com/Joelheile/voz) extension. Say "say hello" at the end of a dictation and Voz shows the greeting from its settings. Agents and the terminal can run the same greeting:
+
+```
+voz {{name}} greet Ada
+```
 
 ## Install
 

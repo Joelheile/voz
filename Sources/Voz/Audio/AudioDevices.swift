@@ -196,7 +196,7 @@ final class OutputMuter: @unchecked Sendable {
         guard status == noErr else { throw MuteError(step: step, status: status) }
     }
 
-    private static var ownProcessObject: AudioObjectID? {
+    static var ownProcessObject: AudioObjectID? {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyTranslatePIDToProcessObject,
             mScope: kAudioObjectPropertyScopeGlobal,

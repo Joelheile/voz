@@ -4,6 +4,8 @@ struct Recording {
     let samples: [Float]
     let app: HostApp
     let trigger: DictationTrigger
+    /// False for `voz dictation stop --print`: the text goes to history and the terminal, not into the front app
+    var inserts = true
 }
 
 @MainActor
@@ -21,8 +23,9 @@ final class Dictation {
     private let pipeline: DictationPipeline
     private let settings: AppSettings
     private let analytics: Analytics
-    private var recordingApp = HostApp(bundleID: nil, name: nil)
+    private var recordingApp: Task<HostApp, Never>?
     private var recordingTrigger = DictationTrigger.tap
+    private var recordingInserts = true
     private var streaming: StreamingDictation?
     private let activity = ActivityHold()
 
@@ -67,6 +70,13 @@ final class Dictation {
         }
     }
 
+    /// Stops without typing the text anywhere, so `voz dictation stop --print` can print it
+    func stopWithoutInserting() {
+        guard phase == .recording else { return }
+        recordingInserts = false
+        stopAfterTrailingWords()
+    }
+
     func stopIfRecording() {
         guard phase == .recording else { return }
         Log.app.notice("Recording interrupted, transcribing what was captured")
@@ -81,7 +91,7 @@ final class Dictation {
             Task { await Permissions.requestMicrophone() }
             return
         }
-        let app = HostApp.current
+        let app = HostApp.front()
         let session = pipeline.makeStreaming(app: app)
         if settings.livePreviewEnabled {
             session.onPreview = { [weak self] text in self?.onPreview(text) }
@@ -104,6 +114,7 @@ final class Dictation {
         let cuePlayed = settings.soundCues && SoundCues.play(.start)
         recordingApp = app
         recordingTrigger = trigger
+        recordingInserts = true
         phase = .recording
         pipeline.collectLearnedWords()
         if settings.muteWhileRecording { mute(after: cuePlayed ? .milliseconds(150) : .zero) }
@@ -141,8 +152,7 @@ final class Dictation {
         case .tooShort: discard(session, reason: .tooShort)
         case .silent: discard(session, reason: .silent)
         case .keep:
-            let recording = Recording(samples: samples, app: recordingApp, trigger: recordingTrigger)
-            transcribe(recording, streaming: session, released: released)
+            transcribe(samples, app: recordingApp, trigger: recordingTrigger, inserts: recordingInserts, streaming: session, released: released)
         }
     }
 
@@ -154,10 +164,11 @@ final class Dictation {
         phase = .idle
     }
 
-    private func transcribe(_ recording: Recording, streaming: StreamingDictation, released: ContinuousClock.Instant) {
+    private func transcribe(_ samples: [Float], app: Task<HostApp, Never>?, trigger: DictationTrigger, inserts: Bool, streaming: StreamingDictation, released: ContinuousClock.Instant) {
         phase = .transcribing
         Task {
             defer { phase = .idle }
+            let recording = Recording(samples: samples, app: await app?.value ?? HostApp(bundleID: nil, name: nil), trigger: trigger, inserts: inserts)
             onOutcome(await pipeline.run(recording, streaming: streaming, released: released))
         }
     }

@@ -94,8 +94,8 @@ func hostApiVersion() -> String? {
     return String(host[start...].prefix(while: \.isNumber))
 }
 
-func startedActivity(_ id: String, _ title: String, since seconds: Double, stoppable: Bool) -> HostAction {
-    .startActivity(ExtensionActivity(id: id, title: title, since: Date(timeIntervalSince1970: seconds), stoppable: stoppable))
+func startedActivity(_ id: String, _ title: String, since seconds: Double, stoppable: Bool, openable: Bool = false) -> HostAction {
+    .startActivity(ExtensionActivity(id: id, title: title, since: Date(timeIntervalSince1970: seconds), stoppable: stoppable, openable: openable))
 }
 
 private struct HostLaunch: Encodable {
@@ -299,4 +299,43 @@ func audioConfigurationChangeReturnsWhileMainThreadIsBlocked() -> Bool {
 
 func blockCurrentThread(seconds: Double) {
     Thread.sleep(forTimeInterval: seconds)
+}
+
+func temporarySocketPath() -> String {
+    "/tmp/voz-test-\(UUID().uuidString.prefix(8)).sock"
+}
+
+/// Stands in for the microphone: toggling starts recording, then stops into transcribing
+@MainActor
+final class FakeDictation {
+    var phase = DictationPhase.idle
+    var canRecord = true
+    /// What `stop --print` transcribes. Nil saves nothing, as when Voz hears no speech
+    var heard: String?
+    var history: HistoryStore?
+
+    var control: ControlCommands.DictationControl {
+        .init(
+            phase: { self.phase },
+            handle: { _ in self.phase = self.phase == .recording ? .transcribing : self.canRecord ? .recording : .idle },
+            stopWithoutInserting: {
+                self.phase = .transcribing
+                Task { @MainActor in
+                    if let heard = self.heard { try? self.history?.insert(makeRecord(heard, at: Date().timeIntervalSince1970)) }
+                    self.phase = .idle
+                }
+            }
+        )
+    }
+}
+
+@MainActor
+func makeControlCommands(_ records: [TranscriptRecord] = [], dictation: FakeDictation = FakeDictation()) throws -> (ControlCommands, AppSettings) {
+    let history = try HistoryStore()
+    for record in records { try history.insert(record) }
+    dictation.history = history
+    let home = temporaryHome()
+    let settings = AppSettings(defaults: makeDefaults(), home: home)
+    let extensions = ExtensionsModel(analytics: Analytics(usage: false, errors: false, installID: UUID()), home: home, cache: nil) { _ in Data("{\"objects\":[]}".utf8) }
+    return (ControlCommands(history: history, settings: settings, extensions: extensions, catalog: ExtensionCatalog(), dictation: dictation.control, home: home), settings)
 }

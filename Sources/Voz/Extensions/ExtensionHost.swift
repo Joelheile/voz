@@ -20,6 +20,8 @@ actor ExtensionHost {
     private let onExit: @Sendable (Int32) -> Void
     private let generate: @Sendable (GenerateParams) async throws -> String
     private let transcribeFile: @Sendable (TranscribeFileParams) async throws -> FileTranscript
+    private let startLive: @Sendable (LiveStartParams, @escaping @Sendable (FileTranscript) async -> Void) async throws -> Void
+    private let stopLive: @Sendable (LiveStopParams) async throws -> FileTranscript
     private var process: Process?
     private var input: FileHandle?
     private var buffer = Data()
@@ -36,7 +38,9 @@ actor ExtensionHost {
         onLog: @escaping @Sendable (String) -> Void,
         onExit: @escaping @Sendable (Int32) -> Void,
         generate: @escaping @Sendable (GenerateParams) async throws -> String = ExtensionModel.generate,
-        transcribeFile: @escaping @Sendable (TranscribeFileParams) async throws -> FileTranscript = { _ in throw FileTranscriberError.needsParakeet }
+        transcribeFile: @escaping @Sendable (TranscribeFileParams) async throws -> FileTranscript = { _ in throw FileTranscriberError.needsParakeet },
+        startLive: @escaping @Sendable (LiveStartParams, @escaping @Sendable (FileTranscript) async -> Void) async throws -> Void = { _, _ in throw FileTranscriberError.needsParakeet },
+        stopLive: @escaping @Sendable (LiveStopParams) async throws -> FileTranscript = { throw LiveSessionError.unknown($0.session) }
     ) {
         self.launch = launch
         self.onAction = onAction
@@ -44,6 +48,8 @@ actor ExtensionHost {
         self.onExit = onExit
         self.generate = generate
         self.transcribeFile = transcribeFile
+        self.startLive = startLive
+        self.stopLive = stopLive
     }
 
     func start(timeout: Duration = .seconds(30)) async throws -> HostManifest {
@@ -113,8 +119,29 @@ actor ExtensionHost {
         decodeResult(EmptyParams.self, from: await request("action", ActionParams(action: id, app: app), timeout: timeout)) != nil
     }
 
+    func runTool(_ id: String, input: [String: JSONValue], app: HostApp, timeout: Duration) async throws -> JSONValue {
+        guard let data = await request("tool", ToolParams(tool: id, input: input, app: app), timeout: timeout) else {
+            throw ControlError.failed("\(id) did not answer within \(timeout.components.seconds) seconds. Read voz logs --extensions to see why.")
+        }
+        let response = try JSONDecoder().decode(HostResponse<ToolResult>.self, from: data)
+        if let error = response.result?.error ?? response.error { throw ControlError.failed(error) }
+        return response.result?.result ?? .null
+    }
+
     func stopActivity(_ id: String, app: HostApp, timeout: Duration) async -> Bool {
-        decodeResult(EmptyParams.self, from: await request("stopActivity", StopActivityParams(activity: id, app: app), timeout: timeout)) != nil
+        decodeResult(EmptyParams.self, from: await request("stopActivity", ActivityParams(activity: id, app: app), timeout: timeout)) != nil
+    }
+
+    func openActivity(_ id: String, app: HostApp, timeout: Duration) async -> Bool {
+        decodeResult(EmptyParams.self, from: await request("openActivity", ActivityParams(activity: id, app: app), timeout: timeout)) != nil
+    }
+
+    func noteChanged(_ id: String, text: String, timeout: Duration) async -> Bool {
+        decodeResult(EmptyParams.self, from: await request("noteChanged", NoteChangeParams(note: id, text: text), timeout: timeout)) != nil
+    }
+
+    private func sendTranscript(_ transcript: FileTranscript, session: String) {
+        post(HostReply(method: "liveTranscript", params: LiveTranscriptParams(session: session, transcript: transcript), deadline: Date().timeIntervalSince1970 * 1000 + 86_400_000))
     }
 
     @discardableResult
@@ -228,6 +255,8 @@ actor ExtensionHost {
         case "actions": decodeNotification(ActionsParams.self, line).map { onAction(.actions($0.actions)) }
         case "startActivity": decodeNotification(ExtensionActivity.self, line).map { onAction(.startActivity($0)) }
         case "endActivity": decodeNotification(IDParams.self, line).map { onAction(.endActivity($0.id)) }
+        case "openNote": decodeNotification(ExtensionNote.self, line).map { onAction(.openNote($0)) }
+        case "closeNote": decodeNotification(IDParams.self, line).map { onAction(.closeNote($0.id)) }
         case "addHistory": decodeNotification(ExtensionHistoryEntry.self, line).map { onAction(.addHistory($0)) }
         case "log": decodeNotification(TextParams.self, line).map { onLog($0.text) }
         case "generate":
@@ -238,6 +267,19 @@ actor ExtensionHost {
             decodeNotification(TranscribeFileParams.self, line).map { params in
                 reply(to: params.call, deadline: params.deadline, as: "transcribedFile") { [transcribeFile] in
                     String(decoding: try JSONEncoder().encode(try await transcribeFile(params)), as: UTF8.self)
+                }
+            }
+        case "startLive":
+            decodeNotification(LiveStartParams.self, line).map { params in
+                reply(to: params.call, deadline: params.deadline, as: "liveStarted") { [startLive] in
+                    try await startLive(params) { [weak self] transcript in await self?.sendTranscript(transcript, session: params.session) }
+                    return "{}"
+                }
+            }
+        case "stopLive":
+            decodeNotification(LiveStopParams.self, line).map { params in
+                reply(to: params.call, deadline: params.deadline, as: "liveStopped") { [stopLive] in
+                    String(decoding: try JSONEncoder().encode(try await stopLive(params)), as: UTF8.self)
                 }
             }
         default: onLog("Extension host sent unknown method \(envelope.method ?? "nil")")

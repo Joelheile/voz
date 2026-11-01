@@ -25,11 +25,17 @@ final class IndicatorController {
     private var cancelledFile = false
     private var smoother = LevelSmoother()
     private var lastSampleTime = 0.0
+    private var activity: ExtensionActivity?
     var levelSource: () -> Float = { 0 }
     var onCancelFile: () -> Void = {}
+    var onOpenActivity: (ExtensionActivity) -> Void = { _ in }
 
     init() {
         model.onCancel = { [weak self] in self?.cancelFile() }
+        model.onOpen = { [weak self] in
+            guard let self, let activity = self.activity else { return }
+            self.onOpenActivity(activity)
+        }
         let reposition: @Sendable (Notification) -> Void = { [weak self] _ in
             MainActor.assumeIsolated { self?.repositionIfVisible() }
         }
@@ -76,8 +82,28 @@ final class IndicatorController {
         }
     }
 
+    /// Keeps the activity in the notch until it ends. Dictations and drops take over and give it back.
+    func show(_ activity: ExtensionActivity?) {
+        self.activity = activity
+        guard !panel.isVisible || model.state == .activity else { return }
+        activity == nil ? hide() : restoreActivity()
+    }
+
+    private func restoreActivity() {
+        guard let activity else { return }
+        lifecycle?.cancel()
+        clearPreview()
+        if !panel.isVisible { present() }
+        model.canCancel = false
+        model.recordingStart = activity.since
+        model.recordingEnd = nil
+        model.state = .activity
+        expandAfterPresenting()
+        trackHover()
+    }
+
     func inviteDrop(on screen: NSScreen) {
-        guard !panel.isVisible, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+        guard !panel.isVisible || model.state == .activity, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
         lifecycle?.cancel()
         clearPreview()
         present(on: screen)
@@ -93,7 +119,7 @@ final class IndicatorController {
     }
 
     func showDropTarget(on screen: NSScreen) -> Bool {
-        guard !panel.isVisible || model.state == .dropTarget else { return false }
+        guard !panel.isVisible || model.state == .dropTarget || model.state == .activity else { return false }
         lifecycle?.cancel()
         clearPreview()
         if !panel.isVisible || layout != IndicatorLayout.make(screen: ScreenResolver.metrics(for: screen)) { present(on: screen) }
@@ -261,7 +287,7 @@ final class IndicatorController {
 
     // The panel lets clicks through except over the indicator, so it never blocks the menu bar
     private func updateHover() {
-        let hovering = model.canCancel && layout?.panelFrame.contains(NSEvent.mouseLocation) == true
+        let hovering = (model.canCancel || model.state == .activity) && layout?.panelFrame.contains(NSEvent.mouseLocation) == true
         if model.isHovering != hovering { model.isHovering = hovering }
         panel.ignoresMouseEvents = !hovering
     }
@@ -285,7 +311,7 @@ final class IndicatorController {
         case .done: Self.doneHold
         case .discarded: Self.discardHold
         case .failed: Self.failureHold
-        case .recording, .transcribing, .dropTarget: .zero
+        case .recording, .transcribing, .dropTarget, .activity: .zero
         }
     }
 
@@ -308,6 +334,7 @@ final class IndicatorController {
             self.clearPreview()
             self.panel.orderOut(nil)
             self.panel.contentView = nil
+            self.restoreActivity()
         }
     }
 

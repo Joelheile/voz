@@ -175,6 +175,7 @@ struct IndicatorView: View {
         .opacity(reduceMotion && !model.isExpanded ? 0 : 1)
         .animation(animation, value: model.isExpanded)
         .animation(previewAnimation, value: model.preview)
+        .opensActivity(model)
     }
 
     private var previewAnimation: Animation {
@@ -227,6 +228,7 @@ struct IndicatorView: View {
         }
         .frame(width: IndicatorLayout.pillSize.width, height: IndicatorLayout.pillSize.height)
         .animation(animation, value: model.isExpanded)
+        .opensActivity(model)
     }
 
     private func revealed<Content: View>(
@@ -268,6 +270,12 @@ struct DropGlow {
 }
 
 extension View {
+    func opensActivity(_ model: IndicatorModel) -> some View {
+        contentShape(Rectangle()).onTapGesture {
+            if model.state == .activity { model.onOpen() }
+        }
+    }
+
     func dropGlow(_ glow: DropGlow) -> some View {
         shadow(color: Theme.accent.opacity(glow.accent), radius: glow.accentRadius / 4)
             .shadow(color: Theme.accent.opacity(glow.accent), radius: glow.accentRadius)
@@ -282,6 +290,7 @@ enum IndicatorState: Equatable {
     case discarded
     case failed
     case dropTarget
+    case activity
 }
 
 @MainActor
@@ -300,6 +309,7 @@ final class IndicatorModel {
     var isHovering = false
     @ObservationIgnored var previewFrame = CGRect.zero
     @ObservationIgnored var onCancel: () -> Void = {}
+    @ObservationIgnored var onOpen: () -> Void = {}
     @ObservationIgnored var levels = LevelHistory()
 }
 
@@ -324,7 +334,7 @@ struct IndicatorLeading: View {
         )
         .font(.ui(12, weight: .medium))
         .monospacedDigit()
-        .foregroundStyle(.primary.opacity(model.state == .recording ? 0.9 : 0.4))
+        .foregroundStyle(.primary.opacity(model.state == .recording || model.state == .activity ? 0.9 : 0.4))
         .animation(.easeOut(duration: 0.2), value: model.state)
     }
 }
@@ -351,6 +361,11 @@ struct IndicatorTrailing: View {
                 ResultSymbol(icon: .triangleAlert, color: Theme.failure, effect: .bounce).transition(swap)
             case .dropTarget:
                 DropArrow(isTargeted: model.isDropTargeted).transition(swap)
+            case .activity:
+                Icon(.notebookPen, size: 15, strokeWidth: 2)
+                    .foregroundStyle(.primary.opacity(model.isHovering ? 1 : 0.6))
+                    .animation(Theme.Motion.hover, value: model.isHovering)
+                    .transition(swap)
             }
         }
         .animation(reduceMotion ? IndicatorMotion.reducedMotion : IndicatorMotion.stateSwap, value: model.state)

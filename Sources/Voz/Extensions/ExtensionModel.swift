@@ -14,6 +14,14 @@ final class GenerationSpec: Decodable, Sendable {
     let items: GenerationSpec?
     let properties: [Property]?
 
+    init(type: String, description: String? = nil, choices: [String]? = nil, items: GenerationSpec? = nil, properties: [Property]? = nil) {
+        self.type = type
+        self.description = description
+        self.choices = choices
+        self.items = items
+        self.properties = properties
+    }
+
     private enum CodingKeys: String, CodingKey {
         case type, description, items, properties
         case choices = "enum"

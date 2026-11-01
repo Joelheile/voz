@@ -1,5 +1,5 @@
+import AppKit
 import CoreServices
-import Foundation
 
 struct ExtensionDelivery {
     let text: String
@@ -15,18 +15,35 @@ final class ExtensionCatalog: ObservableObject {
     @Published fileprivate(set) var cleanupModels: [HostComponent] = []
     @Published fileprivate(set) var cleanupSteps: [HostComponent] = []
     @Published fileprivate(set) var actions: [ExtensionAction] = []
+    @Published fileprivate(set) var tools: [ExtensionTool] = []
     @Published fileprivate(set) var activities: [ExtensionActivity] = []
     @Published fileprivate(set) var settings: [ExtensionSettings] = []
     @Published fileprivate(set) var hostError: String?
     fileprivate var perform: (ExtensionAction) -> Void = { _ in }
+    fileprivate var performTool: (ExtensionTool, [String: JSONValue]) async throws -> JSONValue = { tool, _ in
+        throw ControlError.failed("Extensions are not running, so \(tool.id) can't run.")
+    }
     fileprivate var performStop: (ExtensionActivity) -> Void = { _ in }
+    fileprivate var performOpen: (ExtensionActivity) -> Void = { _ in }
 
     func run(_ action: ExtensionAction) {
         perform(action)
     }
 
+    func call(_ tool: ExtensionTool, input: [String: JSONValue]) async throws -> JSONValue {
+        try await performTool(tool, input)
+    }
+
+    func tools(for name: String) -> [ExtensionTool] {
+        tools.filter { Self.belongs($0.extension, to: name) }
+    }
+
     func stop(_ activity: ExtensionActivity) {
         performStop(activity)
+    }
+
+    func open(_ activity: ExtensionActivity) {
+        performOpen(activity)
     }
 
     func settings(for name: String) -> [ExtensionSettings] {
@@ -65,6 +82,7 @@ final class ExtensionCatalog: ObservableObject {
         cleanupModels = manifest?.cleanupModels ?? []
         cleanupSteps = manifest?.cleanupSteps ?? []
         actions = manifest?.actions ?? []
+        tools = manifest?.tools ?? []
         settings = manifest?.settings ?? []
         hostError = nil
     }
@@ -82,6 +100,8 @@ final class ExtensionService {
     private static let cleanupStepTimeout: Duration = .milliseconds(300)
     private static let transcribeTimeout: Duration = .seconds(2)
     private static let commandTimeout: Duration = .seconds(10)
+    /// Agents and scripts wait on a tool, so a hung one must fail instead of holding them forever
+    static let toolTimeout: Duration = .seconds(60)
     private static let maxRestarts = 3
     private static let watchdogInterval: Duration = .seconds(5)
     private static let pingTimeout: Duration = .seconds(2)
@@ -96,6 +116,8 @@ final class ExtensionService {
     private let toast: ToastController
     private let settings: AppSettings
     private let fileTranscriber: FileTranscriber
+    private let live: LiveSessions
+    private let note = NoteController()
     let catalog = ExtensionCatalog()
     var onFileTranscribing: () -> Void = {}
     var onFileTranscribed: (_ succeeded: Bool) -> Void = { _ in }
@@ -108,6 +130,7 @@ final class ExtensionService {
     private var restarts = 0
     private var started = ContinuousClock.now
     private var observer: NSObjectProtocol?
+    private var activationObserver: NSObjectProtocol?
     private var reloading: Task<Void, Never>?
     private var reloadRequested = false
     private var generation = UUID()
@@ -124,8 +147,15 @@ final class ExtensionService {
         self.toast = toast
         self.settings = settings
         self.fileTranscriber = fileTranscriber
+        live = LiveSessions(transcriber: fileTranscriber.transcriber, vocabulary: fileTranscriber.vocabulary, settings: settings)
         catalog.perform = { [weak self] action in self?.runAction(action) }
+        catalog.performTool = { [weak self] tool, input in
+            guard let host = self?.host else { throw ControlError.failed("Extensions are not running, so \(tool.id) can't run.") }
+            return try await host.runTool(tool.id, input: input, app: await HostApp.front().value, timeout: Self.toolTimeout)
+        }
         catalog.performStop = { [weak self] activity in self?.stopActivity(activity) }
+        catalog.performOpen = { [weak self] activity in self?.openActivity(activity) }
+        note.onChange = { [weak self] id, text in self?.noteChanged(id, text: text) }
     }
 
     func start() {
@@ -142,6 +172,13 @@ final class ExtensionService {
             MainActor.assumeIsolated {
                 self?.restarts = 0
                 self?.reload()
+            }
+        }
+        activationObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] notification in
+            let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+            MainActor.assumeIsolated {
+                guard self?.host != nil else { return }
+                FocusedWebsite.enableWebAccessibility(in: app)
             }
         }
         reload()
@@ -166,7 +203,7 @@ final class ExtensionService {
         await host?.stop()
         host = nil
         manifest = nil
-        catalog.activities = []
+        endActivities()
         loadedExtensionSettings = try? home.extensionSettings()
         watch()
         guard home.hasEnabledExtensions else { return catalog.show(nil) }
@@ -190,13 +227,13 @@ final class ExtensionService {
         manifest?.speechModels.contains { $0.id == id } == true
     }
 
-    func cleanupExtensions(model: String, app: HostApp) -> CleanupExtensions {
+    func cleanupExtensions(model: String, app: Task<HostApp, Never>) -> CleanupExtensions {
         let extensionModel: CleanupExtensions.Model = { [weak self] text, prompt, timeout in
-            await self?.host?.clean(model: model, text: text, prompt: prompt, app: app, timeout: timeout)
+            await self?.host?.clean(model: model, text: text, prompt: prompt, app: await app.value, timeout: timeout)
         }
         let usesExtensionModel = manifest?.cleanupModels.contains { $0.id == model } == true
         return CleanupExtensions(model: usesExtensionModel ? extensionModel : nil) { [weak self] id, text, deadline in
-            await self?.runStep(id, text: text, app: app, deadline: deadline) ?? text
+            await self?.runStep(id, text: text, app: await app.value, deadline: deadline) ?? text
         }
     }
 
@@ -267,7 +304,7 @@ final class ExtensionService {
         guard let host else { return false }
         runningDrops += 1
         defer { runningDrops -= 1 }
-        return await host.emit(.audioDrop(path: file.path), app: .current, timeout: Self.untimed)
+        return await host.emit(.audioDrop(path: file.path), app: await HostApp.front().value, timeout: Self.untimed)
     }
 
     func run(_ command: VoiceCommandMatch, app: HostApp) {
@@ -283,18 +320,45 @@ final class ExtensionService {
 
     func runAction(_ action: ExtensionAction) {
         guard let host else { return }
-        let app = HostApp.current
+        let app = HostApp.front()
         Task {
+            let app = await app.value
             if await !host.runAction(action.id, app: app, timeout: Self.untimed) { toast.show("\(action.name) failed") }
         }
     }
 
     private func stopActivity(_ activity: ExtensionActivity) {
         guard let host else { return }
-        let app = HostApp.current
+        let app = HostApp.front()
         Task {
+            let app = await app.value
             if await !host.stopActivity(activity.id, app: app, timeout: Self.untimed) { toast.show("Could not stop \(activity.title)") }
         }
+    }
+
+    private func openActivity(_ activity: ExtensionActivity) {
+        guard let host, activity.openable else { return }
+        let app = HostApp.front()
+        Task {
+            let app = await app.value
+            if await !host.openActivity(activity.id, app: app, timeout: Self.untimed) { toast.show("Could not open \(activity.title)") }
+        }
+    }
+
+    private func noteChanged(_ id: String, text: String) {
+        guard let host else { return }
+        Task { _ = await host.noteChanged(id, text: text, timeout: Self.untimed) }
+    }
+
+    private func startLive(_ params: LiveStartParams, onTranscript: @escaping @Sendable (FileTranscript) async -> Void) async throws {
+        guard catalog.activities.contains(where: { $0.id == params.activity }) else { throw LiveSessionError.unknown(params.session) }
+        try await live.start(params, onTranscript: onTranscript)
+    }
+
+    private func endActivities() {
+        catalog.activities = []
+        live.stopAll()
+        note.close()
     }
 
     private func launch() async throws {
@@ -321,6 +385,14 @@ final class ExtensionService {
             transcribeFile: { [weak self] params in
                 guard let self else { throw CancellationError() }
                 return try await self.transcribe(params)
+            },
+            startLive: { [weak self] params, onTranscript in
+                guard let self else { throw CancellationError() }
+                try await self.startLive(params, onTranscript: onTranscript)
+            },
+            stopLive: { [weak self] params in
+                guard let self else { throw CancellationError() }
+                return try await self.live.stop(params.session)
             }
         )
         let manifest = try await host.start()
@@ -329,6 +401,7 @@ final class ExtensionService {
         Log.extensions.notice("Extensions loaded: \(manifest.extensions.joined(separator: ", "), privacy: .public)")
         self.host = host
         self.manifest = manifest
+        NSWorkspace.shared.runningApplications.forEach(FocusedWebsite.enableWebAccessibility(in:))
         catalog.show(manifest)
         show(manifest.actions)
         started = .now
@@ -423,6 +496,11 @@ final class ExtensionService {
             catalog.activities.append(activity)
         case .endActivity(let id):
             catalog.activities.removeAll { $0.id == id }
+            live.endActivity(id)
+        case .openNote(let opened):
+            note.show(opened)
+        case .closeNote(let id):
+            note.close(id)
         case .addHistory(let entry):
             onHistory(entry)
         case .actions(let actions):
@@ -441,7 +519,7 @@ final class ExtensionService {
         hotkeys.unregisterAll()
         host = nil
         manifest = nil
-        catalog.activities = []
+        endActivities()
         if ContinuousClock.now - started > Self.healthyUptime { restarts = 0 }
         guard restarts < Self.maxRestarts else {
             Log.extensions.error("Extension host keeps exiting, last status \(status), extensions stay off until the next change")
