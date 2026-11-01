@@ -27,6 +27,12 @@ final class PopoverPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 
+    /// Shows the panel while the front app keeps the keyboard. Voz opens the panel on its own at launch and after
+    /// updates. Making it key then would send every keystroke to Voz, and keep them there if Voz hangs
+    func orderFrontLeavingKeyboard() {
+        orderFrontRegardless()
+    }
+
     override func cancelOperation(_ sender: Any?) {
         onCancel()
     }
@@ -235,6 +241,7 @@ final class StatusItemController: NSObject {
             closePanel()
         } else if Date().timeIntervalSince(closedAt) > Self.reopenGuard {
             open()
+            panel.makeKey()
         }
     }
 
@@ -254,7 +261,7 @@ final class StatusItemController: NSObject {
         if !model.needsSetup { analytics.capture(.historyOpened) }
         hosting.layoutSubtreeIfNeeded()
         layoutPanel(size: contentSize)
-        panel.makeKeyAndOrderFront(nil)
+        panel.orderFrontLeavingKeyboard()
         syncStats(page: model.page)
         statusItem.button?.highlight(true)
         outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
