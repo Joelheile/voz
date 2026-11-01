@@ -106,6 +106,8 @@ Install one from the menu bar, or run `voz install voz-meeting`. [Browse extensi
 ## What's new
 
 <!-- changelog -->
+- Typing in other apps keeps working when Voz opens its panel at launch
+- Voz no longer freezes after your microphone or headphones change
 - Your Voz icon no longer hides behind the notch when your menu bar is full
 
 [See everything new](CHANGELOG.md)
