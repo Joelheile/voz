@@ -158,15 +158,21 @@ struct IndicatorView: View {
                 notchShape.fill(.black).frame(width: notchWidth)
             }
             .overlay {
-                notchShape
-                    .stroke(LinearGradient(colors: [.clear, Theme.accent], startPoint: .top, endPoint: .bottom), lineWidth: 3)
-                    .frame(width: notchWidth)
-                    .animation(IndicatorMotion.glow) { $0.opacity(dropGlow.rim) }
+                if model.state == .dropTarget {
+                    notchShape
+                        .stroke(LinearGradient(colors: [.clear, Theme.accent], startPoint: .top, endPoint: .bottom), lineWidth: 3)
+                        .frame(width: notchWidth)
+                        .animation(IndicatorMotion.glow) { $0.opacity(dropGlow.rim) }
+                        .transition(glowExit)
+                }
             }
             .mask { notchShape.frame(width: notchWidth) }
             .background {
-                notchShape.fill(.black).frame(width: notchWidth)
-                    .animation(IndicatorMotion.glow) { $0.dropGlow(dropGlow) }
+                if model.state == .dropTarget {
+                    notchShape.fill(.black).frame(width: notchWidth)
+                        .animation(IndicatorMotion.glow) { $0.dropGlow(dropGlow) }
+                        .transition(glowExit)
+                }
             }
             Rectangle()
                 .fill(.black)
@@ -176,6 +182,8 @@ struct IndicatorView: View {
         .animation(animation, value: model.isExpanded)
         .animation(previewAnimation, value: model.preview)
     }
+
+    private var glowExit: AnyTransition { .opacity.animation(IndicatorMotion.glow) }
 
     private var previewAnimation: Animation {
         reduceMotion ? IndicatorMotion.reducedMotion : IndicatorMotion.previewUpdate
