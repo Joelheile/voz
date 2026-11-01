@@ -56,6 +56,7 @@ enum PopoverPage {
     case speechModel
     case languages
     case whatsNew
+    case tour
 
     var title: String {
         switch self {
@@ -71,6 +72,7 @@ enum PopoverPage {
         case .speechModel: "Speech model"
         case .languages: "Languages"
         case .whatsNew: "What's new"
+        case .tour: "Tour"
         }
     }
 
@@ -78,7 +80,7 @@ enum PopoverPage {
         switch self {
         case .cleanupPrompt, .cleanupSteps: .cleanup
         case .cleanup, .privacy, .speechModel, .languages, .whatsNew: .settings
-        case .home, .settings, .dictionary, .insights, .extensions: .home
+        case .home, .settings, .dictionary, .insights, .extensions, .tour: .home
         }
     }
 }

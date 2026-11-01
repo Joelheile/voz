@@ -85,6 +85,18 @@ extension ButtonStyle where Self == PressableButtonStyle {
     }
 }
 
+struct QuietTextButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        PressableButtonStyle(scale: 0.97).makeBody(configuration: configuration)
+            .font(.ui(13, weight: .medium))
+            .foregroundStyle(Theme.inkSecondary)
+    }
+}
+
+extension ButtonStyle where Self == QuietTextButtonStyle {
+    static var quietText: QuietTextButtonStyle { QuietTextButtonStyle() }
+}
+
 struct IconButton: View {
     let icon: LucideIconName
     let help: String
@@ -187,6 +199,17 @@ struct FlowLayout: Layout {
             maxX = max(maxX, x - spacing)
         }
         return (CGSize(width: maxX, height: y + rowHeight), origins)
+    }
+}
+
+extension AnyTransition {
+    static func page(forward: Bool, reduceMotion: Bool) -> AnyTransition {
+        guard !reduceMotion else { return .opacity }
+        let distance: CGFloat = forward ? 24 : -24
+        return .asymmetric(
+            insertion: .offset(x: distance).combined(with: .opacity),
+            removal: .offset(x: -distance).combined(with: .opacity)
+        )
     }
 }
 
