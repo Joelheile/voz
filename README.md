@@ -151,6 +151,7 @@ Each command becomes a tool, such as `history`, `vocabulary_add` or `voz-jira_is
 ## What's new
 
 <!-- changelog -->
+- The notch opens and closes more smoothly
 - Typing in other apps keeps working when Voz opens its panel at launch
 - Voz no longer freezes after your microphone or headphones change
 - Your Voz icon no longer hides behind the notch when your menu bar is full

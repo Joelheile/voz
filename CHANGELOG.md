@@ -4,6 +4,7 @@ Newest first. To get beta changes now, turn on Beta updates under What's new in 
 
 ## In beta
 
+- The notch opens and closes more smoothly
 - Typing in other apps keeps working when Voz opens its panel at launch
 - Voz no longer freezes after your microphone or headphones change
 - Your Voz icon no longer hides behind the notch when your menu bar is full
