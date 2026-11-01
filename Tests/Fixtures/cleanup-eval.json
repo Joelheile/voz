@@ -194,5 +194,23 @@
     "category": "filler-mid",
     "input": "so when I hit command um also minimize the prompt",
     "expected": "So when I hit command, also minimize the prompt."
+  },
+  {
+    "id": 33,
+    "category": "mixed-no-translate",
+    "input": "the button should look more elegant und das Layout sollte einfacher sein",
+    "expected": "The button should look more elegant und das Layout sollte einfacher sein."
+  },
+  {
+    "id": 34,
+    "category": "long-keeps-clauses",
+    "input": "um so we redesigned the onboarding um and uh I simplified the settings page a bit and um maybe that would make it faster",
+    "expected": "So we redesigned the onboarding and I simplified the settings page a bit and maybe that would make it faster."
+  },
+  {
+    "id": 35,
+    "category": "mixed-no-translate",
+    "input": "kannst du mir ähm eine ausklappbare sidebar bauen",
+    "expected": "Kannst du mir eine ausklappbare Sidebar bauen?"
   }
 ]

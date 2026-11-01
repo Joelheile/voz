@@ -10,7 +10,7 @@ struct CleanupEvalCase: Decodable {
 
 @MainActor
 enum CleanupEval {
-    static func run(path: String, repeats: Int, budget: Duration) async -> Int32 {
+    static func run(path: String, repeats: Int, budget: Duration, plan: CleanupPlan, languages: [SpeechLanguage]) async -> Int32 {
         let cases: [CleanupEvalCase]
         do {
             cases = try JSONDecoder().decode([CleanupEvalCase].self, from: Data(contentsOf: URL(fileURLWithPath: path)))
@@ -19,9 +19,9 @@ enum CleanupEval {
             return 66
         }
         let cleaner = TextCleaner(budget: budget)
-        cleaner.prewarm(prompt: CleanupPrompt.standard, vocabulary: [])
+        cleaner.prewarm(CleanupSetup(plan: plan, vocabulary: [], languages: languages))
         try? await Task.sleep(for: .seconds(1))
-        _ = await cleaner.clean("um so can you uh send me the report by friday", prompt: CleanupPrompt.standard, vocabulary: [])
+        _ = await cleaner.clean("um so can you uh send me the report by friday", plan: plan, vocabulary: [], languages: languages)
 
         var allLatencies: [Int] = []
         var scored = 0
@@ -32,7 +32,7 @@ enum CleanupEval {
             var latencies: [Int] = []
             var last: CleanedText?
             for _ in 0..<repeats {
-                let result = await cleaner.clean(evalCase.input, prompt: CleanupPrompt.standard, vocabulary: evalCase.vocabulary ?? [])
+                let result = await cleaner.clean(evalCase.input, plan: plan, vocabulary: evalCase.vocabulary ?? [], languages: languages)
                 latencies.append(result.milliseconds)
                 last = result
                 try? await Task.sleep(for: .seconds(1.5))

@@ -58,6 +58,7 @@ struct SettingsPage: View {
                     .frame(width: 120)
             }
             LinkRow(title: "Speech model", value: speechModelName) { model.page = .speechModel }
+            LinkRow(title: "Languages", value: SpeechLanguage.summary(of: settings.languages)) { model.page = .languages }
         }
         PanelGroup(title: "Text") {
             PanelRow(title: "Output") {

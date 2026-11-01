@@ -54,6 +54,7 @@ enum PopoverPage {
     case cleanupPrompt
     case cleanupSteps
     case speechModel
+    case languages
     case whatsNew
     case tour
 
@@ -69,6 +70,7 @@ enum PopoverPage {
         case .cleanupPrompt: "Cleanup prompt"
         case .cleanupSteps: "Cleanup steps"
         case .speechModel: "Speech model"
+        case .languages: "Languages"
         case .whatsNew: "What's new"
         case .tour: "Tour"
         }
@@ -77,7 +79,7 @@ enum PopoverPage {
     var parent: PopoverPage {
         switch self {
         case .cleanupPrompt, .cleanupSteps: .cleanup
-        case .cleanup, .privacy, .speechModel, .whatsNew: .settings
+        case .cleanup, .privacy, .speechModel, .languages, .whatsNew: .settings
         case .home, .settings, .dictionary, .insights, .extensions, .tour: .home
         }
     }

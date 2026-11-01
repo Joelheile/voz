@@ -46,6 +46,7 @@ final class DictationPipeline {
             cleaner: cleaner,
             vocabulary: vocabulary,
             plan: Task { [extensions] in await extensions.cleanupPlan(plan, app: app) },
+            languages: settings.languages,
             cleanupEnabled: settings.cleanupEnabled,
             steps: settings.cleanupSteps,
             extensions: extensions.cleanupExtensions(model: settings.cleanupModel, app: app)
