@@ -63,3 +63,18 @@ import Testing
         #expect(Milestone.unseen(in: usage(words: 0, streak: 7), seen: seen) == nil)
     }
 }
+
+@Suite struct StarPromptTests {
+    private func usage(dictations: Int) -> UsageStats {
+        var stats = UsageStats()
+        var all = PeriodStats()
+        all.dictations = dictations
+        stats.periods[.all] = all
+        return stats
+    }
+
+    @Test func asksForAStarAfterTenDictations() {
+        #expect(!StarPrompt.isDue(in: usage(dictations: 9)))
+        #expect(StarPrompt.isDue(in: usage(dictations: 10)))
+    }
+}

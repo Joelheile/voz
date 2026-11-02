@@ -57,6 +57,7 @@ import Testing
         let stats = try utcStats(store, at: Self.now)
 
         #expect(StatsPeriod.allCases.map { stats[$0].words } == [4, 6, 9, 14])
+        #expect(StatsPeriod.allCases.map { stats[$0].dictations } == [1, 2, 3, 4])
         #expect(stats[.day].fixes == 3)
         #expect(stats[.week].speakingSeconds == 4)
         #expect(stats[.day].wordsPerMinute == 120)

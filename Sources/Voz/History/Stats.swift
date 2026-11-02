@@ -25,6 +25,7 @@ struct PeriodStats: Equatable, Sendable {
     static let typingWordsPerMinute = 40.0
 
     var words = 0
+    var dictations = 0
     var speakingSeconds = 0.0
     var fixes = 0
     var wordsPerMinute: Double?
@@ -143,6 +144,7 @@ private struct PeriodTally {
 
     mutating func add(_ row: StatsRow) {
         stats.words += row.wordCount
+        stats.dictations += 1
         stats.speakingSeconds += row.audioSeconds
         stats.fixes += row.fillerWordsRemoved
         addApp(of: row)
@@ -214,5 +216,13 @@ struct Milestone: Equatable {
 
     static func markingSeen(in stats: UsageStats, seen: [String: Int]) -> [String: Int] {
         reached(in: stats).reduce(into: seen) { $0[$1.kind.rawValue] = max($0[$1.kind.rawValue, default: 0], $1.value) }
+    }
+}
+
+enum StarPrompt {
+    static let dictations = 10
+
+    static func isDue(in stats: UsageStats) -> Bool {
+        stats[.all].dictations >= dictations
     }
 }
