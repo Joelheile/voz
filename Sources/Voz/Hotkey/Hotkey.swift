@@ -244,12 +244,12 @@ enum DictationHint {
 
     static func recording(hotkey: Hotkey, holdToTalk: Bool) -> String {
         holdToTalk
-            ? "Release \(key(hotkey)) to stop"
+            ? "Release or tap \(key(hotkey)) to stop"
             : "\(verb(hotkey: hotkey, holdToTalk: false)) \(key(hotkey)) again to stop"
     }
 
     private static func verb(hotkey: Hotkey, holdToTalk: Bool) -> String {
-        if holdToTalk { return "Hold" }
+        if holdToTalk { return "Tap or hold" }
         return hotkey.isModifierOnly ? "Tap" : "Press"
     }
 

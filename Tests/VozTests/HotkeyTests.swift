@@ -75,4 +75,9 @@ private let controlOptionFlags: CGEventFlags = [.maskControl, .maskAlternate]
         chord.keyDown(8, flags: .maskCommand)
         #expect(chord.release(at: 0.2) == .stop)
     }
+
+    @Test func holdModeHintsMentionTapToo() {
+        #expect(DictationHint.idle(hotkey: .rightCommand, holdToTalk: true) == "Tap or hold right ⌘ to dictate")
+        #expect(DictationHint.recording(hotkey: .rightCommand, holdToTalk: true) == "Release or tap right ⌘ to stop")
+    }
 }
