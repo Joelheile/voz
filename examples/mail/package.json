@@ -10,5 +10,5 @@
     "directory": "examples/mail"
   },
   "files": ["index.ts"],
-  "voz": { "apiVersion": 4 }
+  "voz": { "apiVersion": 6 }
 }
