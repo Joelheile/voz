@@ -4,6 +4,10 @@ Newest first. To get beta changes now, turn on Beta updates under What's new in 
 
 ## In beta
 
+- Control Voz from the terminal: run voz help to see every command
+- Connect Claude, Codex and other AI apps to Voz with voz mcp
+- Print a dictation in the terminal with voz dictation stop --print
+- Extensions can take live notes while you talk, in a panel by the notch
 - Take a short tour of what Voz can do after setup
 - Pick the languages you speak in Settings so dictation stops mixing alphabets
 - Cleanup keeps your words in the language you spoke them
