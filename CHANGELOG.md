@@ -4,6 +4,7 @@ Newest first. To get beta changes now, turn on Beta updates under What's new in 
 
 ## In beta
 
+- Take a short tour of what Voz can do after setup
 - Pick the languages you speak in Settings so dictation stops mixing alphabets
 - Cleanup keeps your words in the language you spoke them
 - The notch opens and closes more smoothly

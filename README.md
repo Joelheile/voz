@@ -151,11 +151,11 @@ Each command becomes a tool, such as `history`, `vocabulary_add` or `voz-jira_is
 ## What's new
 
 <!-- changelog -->
+- Take a short tour of what Voz can do after setup
 - Pick the languages you speak in Settings so dictation stops mixing alphabets
 - Cleanup keeps your words in the language you spoke them
 - The notch opens and closes more smoothly
 - Typing in other apps keeps working when Voz opens its panel at launch
-- Voz no longer freezes after your microphone or headphones change
 
 [See everything new](CHANGELOG.md)
 <!-- /changelog -->
