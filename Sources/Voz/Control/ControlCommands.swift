@@ -408,7 +408,7 @@ struct ControlCommands {
     private var appSettings: [Setting] {
         let flags: [(String, String, ReferenceWritableKeyPath<AppSettings, Bool>)] = [
             ("logText", "Write dictated text to the log, for debugging", \.logIncludesText),
-            ("holdToTalk", "Hold the hotkey to talk instead of tapping it", \.holdToTalk),
+            ("holdToTalk", "Hold the hotkey to talk, or tap it to start and stop", \.holdToTalk),
             ("muteWhileRecording", "Mute other apps while you dictate", \.muteWhileRecording),
             ("copyToClipboard", "Copy each dictation to the clipboard", \.copyToClipboard),
             ("insertIntoApp", "Type each dictation into the front app", \.insertIntoApp),
