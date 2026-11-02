@@ -145,6 +145,7 @@ enum DesignRender {
         ("dictionary", .dictionary),
         ("insights", .insights),
         ("extensions", .extensions),
+        ("feedback", .feedback),
         ("cleanup", .cleanup),
         ("privacy", .privacy),
         ("cleanup-prompt", .cleanupPrompt),

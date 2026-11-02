@@ -26,6 +26,17 @@ struct ControlCommandsTests {
         #expect(reply.stderr.contains("--since must be a date like"))
     }
 
+    @Test func feedbackNeedsAMessageAndAnOfficialBuild() async throws {
+        let (commands, _) = try makeControlCommands()
+        let center = ControlCenter(commands: commands.all)
+        let empty = await center.handle(["feedback", " "], json: false)
+        #expect(empty.exit == 2)
+        #expect(empty.stderr.contains("voz feedback"))
+        let fork = await center.handle(["feedback", "Short words get cut off"], json: false)
+        #expect(fork.exit == 1)
+        #expect(fork.stderr.contains("github.com/Joelheile/voz"))
+    }
+
     @Test func settingsChangeAndSuggestKeys() async throws {
         let (commands, settings) = try makeControlCommands()
         let center = ControlCenter(commands: commands.all)

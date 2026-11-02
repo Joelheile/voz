@@ -22,8 +22,15 @@ struct SettingsPage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             PageBar(title: "Settings", back: model.goBack) {
-                Button("What's new") { model.page = .whatsNew }
-                    .buttonStyle(.pill(.quiet, .small))
+                HStack(spacing: 6) {
+                    Button { model.page = .feedback } label: {
+                        HStack(spacing: 5) { Icon(.messageSquare, size: 12); Text("Feedback") }
+                    }
+                    Button { model.page = .whatsNew } label: {
+                        HStack(spacing: 5) { Icon(.sparkles, size: 12); Text("What's new") }
+                    }
+                }
+                .buttonStyle(.pill(.outline, .small))
             }
             CappedScrollView(maxHeight: 640) {
                 VStack(alignment: .leading, spacing: 24) {

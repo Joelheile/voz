@@ -22,7 +22,7 @@ struct ControlCommands {
 
     func all() -> [ControlCommand] {
         [status] + LocalCommands.all(inTerminal: false) + [dictationCommand("start"), dictationCommand("stop"), dictationCommand("toggle"), historyCommand, last,
-         vocabularyList, vocabularyAdd, vocabularyRemove, extensionList, search, enable(true), enable(false), config, settingsCommand, commandList]
+         vocabularyList, vocabularyAdd, vocabularyRemove, extensionList, search, enable(true), enable(false), config, settingsCommand, feedback, commandList]
             + catalog.tools.map(tool) + catalog.actions.filter { !$0.hidden }.map(action)
     }
 
@@ -175,6 +175,29 @@ struct ControlCommands {
             let word = arguments["word"]?.string ?? ""
             guard try history.vocabulary.remove(word: word) else { return .message("\(word) is not in your vocabulary.", changed: false) }
             return .message("Removed \(word).")
+        }
+    }
+
+    // MARK: Feedback
+
+    private var feedback: ControlCommand {
+        ControlCommand(
+            name: "feedback",
+            summary: "Tell the Voz developer what works, what breaks or what's missing",
+            input: .object([
+                .init(name: "message", schema: .string("What you want to say"), optional: false),
+                .init(name: "email", schema: .string("Where to reply, if you want an answer"), optional: true),
+            ]),
+            positionals: ["message"]
+        ) { arguments in
+            let feedback = Feedback(message: arguments["message"]?.string ?? "", email: arguments["email"]?.string ?? "", speechModel: settings.speechModel)
+            guard !feedback.isEmpty else { throw ControlError.usage("Give a message, such as voz feedback \"Short words get cut off\"") }
+            do {
+                try await feedback.send()
+            } catch {
+                throw ControlError.failed("Voz could not send your feedback: \(error.localizedDescription)")
+            }
+            return .message("Sent. Thanks for the feedback.")
         }
     }
 

@@ -354,3 +354,7 @@ func makeControlCommands(_ records: [TranscriptRecord] = [], dictation: FakeDict
     let extensions = ExtensionsModel(analytics: Analytics(usage: false, errors: false, installID: UUID()), home: home, cache: nil) { _ in Data("{\"objects\":[]}".utf8) }
     return (ControlCommands(history: history, settings: settings, extensions: extensions, catalog: ExtensionCatalog(), dictation: dictation.control, home: home), settings)
 }
+
+func decodeJSON(_ data: Data) throws -> JSONValue {
+    try JSONDecoder().decode(JSONValue.self, from: data)
+}

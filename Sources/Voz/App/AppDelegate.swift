@@ -85,6 +85,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             checkForUpdates: { [weak self] in self?.updater.checkForUpdates() },
             retryModel: { [weak self] in self?.retryModel() },
             finishSetup: { [weak self] in self?.finishSetup() },
+            toast: { [toast] in toast.show($0) },
             quit: { [weak self] in self?.quitFromMenu() }
         )
         self.statusItemController = statusItemController
