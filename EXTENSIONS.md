@@ -66,6 +66,7 @@ The interview is done when you can state the extension in one sentence that name
 | Something that keeps running, such as a recording                         | [`startActivity`](#activities)                                                  |
 | Live transcription of the mic and a call, or notes while it runs          | [`transcribeLive`](#live-transcription) and [`ctx.openNote`](#notes)            |
 | Text the user should find later, such as a meeting transcript             | [`addHistory`](#history)                                                        |
+| A check before acting, such as "add this to my calendar or type it?"      | [`ctx.ask`](#ask)                                                               |
 
 Put network calls and model calls in commands, actions, `afterInsert` or a registered model. `beforeCleanup`, `beforeInsert` and cleanup steps get 300 ms, enough for string work only.
 
@@ -194,6 +195,7 @@ Every handler gets `(event, ctx)`.
 - `ctx.generate({ prompt, instructions, schema })`: asks Apple's on-device model for JSON that fits `schema`. See [On-device model](#on-device-model)
 - `ctx.transcribe(path, { speakers })`: transcribes an audio or video file with Parakeet. See [Audio files](#audio-files)
 - `ctx.openNote({ title, text, onChange })`: opens a small note the user can move and type in. See [Notes](#notes)
+- `ctx.ask({ title, fields, buttons })`: shows a card under the notch and waits until the user presses a button. See [Ask](#ask)
 
 The types are in [`Resources/Extensions/voz.d.ts`](Resources/Extensions/voz.d.ts).
 
@@ -420,6 +422,28 @@ voz.startActivity({
 - `onChange` gets the full text after the user pauses typing, and when the note closes
 - `openNote` returns `{ close() }`. Call it in `ctx`'s handler, such as an activity's `open`, an action or a command
 
+## Ask
+
+`ctx.ask` shows a card under the notch with fields the user can edit and a row of buttons. It waits until the user presses a button or closes the card, so it never acts on a guess. The handler's time stops while the card is open.
+
+```ts
+const answer = await ctx.ask({
+  title: "Add to calendar?",
+  fields: [
+    { id: "title", label: "Title", type: "text", value: "Lunch with Tom" },
+    { id: "start", label: "Starts", type: "date", value: start },
+    { id: "calendar", label: "Calendar", type: "choice", value: "Home", options: ["Home", "Work"] },
+  ],
+  buttons: ["Copy", "Add"],
+});
+if (answer?.button === "Add") await addEvent(answer.values.title, answer.values.start);
+```
+
+- Field types are `text`, `date` (milliseconds since 1970) and `choice` with `options`
+- The last button is the main one, and Return presses it
+- `answer` is `{ button, values }` with each field's value by `id`, or `null` when the user closes the card with Esc or the close button
+- Voz shows one card at a time, so a new card closes the open one, which answers `null`
+
 ## History
 
 `voz.addHistory` adds an entry to the Voz history, next to dictations. The user can search it, copy it, and open its file in Finder.
@@ -550,22 +574,33 @@ voz remove voz-jira
 - Packages only change when you run `voz update`. Voz never updates them on its own
 - Voz never runs install scripts
 - Installed packages are listed in `~/.voz/settings.json`
-- See [Versions](#versions) for `"voz": { "apiVersion": 6 }` in `package.json`
+- See [Versions](#versions) for `"voz": { "apiVersion": 7 }` in `package.json`
 
 ## Versions
 
-`"voz": { "apiVersion": 6 }` in `package.json` names the Voz API your package is written for. It works like `swift-tools-version` in a Swift package:
+`"voz": { "apiVersion": 7 }` in `package.json` names the oldest Voz API your package needs. Keep it as low as you can, because people run older Voz versions:
 
 - `voz new` writes the current version. The number is also in `voz.d.ts` as `apiVersion`, and `import { apiVersion } from "voz"` gives the version of the Voz that runs
-- When you use something new, raise it to the number in `voz.d.ts`
-- An older Voz shows "Update Voz" instead of loading a package written for a newer API
-- A newer Voz runs a package with the API it was written for. API 4 is the last version that changes or removes anything. Later versions only add
+- To use something newer, check for it instead of raising the number. Your package then keeps working everywhere, and gets the new feature where Voz has it:
+
+```ts
+if (ctx.ask) {
+  const answer = await ctx.ask({ title: "Add to calendar?", buttons: ["Copy", "Add"] });
+  if (answer?.button !== "Add") return;
+}
+await addEvent();
+```
+
+- Raise `apiVersion` only when your package can't work without a newer member
+- Voz 0.2.0 and older show "Update Voz" instead of loading a package written for a newer API. Newer Voz versions load it, and show "Update Voz" only if loading fails
+- A newer Voz runs a package with the API it was written for. API 4 is the last version that changes or removes anything. Later versions only add, so nothing you shipped breaks when Voz updates
 - A package without `apiVersion`, and every file in `~/.voz/extensions`, gets the current API plus everything older versions had
 
 What each version changed, and what older packages keep:
 
 | Version | Changes                                                                                                                                          | Older packages keep                                                                       |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| 7       | Adds `ctx.ask`                                                                                                                                   |                                                                                           |
 | 6       | Adds `open` to activities, `transcribeLive` on a running activity, `ctx.openNote`, `website` to `ctx.app`, and `voz.registerTool` with `positional`                |                                                                                           |
 | 5       | Adds `mode` to the `beforeCleanup` event and result                                                                                              |                                                                                           |
 | 4       | Adds `voz.startActivity`, `voz.addHistory`, and `hidden` with `update({ hidden })` for actions. `registerCommand` takes one object. `recording` is now `afterRecording`. `ctx` in transform hooks is typed as `{ app }`. Dropped `ctx` calls are logged | `registerCommand(phrase, handler, { at })` and `on("recording")`                          |

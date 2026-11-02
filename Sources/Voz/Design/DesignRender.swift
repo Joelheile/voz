@@ -94,12 +94,30 @@ enum DesignRender {
                     appearance: appearance
                 )
             }
+            let ask = AskModel()
+            ask.load(Self.calendarAsk)
+            try write(AskView(model: ask, onAnswer: { _ in }, onClose: {}), to: outputDirectory, name: "ask-calendar-\(suffix)", appearance: appearance)
             for step in SetupStep.allCases {
                 fixture.sources.setup.step = step
                 try write(fixture.popover(needsSetup: true), to: outputDirectory, name: "popover-setup-\(step)-\(suffix)", appearance: appearance)
             }
         }
     }
+
+    private static let calendarAsk = AskParams(
+        call: 0,
+        deadline: 0,
+        title: "Add to calendar?",
+        fields: [
+            AskField(id: "title", label: "Title", type: .text, value: .string("Moritz Entlassung"), options: nil),
+            AskField(id: "start", label: "Starts", type: .date, value: .number(1_796_515_200_000), options: nil),
+            AskField(id: "end", label: "Ends", type: .date, value: .number(1_796_518_800_000), options: nil),
+            AskField(id: "location", label: "Location", type: .text, value: .string("Fritzlar"), options: nil),
+            AskField(id: "calendar", label: "Calendar", type: .choice, value: .string("Home"), options: ["Home", "Work", "Family"]),
+        ],
+        buttons: ["Copy", "Add"],
+        remaining: 0
+    )
 
     private static let popoverStates: [(String, PopoverStatus, String)] = [
         ("ready", .ready, ""),

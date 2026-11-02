@@ -239,6 +239,31 @@ struct ExtensionNote: Decodable, Equatable, Sendable {
     let text: String
 }
 
+struct AskParams: Decodable, Equatable, Sendable {
+    let call: Int
+    let deadline: Double
+    let title: String
+    let fields: [AskField]
+    let buttons: [String]
+    /// Milliseconds the handler had left when it asked. Its clock restarts with this much once the user answers.
+    let remaining: Double
+}
+
+struct AskField: Decodable, Equatable, Sendable {
+    enum Kind: String, Decodable, Sendable { case text, date, choice }
+
+    let id: String
+    let label: String
+    let type: Kind
+    let value: JSONValue
+    let options: [String]?
+}
+
+struct AskAnswer: Encodable, Equatable, Sendable {
+    let button: String
+    let values: [String: JSONValue]
+}
+
 struct ExtensionHistoryEntry: Decodable, Equatable, Sendable {
     let `extension`: String
     let text: String

@@ -80,6 +80,28 @@ export type NoteOptions = {
   onChange?(text: string): void;
 };
 export type Note = { close(): void };
+/** A field the user can edit in `ctx.ask`. A `date` value is milliseconds since 1970. */
+export type AskField =
+  | { id: string; label: string; type: "text"; value: string }
+  | { id: string; label: string; type: "date"; value: number }
+  | {
+      id: string;
+      label: string;
+      type: "choice";
+      value: string;
+      options: string[];
+    };
+/** The last button is the main one. */
+export type AskOptions = {
+  title: string;
+  fields?: AskField[];
+  buttons: string[];
+};
+/** `null` when the user closes the card. `values` holds each field by `id`. */
+export type Answer = {
+  button: string;
+  values: Record<string, string | number>;
+} | null;
 
 export type TransformContext = { app: App };
 
@@ -92,6 +114,8 @@ export type Context = TransformContext & {
   ): Promise<Generated<S>>;
   transcribe(path: string, options?: TranscribeOptions): Promise<Transcript>;
   openNote(note: NoteOptions): Note;
+  /** Shows a card under the notch and waits for the user to press a button. The handler's time stops while it waits. */
+  ask(options: AskOptions): Promise<Answer>;
 };
 
 /** `light` only removes fillers and fixes punctuation. `heavy` also applies the prompt, self-corrections, numbers and lists. */
@@ -248,6 +272,6 @@ export type ExtensionAPI = {
 
 export type Extension = (voz: ExtensionAPI) => Awaitable<void>;
 
-export const apiVersion: 6;
+export const apiVersion: 7;
 
 export function defineExtension(extension: Extension): Extension;

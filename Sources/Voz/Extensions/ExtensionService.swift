@@ -118,6 +118,7 @@ final class ExtensionService {
     private let fileTranscriber: FileTranscriber
     private let live: LiveSessions
     private let note = NoteController()
+    private let asker = AskController()
     let catalog = ExtensionCatalog()
     var onFileTranscribing: () -> Void = {}
     var onFileTranscribed: (_ succeeded: Bool) -> Void = { _ in }
@@ -393,7 +394,8 @@ final class ExtensionService {
             stopLive: { [weak self] params in
                 guard let self else { throw CancellationError() }
                 return try await self.live.stop(params.session)
-            }
+            },
+            ask: { [weak self] params in await self?.asker.ask(params) }
         )
         let manifest = try await host.start()
         for error in manifest.errors { Log.extensions.error("\(error.extension, privacy: .public) failed to load: \(error.message, privacy: .public)") }
@@ -516,6 +518,7 @@ final class ExtensionService {
 
     private func hostExited(_ status: Int32) {
         watchdog?.cancel()
+        asker.close()
         hotkeys.unregisterAll()
         host = nil
         manifest = nil
