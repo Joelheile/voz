@@ -87,6 +87,7 @@ private struct HomePage: View {
     @State private var usage: UsageStats?
 
     private var milestone: Milestone? { usage.flatMap { Milestone.unseen(in: $0, seen: settings.milestonesSeen) } }
+    private var asksForStar: Bool { !settings.starPromptDismissed && usage.map(StarPrompt.isDue) == true }
 
     private var records: [TranscriptRecord] { history.records }
     private var isSearching: Bool { !history.query.isEmpty }
@@ -106,6 +107,9 @@ private struct HomePage: View {
                 if needsAttention { notice }
                 transcripts
                 ForEach(catalog.activities, id: \.id, content: activityRow)
+                if asksForStar {
+                    StarCard { withAnimation(Theme.Motion.section) { settings.starPromptDismissed = true } }
+                }
                 footer
             }
         }
@@ -293,9 +297,8 @@ private struct HomePage: View {
     private var footer: some View {
         HStack(spacing: 2) {
             ViewThatFits(in: .horizontal) {
-                footerLeading(milestone: milestone, star: !settings.starPromptDismissed)
-                footerLeading(milestone: milestone, star: false)
-                footerLeading(milestone: nil, star: false)
+                footerLeading(milestone: milestone)
+                footerLeading(milestone: nil)
             }
             .layoutPriority(1)
             Spacer(minLength: 8)
@@ -318,7 +321,7 @@ private struct HomePage: View {
         .padding(.bottom, -8)
     }
 
-    private func footerLeading(milestone: Milestone?, star: Bool) -> some View {
+    private func footerLeading(milestone: Milestone?) -> some View {
         HStack(spacing: 6) {
             ForEach(catalog.actions.filter { !$0.hidden }, id: \.id) { action in
                 Button(action.name) { catalog.run(action) }
@@ -330,12 +333,6 @@ private struct HomePage: View {
                 MilestoneBadge(milestone: milestone) {
                     markMilestonesSeen()
                     model.page = .insights
-                }
-                if star {
-                    StarButton(title: "Star") {
-                        settings.starPromptDismissed = true
-                        markMilestonesSeen()
-                    }
                 }
             }
         }
@@ -517,6 +514,37 @@ private struct IndeterminateBar: View {
         .animation(.easeInOut(duration: 0.9).repeatForever(), value: sweeping)
         .onAppear { sweeping = !reduceMotion }
         .accessibilityLabel("Preparing")
+    }
+}
+
+private struct StarCard: View {
+    let dismiss: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Icon(.star, size: 16)
+                .foregroundStyle(Theme.accent)
+                .padding(.top, 1)
+            VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Enjoying Voz?").font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
+                    Text("It's free and open source. A star on GitHub helps other developers find it.")
+                        .font(.meta)
+                        .lineSpacing(2)
+                        .foregroundStyle(Theme.inkSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                StarButton(title: "Star on GitHub", kind: .accent, starred: dismiss)
+            }
+            Spacer(minLength: 0)
+            IconButton(icon: .x, help: "Dismiss", action: dismiss)
+                .padding(.top, -6)
+        }
+        .padding(.leading, 12)
+        .padding(.trailing, 6)
+        .padding(.vertical, 12)
+        .background(Theme.selected, in: RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous))
+        .transition(.opacity)
     }
 }
 

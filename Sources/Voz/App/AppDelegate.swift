@@ -106,6 +106,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         indicator.attach(to: dictation)
+        let showOutcome = dictation.onOutcome
+        dictation.onOutcome = { [weak self] outcome in
+            showOutcome(outcome)
+            if case .done = outcome { self?.suggestStarIfDue() }
+        }
         indicator.onCancelFile = { [weak self] in self?.extensions.cancelFileTranscriptions() }
         indicator.onOpenActivity = { [catalog = extensions.catalog] in catalog.open($0) }
         extensions.catalog.$activities
@@ -344,6 +349,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func finishSetup() {
         setupModel.reportCompletion()
         settings.onboardingCompleted = true
+    }
+
+    private func suggestStarIfDue() {
+        guard !settings.starToastShown, !settings.starPromptDismissed else { return }
+        Task {
+            guard let usage = await historyModel.usage(), StarPrompt.isDue(in: usage) else { return }
+            settings.starToastShown = true
+            toast.show("Enjoying Voz? Star it on GitHub from the menu bar.")
+        }
     }
 
     private func retryModel() {
