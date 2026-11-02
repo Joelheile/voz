@@ -2,7 +2,7 @@
 
 Newest first. To get beta changes now, turn on Beta updates under What's new in Settings.
 
-## In beta
+## 0.2.0 (November 2, 2026)
 
 - Send feedback from Settings or with voz feedback, typed or dictated
 - After a few dictations, Voz asks once if you'd star it on GitHub

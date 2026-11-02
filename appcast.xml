@@ -3,6 +3,16 @@
   <channel>
     <title>voz</title>
     <item>
+      <title>voz 0.2.0</title>
+      <description>&lt;ul&gt;&lt;li&gt;Send feedback from Settings or with voz feedback, typed or dictated&lt;/li&gt;&lt;li&gt;After a few dictations, Voz asks once if you&amp;#x27;d star it on GitHub&lt;/li&gt;&lt;li&gt;Control Voz from the terminal: run voz help to see every command&lt;/li&gt;&lt;li&gt;Connect Claude, Codex and other AI apps to Voz with voz mcp&lt;/li&gt;&lt;li&gt;Print a dictation in the terminal with voz dictation stop --print&lt;/li&gt;&lt;li&gt;Extensions can take live notes while you talk, in a panel by the notch&lt;/li&gt;&lt;li&gt;Take a short tour of what Voz can do after setup&lt;/li&gt;&lt;li&gt;Pick the languages you speak in Settings so dictation stops mixing alphabets&lt;/li&gt;&lt;li&gt;Cleanup keeps your words in the language you spoke them&lt;/li&gt;&lt;li&gt;The notch opens and closes more smoothly&lt;/li&gt;&lt;li&gt;Typing in other apps keeps working when Voz opens its panel at launch&lt;/li&gt;&lt;li&gt;Voz no longer freezes after your microphone or headphones change&lt;/li&gt;&lt;li&gt;Your Voz icon no longer hides behind the notch when your menu bar is full&lt;/li&gt;&lt;/ul&gt;</description>
+      <link>https://github.com/Joelheile/voz/releases/tag/v0.2.0</link>
+      <pubDate>Mon, 02 Nov 2026 03:21:32 GMT</pubDate>
+      <sparkle:version>100057</sparkle:version>
+      <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <enclosure url="https://github.com/Joelheile/voz/releases/download/v0.2.0/voz-0.2.0.zip" length="8724432" sparkle:edSignature="pHw/dfl4c6wkcK68j+QyKp4vX+IDmBMVTO6DtGfdGkQkYVDH6mlhAXo8hliBVyowKoEdqWUexxZkn5MEEUVTDg==" type="application/octet-stream" />
+    </item>
+    <item>
       <title>voz 0.1.0-beta.100056</title>
       <description>&lt;ul&gt;&lt;li&gt;Send feedback from Settings or with voz feedback, typed or dictated&lt;/li&gt;&lt;/ul&gt;</description>
       <link>https://github.com/Joelheile/voz/releases/tag/beta-100056</link>
