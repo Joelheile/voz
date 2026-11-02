@@ -4,6 +4,7 @@ Newest first. To get beta changes now, turn on Beta updates under What's new in 
 
 ## In beta
 
+- Send feedback from Settings or with voz feedback, typed or dictated
 - After a few dictations, Voz asks once if you'd star it on GitHub
 - Control Voz from the terminal: run voz help to see every command
 - Connect Claude, Codex and other AI apps to Voz with voz mcp
