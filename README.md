@@ -151,11 +151,11 @@ Each command becomes a tool, such as `history`, `vocabulary_add` or `voz-jira_is
 ## What's new
 
 <!-- changelog -->
+- After a few dictations, Voz asks once if you'd star it on GitHub
 - Control Voz from the terminal: run voz help to see every command
 - Connect Claude, Codex and other AI apps to Voz with voz mcp
 - Print a dictation in the terminal with voz dictation stop --print
 - Extensions can take live notes while you talk, in a panel by the notch
-- Take a short tour of what Voz can do after setup
 
 [See everything new](CHANGELOG.md)
 <!-- /changelog -->

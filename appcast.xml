@@ -3,6 +3,17 @@
   <channel>
     <title>voz</title>
     <item>
+      <title>voz 0.1.0-beta.100055</title>
+      <description>&lt;ul&gt;&lt;li&gt;After a few dictations, Voz asks once if you&amp;#x27;d star it on GitHub&lt;/li&gt;&lt;/ul&gt;</description>
+      <link>https://github.com/Joelheile/voz/releases/tag/beta-100055</link>
+      <pubDate>Mon, 02 Nov 2026 02:04:10 GMT</pubDate>
+      <sparkle:version>100055</sparkle:version>
+      <sparkle:shortVersionString>0.1.0-beta.100055</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100055/voz-0.1.0-beta.100055.zip" length="8707803" sparkle:edSignature="BdjwWf4NgpbZBnXjSq2LrtpVN3pwbky3xrvI75m03cIAhgv5RcxaFl/v3aOISXLqCTKMm5Pmf3MpLO6unnrtDA==" type="application/octet-stream" />
+    </item>
+    <item>
       <title>voz 0.1.0-beta.100054</title>
       <description>&lt;ul&gt;&lt;li&gt;Control Voz from the terminal: run voz help to see every command&lt;/li&gt;&lt;li&gt;Connect Claude, Codex and other AI apps to Voz with voz mcp&lt;/li&gt;&lt;li&gt;Print a dictation in the terminal with voz dictation stop --print&lt;/li&gt;&lt;li&gt;Extensions can take live notes while you talk, in a panel by the notch&lt;/li&gt;&lt;/ul&gt;</description>
       <link>https://github.com/Joelheile/voz/releases/tag/beta-100054</link>
@@ -110,17 +121,6 @@
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <sparkle:channel>beta</sparkle:channel>
       <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100044/voz-0.0.5-beta.100044.zip" length="8494155" sparkle:edSignature="FaaTJ3An8gLkcvb65PxF6h4dINZS/1zebIAuN+sOuVD+AlRoafYEq8to8EoJL2sML1qqiUBXfS6kU1eF7KrmDQ==" type="application/octet-stream" />
-    </item>
-    <item>
-      <title>voz 0.0.5-beta.100043</title>
-      <description>&lt;ul&gt;&lt;li&gt;A broken extension package no longer stops your other extensions from loading&lt;/li&gt;&lt;li&gt;With Reduce Motion on, the indicator stops shaking and icons fade in&lt;/li&gt;&lt;/ul&gt;</description>
-      <link>https://github.com/Joelheile/voz/releases/tag/beta-100043</link>
-      <pubDate>Sat, 31 Oct 2026 07:25:32 GMT</pubDate>
-      <sparkle:version>100043</sparkle:version>
-      <sparkle:shortVersionString>0.0.5-beta.100043</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <sparkle:channel>beta</sparkle:channel>
-      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100043/voz-0.0.5-beta.100043.zip" length="8489886" sparkle:edSignature="jgIQOOp0huIZM8gzm7TQaaMqHYgxO7knUq/JqaivRMDvdjFcmd7hlzdLdio8GanT3G1lMFPC7zBIlA6Ub1smCA==" type="application/octet-stream" />
     </item>
     <item>
       <title>voz 0.0.5</title>
