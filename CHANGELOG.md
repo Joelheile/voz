@@ -4,6 +4,8 @@ Newest first. To get beta changes now, turn on Beta updates under What's new in 
 
 ## In beta
 
+- Pick the languages you speak in Settings so dictation stops mixing alphabets
+- Cleanup keeps your words in the language you spoke them
 - The notch opens and closes more smoothly
 - Typing in other apps keeps working when Voz opens its panel at launch
 - Voz no longer freezes after your microphone or headphones change
