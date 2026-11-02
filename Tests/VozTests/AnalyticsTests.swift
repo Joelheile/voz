@@ -10,8 +10,8 @@ struct AnalyticsEventTests {
         #expect(AppError.appHang.stage == "main_thread")
         #expect(AppError.appHang.rawValue == "app_hang")
         #expect(AppError.accessibilityDenied.stage == "delivery")
-        let interrupted = AnalyticsEvent.dictationFailed(stage: .recording, errorCode: .recorderInterrupted)
-        #expect(interrupted.failure?.code == "recorder_interrupted")
+        let refused = AnalyticsEvent.dictationFailed(stage: .recording, errorCode: .recorderStartFailed)
+        #expect(refused.failure?.code == "recorder_start_failed")
     }
 
     @Test func errorReportsAndUsageFollowTheirOwnSetting() {

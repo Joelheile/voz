@@ -1,14 +1,6 @@
 import Testing
 @testable import Voz
 
-@MainActor
-@Test func audioConfigurationChangeDoesNotWaitForTheMainThread() {
-    let recorder = Recorder()
-    withExtendedLifetime(recorder) {
-        #expect(audioConfigurationChangeReturnsWhileMainThreadIsBlocked())
-    }
-}
-
 private struct EngineRefused: Error {}
 
 @MainActor
@@ -32,9 +24,4 @@ private struct EngineRefused: Error {}
         }
     }
     #expect(attempts == 1)
-}
-
-@MainActor
-@Test func idleConfigurationChangeDiscardsTheEngineWithoutBuildingAnother() {
-    #expect(capturesBuiltAfterIdleConfigurationChange() == 1)
 }

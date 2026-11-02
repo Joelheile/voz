@@ -1,4 +1,3 @@
-import AVFoundation
 import AppKit
 import Synchronization
 @testable import Voz
@@ -285,31 +284,6 @@ func editActionsHandled(byPanelFor keys: [(String, NSEvent.ModifierFlags)]) -> [
 func compilesAsAppleScript(_ source: String) -> Bool {
     var error: NSDictionary?
     return NSAppleScript(source: source)?.compileAndReturnError(&error) == true
-}
-
-@MainActor
-func audioConfigurationChangeReturnsWhileMainThreadIsBlocked() -> Bool {
-    let posted = DispatchSemaphore(value: 0)
-    DispatchQueue.global().async {
-        NotificationCenter.default.post(name: .AVAudioEngineConfigurationChange, object: nil)
-        posted.signal()
-    }
-    return posted.wait(timeout: .now() + 1) == .success
-}
-
-@MainActor
-func capturesBuiltAfterIdleConfigurationChange() -> Int {
-    var builds = 0
-    let engine = AVAudioEngine()
-    let recorder = Recorder()
-    recorder.buildCapture = {
-        builds += 1
-        let format = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 1)!
-        return Recorder.Capture(engine: engine, device: nil, format: format)
-    }
-    recorder.prepare()
-    recorder.configurationChanged(engine: ObjectIdentifier(engine))
-    return builds
 }
 
 func blockCurrentThread(seconds: Double) {

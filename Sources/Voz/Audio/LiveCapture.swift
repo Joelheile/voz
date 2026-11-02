@@ -31,12 +31,10 @@ struct LiveMix {
 }
 
 enum LiveCaptureError: LocalizedError {
-    case microphoneUnavailable
     case systemAudio(step: String, status: OSStatus)
 
     var errorDescription: String? {
         switch self {
-        case .microphoneUnavailable: "Voz can't use the microphone"
         case .systemAudio(let step, let status): "Voz can't record system audio: \(step) returned \(status)"
         }
     }
@@ -50,7 +48,7 @@ final class LiveCapture: @unchecked Sendable {
     private let systemAudio: Bool
     private let onSamples: @Sendable ([Float]) -> Void
     private let mix = Mutex(LiveMix())
-    private let engine = AVAudioEngine()
+    private var microphoneQueue: MicrophoneQueue?
     private var tap = AudioObjectID(kAudioObjectUnknown)
     private var device = AudioObjectID(kAudioObjectUnknown)
     private var ioProc: AudioDeviceIOProcID?
@@ -72,8 +70,8 @@ final class LiveCapture: @unchecked Sendable {
     }
 
     func stop() {
-        engine.stop()
-        engine.inputNode.removeTap(onBus: 0)
+        microphoneQueue?.stop()
+        microphoneQueue = nil
         if let ioProc {
             AudioDeviceStop(device, ioProc)
             AudioDeviceDestroyIOProcID(device, ioProc)
@@ -86,16 +84,12 @@ final class LiveCapture: @unchecked Sendable {
     }
 
     private func startMicrophone() throws {
-        if let microphone { Recorder.use(microphone, on: engine) }
-        let input = engine.inputNode
-        let inputFormat = input.outputFormat(forBus: 0)
-        guard inputFormat.channelCount > 0, inputFormat.sampleRate > 0 else { throw LiveCaptureError.microphoneUnavailable }
-        let resampler = Resampler(to: Self.format)
-        input.installTap(onBus: 0, bufferSize: 4096, format: nil) { [weak self] pcm, _ in
-            guard let self, let samples = resampler.convert(pcm) else { return }
+        let queue = try MicrophoneQueue(device: microphone) { [weak self] samples in
+            guard let self else { return }
             deliver(systemAudio ? mix.withLock { $0.add(mic: samples) } : samples)
         }
-        try engine.start()
+        try queue.start()
+        microphoneQueue = queue
     }
 
     private func startSystemAudio() throws {

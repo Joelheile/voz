@@ -1,5 +1,6 @@
 @preconcurrency import AVFoundation
 import AudioToolbox
+import CoreAudio
 import Synchronization
 
 final class SampleBuffer: Sendable {
@@ -78,64 +79,37 @@ final class Resampler: @unchecked Sendable {
 
 @MainActor
 final class Recorder {
-    struct Capture {
-        let engine: AVAudioEngine
-        let device: AudioDeviceID?
-        let format: AVAudioFormat
-    }
-
-    private nonisolated static let targetFormat = AVAudioFormat(
-        commonFormat: .pcmFormatFloat32,
-        sampleRate: RecordingFilter.sampleRate,
-        channels: 1,
-        interleaved: false
-    )!
-
-    private var capture: Capture?
+    private var capture: MicrophoneQueue?
     private let buffer = SampleBuffer()
-    private var configurationObserver: NSObjectProtocol?
     private let preferredInput: @MainActor () -> String
-    var buildCapture: (() throws -> Capture)!
 
     private(set) var isRecording = false
     let level = LiveLevel()
     var onSamples: (@Sendable ([Float]) -> Void)?
-    var onInterrupted: (@MainActor () -> Void)?
 
     init(preferredInput: @escaping @MainActor () -> String = { "" }) {
         self.preferredInput = preferredInput
-        buildCapture = { [unowned self] in try makeCapture() }
-        // The engine posts this on its own queue and waits for observers. Releasing an engine also waits
-        // for that queue, so observing on the main queue deadlocks. Hop to the main actor without waiting.
-        configurationObserver = NotificationCenter.default.addObserver(
-            forName: .AVAudioEngineConfigurationChange,
-            object: nil,
-            queue: nil
-        ) { [weak self] notification in
-            let engine = (notification.object as AnyObject?).map(ObjectIdentifier.init)
-            Task { @MainActor in self?.configurationChanged(engine: engine) }
-        }
     }
 
     func prepare() {
         guard !isRecording else { return }
-        if let stale = capture, !isCurrent(stale) { discard() }
+        dropStaleCapture()
         guard capture == nil else { return }
         do {
-            capture = try buildCapture()
+            capture = try makeCapture()
         } catch {
             Log.app.error("Recorder prepare failed: \(error.localizedDescription, privacy: .private)")
         }
     }
 
     func start() throws {
-        if let stale = capture, !isCurrent(stale) { discard() }
+        dropStaleCapture()
         let prepared = capture
         capture = nil
         level.store(0)
         buffer.begin(onSamples: onSamples)
         do {
-            capture = try Self.startCapture(prepared: prepared, fresh: buildCapture, start: Self.startEngine)
+            capture = try Self.startCapture(prepared: prepared, fresh: makeCapture) { try $0.start() }
         } catch {
             _ = buffer.end()
             throw error
@@ -143,7 +117,7 @@ final class Recorder {
         isRecording = true
     }
 
-    /// A prepared engine can refuse to start after sleep or a device switch without posting a configuration change.
+    /// A prepared queue can refuse to start after sleep or a device switch.
     static func startCapture<C>(prepared: C?, fresh: () throws -> C, start: (C) throws -> Void) throws -> C {
         if let prepared {
             do {
@@ -151,7 +125,7 @@ final class Recorder {
                 return prepared
             } catch {
                 let code = (error as NSError).code
-                Log.app.notice("Prepared engine refused to start (\(code, privacy: .public)), using a fresh one")
+                Log.app.notice("Prepared microphone refused to start (\(code, privacy: .public)), using a fresh one")
             }
         }
         let capture = try fresh()
@@ -159,119 +133,32 @@ final class Recorder {
         return capture
     }
 
+    /// A stopped queue isn't reused, so this prepares the next one right away.
     func stop() -> [Float] {
-        capture?.engine.stop()
-        isRecording = false
-        return buffer.end()
-    }
-
-    func configurationChanged(engine: ObjectIdentifier?) {
-        guard let capture, ObjectIdentifier(capture.engine) == engine else { return }
-        if isRecording {
-            rebuildWhileRecording()
-        } else {
-            // Building an engine posts another change while the devices settle, so rebuilding here loops on
-            // the main thread. The next prepare() or start() builds a fresh one.
-            discard()
-        }
-    }
-
-    private func isCurrent(_ capture: Capture) -> Bool {
-        capture.device == selectedInput() && capture.engine.inputNode.outputFormat(forBus: 0) == capture.format
-    }
-
-    private func discard() {
-        if let capture { Self.tearDown(capture) }
+        capture?.stop()
         capture = nil
+        isRecording = false
+        let samples = buffer.end()
+        prepare()
+        return samples
     }
 
-    private static func startEngine(_ capture: Capture) throws {
-        do {
-            try capture.engine.start()
-        } catch {
-            tearDown(capture)
-            throw error
-        }
+    /// Drops a prepared queue whose microphone is no longer the one to record from
+    private func dropStaleCapture() {
+        if let capture, capture.device != selectedInput() { self.capture = nil }
     }
 
-    private static func tearDown(_ capture: Capture) {
-        capture.engine.inputNode.removeTap(onBus: 0)
-        capture.engine.stop()
-    }
-
-    private func makeCapture() throws -> Capture {
-        let engine = AVAudioEngine()
-        let chosen = InputDevice.connected(uid: preferredInput())
-        let device = chosen ?? InputDevice.defaultInput()
-        if let override = chosen ?? InputDevice.builtInIfDefaultIsBluetooth() {
-            Self.use(override, on: engine)
-        }
-        let input = engine.inputNode
-        let inputFormat = input.outputFormat(forBus: 0)
-        guard inputFormat.channelCount > 0, inputFormat.sampleRate > 0 else {
-            throw RecorderError.inputUnavailable
-        }
-        let resampler = Resampler(to: Self.targetFormat)
-        let buffer = buffer
-        // A nil format follows the hardware. Passing a format read moments earlier raises an uncatchable
-        // exception when the device changes in between.
-        input.installTap(onBus: 0, bufferSize: 1024, format: nil) { @Sendable pcm, _ in
-            guard let converted = resampler.convert(pcm) else { return }
-            buffer.append(converted)
-        }
-        let meter = Self.makeMeter(storingInto: level)
-        engine.attach(meter)
-        engine.connect(input, to: meter, format: nil)
-        engine.prepare()
-        return Capture(engine: engine, device: device, format: inputFormat)
-    }
-
-    private nonisolated static func makeMeter(storingInto level: LiveLevel) -> AVAudioSinkNode {
-        AVAudioSinkNode { @Sendable _, frameCount, audioBufferList in
-            let buffers = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: audioBufferList))
-            let samples = buffers.first?.mData?.assumingMemoryBound(to: Float.self)
-            level.store(AudioLevel.rms(samples, count: Int(frameCount)))
-            return noErr
-        }
-    }
-
-    private func rebuildWhileRecording() {
-        Log.app.notice("Audio configuration changed, rebuilding engine")
-        discard()
-        level.store(0)
-        do {
-            let capture = try buildCapture()
-            try capture.engine.start()
-            self.capture = capture
-        } catch {
-            Log.app.error("Engine rebuild failed: \(error.localizedDescription, privacy: .private)")
-            onInterrupted?()
+    private func makeCapture() throws -> MicrophoneQueue {
+        let buffer = buffer, level = level
+        return try MicrophoneQueue(device: selectedInput()) { samples in
+            level.store(AudioLevel.rms(of: samples))
+            buffer.append(samples)
         }
     }
 
     private func selectedInput() -> AudioDeviceID? {
-        InputDevice.connected(uid: preferredInput()) ?? InputDevice.defaultInput()
+        InputDevice.forRecording(uid: preferredInput())
     }
-
-    nonisolated static func use(_ device: AudioDeviceID, on engine: AVAudioEngine) {
-        guard let unit = engine.inputNode.audioUnit else { return }
-        var device = device
-        let status = AudioUnitSetProperty(
-            unit,
-            kAudioOutputUnitProperty_CurrentDevice,
-            kAudioUnitScope_Global,
-            0,
-            &device,
-            UInt32(MemoryLayout<AudioDeviceID>.size)
-        )
-        if status != noErr {
-            Log.app.error("Selecting mic failed: \(status)")
-        }
-    }
-}
-
-enum RecorderError: Error {
-    case inputUnavailable
 }
 
 final class LiveLevel: Sendable {
