@@ -2,6 +2,10 @@
 
 Newest first. To get beta changes now, turn on Beta updates under What's new in Settings.
 
+## In beta
+
+- In Hold mode, tap the hotkey to dictate hands-free or hold it to talk
+
 ## 0.2.0 (November 2, 2026)
 
 - Send feedback from Settings or with voz feedback, typed or dictated
