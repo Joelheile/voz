@@ -102,6 +102,7 @@ final class StatusItemController: NSObject {
         checkForUpdates: @escaping () -> Void,
         retryModel: @escaping () -> Void,
         finishSetup: @escaping () -> Void,
+        toast: @escaping (String) -> Void,
         quit: @escaping () -> Void
     ) {
         self.dictation = dictation
@@ -132,6 +133,7 @@ final class StatusItemController: NSObject {
                 finishSetup()
             },
             resize: { [weak self] in self?.resize(to: $0) },
+            toast: toast,
             quit: quit
         )
         if let button = statusItem.button {

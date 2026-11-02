@@ -18,7 +18,7 @@ enum VersionPing: String, Sendable, Encodable {
     /// Each ping gets a fresh ID, so install and update pings cannot be linked to each other or to one Mac.
     func body(version: String, previous: String?, projectToken: String) throws -> Data {
         let properties = Properties(kind: self, version: version, previous: previous, channel: UpdateChannel(version: version).rawValue)
-        return try PingPayload(event: "version_ping", distinctID: UUID(), properties: properties, projectToken: projectToken).encoded()
+        return try CapturePayload(event: "version_ping", distinctID: UUID(), properties: properties, projectToken: projectToken).encoded()
     }
 
     private struct Properties: Encodable {
@@ -56,7 +56,7 @@ enum DailyActivePing {
             osMajor: ProcessInfo.processInfo.operatingSystemVersion.majorVersion,
             chip: SystemContext.chip
         )
-        return try PingPayload(event: "daily_active", distinctID: installID, properties: properties, projectToken: projectToken).encoded()
+        return try CapturePayload(event: "daily_active", distinctID: installID, properties: properties, projectToken: projectToken).encoded()
     }
 
     private struct Properties: Encodable {
@@ -77,7 +77,7 @@ enum DailyActivePing {
     }
 }
 
-private struct PingPayload<Properties: Encodable>: Encodable {
+struct CapturePayload<Properties: Encodable>: Encodable {
     let uuid = UUID().uuidString
     let timestamp = ISO8601DateFormatter().string(from: Date())
     let apiKey: String

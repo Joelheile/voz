@@ -15,12 +15,14 @@ enum PillKind {
     case ink
     case accent
     case quiet
+    case outline
 
-    var fill: Color {
+    func fill(hovering: Bool) -> Color {
         switch self {
         case .ink: Theme.ink
         case .accent: Theme.accent
         case .quiet: Theme.selected
+        case .outline: hovering ? Theme.selected : .clear
         }
     }
 
@@ -28,8 +30,12 @@ enum PillKind {
         switch self {
         case .ink: Theme.onInk
         case .accent: .white
-        case .quiet: Theme.ink
+        case .quiet, .outline: Theme.ink
         }
+    }
+
+    var stroke: Color {
+        self == .outline ? Theme.hairline : .clear
     }
 }
 
@@ -51,15 +57,31 @@ struct PillButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
+        PillBody(configuration: configuration, kind: kind, size: size, isEnabled: isEnabled)
+    }
+}
+
+private struct PillBody: View {
+    let configuration: ButtonStyleConfiguration
+    let kind: PillKind
+    let size: PillSize
+    let isEnabled: Bool
+    @State private var hovering = false
+
+    var body: some View {
         configuration.label
             .font(.ui(size == .small ? 12 : 13, weight: .medium))
             .foregroundStyle(kind.text)
             .padding(.horizontal, size.height * 0.5)
             .frame(height: size.height)
-            .background(kind.fill, in: Capsule())
+            .background(kind.fill(hovering: hovering), in: Capsule())
+            .overlay(Capsule().strokeBorder(kind.stroke))
+            .contentShape(Capsule())
             .opacity(isEnabled ? 1 : 0.4)
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(Theme.Motion.press, value: configuration.isPressed)
+            .onHover { hovering = $0 }
+            .animation(Theme.Motion.hover, value: hovering)
     }
 }
 

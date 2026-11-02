@@ -120,6 +120,7 @@ voz vocabulary add Kubernetes     # teach Voz a word
 voz config voz-jira token -       # set a token from stdin
 voz disable voz-jira              # turn an extension off
 voz jira issues VOZ               # run a tool an extension adds
+voz feedback "Hotkey lags"        # tell the developer, privately
 voz help calendar                 # find a command
 voz guide                         # how to build an extension
 ```
@@ -162,7 +163,7 @@ Each command becomes a tool, such as `history`, `vocabulary_add` or `voz-jira_is
 
 ## Privacy
 
-Built-in dictation processes audio and transcripts on your Mac. Extensions can send data to external services, so review what you install. Voz sends a version ping on install and update, with a new random ID each time. On each day you dictate, it sends one more ping with the app version, macOS version, chip and speech model, under a random ID stored on your Mac, so active installs can be counted. Neither ping contains what you said, and PostHog does not store your IP address. Usage analytics are off unless you opt in, and they never contain what you said. Crash reports are on by default and have their own setting under Privacy. They send crashes, freezes and fixed error codes with a stack trace, never text, audio or app names.
+Built-in dictation processes audio and transcripts on your Mac. Extensions can send data to external services, so review what you install. Voz sends a version ping on install and update, with a new random ID each time. On each day you dictate, it sends one more ping with the app version, macOS version, chip and speech model, under a random ID stored on your Mac, so active installs can be counted. Neither ping contains what you said, and PostHog does not store your IP address. Usage analytics are off unless you opt in, and they never contain what you said. Crash reports are on by default and have their own setting under Privacy. They send crashes, freezes and fixed error codes with a stack trace, never text, audio or app names. Feedback you send from the menu or with `voz feedback` goes to PostHog only when you press Send or run the command. It holds your message, the email you add, if any, and the Voz version, macOS version and speech model, under a new random ID each time.
 
 For debugging, Voz keeps a log on your Mac at `~/Library/Logs/Voz/voz-logs.jsonl`, with one line per dictation: timings, model and app names. It includes what you said only when you turn on Include text under Privacy in Settings. It never leaves your Mac unless you copy it.
 

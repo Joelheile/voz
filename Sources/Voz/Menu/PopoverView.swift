@@ -52,6 +52,8 @@ struct PopoverView: View {
                 InsightsPage(model: sources.stats, settings: sources.settings, back: model.goBack)
             case .extensions:
                 ExtensionsPage(model: sources.extensions, catalog: sources.catalog, settings: sources.settings, back: model.goBack)
+            case .feedback:
+                FeedbackPage(settings: sources.settings, toast: model.actions.toast, back: model.goBack)
             case .cleanupPrompt:
                 CleanupPromptPage(settings: sources.settings, back: model.goBack)
             case .cleanupSteps:
@@ -314,8 +316,8 @@ private struct HomePage: View {
                 .keyboardShortcut(",", modifiers: .command)
         }
         .padding(.trailing, -8)
-        .padding(.top, -4)
-        .padding(.bottom, -8)
+        .padding(.top, -10)
+        .padding(.bottom, -12)
     }
 
     private func footerLeading(milestone: Milestone?, star: Bool) -> some View {
