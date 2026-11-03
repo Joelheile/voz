@@ -17,7 +17,7 @@ Capitalized folders follow SwiftPM and app bundle conventions. Lowercase folders
 
 One SwiftPM executable target, `Sources/Voz`, grouped by feature. `Tests/VozTests` imports it with `@testable import Voz`.
 
-- `App`: entry point, app delegate, settings, launch agent, updates, permissions, headless CLI.
+- `App`: entry point, app delegate, settings, login item, updates, permissions, headless CLI.
 - `Dictation`: one dictation from hotkey to inserted text. `DictationPipeline` orders the steps.
 - `Audio`, `Transcription`, `Cleanup`, `Text`: capture, speech to text, on-device model cleanup, deterministic text rules.
 - `Extensions`: Bun host process, JSON protocol, npm packages, `~/.voz`. `Resources/Extensions` holds the TypeScript side.

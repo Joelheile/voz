@@ -1,118 +1,55 @@
 import AppKit
 import ServiceManagement
 
-enum LaunchAgent {
-    static let label = "com.joelheile.voz.relaunch"
+enum LoginItem {
     static let installedPath = "/Applications/voz.app"
-    private static let startAttempts = 3
-
-    private static var service: SMAppService { SMAppService.agent(plistName: "\(label).plist") }
+    private static let legacyAgentPlist = "com.joelheile.voz.relaunch.plist"
 
     static var isInstalledCopy: Bool { Bundle.main.bundlePath == installedPath }
-    static var launchedByLaunchd: Bool { ProcessInfo.processInfo.environment["XPC_SERVICE_NAME"] == label }
-
     static var isInTrash: Bool { Bundle.main.bundlePath.contains("/.Trash/") }
 
-    static func unregisterIfRegistered() {
-        guard isInstalledCopy || isInTrash, service.status != .notRegistered, service.status != .notFound else { return }
-        removeLegacyLoginItem()
+    /// Read during launch, while the open event macOS sent is still the current one.
+    static var launchedAtLogin: Bool {
+        let event = NSAppleEventManager.shared().currentAppleEvent
+        return event?.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue == keyAELaunchedAsLogInItem
+    }
+
+    /// Only the copy in Applications opens at login, so a build elsewhere never takes over.
+    static func sync(enabled: Bool) {
+        guard isInstalledCopy else { return }
+        removeLegacyAgent()
+        enabled ? register() : unregister()
+    }
+
+    static func unregister() {
+        let service = SMAppService.mainApp
+        guard service.status == .enabled || service.status == .requiresApproval else { return }
         do {
             try service.unregister()
         } catch {
-            Log.app.error("Launch agent unregister failed: \(error.localizedDescription, privacy: .private)")
+            Log.app.error("Login item unregister failed: \(error.localizedDescription, privacy: .private)")
         }
     }
 
-    static func bootOut() {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-        process.arguments = ["bootout", "gui/\(getuid())/\(label)"]
+    private static func register() {
+        let service = SMAppService.mainApp
+        guard service.status != .enabled else { return }
         do {
-            try process.run()
-            process.waitUntilExit()
-        } catch {
-            Log.app.error("launchctl bootout failed: \(error.localizedDescription, privacy: .private)")
-        }
-    }
-
-    static func handOver() async -> Bool {
-        guard isInstalledCopy, !launchedByLaunchd else { return false }
-        removeLegacyLoginItem()
-        for attempt in 1...startAttempts {
-            if await startJob() { return true }
-            Log.app.error("Launch agent did not start voz, attempt \(attempt)")
-            unregisterIfRegistered()
-            try? await Task.sleep(for: .milliseconds(200))
-        }
-        Log.app.error("Launch agent failed, staying unmanaged")
-        Analytics.report(.launchAgentFailed)
-        return false
-    }
-
-    private static func startJob() async -> Bool {
-        do {
-            if service.status != .notRegistered, service.status != .notFound {
-                try await service.unregister()
-            }
             try service.register()
         } catch {
-            Log.app.error("Launch agent register failed: \(error.localizedDescription, privacy: .private)")
-            return false
+            Log.app.error("Login item register failed: \(error.localizedDescription, privacy: .private)")
+            Analytics.report(.loginItemFailed)
         }
-        Log.app.notice("Launch agent registered, status \(service.status.rawValue)")
-        for _ in 0..<20 {
-            switch jobState {
-            case .running: return true
-            case .failed: return false
-            case .starting: try? await Task.sleep(for: .milliseconds(200))
-            }
-        }
-        return false
     }
 
-    private enum JobState {
-        case failed
-        case starting
-        case running
-    }
-
-    private static var jobState: JobState {
-        guard let description = launchctlPrint() else { return .failed }
-        let lines = description.split(separator: "\n")
-        let exited = lines.contains { $0.hasPrefix("\tlast exit code = ") && !$0.hasSuffix("(never exited)") }
-        guard !exited else { return .failed }
-        let line = lines.first { $0.hasPrefix("\tpid = ") }
-        guard let pid = line.flatMap({ Int32($0.dropFirst("\tpid = ".count)) }), let executable = Bundle.main.executablePath else { return .starting }
-        var buffer = [UInt8](repeating: 0, count: Int(MAXPATHLEN) * 4)
-        guard proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 else { return .starting }
-        return String(decoding: buffer.prefix(while: { $0 != 0 }), as: UTF8.self) == executable ? .running : .starting
-    }
-
-    private static func launchctlPrint() -> String? {
-        let process = Process()
-        let output = Pipe()
-        process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-        process.arguments = ["print", "gui/\(getuid())/\(label)"]
-        process.standardOutput = output
-        process.standardError = FileHandle.nullDevice
+    /// Older versions kept voz alive with a launch agent, which could restart the old copy during an update.
+    private static func removeLegacyAgent() {
+        let agent = SMAppService.agent(plistName: legacyAgentPlist)
+        guard agent.status != .notRegistered, agent.status != .notFound else { return }
         do {
-            try process.run()
+            try agent.unregister()
         } catch {
-            Log.app.error("launchctl print failed: \(error.localizedDescription, privacy: .private)")
-            return nil
-        }
-        let text = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-        process.waitUntilExit()
-        return process.terminationStatus == 0 ? text : nil
-    }
-
-    private static func removeLegacyLoginItem() {
-        let legacy = SMAppService.mainApp
-        guard legacy.status == .enabled else { return }
-        do {
-            try legacy.unregister()
-        } catch {
-            Log.app.error("Login item removal failed: \(error.localizedDescription, privacy: .private)")
+            Log.app.error("Launch agent unregister failed: \(error.localizedDescription, privacy: .private)")
         }
     }
 }
@@ -123,7 +60,7 @@ enum AppMover {
         #if DEBUG
         false
         #else
-        !LaunchAgent.isInstalledCopy
+        !LoginItem.isInstalledCopy
         #endif
     }
 
@@ -136,7 +73,7 @@ enum AppMover {
             showFailure(error)
             return
         }
-        relaunchAfterExit(URL(fileURLWithPath: LaunchAgent.installedPath))
+        relaunchAfterExit(URL(fileURLWithPath: LoginItem.installedPath))
         exit(0)
     }
 
@@ -155,7 +92,7 @@ enum AppMover {
     private static func moveToApplications() throws {
         let fileManager = FileManager.default
         let source = Bundle.main.bundleURL
-        let destination = URL(fileURLWithPath: LaunchAgent.installedPath)
+        let destination = URL(fileURLWithPath: LoginItem.installedPath)
         if fileManager.fileExists(atPath: destination.path) {
             try fileManager.trashItem(at: destination, resultingItemURL: nil)
         }
@@ -164,7 +101,7 @@ enum AppMover {
         try fileManager.trashItem(at: source, resultingItemURL: nil)
     }
 
-    private static func relaunchAfterExit(_ app: URL) {
+    static func relaunchAfterExit(_ app: URL) {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
         process.arguments = [
@@ -189,20 +126,16 @@ enum AppMover {
 final class SingleInstance {
     private var descriptor: Int32 = -1
 
-    func claim(waiting: Duration) throws -> Bool {
+    func claim() throws -> Bool {
         let path = try AppStorage.directory().appendingPathComponent("instance.lock").path
         descriptor = open(path, O_CREAT | O_RDWR, 0o600)
         guard descriptor >= 0 else {
             throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
         }
-        let deadline = ContinuousClock.now + waiting
-        while flock(descriptor, LOCK_EX | LOCK_NB) != 0 {
-            guard ContinuousClock.now < deadline else {
-                close(descriptor)
-                descriptor = -1
-                return false
-            }
-            Thread.sleep(forTimeInterval: 0.1)
+        guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else {
+            close(descriptor)
+            descriptor = -1
+            return false
         }
         return true
     }
@@ -210,7 +143,6 @@ final class SingleInstance {
 
 enum OpenRequest {
     private static let name = Notification.Name("com.joelheile.voz.open")
-    private static let pendingKey = "openPanelOnNextLaunch"
 
     static func send() {
         DistributedNotificationCenter.default().postNotificationName(name, object: nil, userInfo: nil, deliverImmediately: true)
@@ -222,26 +154,31 @@ enum OpenRequest {
             MainActor.assumeIsolated(handler)
         }
     }
+}
 
-    static func deferToNextLaunch() {
-        UserDefaults.standard.set(true, forKey: pendingKey)
-    }
+/// Identifies the bundle at a path, so a swap that leaves the path in place still counts as a change.
+struct BundleIdentity: Equatable {
+    private let device: dev_t
+    private let inode: ino_t
 
-    static func takePending() -> Bool {
-        defer { UserDefaults.standard.removeObject(forKey: pendingKey) }
-        return UserDefaults.standard.bool(forKey: pendingKey)
+    init?(path: String) {
+        var info = stat()
+        guard stat(path, &info) == 0 else { return nil }
+        device = info.st_dev
+        inode = info.st_ino
     }
 }
 
 @MainActor
 final class UninstallWatcher {
-    private static let settleDelay: Duration = .seconds(2)
+    private static let settleDelay: TimeInterval = 2
 
+    private let launchedBundle = BundleIdentity(path: Bundle.main.bundlePath)
     private var source: DispatchSourceFileSystemObject?
 
     func start() {
-        guard LaunchAgent.isInstalledCopy else { return }
-        let descriptor = open(LaunchAgent.installedPath, O_EVTONLY)
+        guard LoginItem.isInstalledCopy else { return }
+        let descriptor = open(LoginItem.installedPath, O_EVTONLY)
         guard descriptor >= 0 else {
             Log.app.error("Could not watch the app bundle for removal")
             return
@@ -258,12 +195,27 @@ final class UninstallWatcher {
     private func bundleMoved() {
         source?.cancel()
         source = nil
-        Task {
-            try? await Task.sleep(for: Self.settleDelay)
-            guard !FileManager.default.fileExists(atPath: LaunchAgent.installedPath) else { return start() }
-            Log.app.notice("App moved out of Applications, quitting")
-            LaunchAgent.bootOut()
-            NSApp.terminate(nil)
+        // A run loop timer, not a Task: terminating from a main queue job deadlocks the delayed terminate reply.
+        Timer.scheduledTimer(withTimeInterval: Self.settleDelay, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.bundleSettled() }
         }
+    }
+
+    private func bundleSettled() {
+        guard let installed = BundleIdentity(path: LoginItem.installedPath) else { return quit() }
+        guard installed != launchedBundle else { return start() }
+        restartIntoReplacement()
+    }
+
+    private func quit() {
+        Log.app.notice("App moved out of Applications, quitting")
+        LoginItem.unregister()
+        NSApp.terminate(nil)
+    }
+
+    private func restartIntoReplacement() {
+        Log.app.notice("A new copy replaced the app, restarting")
+        AppMover.relaunchAfterExit(URL(fileURLWithPath: LoginItem.installedPath))
+        NSApp.terminate(nil)
     }
 }

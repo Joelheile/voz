@@ -216,7 +216,8 @@ private final class Fixture {
             vocabulary: VocabularyModel(store: history.vocabulary, analytics: analytics),
             setup: SetupModel(analytics: analytics) {},
             extensions: ExtensionsModel(analytics: analytics, home: home, cache: nil, fetch: { _ in Self.listings }),
-            catalog: ExtensionCatalog()
+            catalog: ExtensionCatalog(),
+            updater: Updater(settings: settings, isBusy: { false })
         )
         status.update(.parakeetUltra, .ready(bytes: 483_000_000))
     }

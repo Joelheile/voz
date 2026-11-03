@@ -27,7 +27,7 @@ if arguments.contains(IndicatorDemo.launchArgument) {
 let instance = SingleInstance()
 let claimed: Bool
 do {
-    claimed = try instance.claim(waiting: LaunchAgent.launchedByLaunchd ? .seconds(5) : .zero)
+    claimed = try instance.claim()
 } catch {
     Log.app.error("Could not acquire instance lock: \(error.localizedDescription, privacy: .public)")
     let alert = NSAlert()
@@ -38,7 +38,7 @@ do {
 }
 guard claimed else {
     Log.app.notice("Another voz is running, exiting")
-    if !LaunchAgent.launchedByLaunchd { OpenRequest.send() }
+    OpenRequest.send()
     exit(0)
 }
 application.setActivationPolicy(.accessory)

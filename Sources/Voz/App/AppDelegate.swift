@@ -49,7 +49,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var extensionsModel = ExtensionsModel(analytics: analytics)
     private var statusItemController: StatusItemController?
     private var hotkeyMonitor: HotkeyMonitor?
-    private var quitRequested = false
     private let indicator = IndicatorController()
     private lazy var dropSensor = DropSensor(
         onInvite: { [weak self] screen in self?.inviteDrop(on: screen) },
@@ -61,10 +60,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var updater = Updater(settings: settings, isBusy: { [weak self] in self?.dictation.phase != .idle })
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        guard !LaunchAgent.isInTrash else {
-            LaunchAgent.unregisterIfRegistered()
+        guard !LoginItem.isInTrash else {
+            LoginItem.unregister()
             return NSApp.terminate(nil)
         }
+        let launchedAtLogin = LoginItem.launchedAtLogin
         uninstallWatcher.start()
         extensions.start()
         startControlServer()
@@ -78,7 +78,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 vocabulary: vocabularyModel,
                 setup: setupModel,
                 extensions: extensionsModel,
-                catalog: extensions.catalog
+                catalog: extensions.catalog,
+                updater: updater
             ),
             analytics: analytics,
             copy: { [output] in output.copy($0.finalText) },
@@ -86,7 +87,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             retryModel: { [weak self] in self?.retryModel() },
             finishSetup: { [weak self] in self?.finishSetup() },
             toast: { [toast] in toast.show($0) },
-            quit: { [weak self] in self?.quitFromMenu() }
+            quit: { NSApp.terminate(nil) }
         )
         self.statusItemController = statusItemController
         dictation.onChange = { [weak self] in
@@ -156,7 +157,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         VersionPinger.sendPending(launch: launch)
         updater.start()
-        manageLaunchAgent()
+        LoginItem.sync(enabled: settings.launchAtLogin)
+        analytics.capture(.appLaunched(atLogin: launchedAtLogin))
+        if !launchedAtLogin, launch.updatedFrom == nil { statusItemController.open() }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -191,34 +194,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func manageLaunchAgent() {
-        guard settings.launchAtLogin else {
-            LaunchAgent.unregisterIfRegistered()
-            return finishLaunch()
-        }
-        Task {
-            guard await LaunchAgent.handOver() else { return finishLaunch() }
-            OpenRequest.deferToNextLaunch()
-            NSApp.perform(#selector(NSApplication.terminate(_:)), with: nil, afterDelay: 0)
-        }
-    }
-
-    /// Runs only in the instance that keeps running, so a launch handed over to the launch agent counts once.
-    private func finishLaunch() {
-        analytics.capture(.appLaunched(byLaunchAgent: LaunchAgent.launchedByLaunchd))
-        if OpenRequest.takePending() || !LaunchAgent.launchedByLaunchd {
-            statusItemController?.open()
-        }
-    }
-
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         statusItemController?.open()
         return false
-    }
-
-    private func quitFromMenu() {
-        quitRequested = true
-        NSApp.terminate(nil)
     }
 
     private func startControlServer() {
@@ -241,7 +219,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         controlServer?.stop()
-        if quitRequested { LaunchAgent.bootOut() }
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -273,7 +250,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .store(in: &cancellables)
         settings.$launchAtLogin
             .dropFirst()
-            .sink { [weak self] _ in self?.manageLaunchAgent() }
+            .sink { LoginItem.sync(enabled: $0) }
             .store(in: &cancellables)
         settings.$receiveBetaUpdates
             .dropFirst()
