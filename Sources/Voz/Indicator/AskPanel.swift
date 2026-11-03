@@ -102,45 +102,47 @@ struct AskView: View {
     let onClose: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 0) {
                 Text(model.title)
-                    .font(.ui(13, weight: .medium))
+                    .font(.ui(14, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                     .lineLimit(2)
                 Spacer(minLength: 8)
                 IconButton(icon: .x, help: "Close", action: onClose)
+                    .padding(.trailing, -4)
             }
-            ForEach(model.fields, id: \.id) { field in
-                HStack(spacing: 10) {
-                    Text(field.label)
-                        .font(.meta)
-                        .foregroundStyle(Theme.inkSecondary)
-                        .frame(width: 64, alignment: .leading)
-                    control(for: field)
+            if !model.fields.isEmpty {
+                PanelGroup {
+                    ForEach(model.fields, id: \.id) { field in
+                        HStack(spacing: 10) {
+                            Text(field.label)
+                                .font(.ui(12))
+                                .foregroundStyle(Theme.inkTertiary)
+                                .frame(width: 64, alignment: .leading)
+                            control(for: field)
+                        }
+                        .frame(minHeight: 34)
+                    }
                 }
             }
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 Spacer(minLength: 0)
                 ForEach(Array(model.buttons.enumerated()), id: \.offset) { index, button in
                     if index == model.buttons.count - 1 {
                         Button(button) { onAnswer(button) }
-                            .buttonStyle(.pill(.accent, .small))
+                            .buttonStyle(.pill(.accent, .regular))
                             .keyboardShortcut(.defaultAction)
                     } else {
                         Button(button) { onAnswer(button) }
-                            .buttonStyle(.pill(.outline, .small))
+                            .buttonStyle(.pill(.quiet, .regular))
                     }
                 }
             }
-            .padding(.top, 4)
         }
-        .padding(.leading, 14)
-        .padding(.trailing, 6)
-        .padding(.vertical, 8)
+        .padding(12)
         .frame(width: AskController.width)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous).strokeBorder(Theme.hairline))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous))
     }
 
     @ViewBuilder
@@ -151,8 +153,6 @@ struct AskView: View {
                 .textFieldStyle(.plain)
                 .font(.ui(13))
                 .foregroundStyle(Theme.ink)
-                .fieldBackground(.small)
-                .padding(.trailing, 8)
         case .date:
             DatePicker("", selection: date(field.id), displayedComponents: [.date, .hourAndMinute])
                 .labelsHidden()

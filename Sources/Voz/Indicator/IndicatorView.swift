@@ -364,7 +364,7 @@ struct IndicatorTrailing: View {
                     ProgressDots().transition(swap)
                 }
             case .done:
-                ResultSymbol(icon: .check, color: .primary, effect: .reveal).transition(swap)
+                ResultSymbol(icon: .check, color: Theme.success, effect: .reveal).transition(swap)
             case .failed:
                 ResultSymbol(icon: .triangleAlert, color: Theme.failure, effect: .bounce).transition(swap)
             case .dropTarget:

@@ -52,7 +52,7 @@ enum LocalCommands {
         ControlCommand(name: "guide", summary: "Print the guide to building extensions, written for you and your coding agent", input: .object([]), readOnly: true) { _ in
             let skill = ExtensionService.resources.appendingPathComponent(VozHome.skillName, isDirectory: true)
             guard let guide = try? String(contentsOf: skill.appendingPathComponent("SKILL.md"), encoding: .utf8) else {
-                throw ControlError.failed("Voz could not find its extension guide. Reinstall Voz from voz.joels.tech.")
+                throw ControlError.failed("Voz could not find its extension guide. Reinstall Voz from voz.tools.")
             }
             let text = guide + "\nThe API reference is in \(skill.appendingPathComponent("references/api.md").path).\n"
             return ControlOutput(.string(text), text: text)

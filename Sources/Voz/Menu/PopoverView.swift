@@ -26,7 +26,7 @@ struct PopoverView: View {
             .padding(Theme.Spacing.item)
             .frame(width: Self.width)
             .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous))
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous))
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous).strokeBorder(Theme.hairline))
             .toggleStyle(.accentSwitch)
             .fixedSize(horizontal: false, vertical: true)
@@ -78,7 +78,7 @@ struct PopoverView: View {
 
 private struct HomePage: View {
     private static let visibleRows = 5
-    private static let rowHeight: CGFloat = 40
+    private static let rowHeight: CGFloat = 52
 
     @ObservedObject var model: PopoverModel
     @ObservedObject var history: HistoryModel
@@ -97,18 +97,16 @@ private struct HomePage: View {
     private var isSearching: Bool { !history.query.isEmpty }
     private var showsSearch: Bool { isSearching || !records.isEmpty }
 
-    private var needsAttention: Bool {
-        switch model.status {
-        case .loadingModel, .modelFailed, .permissionNeeded: true
-        default: false
-        }
-    }
+    private var needsAttention: Bool { model.status != .ready }
 
     var body: some View {
         ScrollViewReader { proxy in
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 10) {
+                if needsAttention {
+                    StatusBanner(status: model.status, hint: model.hint) { statusAction }
+                        .transition(.opacity)
+                }
                 header(proxy: proxy)
-                if needsAttention { notice }
                 transcripts
                 ForEach(catalog.activities, id: \.id, content: activityRow)
                 if asksForStar {
@@ -125,48 +123,29 @@ private struct HomePage: View {
         .onChange(of: history.query) { selectedID = nil }
     }
 
-    private var notice: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if !model.hint.isEmpty {
-                Text(model.hint)
-                    .font(.meta)
-                    .lineSpacing(2)
-                    .foregroundStyle(Theme.inkSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            statusDetail
-        }
-    }
-
     @ViewBuilder
-    private var statusDetail: some View {
+    private var statusAction: some View {
         switch model.status {
-        case let .loadingModel(_, progress?):
-            ProgressView(value: progress).progressViewStyle(.linear)
-        case .loadingModel:
-            IndeterminateBar()
         case let .permissionNeeded(fix):
             Button(fix.buttonTitle) { model.actions.fixPermission(fix) }
-                .buttonStyle(.pill(.accent, .regular))
+                .buttonStyle(.pill(.ink, .small))
+                .fixedSize()
         case .modelFailed:
             Button("Try again", action: model.actions.retryModel)
-                .buttonStyle(.pill(.accent, .regular))
+                .buttonStyle(.pill(.quiet, .small))
+                .fixedSize()
         default:
             EmptyView()
         }
     }
 
+    @ViewBuilder
     private func header(proxy: ScrollViewProxy) -> some View {
-        HStack(spacing: 10) {
-            if showsSearch {
-                search(proxy: proxy)
-            } else {
-                Text("Voz").font(.wordmark(17)).foregroundStyle(Theme.ink)
-                Spacer(minLength: 0)
-            }
-            status
+        if showsSearch {
+            search(proxy: proxy)
+        } else {
+            Text("Voz").font(.wordmark(17)).foregroundStyle(Theme.ink).padding(.leading, 4)
         }
-        .animation(Theme.Motion.section, value: model.status)
     }
 
     private func search(proxy: ScrollViewProxy) -> some View {
@@ -187,9 +166,9 @@ private struct HomePage: View {
                     .transition(.opacity)
             }
         }
-        .padding(.horizontal, 12)
-        .frame(height: 34)
-        .background(Theme.selected, in: RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous))
+        .padding(.horizontal, 10)
+        .frame(height: 32)
+        .background(Theme.selected, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
         .animation(Theme.Motion.hover, value: isSearching)
         .onSubmit(copySelection)
         .onKeyPress(.downArrow) { moveSelection(by: 1, proxy: proxy) }
@@ -298,34 +277,35 @@ private struct HomePage: View {
         settings.milestoneShows = 0
     }
 
-    private var footer: some View {
-        HStack(spacing: 2) {
-            ViewThatFits(in: .horizontal) {
-                footerLeading(milestone: milestone)
-                footerLeading(milestone: nil)
-            }
-            .layoutPriority(1)
-            Spacer(minLength: 8)
-            IconButton(icon: .bookA, help: "Dictionary") { model.page = .dictionary }
-            IconButton(icon: .chartNoAxesColumn, help: "Insights") {
-                markMilestonesSeen()
-                model.page = .insights
-            }
-            IconButton(icon: .puzzle, help: extensionsHelp) { model.page = .extensions }
-                .overlay(alignment: .topTrailing) {
-                    if extensions.updateCount > 0 {
-                        Circle().fill(Theme.accent).frame(width: 6, height: 6).offset(x: -6, y: 6)
-                    }
-                }
-            IconButton(icon: .settings, help: "Settings") { model.page = .settings }
-                .keyboardShortcut(",", modifiers: .command)
-        }
-        .padding(.trailing, -8)
-        .padding(.top, -10)
-        .padding(.bottom, -12)
+    private var hasActions: Bool {
+        updater.availableVersion != nil || milestone != nil || catalog.actions.contains { !$0.hidden }
     }
 
-    private func footerLeading(milestone: Milestone?) -> some View {
+    private var footer: some View {
+        VStack(spacing: 8) {
+            if hasActions {
+                ViewThatFits(in: .horizontal) {
+                    footerActions(milestone: milestone)
+                    footerActions(milestone: nil)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            RowDivider()
+            HStack(spacing: 2) {
+                NavButton(icon: .bookA, help: "Dictionary") { model.page = .dictionary }
+                NavButton(icon: .chartNoAxesColumn, help: "Insights") {
+                    markMilestonesSeen()
+                    model.page = .insights
+                }
+                NavButton(icon: .puzzle, help: extensionsHelp, badge: extensions.updateCount > 0) { model.page = .extensions }
+                NavButton(icon: .settings, help: "Settings") { model.page = .settings }
+                    .keyboardShortcut(",", modifiers: .command)
+            }
+            .padding(.bottom, -4)
+        }
+    }
+
+    private func footerActions(milestone: Milestone?) -> some View {
         HStack(spacing: 6) {
             if let version = updater.availableVersion {
                 Button("Update to \(version)", action: model.actions.checkForUpdates)
@@ -334,7 +314,7 @@ private struct HomePage: View {
             }
             ForEach(catalog.actions.filter { !$0.hidden }, id: \.id) { action in
                 Button(action.name) { catalog.run(action) }
-                    .buttonStyle(.pill(.accent, .small))
+                    .buttonStyle(.pill(.quiet, .small))
                     .fixedSize()
                     .help(action.hotkeyLabel ?? action.name)
             }
@@ -344,25 +324,6 @@ private struct HomePage: View {
                     model.page = .insights
                 }
             }
-        }
-    }
-
-    @ViewBuilder
-    private var status: some View {
-        switch model.status {
-        case .ready:
-            EmptyView()
-        case .recording:
-            HStack(spacing: 6) {
-                RecordingMark()
-                Text("Recording").font(.ui(12, weight: .medium)).foregroundStyle(Theme.recording)
-            }
-            .padding(.horizontal, 10)
-            .frame(height: 24)
-            .background(Theme.recording.opacity(0.12), in: Capsule())
-            .popIn(from: 0.9)
-        default:
-            Text(model.status.title).font(.meta).foregroundStyle(Theme.inkSecondary)
         }
     }
 
@@ -402,9 +363,9 @@ private struct DayHeading: View {
 
     var body: some View {
         Text(text)
-            .font(.display(11))
+            .font(.ui(11, weight: .semibold))
             .foregroundStyle(Theme.inkTertiary)
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 12)
             .padding(.top, 10)
             .padding(.bottom, 4)
     }
@@ -424,23 +385,25 @@ private struct TranscriptRow: View {
 
     var body: some View {
         Button(action: copy) {
-            HStack(spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
                 if record.source == nil {
-                    AppIcon(bundleID: record.appBundleID, size: 24)
+                    AppIcon(bundleID: record.appBundleID, size: 22)
                 } else {
-                    Icon(icon, size: 16).foregroundStyle(Theme.inkSecondary).frame(width: 24, height: 24)
+                    IconTile(icon, Color(nsColor: .systemIndigo))
                 }
                 Text(text)
                     .font(.ui(13))
+                    .lineSpacing(1)
                     .foregroundStyle(Theme.ink)
-                    .lineLimit(1)
+                    .lineLimit(2)
                     .truncationMode(.tail)
-                Spacer(minLength: 8)
-                trailing
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                trailing.padding(.top, 2)
             }
-            .padding(.leading, 6)
+            .padding(.leading, 8)
             .padding(.trailing, 10)
-            .frame(height: height)
+            .padding(.vertical, 8)
+            .frame(height: height, alignment: .top)
             .background(selected ? Theme.selected : .clear, in: RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous))
             .contentShape(Rectangle())
         }
@@ -476,12 +439,13 @@ private struct TranscriptRow: View {
     private var trailing: some View {
         if copied {
             Text("Copied")
-                .font(.display(11))
+                .font(.ui(11, weight: .medium))
                 .foregroundStyle(Theme.accent)
                 .transition(.blurReplace)
         } else {
             Text(time)
-                .font(.display(11))
+                .font(.ui(11))
+                .monospacedDigit()
                 .foregroundStyle(Theme.inkTertiary)
                 .transition(.blurReplace)
         }
@@ -495,7 +459,8 @@ private struct RecordingMark: View {
     var body: some View {
         Circle()
             .fill(Theme.recording)
-            .frame(width: 6, height: 6)
+            .frame(width: 8, height: 8)
+            .background(Circle().fill(Theme.recording.opacity(0.25)).padding(-3))
             .opacity(dimmed ? 0.35 : 1)
             .animation(.easeInOut(duration: 1.1).repeatForever(), value: dimmed)
             .onAppear { dimmed = !reduceMotion }
@@ -578,5 +543,99 @@ private struct MilestoneBadge: View {
         .help("See your Insights")
         .onHover { hovering = $0 }
         .animation(Theme.Motion.hover, value: hovering)
+    }
+}
+
+private struct NavButton: View {
+    let icon: LucideIconName
+    let help: String
+    var badge = false
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Icon(icon, size: 16)
+                .foregroundStyle(hovering ? Theme.ink : Theme.inkSecondary)
+                .frame(maxWidth: .infinity, minHeight: 30)
+                .background(hovering ? Theme.selected : .clear, in: RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous))
+                .overlay(alignment: .top) {
+                    if badge {
+                        Circle().fill(Theme.accent).frame(width: 6, height: 6).offset(x: 10, y: 5)
+                    }
+                }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.pressable(0.95))
+        .help(help)
+        .onHover { hovering = $0 }
+        .animation(Theme.Motion.hover, value: hovering)
+    }
+}
+
+private struct StatusBanner<Action: View>: View {
+    let status: PopoverStatus
+    let hint: String
+    @ViewBuilder var action: Action
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            mark
+            VStack(alignment: .leading, spacing: 2) {
+                Text(status.title).font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
+                if !detail.isEmpty {
+                    Text(detail)
+                        .font(.ui(11.5))
+                        .foregroundStyle(Theme.inkSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                progress
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            action
+        }
+        .padding(10)
+        .background(tint.opacity(0.13), in: RoundedRectangle(cornerRadius: Theme.Radius.group, style: .continuous))
+        .animation(Theme.Motion.section, value: status)
+    }
+
+    private var detail: String {
+        switch status {
+        case let .loadingModel(detail, _) where !detail.isEmpty: detail
+        case let .modelFailed(message) where hint.isEmpty: message
+        default: hint
+        }
+    }
+
+    private var tint: Color {
+        switch status {
+        case .recording, .modelFailed: Theme.recording
+        case .permissionNeeded: Color(nsColor: .systemYellow)
+        case .loadingModel: Theme.accent
+        default: Theme.inkTertiary
+        }
+    }
+
+    @ViewBuilder
+    private var mark: some View {
+        switch status {
+        case .recording: RecordingMark()
+        case .modelFailed: Icon(.triangleAlert, size: 16, strokeWidth: 1.5).foregroundStyle(Theme.recording)
+        case .permissionNeeded: Icon(.shield, size: 16, strokeWidth: 1.5).foregroundStyle(Color(nsColor: .systemYellow))
+        case .loadingModel: Icon(.download, size: 16, strokeWidth: 1.5).foregroundStyle(Theme.accent)
+        default: ProgressView().controlSize(.small)
+        }
+    }
+
+    @ViewBuilder
+    private var progress: some View {
+        switch status {
+        case let .loadingModel(_, progress?):
+            ProgressView(value: progress).progressViewStyle(.linear).tint(Theme.accent).padding(.top, 4)
+        case .loadingModel:
+            IndeterminateBar().padding(.top, 4)
+        default:
+            EmptyView()
+        }
     }
 }

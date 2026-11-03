@@ -116,10 +116,10 @@ private struct AccessStep: View {
         VStack(alignment: .leading, spacing: 16) {
             StepHeader(title: "Let Voz hear and type", detail: "Your audio and text never leave this Mac.")
             PanelGroup {
-                PermissionRow(title: "Microphone", detail: "To hear your voice", granted: model.microphoneGranted, fix: model.requestMicrophone)
-                PermissionRow(title: "Accessibility", detail: "To type at your cursor", granted: model.accessibilityGranted, fix: model.requestAccessibility)
-                PermissionRow(title: "Input Monitoring", detail: "To catch your shortcut", granted: model.inputMonitoringGranted, fix: model.requestInputMonitoring)
-                PermissionRow(title: "System Audio", detail: "To mute music while you talk", granted: model.systemAudioGranted, fix: model.requestSystemAudio)
+                PermissionRow(title: "Microphone", detail: "To hear your voice", tile: IconTile(.mic, Color(nsColor: .systemPink)), granted: model.microphoneGranted, fix: model.requestMicrophone)
+                PermissionRow(title: "Accessibility", detail: "To type at your cursor", tile: IconTile(.accessibility, Color(nsColor: .systemBlue)), granted: model.accessibilityGranted, fix: model.requestAccessibility)
+                PermissionRow(title: "Input Monitoring", detail: "To catch your shortcut", tile: IconTile(.keyboard, Color(nsColor: .systemGray)), granted: model.inputMonitoringGranted, fix: model.requestInputMonitoring)
+                PermissionRow(title: "System Audio", detail: "To mute music while you talk", tile: IconTile(.volumeX, Color(nsColor: .systemOrange)), granted: model.systemAudioGranted, fix: model.requestSystemAudio)
             }
             .controlSize(.small)
         }
@@ -207,7 +207,7 @@ private struct TryStep: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 20)
             .padding(.horizontal, 16)
-            .background(Theme.canvas, in: RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous))
+            .groupCard(padding: 0)
             .animation(Theme.Motion.section, value: capture.isListening)
             result
         }

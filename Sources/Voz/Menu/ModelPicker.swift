@@ -14,6 +14,7 @@ struct ModelPicker: View {
     let title: String
     @Binding var selection: String
     let options: [ModelOption]
+    var tile: IconTile?
     @State private var expanded = false
     @Namespace private var highlight
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -55,12 +56,13 @@ struct ModelPicker: View {
     }
 
     private var header: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
+            tile
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
                 Text("\(selected.name), \(selected.detail)")
-                    .font(.meta)
-                    .foregroundStyle(Theme.inkSecondary)
+                    .font(.ui(11.5))
+                    .foregroundStyle(Theme.inkTertiary)
                     .lineLimit(1)
                     .contentTransition(.interpolate)
             }
@@ -71,7 +73,7 @@ struct ModelPicker: View {
                 .animation(.spring(duration: 0.3, bounce: 0.2), value: expanded)
         }
         .frame(minHeight: Theme.Size.row)
-        .padding(.vertical, 6)
+        .padding(.vertical, 4)
         .contentShape(Rectangle())
     }
 }
