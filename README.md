@@ -144,23 +144,18 @@ Each command becomes a tool, such as `history`, `vocabulary_add` or `voz-jira_is
 
 ## Privacy
 
-Dictation processes your audio and transcripts on your Mac. Extensions can send data to other services, so review what you install.
+Dictation runs on your Mac. Your audio and transcripts stay there unless an extension you install sends them somewhere.
 
-What Voz sends to PostHog, which does not store your IP address:
+Voz sends PostHog, without your IP address:
 
-- A version ping on install and update, with a new random ID each time.
-- One ping on each day you dictate, with the app version, macOS version, chip and speech model, under a random ID stored on your Mac. This counts active installs.
-- Usage analytics, only if you opt in.
-- Crash reports, on by default with their own setting under Privacy. They hold crashes, freezes and fixed error codes with a stack trace.
-- Feedback, only when you press Send or run `voz feedback`. It holds your message, the email you add, if any, and the Voz, macOS and speech model versions, under a new random ID each time.
+- An anonymous ping on install, on update and on each day you dictate, with the app version, macOS version, chip and speech model
+- Crash reports, on by default under Privacy, with a stack trace and no text, audio or app names
+- Usage analytics, only if you opt in
+- Feedback, only when you send it
 
-None of these contain your dictations, and crash reports never contain text, audio or app names.
+None of these contain what you dictate. The local log at `~/Library/Logs/Voz/voz-logs.jsonl` includes your text only when you turn on Include text under Privacy.
 
-Voz logs one line per dictation to `~/Library/Logs/Voz/voz-logs.jsonl`, with timings, model and app names. The log includes what you said only when you turn on Include text under Privacy in Settings, and it never leaves your Mac unless you copy it.
-
-Voz asks for System Audio Recording access to mute other apps while you dictate. It silences their sound and does not save their audio. An extension can also ask Voz to transcribe what your Mac plays, such as a call, while the notch shows a timer. Voz transcribes it on your Mac, keeps no audio and gives the extension the text. Extensions also see the name of the app you dictate into and, in web browsers, the hostname, such as github.com, never the full address.
-
-The `voz` command and `voz mcp` reach the app through a socket only your user account can open. Nothing listens on the network. An AI app you connect with `voz mcp` can read your history, so connect only apps you trust.
+Voz asks for System Audio Recording to mute other apps while you dictate, and it saves no audio. Extensions see the app you dictate into and, in browsers, the hostname, never the full address. An AI app you connect with `voz mcp` can read your history, so connect only apps you trust.
 
 Found a vulnerability? Open a [private advisory](https://github.com/Joelheile/voz/security/advisories/new), not a public issue.
 
