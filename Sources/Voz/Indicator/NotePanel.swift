@@ -111,8 +111,8 @@ struct NoteView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 0) {
                 Text(model.title.isEmpty ? "Note" : model.title)
-                    .font(.meta)
-                    .foregroundStyle(Theme.inkSecondary)
+                    .font(.ui(13, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
                     .lineLimit(1)
                 Spacer(minLength: 8)
                 IconButton(icon: .x, help: "Close", action: onClose)
@@ -138,7 +138,6 @@ struct NoteView: View {
             .padding(.horizontal, 9)
             .padding(.bottom, 10)
         }
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous).strokeBorder(Theme.hairline))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous))
     }
 }
