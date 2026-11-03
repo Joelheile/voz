@@ -49,6 +49,26 @@ struct ControlCommandsTests {
         #expect(await center.handle(["settings", "soundCues", "maybe"], json: false).exit == 2)
     }
 
+    @Test func autoUpdateTogglesSparklesOwnPreference() async throws {
+        let (commands, settings) = try makeControlCommands()
+        let center = ControlCenter(commands: commands.all)
+        #expect(settings.installUpdatesAutomatically)
+        #expect(await center.handle(["settings", "autoUpdate", "off"], json: false).exit == 0)
+        #expect(settings.installUpdatesAutomatically == false)
+    }
+
+    @Test func autoUpdateIsStoredUnderSparklesKey() {
+        let defaults = makeDefaults()
+        AppSettings(defaults: defaults, home: temporaryHome()).installUpdatesAutomatically = false
+        #expect(defaults.object(forKey: "SUAutomaticallyUpdate") as? Bool == false)
+    }
+
+    @Test func updatesInstallOnlyOnceYouAreAwayAndIdle() {
+        #expect(IdleInstall.isDue(busy: false, secondsSinceInput: IdleInstall.awayAfter))
+        #expect(!IdleInstall.isDue(busy: false, secondsSinceInput: IdleInstall.awayAfter - 1))
+        #expect(!IdleInstall.isDue(busy: true, secondsSinceInput: IdleInstall.awayAfter * 2))
+    }
+
     @Test func repeatingASettingSucceedsWithoutChange() async throws {
         let (commands, settings) = try makeControlCommands()
         let center = ControlCenter(commands: commands.all)

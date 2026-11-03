@@ -56,6 +56,9 @@ struct WhatsNewPage: View {
                                     .buttonStyle(.pill(.accent, .small))
                             }
                         }
+                        PanelRow(title: "Install automatically", detail: "While you're away from your Mac") {
+                            Toggle("Install automatically", isOn: $settings.installUpdatesAutomatically).labelsHidden()
+                        }
                         PanelRow(title: "Beta updates") {
                             Toggle("Beta updates", isOn: $settings.receiveBetaUpdates).labelsHidden()
                         }
