@@ -1,7 +1,7 @@
 enum AnalyticsEvent: Equatable, Sendable {
     case appOpened
     case modelFailed(model: SpeechModel)
-    case appLaunched(byLaunchAgent: Bool)
+    case appLaunched(atLogin: Bool)
     case permissionResult(permission: PermissionName, granted: Bool)
     case dictationCompleted(DictationMetrics)
     case dictationFailed(stage: DictationStage, errorCode: DictationErrorCode)
@@ -51,8 +51,8 @@ enum AnalyticsEvent: Equatable, Sendable {
             ["reason": .text(reason.rawValue)]
         case let .modelFailed(model):
             ["model": .text(model.rawValue)]
-        case let .appLaunched(byLaunchAgent):
-            ["by_launch_agent": .flag(byLaunchAgent)]
+        case let .appLaunched(atLogin):
+            ["at_login": .flag(atLogin)]
         case .appOpened, .historyOpened, .statsOpened:
             [:]
         case let .modelDownload(model, seconds, success, bytes):
@@ -122,7 +122,7 @@ enum AppError: String, Sendable {
     case historySaveFailed = "history_save_failed"
     case extensionsStartFailed = "extensions_start_failed"
     case extensionHostCrashLoop = "extension_host_crash_loop"
-    case launchAgentFailed = "launch_agent_failed"
+    case loginItemFailed = "login_item_failed"
 
     var stage: String {
         switch self {
@@ -133,7 +133,7 @@ enum AppError: String, Sendable {
         case .accessibilityDenied, .noPasteKey: "delivery"
         case .historySaveFailed: "history"
         case .extensionsStartFailed, .extensionHostCrashLoop: "extensions"
-        case .launchAgentFailed: "launch"
+        case .loginItemFailed: "launch"
         }
     }
 }

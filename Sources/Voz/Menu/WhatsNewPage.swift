@@ -36,6 +36,7 @@ enum Changelog {
 
 struct WhatsNewPage: View {
     @ObservedObject var settings: AppSettings
+    @ObservedObject var updater: Updater
     let releases: [ChangelogRelease]
     let checkForUpdates: () -> Void
     let back: () -> Void
@@ -46,9 +47,14 @@ struct WhatsNewPage: View {
             CappedScrollView(maxHeight: 520) {
                 VStack(alignment: .leading, spacing: 16) {
                     PanelGroup {
-                        PanelRow(title: "Voz \(Self.version)", detail: "Updates install on their own") {
-                            Button("Check now", action: checkForUpdates)
-                                .buttonStyle(.pill(.quiet, .small))
+                        PanelRow(title: "Voz \(Self.version)", detail: updateDetail) {
+                            if updater.availableVersion == nil {
+                                Button("Check now", action: checkForUpdates)
+                                    .buttonStyle(.pill(.quiet, .small))
+                            } else {
+                                Button("Update", action: checkForUpdates)
+                                    .buttonStyle(.pill(.accent, .small))
+                            }
                         }
                         PanelRow(title: "Beta updates") {
                             Toggle("Beta updates", isOn: $settings.receiveBetaUpdates).labelsHidden()
@@ -60,6 +66,10 @@ struct WhatsNewPage: View {
                 }
             }
         }
+    }
+
+    private var updateDetail: String {
+        updater.availableVersion.map { "Version \($0) is available" } ?? "Voz checks for updates every hour"
     }
 
     private static var version: String {

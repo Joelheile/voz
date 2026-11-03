@@ -10,6 +10,7 @@ struct PopoverSources {
     let setup: SetupModel
     let extensions: ExtensionsModel
     let catalog: ExtensionCatalog
+    let updater: Updater
 }
 
 struct PopoverView: View {
@@ -43,7 +44,7 @@ struct PopoverView: View {
         } else {
             switch model.page {
             case .home:
-                HomePage(model: model, history: sources.history, settings: sources.settings, catalog: sources.catalog, extensions: sources.extensions)
+                HomePage(model: model, history: sources.history, settings: sources.settings, catalog: sources.catalog, extensions: sources.extensions, updater: sources.updater)
             case .settings:
                 SettingsPage(model: model, settings: sources.settings, catalog: sources.catalog)
             case .dictionary:
@@ -67,7 +68,7 @@ struct PopoverView: View {
             case .privacy:
                 PrivacyPage(settings: sources.settings, back: model.goBack)
             case .whatsNew:
-                WhatsNewPage(settings: sources.settings, releases: Changelog.bundled, checkForUpdates: model.actions.checkForUpdates, back: model.goBack)
+                WhatsNewPage(settings: sources.settings, updater: sources.updater, releases: Changelog.bundled, checkForUpdates: model.actions.checkForUpdates, back: model.goBack)
             case .tour:
                 TourPage(settings: sources.settings, open: { model.page = $0 }, finish: { withAnimation(Theme.Motion.section) { model.page = .home } })
             }
@@ -84,6 +85,7 @@ private struct HomePage: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var catalog: ExtensionCatalog
     @ObservedObject var extensions: ExtensionsModel
+    @ObservedObject var updater: Updater
     @FocusState private var searchFocused: Bool
     @State private var selectedID: UUID?
     @State private var usage: UsageStats?
@@ -325,6 +327,11 @@ private struct HomePage: View {
 
     private func footerLeading(milestone: Milestone?) -> some View {
         HStack(spacing: 6) {
+            if let version = updater.availableVersion {
+                Button("Update to \(version)", action: model.actions.checkForUpdates)
+                    .buttonStyle(.pill(.accent, .small))
+                    .fixedSize()
+            }
             ForEach(catalog.actions.filter { !$0.hidden }, id: \.id) { action in
                 Button(action.name) { catalog.run(action) }
                     .buttonStyle(.pill(.accent, .small))

@@ -358,3 +358,14 @@ func makeControlCommands(_ records: [TranscriptRecord] = [], dictation: FakeDict
 func decodeJSON(_ data: Data) throws -> JSONValue {
     try JSONDecoder().decode(JSONValue.self, from: data)
 }
+
+func makeTemporaryDirectory() throws -> String {
+    let path = NSTemporaryDirectory() + "voz-test-\(UUID().uuidString)"
+    try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: false)
+    return path
+}
+
+/// Swaps two paths the way Sparkle installs an update.
+func swapItems(atPath first: String, withItemAtPath second: String) -> Bool {
+    renamex_np(first, second, UInt32(RENAME_SWAP)) == 0
+}

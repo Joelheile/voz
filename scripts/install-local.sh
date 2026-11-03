@@ -8,12 +8,11 @@ PREVIOUS=/Applications/.voz-previous.app
 
 scripts/make-app.sh "$@"
 
-launchctl bootout "gui/$(id -u)/com.joelheile.voz.relaunch" 2>/dev/null || true
+pkill -x voz || true
 for _ in $(seq 1 50); do
     pgrep -x voz >/dev/null || break
     sleep 0.1
 done
-pkill -x voz || true
 
 rm -rf "$STAGING" "$PREVIOUS"
 ditto build/voz.app "$STAGING"

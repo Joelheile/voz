@@ -6,7 +6,7 @@ struct AnalyticsEventTests {
         let event = AnalyticsEvent.dictationFailed(stage: .transcription, errorCode: .transcriptionFailed)
         #expect(event.failure?.stage == "transcription")
         #expect(event.failure?.code == "transcription_failed")
-        #expect(AnalyticsEvent.appLaunched(byLaunchAgent: false).failure == nil)
+        #expect(AnalyticsEvent.appLaunched(atLogin: false).failure == nil)
         #expect(AppError.appHang.stage == "main_thread")
         #expect(AppError.appHang.rawValue == "app_hang")
         #expect(AppError.accessibilityDenied.stage == "delivery")
