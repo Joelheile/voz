@@ -13,11 +13,11 @@ Free and open source. Your audio never leaves your Mac.
 [![Latest release](https://img.shields.io/github/v/release/Joelheile/voz)](https://github.com/Joelheile/voz/releases/latest)
 ![macOS 26, Apple Silicon](https://img.shields.io/badge/macOS_26-Apple_Silicon-black)
 
-[Website](https://voz.joels.tech), [Extensions](https://voz.joels.tech/extensions/)
+[Website](https://voz.tools), [Extensions](https://voz.tools/extensions/)
 
-<a href="https://voz.joels.tech"><img src=".github/images/demo.webp" width="720" alt="The Voz launch film: Voz beside Wispr Flow, dictation cleaned in real time, and a coding agent writing a missing feature as an extension."></a>
+<a href="https://voz.tools"><img src=".github/images/demo.webp" width="720" alt="The Voz launch film: Voz beside Wispr Flow, dictation cleaned in real time, and a coding agent writing a missing feature as an extension."></a>
 
-[Watch it with sound](https://voz.joels.tech)
+[Watch it with sound](https://voz.tools)
 
 </div>
 
@@ -26,7 +26,7 @@ Free and open source. Your audio never leaves your Mac.
 macOS 26 on Apple Silicon:
 
 ```
-curl -fsSL https://voz.joels.tech/install | bash
+curl -fsSL https://voz.tools/install | bash
 ```
 
 If Voz saves you some typing, click **Star** at the top of [the repo page](https://github.com/Joelheile/voz). Stars are how other developers find Voz.
@@ -99,9 +99,9 @@ You don't need to learn the API first. Tell a coding agent in `~/.voz` what you 
 
 Publish it to npm with the `voz-package` keyword and it shows up in Extensions for everyone. Here is every published extension, updated hourly:
 
-<a href="https://voz.joels.tech/extensions/"><img src="https://voz.joels.tech/extensions.svg" width="720" alt="Voz extensions published on npm, sorted by monthly downloads"></a>
+<a href="https://voz.tools/extensions/"><img src="https://voz.tools/extensions.svg" width="720" alt="Voz extensions published on npm, sorted by monthly downloads"></a>
 
-Install one from the menu bar, or run `voz install voz-meeting`. [Browse extensions](https://voz.joels.tech/extensions/) or [build your first one](https://voz.joels.tech/build-extension/).
+Install one from the menu bar, or run `voz install voz-meeting`. [Browse extensions](https://voz.tools/extensions/) or [build your first one](https://voz.tools/build-extension/).
 
 ## Control Voz from the terminal and AI apps
 
