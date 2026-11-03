@@ -4,6 +4,9 @@ Newest first. To get beta changes now, turn on Beta updates under What's new in 
 
 ## In beta
 
+- Voz no longer freezes for a few seconds when you switch to a Chrome window
+- Dictation records from your default microphone when the one you picked won't start
+- Text appears sooner after you let go of the hotkey
 - Extensions can ask you to check details in a card under the notch
 - Extensions made for a newer Voz now load instead of asking you to update
 - Extension commands can now trigger on a phrase said anywhere in your dictation

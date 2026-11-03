@@ -152,11 +152,11 @@ Each command becomes a tool, such as `history`, `vocabulary_add` or `voz-jira_is
 ## What's new
 
 <!-- changelog -->
+- Voz no longer freezes for a few seconds when you switch to a Chrome window
+- Dictation records from your default microphone when the one you picked won't start
+- Text appears sooner after you let go of the hotkey
 - Extensions can ask you to check details in a card under the notch
 - Extensions made for a newer Voz now load instead of asking you to update
-- Extension commands can now trigger on a phrase said anywhere in your dictation
-- Dictation starts while music plays, during meetings and with Bluetooth headphones
-- Opening Voz after an update no longer leaves an invisible old copy running
 
 [See everything new](CHANGELOG.md)
 <!-- /changelog -->
