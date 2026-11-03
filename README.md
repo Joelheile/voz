@@ -187,7 +187,7 @@ scripts/make-app.sh      # build and sign build/voz.app
 
 The app is one Swift package target, `Sources/Voz`, with a folder per feature. `AGENTS.md` has the code map.
 
-Pushes to `main` publish a beta and `vX.Y.Z` tags publish a stable release. Keep the signing identity and Sparkle key unchanged and build numbers increasing. To pull a bad update, remove it from `appcast.xml`, then publish a fix.
+Run `gh workflow run release.yml --ref main` to publish a beta. `vX.Y.Z` tags publish a stable release. Keep the signing identity and Sparkle key unchanged and build numbers increasing. To pull a bad update, remove it from `appcast.xml`, then publish a fix.
 
 ## License
 

@@ -70,7 +70,7 @@ Voz is a dictation app that people and agents drive the same way. Everything you
 ## Release hazards
 
 - Do not change the signing identity, Sparkle key, bundle identifier or appcast URL. Changes break permissions or updates.
-- Pushes to `main` publish a beta. Tags `vX.Y.Z` publish a stable release. Both run `.github/workflows/release.yml`. Build numbers must keep increasing.
+- Merging to `main` publishes nothing. Run `gh workflow run release.yml --ref main` to publish a beta. Tags `vX.Y.Z` publish a stable release. Both run `.github/workflows/release.yml`. Build numbers must keep increasing.
 - Changes reach `main` only through a pull request that passes CI. Agents open the pull request. Only the maintainer merges it.
 - Release notes and `CHANGELOG.md` list only `Changelog:` commit trailers. Add one per change users notice, such as `Changelog: See the time left while a speech model downloads`. Leave it off refactors, tests, dependency bumps and fixes to unreleased features.
 - Write each trailer as one line under 15 words: what the user can now do, or the symptom that went away. Use "you", plain words and the place to find it. No PR numbers, file names, hype, emojis or exclamation marks. One warm or specific detail beats a joke.
