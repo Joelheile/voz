@@ -595,13 +595,24 @@ struct ExtensionHostTests {
         try home.writeAuthoringFiles(from: extensionResources)
         let skill = extensionResources.appendingPathComponent("voz-extension")
         for agentFolder in [".claude", ".agents"] {
-            for file in ["SKILL.md", "reference.md"] {
+            for file in ["SKILL.md", "references/api.md"] {
                 let installed = home.root.appendingPathComponent("\(agentFolder)/skills/voz-extension/\(file)")
                 #expect(fileContents(installed) == fileContents(skill.appendingPathComponent(file)))
             }
         }
         #expect(fileContents(home.root.appendingPathComponent("CLAUDE.md")) == "@AGENTS.md\n")
         #expect(fileContents(home.root.appendingPathComponent("AGENTS.md")) == fileContents(extensionResources.appendingPathComponent("AGENTS.md")))
+    }
+
+    @Test func skillInstallsForEveryAgentInTheHomeFolder() throws {
+        let userHome = temporaryHome().root
+        try VozHome.writeSkill(into: userHome, from: extensionResources)
+        try VozHome.writeSkill(into: userHome, from: extensionResources)
+        for agentFolder in [".claude", ".agents"] {
+            let installed = userHome.appendingPathComponent("\(agentFolder)/skills/voz-extension/SKILL.md")
+            #expect(fileContents(installed) == fileContents(extensionResources.appendingPathComponent("voz-extension/SKILL.md")))
+        }
+        #expect(fileContents(userHome.appendingPathComponent("AGENTS.md")) == nil)
     }
 
     @Test func skillNameMatchesItsFolderAndTheBuildPrompt() {

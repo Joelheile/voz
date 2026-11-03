@@ -208,6 +208,7 @@ final class ExtensionsModel: ObservableObject {
     func copyBuildPrompt() -> Bool {
         do {
             try CommandLineTool.install()
+            try VozHome.writeSkill(into: FileManager.default.homeDirectoryForCurrentUser, from: ExtensionService.resources)
         } catch CommandLineToolError.cancelled {
             message = nil
             return false

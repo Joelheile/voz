@@ -97,13 +97,18 @@ struct VozHome: Sendable {
 
     /// The voz-extension skill where Claude Code and other agents look for skills, an `AGENTS.md` that points to it, and a `CLAUDE.md` that loads that
     static func writeGuide(into folder: URL, from resources: URL) throws {
+        try writeSkill(into: folder, from: resources)
+        try replace(folder.appendingPathComponent("AGENTS.md"), with: resources.appendingPathComponent("AGENTS.md"))
+        try Data("@AGENTS.md\n".utf8).write(to: folder.appendingPathComponent("CLAUDE.md"))
+    }
+
+    /// Puts the skill in `.claude/skills` for Claude Code and `.agents/skills` for Codex and other agents. In the user's home folder, every project gets it
+    static func writeSkill(into folder: URL, from resources: URL) throws {
         for agentFolder in [".claude", ".agents"] {
             let skills = folder.appendingPathComponent("\(agentFolder)/skills", isDirectory: true)
             try FileManager.default.createDirectory(at: skills, withIntermediateDirectories: true)
             try replace(skills.appendingPathComponent(skillName, isDirectory: true), with: resources.appendingPathComponent(skillName, isDirectory: true))
         }
-        try replace(folder.appendingPathComponent("AGENTS.md"), with: resources.appendingPathComponent("AGENTS.md"))
-        try Data("@AGENTS.md\n".utf8).write(to: folder.appendingPathComponent("CLAUDE.md"))
     }
 
     static func writeTypes(into folder: URL, from resources: URL) throws {

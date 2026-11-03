@@ -95,7 +95,9 @@ Extensions run with your permissions, so only install ones you trust. If one is 
 
 ## Let a coding agent write them
 
-You don't need to learn the API first. Click Build your own under Extensions, then paste the prompt into Claude Code, Codex or any coding agent. The agent follows the voz-extension skill Voz keeps in `~/.voz`: it asks what you want, writes the extension and tests it with you. Voz loads it when you save. The full API is in [reference.md](Resources/Extensions/voz-extension/reference.md).
+You don't need to learn the API first. Click Build your own under Extensions, then paste the prompt into Claude Code, Codex or any coding agent. The click also installs the [voz-extension skill](skills/voz-extension/SKILL.md) for Claude Code, Codex and other agents. The agent asks what you want, writes the extension and tests it with you. Voz loads it when you save. The full API is in [api.md](skills/voz-extension/references/api.md).
+
+To install the skill without Voz, run `npx skills add Joelheile/voz -g`.
 
 Publish it to npm with the `voz-package` keyword and it shows up in Extensions for everyone. Here is every published extension, updated hourly:
 

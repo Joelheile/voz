@@ -1,6 +1,6 @@
 ---
 name: voz-extension
-description: Builds, changes and debugs Voz extensions, the TypeScript plugins for the Voz dictation app on the Mac. Use when the user wants Voz to do something new with what they dictate, such as a voice command, a writing style per app, a hotkey or a tool agents can call, or when a Voz extension fails to load.
+description: Builds, changes and debugs Voz extensions, the TypeScript plugins for the Voz dictation app on the Mac. Use when the user wants Voz to do something new with what they dictate, such as a voice command, a writing style per app, a hotkey or a tool agents can call, or works in a `voz new` folder or `~/.voz/extensions`, or when a Voz extension fails to load.
 ---
 
 # Voz extension
@@ -18,7 +18,7 @@ Copy this checklist into your reply and keep it current:
 - [ ] 6. Hand over
 ```
 
-The API is in [reference.md](reference.md). Read the section for each member you use before you write code that calls it.
+The API is in [references/api.md](references/api.md). Read the section for each member you use before you write code that calls it.
 
 ## 1. Look
 
@@ -65,7 +65,7 @@ Done when you can say the extension in one sentence and the user says yes. Write
 | Something that keeps running, such as a meeting recording         | `startActivity`, `transcribeLive`, `ctx.openNote`, `addHistory` |
 | A check before acting                                             | `ctx.ask`                                                       |
 
-`beforeCleanup`, `beforeInsert` and cleanup steps get 300 ms and only `ctx.app`: string work only. Put network and model calls in commands, actions, tools or `afterInsert`. See Limits in [reference.md](reference.md).
+`beforeCleanup`, `beforeInsert` and cleanup steps get 300 ms and only `ctx.app`: string work only. Put network and model calls in commands, actions, tools or `afterInsert`. See Limits in [references/api.md](references/api.md).
 
 ## 4. Build
 
