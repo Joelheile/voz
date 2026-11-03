@@ -122,7 +122,7 @@ export default defineExtension((voz) => {
 });
 ```
 
-To share it, run `npm publish` in the folder. Anyone can then install it with `voz install voz-hello`, or open `voz://extensions/voz-hello` to see it in Voz with an Install button. The `voz-package` keyword in `package.json` lists it in the Extensions page and on [voz.joels.tech/extensions](https://voz.joels.tech/extensions/).
+To share it, run `npm publish` in the folder. Anyone can then install it with `voz install voz-hello`, or open `voz://extensions/voz-hello` to see it in Voz with an Install button. The `voz-package` keyword in `package.json` lists it in the Extensions page and on [voz.tools/extensions](https://voz.tools/extensions/).
 
 `voz dev` writes `voz.d.ts` again each time, so the types match the Voz you run. In a folder you did not create with `voz new`, add `"paths": { "voz": ["./voz.d.ts"] }` to `compilerOptions` in `tsconfig.json`.
 

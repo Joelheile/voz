@@ -51,7 +51,7 @@ enum LocalCommands {
     private static var guide: ControlCommand {
         ControlCommand(name: "guide", summary: "Print the guide to building extensions, written for you and your coding agent", input: .object([]), readOnly: true) { _ in
             guard let text = try? String(contentsOf: ExtensionService.resources.appendingPathComponent("AGENTS.md"), encoding: .utf8) else {
-                throw ControlError.failed("Voz could not find its extension guide. Reinstall Voz from voz.joels.tech.")
+                throw ControlError.failed("Voz could not find its extension guide. Reinstall Voz from voz.tools.")
             }
             return ControlOutput(.string(text), text: text)
         }
