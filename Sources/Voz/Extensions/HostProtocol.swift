@@ -475,7 +475,6 @@ enum VoiceCommands {
 
     private static func contains(_ phrase: [String], in words: [Range<String.Index>], of text: String) -> Bool {
         let spoken = words.map { text[$0].lowercased() }
-        guard spoken.count >= phrase.count else { return false }
         return (0...(spoken.count - phrase.count)).contains { Array(spoken[$0..<($0 + phrase.count)]) == phrase }
     }
 
