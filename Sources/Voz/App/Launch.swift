@@ -64,20 +64,22 @@ enum AppMover {
         #endif
     }
 
+    /// A copy on a disk image or in a translocated folder can't run for long, so it moves without asking.
     static func offer() {
-        guard confirm() else { return }
+        let source = Bundle.main.bundleURL
+        let readOnly = (try? source.resourceValues(forKeys: [.volumeIsReadOnlyKey]).volumeIsReadOnly) == true
+        guard readOnly || confirm() else { return }
+        let diskImage = readOnly ? mountedDiskImage(holding: source) : nil
         do {
-            try moveToApplications()
+            try moveToApplications(from: source, keepSource: readOnly)
         } catch {
             Log.app.error("Move to Applications failed: \(error.localizedDescription, privacy: .private)")
             showFailure(error)
             return
         }
-        relaunchAfterExit(URL(fileURLWithPath: LoginItem.installedPath))
+        relaunchAfterExit(URL(fileURLWithPath: LoginItem.installedPath), ejecting: diskImage)
         exit(0)
     }
-
-    private static var isTranslocated: Bool { Bundle.main.bundlePath.contains("/AppTranslocation/") }
 
     private static func confirm() -> Bool {
         let alert = NSAlert()
@@ -89,24 +91,42 @@ enum AppMover {
         return alert.runModal() == .alertFirstButtonReturn
     }
 
-    private static func moveToApplications() throws {
+    private static func moveToApplications(from source: URL, keepSource: Bool) throws {
         let fileManager = FileManager.default
-        let source = Bundle.main.bundleURL
         let destination = URL(fileURLWithPath: LoginItem.installedPath)
         if fileManager.fileExists(atPath: destination.path) {
             try fileManager.trashItem(at: destination, resultingItemURL: nil)
         }
         try fileManager.copyItem(at: source, to: destination)
-        guard !isTranslocated else { return }
+        clearQuarantine(destination)
+        guard !keepSource else { return }
         try fileManager.trashItem(at: source, resultingItemURL: nil)
     }
 
-    static func relaunchAfterExit(_ app: URL) {
+    /// You already approved this download when you opened it, so the copy shouldn't ask again.
+    private static func clearQuarantine(_ app: URL) {
+        let paths = [app.path] + (FileManager.default.enumerator(atPath: app.path)?.compactMap { $0 as? String }.map { app.appendingPathComponent($0).path } ?? [])
+        for path in paths {
+            removexattr(path, "com.apple.quarantine", XATTR_NOFOLLOW)
+        }
+    }
+
+    /// Translocation hides the original path, so this finds the read-only volume that holds a copy of Voz.
+    private static func mountedDiskImage(holding source: URL) -> URL? {
+        let volumes = FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: [.volumeIsReadOnlyKey], options: [.skipHiddenVolumes]) ?? []
+        return volumes.first { volume in
+            volume.path != "/"
+                && (try? volume.resourceValues(forKeys: [.volumeIsReadOnlyKey]).volumeIsReadOnly) == true
+                && FileManager.default.fileExists(atPath: volume.appendingPathComponent(source.lastPathComponent).path)
+        }
+    }
+
+    static func relaunchAfterExit(_ app: URL, ejecting volume: URL? = nil) {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
         process.arguments = [
-            "-c", "while kill -0 \"$1\" 2>/dev/null; do sleep 0.1; done; open \"$2\"",
-            "sh", String(getpid()), app.path,
+            "-c", "while kill -0 \"$1\" 2>/dev/null; do sleep 0.1; done; [ -n \"$3\" ] && hdiutil detach -quiet \"$3\"; open \"$2\"",
+            "sh", String(getpid()), app.path, volume?.path ?? "",
         ]
         do {
             try process.run()

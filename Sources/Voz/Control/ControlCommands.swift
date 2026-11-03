@@ -418,6 +418,7 @@ struct ControlCommands {
             ("cleanup", "Clean up dictations with the model", \.cleanupEnabled),
             ("analytics", "Share anonymous usage counts", \.analyticsEnabled),
             ("betaUpdates", "Get beta updates", \.receiveBetaUpdates),
+            ("autoUpdate", "Install updates while you're away from your Mac", \.installUpdatesAutomatically),
             ("errorReports", "Send crash and error reports", \.errorReportsEnabled),
         ]
         let texts: [(String, String, ReferenceWritableKeyPath<AppSettings, String>)] = [
