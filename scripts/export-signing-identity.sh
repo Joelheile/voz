@@ -1,10 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
-IDENTITY_NAME="voz Dev"
-OUTPUT=${1:-voz-signing.p12.b64}
+export LC_ALL=C
+TEAM_ID=G2CSKBA739
+OUTPUT=${1:-developer-id.p12.b64}
 
-read -r -s -p "Password to protect the export (becomes VOZ_SIGNING_P12_PASSWORD): " PASSWORD
+read -r -s -p "Password to protect the export (becomes DEVELOPER_ID_P12_PASSWORD): " PASSWORD
 echo
 export PASSWORD
 
@@ -17,7 +18,7 @@ if [[ -z "${ALL_IDENTITIES_P12:-}" ]]; then
     security export -k login.keychain-db -t identities -f pkcs12 -P "$PASSWORD" -o "$ALL_IDENTITIES_P12"
 fi
 
-openssl pkcs12 -in "$ALL_IDENTITIES_P12" -passin env:PASSWORD -nodes -out "$WORK/all.pem"
+/usr/bin/openssl pkcs12 -in "$ALL_IDENTITIES_P12" -passin env:PASSWORD -nodes -out "$WORK/all.pem"
 awk -v dir="$WORK" '
     /-----BEGIN CERTIFICATE-----/ { file = sprintf("%s/cert-%d.pem", dir, ++count) }
     /-----BEGIN .*PRIVATE KEY-----/ { file = sprintf("%s/key-%d.pem", dir, ++count) }
@@ -27,18 +28,19 @@ awk -v dir="$WORK" '
 
 for cert in "$WORK"/cert-*.pem; do
     [[ -e "$cert" ]] || continue
-    openssl x509 -noout -subject -in "$cert" | grep -q "CN *= *$IDENTITY_NAME\$" || continue
-    public_key=$(openssl x509 -pubkey -noout -in "$cert")
+    subject=$(/usr/bin/openssl x509 -noout -subject -in "$cert")
+    [[ "$subject" == *"Developer ID Application"* && "$subject" =~ OU\ ?=\ ?$TEAM_ID ]] || continue
+    public_key=$(/usr/bin/openssl x509 -pubkey -noout -in "$cert")
     for key in "$WORK"/key-*.pem; do
         [[ -e "$key" ]] || continue
-        [[ "$(openssl pkey -pubout -in "$key")" == "$public_key" ]] || continue
-        openssl pkcs12 -export -inkey "$key" -in "$cert" -name "$IDENTITY_NAME" \
-            -passout env:PASSWORD -out "$WORK/voz.p12"
-        base64 -i "$WORK/voz.p12" | tr -d '\n' > "$OUTPUT"
-        echo "Wrote $OUTPUT. Paste its contents into the GitHub secret VOZ_SIGNING_P12, then delete the file."
+        [[ "$(/usr/bin/openssl pkey -pubout -in "$key")" == "$public_key" ]] || continue
+        /usr/bin/openssl pkcs12 -export -inkey "$key" -in "$cert" -name "Developer ID Application ($TEAM_ID)" \
+            -passout env:PASSWORD -out "$WORK/developer-id.p12"
+        base64 -i "$WORK/developer-id.p12" | tr -d '\n' > "$OUTPUT"
+        echo "Wrote $OUTPUT. Paste its contents into the GitHub secret DEVELOPER_ID_P12, then delete the file."
         exit 0
     done
 done
 
-echo "Identity '$IDENTITY_NAME' with a private key was not found." >&2
+echo "No Developer ID Application identity with a private key for team $TEAM_ID." >&2
 exit 1

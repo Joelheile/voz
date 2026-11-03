@@ -23,7 +23,9 @@ Free and open source. Your audio never leaves your Mac.
 
 ## Install
 
-macOS 26 on Apple Silicon:
+macOS 26 on Apple Silicon. [Download Voz](https://github.com/Joelheile/voz/releases/latest/download/voz.dmg), open the disk image and drag Voz into Applications.
+
+Or install from the terminal:
 
 ```
 curl -fsSL https://voz.joels.tech/install | bash

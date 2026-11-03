@@ -9,3 +9,6 @@ __pycache__/
 *.py[cod]
 CLAUDE.local.md
 .claude/settings.local.json
+*.p8
+*.p12
+*.p12.b64
