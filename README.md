@@ -152,6 +152,8 @@ Each command becomes a tool, such as `history`, `vocabulary_add` or `voz-jira_is
 ## What's new
 
 <!-- changelog -->
+- Opening Voz after an update no longer leaves an invisible old copy running
+- When an update is ready, Update appears at the bottom of the menu
 - In Hold mode, tap the hotkey to dictate hands-free or hold it to talk
 
 [See everything new](CHANGELOG.md)
