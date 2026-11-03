@@ -4,6 +4,7 @@ Newest first. To get beta changes now, turn on Beta updates under What's new in 
 
 ## In beta
 
+- Dictation starts while music plays, during meetings and with Bluetooth headphones
 - Opening Voz after an update no longer leaves an invisible old copy running
 - When an update is ready, Update appears at the bottom of the menu
 - In Hold mode, tap the hotkey to dictate hands-free or hold it to talk
