@@ -12,7 +12,7 @@ Free, open source and on your Mac. Missing a feature? Your coding agent writes i
 [![Latest release](https://img.shields.io/github/v/release/Joelheile/voz)](https://github.com/Joelheile/voz/releases/latest)
 ![macOS 26, Apple Silicon](https://img.shields.io/badge/macOS_26-Apple_Silicon-black)
 
-<a href="https://voz.tools"><img src=".github/images/demo.webp" width="720" alt="The Voz launch film: Voz beside Wispr Flow, dictation cleaned in real time, and a coding agent writing a missing feature as an extension."></a>
+<a href="https://voz.tools"><img src=".github/images/demo.webp" width="720" alt="The Voz launch film: dictation cleaned in real time, spoken commands for your calendar, todos and notes, and a coding agent building a missing feature as an extension."></a>
 
 [Website](https://voz.tools), [Extensions](https://voz.tools/extensions/)
 
