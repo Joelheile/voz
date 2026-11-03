@@ -35,18 +35,17 @@ Done when you know what is installed, what is broken, and whether an installed e
 
 ## 2. Interview
 
-Grill the user until you both picture the same extension. Ask in rounds. Each round holds every question whose answer doesn't depend on another open question. Number the questions, give your recommended answer to each, and word each so "yes" accepts it. Use your question tool if you have one. Skip what the user already told you, and look up facts yourself, such as a bundle ID with `osascript -e 'id of app "Slack"'`.
+Interview the user until you both picture the same extension. Ask one question at a time, in plain words, with two to four options and your recommended answer first. Skip what the user already told you, and look up facts yourself, such as a bundle ID with `osascript -e 'id of app "Slack"'`.
 
-Cover each branch:
+Find out:
 
-1. **Trigger**: a phrase at the end or start of a dictation, every dictation, certain apps or sites, a button, a hotkey, a dropped file
-2. **Effect**: the words Voz types, how cleanup writes, something outside Voz (an API, a file, a key press), or the model itself
-3. **Examples**: two or three real dictations and the exact result the user wants for each. These become your tests
-4. **Setup**: each token, URL or choice the user sets. Each one is a setting
-5. **Feedback and failure**: how the user knows it worked, and what happens when a service is down
-6. **Sharing**: a private file in `~/.voz/extensions`, or a package to publish on npm
+1. What starts it: a phrase, every dictation, an app, a button or a hotkey
+2. What it does: changes the text, or acts somewhere else
+3. Two or three things the user would say, and the exact result for each. These become your tests
+4. What the user sets up, such as a token. Each one is a setting
+5. Whether it stays private or gets shared on npm
 
-Done when you can say the extension in one sentence that names its trigger, the API members, its output and its settings, and the user says yes to that sentence. Write no code before that.
+Done when you can say the extension in one sentence and the user says yes. Write no code before that.
 
 ## 3. Pick
 
