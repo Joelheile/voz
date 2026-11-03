@@ -106,7 +106,7 @@ final class Dictation {
         } catch {
             session.cancel()
             Log.app.error("Recording failed to start (\((error as NSError).code, privacy: .public)): \(error.localizedDescription, privacy: .private)")
-            analytics.capture(.dictationFailed(stage: .recording, errorCode: .recorderStartFailed))
+            analytics.capture(.dictationFailed(stage: .recording, errorCode: .recorderStartFailed, status: (error as NSError).code))
             onStartFailed("Could not start recording. Check your microphone.")
             return
         }

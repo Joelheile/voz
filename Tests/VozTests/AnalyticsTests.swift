@@ -12,6 +12,23 @@ struct AnalyticsEventTests {
         #expect(AppError.accessibilityDenied.stage == "delivery")
         let interrupted = AnalyticsEvent.dictationFailed(stage: .recording, errorCode: .recorderInterrupted)
         #expect(interrupted.failure?.code == "recorder_interrupted")
+        #expect(interrupted.properties["os_status"] == nil)
+    }
+
+    @Test func recorderFailuresCarryTheSystemStatus() {
+        let failed = AnalyticsEvent.dictationFailed(stage: .recording, errorCode: .recorderStartFailed, status: -10868)
+        #expect(failed.properties["os_status"] == .integer(-10868))
+        #expect(failed.failure?.status == -10868)
+    }
+
+    @MainActor
+    @Test func hangReportsNameTheCallInProgress() {
+        #expect(MainThreadActivity.name == nil)
+        MainThreadActivity.during("recorder_start") {
+            MainThreadActivity.during("sound_cue") { #expect(MainThreadActivity.name == "sound_cue") }
+            #expect(MainThreadActivity.name == "recorder_start")
+        }
+        #expect(MainThreadActivity.name == nil)
     }
 
     @Test func errorReportsAndUsageFollowTheirOwnSetting() {

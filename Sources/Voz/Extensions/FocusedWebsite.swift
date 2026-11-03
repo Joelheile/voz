@@ -13,16 +13,21 @@ enum FocusedWebsite {
     private static let messagingTimeout: Float = 0.25
     private static let budget = Duration.milliseconds(300)
     private static let maxDepth = 64
+    private static let accessibilityQueue = DispatchQueue(label: "com.joelheile.voz.web-accessibility", qos: .utility)
 
     /// Chromium builds its web accessibility tree only when an app asks for it, so Voz asks for every running browser
     /// when extensions load and again when one comes to the front.
     /// Chrome takes about 2 seconds to apply `AXEnhancedUserInterface` and reports kAXErrorNotImplemented even when it does.
     /// Browsers built on Electron read `AXManualAccessibility` instead.
+    /// Each call can wait seconds for a busy browser, so they run on their own queue instead of freezing the main thread.
     static func enableWebAccessibility(in app: NSRunningApplication?) {
         guard let app, let bundleID = app.bundleIdentifier, chromium.contains(bundleID), AXIsProcessTrusted() else { return }
-        let element = AXUIElementCreateApplication(app.processIdentifier)
-        for attribute in ["AXEnhancedUserInterface", "AXManualAccessibility"] {
-            AXUIElementSetAttributeValue(element, attribute as CFString, kCFBooleanTrue)
+        let pid = app.processIdentifier
+        accessibilityQueue.async {
+            let element = AXUIElementCreateApplication(pid)
+            for attribute in ["AXEnhancedUserInterface", "AXManualAccessibility"] {
+                AXUIElementSetAttributeValue(element, attribute as CFString, kCFBooleanTrue)
+            }
         }
     }
 

@@ -4,7 +4,7 @@ enum AnalyticsEvent: Equatable, Sendable {
     case appLaunched(atLogin: Bool)
     case permissionResult(permission: PermissionName, granted: Bool)
     case dictationCompleted(DictationMetrics)
-    case dictationFailed(stage: DictationStage, errorCode: DictationErrorCode)
+    case dictationFailed(stage: DictationStage, errorCode: DictationErrorCode, status: Int? = nil)
     case dictationDiscarded(reason: DiscardReason)
     case modelDownload(model: SpeechModel, seconds: Int, success: Bool, bytes: Int)
     case modelLoad(model: SpeechModel, coldMs: Int)
@@ -45,8 +45,8 @@ enum AnalyticsEvent: Equatable, Sendable {
             ["permission": .text(permission.rawValue), "granted": .flag(granted)]
         case let .dictationCompleted(metrics):
             Self.properties(of: metrics)
-        case let .dictationFailed(stage, errorCode):
-            ["stage": .text(stage.rawValue), "error_code": .text(errorCode.rawValue)]
+        case let .dictationFailed(stage, errorCode, status):
+            ["stage": .text(stage.rawValue), "error_code": .text(errorCode.rawValue)].merging(status.map { ["os_status": .integer($0)] } ?? [:]) { $1 }
         case let .dictationDiscarded(reason):
             ["reason": .text(reason.rawValue)]
         case let .modelFailed(model):
@@ -74,12 +74,12 @@ enum AnalyticsEvent: Equatable, Sendable {
         }
     }
 
-    var failure: (stage: String, code: String)? {
+    var failure: (stage: String, code: String, status: Int?)? {
         switch self {
-        case let .dictationFailed(stage, errorCode): (stage.rawValue, errorCode.rawValue)
-        case .modelFailed: ("model_loading", "model_load_failed")
-        case .modelDownload(_, _, false, _): ("model_download", "model_download_failed")
-        case let .extensionFailed(change, _, failure): ("extension_\(change.rawValue)", failure.rawValue)
+        case let .dictationFailed(stage, errorCode, status): (stage.rawValue, errorCode.rawValue, status)
+        case .modelFailed: ("model_loading", "model_load_failed", nil)
+        case .modelDownload(_, _, false, _): ("model_download", "model_download_failed", nil)
+        case let .extensionFailed(change, _, failure): ("extension_\(change.rawValue)", failure.rawValue, nil)
         default: nil
         }
     }

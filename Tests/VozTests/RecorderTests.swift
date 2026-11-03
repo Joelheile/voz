@@ -25,3 +25,14 @@ private struct EngineRefused: Error {}
     }
     #expect(attempts == 1)
 }
+
+@MainActor
+@Test func chosenMicrophoneThatRefusesFallsBackToTheSystemDefault() throws {
+    var attempts: [String] = []
+    let started = try Recorder.startCapture(prepared: "prepared", fresh: { "chosen" }, fallback: { "default" }) { capture in
+        attempts.append(capture)
+        if capture != "default" { throw EngineRefused() }
+    }
+    #expect(started == "default")
+    #expect(attempts == ["prepared", "chosen", "default"])
+}
