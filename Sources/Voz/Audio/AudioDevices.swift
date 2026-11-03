@@ -10,13 +10,22 @@ struct Microphone: Hashable, Sendable {
 enum InputDevice {
     static func microphones() -> [Microphone] {
         allDevices().filter(hasInputStreams).compactMap { device in
-            guard let uid = string(kAudioDevicePropertyDeviceUID, of: device), let name = name(of: device) else { return nil }
+            guard let uid = uid(of: device), let name = name(of: device) else { return nil }
             return Microphone(uid: uid, name: name, kind: kind(of: device))
         }
     }
 
     static func defaultName() -> String? {
         defaultInput().flatMap(name)
+    }
+
+    static func uid(of device: AudioDeviceID) -> String? {
+        string(kAudioDevicePropertyDeviceUID, of: device)
+    }
+
+    /// The chosen microphone, else the Mac's own while the default is Bluetooth, which would drop headphones to call quality
+    static func forRecording(uid: String) -> AudioDeviceID? {
+        connected(uid: uid) ?? builtInIfDefaultIsBluetooth() ?? defaultInput()
     }
 
     private static func name(of device: AudioDeviceID) -> String? {
