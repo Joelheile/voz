@@ -2,9 +2,11 @@
 import CoreAudio
 import Foundation
 
-struct MicrophoneError: LocalizedError {
+struct MicrophoneError: LocalizedError, CustomNSError {
     let step: String
     let status: OSStatus
+
+    var errorCode: Int { Int(status) }
 
     var errorDescription: String? { "Voz can't use the microphone: \(step) returned \(status)" }
 }

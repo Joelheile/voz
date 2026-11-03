@@ -246,6 +246,6 @@ enum SoundCues {
             return false
         }
         current = sound
-        return sound.play()
+        return MainThreadActivity.during("sound_cue") { sound.play() }
     }
 }

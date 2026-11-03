@@ -33,3 +33,20 @@ final class HangWatchdog: Sendable {
         }
     }
 }
+
+/// Names the slow system call the main thread is in, so a hang report says where it froze. Names are fixed, never user data.
+enum MainThreadActivity {
+    private static let current = Mutex<StaticString?>(nil)
+
+    static var name: String? { current.withLock { $0.map { "\($0)" } } }
+
+    @MainActor
+    static func during<T>(_ name: StaticString, _ body: () throws -> T) rethrows -> T {
+        let outer = current.withLock { current in
+            defer { current = name }
+            return current
+        }
+        defer { current.withLock { $0 = outer } }
+        return try body()
+    }
+}

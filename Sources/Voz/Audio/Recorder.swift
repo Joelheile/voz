@@ -97,7 +97,7 @@ final class Recorder {
         dropStaleCapture()
         guard capture == nil else { return }
         do {
-            capture = try makeCapture()
+            capture = try MainThreadActivity.during("recorder_prepare") { try makeCapture() }
         } catch {
             Log.app.error("Recorder prepare failed: \(error.localizedDescription, privacy: .private)")
         }
@@ -110,7 +110,10 @@ final class Recorder {
         level.store(0)
         buffer.begin(onSamples: onSamples)
         do {
-            capture = try Self.startCapture(prepared: prepared, fresh: makeCapture) { try $0.start() }
+            let systemDefault: (() throws -> MicrophoneQueue)? = selectedInput() == nil ? nil : { try self.makeCapture(device: nil) }
+            capture = try MainThreadActivity.during("recorder_start") {
+                try Self.startCapture(prepared: prepared, fresh: { try self.makeCapture() }, fallback: systemDefault) { try $0.start() }
+            }
         } catch {
             _ = buffer.end()
             throw error
@@ -118,8 +121,9 @@ final class Recorder {
         isRecording = true
     }
 
-    /// A prepared queue can refuse to start after sleep or a device switch.
-    static func startCapture<C>(prepared: C?, fresh: () throws -> C, start: (C) throws -> Void) throws -> C {
+    /// A prepared queue can refuse to start after sleep or a device switch. A chosen microphone that refuses outright
+    /// falls back to the system default, so the dictation still records.
+    static func startCapture<C>(prepared: C?, fresh: () throws -> C, fallback: (() throws -> C)? = nil, start: (C) throws -> Void) throws -> C {
         if let prepared {
             do {
                 try start(prepared)
@@ -129,14 +133,22 @@ final class Recorder {
                 Log.app.notice("Prepared microphone refused to start (\(code, privacy: .public)), using a fresh one")
             }
         }
-        let capture = try fresh()
-        try start(capture)
-        return capture
+        do {
+            let capture = try fresh()
+            try start(capture)
+            return capture
+        } catch {
+            guard let fallback else { throw error }
+            Log.app.notice("Microphone refused to start (\((error as NSError).code, privacy: .public)), using the system default")
+            let capture = try fallback()
+            try start(capture)
+            return capture
+        }
     }
 
     /// A stopped queue isn't reused, so this prepares the next one right away.
     func stop() -> [Float] {
-        capture?.stop()
+        MainThreadActivity.during("recorder_stop") { capture?.stop() }
         capture = nil
         isRecording = false
         let samples = buffer.end()
@@ -167,8 +179,11 @@ final class Recorder {
     }
 
     private func makeCapture() throws -> MicrophoneQueue {
+        try makeCapture(device: selectedInput())
+    }
+
+    private func makeCapture(device: AudioDeviceID?) throws -> MicrophoneQueue {
         let buffer = buffer, level = level
-        let device = selectedInput()
         return try MicrophoneQueue(device: device, onDeviceLost: { [weak self] in
             Task { @MainActor in self?.microphoneLost(device) }
         }) { samples in

@@ -65,21 +65,26 @@ final class TextOutput {
     }
 
     private func write(_ text: String, to pasteboard: NSPasteboard, markers: [NSPasteboard.PasteboardType]) -> Int {
-        pasteboard.clearContents()
-        let item = NSPasteboardItem()
-        item.setString(text, forType: .string)
-        for marker in markers { item.setData(Data(), forType: marker) }
-        pasteboard.writeObjects([item])
-        return pasteboard.changeCount
+        MainThreadActivity.during("clipboard_write") {
+            pasteboard.clearContents()
+            let item = NSPasteboardItem()
+            item.setString(text, forType: .string)
+            for marker in markers { item.setData(Data(), forType: marker) }
+            pasteboard.writeObjects([item])
+            return pasteboard.changeCount
+        }
     }
 
+    /// Reading another app's promised clipboard data waits for that app, so this can stall the main thread.
     private static func snapshot(of pasteboard: NSPasteboard) -> [[NSPasteboard.PasteboardType: Data]] {
-        (pasteboard.pasteboardItems ?? []).map { item in
-            var stored: [NSPasteboard.PasteboardType: Data] = [:]
-            for type in item.types {
-                if let data = item.data(forType: type) { stored[type] = data }
+        MainThreadActivity.during("clipboard_snapshot") {
+            (pasteboard.pasteboardItems ?? []).map { item in
+                var stored: [NSPasteboard.PasteboardType: Data] = [:]
+                for type in item.types {
+                    if let data = item.data(forType: type) { stored[type] = data }
+                }
+                return stored
             }
-            return stored
         }
     }
 

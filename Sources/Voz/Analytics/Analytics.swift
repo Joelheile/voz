@@ -11,7 +11,7 @@ final class Analytics {
 
     private let installID: UUID
     private let watchdog = HangWatchdog(seconds: 5) {
-        Analytics.report(.appHang)
+        Analytics.report(.appHang, details: ["activity": MainThreadActivity.name ?? "unknown"])
         PostHogSDK.shared.flush()
     }
     private var isSetUp = false
@@ -44,16 +44,18 @@ final class Analytics {
             properties.merge(SystemContext.properties) { eventValue, _ in eventValue }
             PostHogSDK.shared.capture(event.name, properties: properties)
         }
-        if let failure = event.failure { Self.report(stage: failure.stage, code: failure.code) }
+        if let failure = event.failure {
+            Self.report(stage: failure.stage, code: failure.code, details: failure.status.map { ["os_status": $0] } ?? [:])
+        }
     }
 
-    nonisolated static func report(_ error: AppError) {
-        report(stage: error.stage, code: error.rawValue)
+    nonisolated static func report(_ error: AppError, details: [String: Any] = [:]) {
+        report(stage: error.stage, code: error.rawValue, details: details)
     }
 
-    private nonisolated static func report(stage: String, code: String) {
+    private nonisolated static func report(stage: String, code: String, details: [String: Any] = [:]) {
         guard reportsErrors.load(ordering: .relaxed) else { return }
-        PostHogSDK.shared.capture("$exception", properties: [
+        PostHogSDK.shared.capture("$exception", properties: details.merging([
             "$exception_list": [["type": "VozError", "value": code, "mechanism": ["type": "handled", "handled": true]]],
             "$exception_fingerprint": "voz.\(stage).\(code)",
             "stage": stage,
@@ -61,7 +63,7 @@ final class Analytics {
             "app_version": SystemContext.appVersion,
             "$process_person_profile": false,
             "$geoip_disable": true,
-        ])
+        ]) { $1 })
     }
 
     /// The SDK also sends crash reports it captured itself, so consent is checked once more right before anything leaves.
