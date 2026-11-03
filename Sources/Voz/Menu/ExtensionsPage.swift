@@ -5,6 +5,7 @@ struct ExtensionsPage: View {
     @ObservedObject var model: ExtensionsModel
     @ObservedObject var catalog: ExtensionCatalog
     @ObservedObject var settings: AppSettings
+    let toast: (String) -> Void
     let back: () -> Void
 
     var body: some View {
@@ -16,7 +17,7 @@ struct ExtensionsPage: View {
                 ListingDetail(listing: listing, model: model)
                     .transition(.opacity)
             } else {
-                ExtensionList(model: model, catalog: catalog, back: back)
+                ExtensionList(model: model, catalog: catalog, toast: toast, back: back)
                     .transition(.opacity)
             }
         }
@@ -29,31 +30,28 @@ struct ExtensionsPage: View {
 private struct ExtensionList: View {
     @ObservedObject var model: ExtensionsModel
     @ObservedObject var catalog: ExtensionCatalog
+    let toast: (String) -> Void
     let back: () -> Void
     @FocusState private var searchFocused: Bool
-    @State private var copiedCommand = false
+    @State private var copiedPrompt = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             PageBar(title: "Extensions", back: back) {
                 HStack(spacing: 4) {
                     IconButton(icon: .folderOpen, help: "Open extensions folder", action: model.openExtensionsFolder)
-                    Button(action: copyClaudeCommand) {
+                    Button(action: copyBuildPrompt) {
                         ZStack {
-                            crossfading("Create", visible: !copiedCommand)
-                            crossfading("Copied", visible: copiedCommand)
+                            crossfading("Build your own", visible: !copiedPrompt)
+                            crossfading("Copied", visible: copiedPrompt)
                         }
                     }
                     .buttonStyle(.pill(.accent, .small))
                     .fixedSize()
-                    .help("Copy a prompt that has Claude Code build an extension with you")
+                    .help("Copy a prompt that has your coding agent build an extension with you")
                 }
             }
             SearchField(text: $model.query, prompt: "Search extensions", focused: $searchFocused)
-            if copiedCommand {
-                PageNote(text: "Prompt copied. Paste it into Terminal to build your extension with Claude Code.")
-                    .transition(.opacity)
-            }
             TabBar(tabs: ExtensionsModel.Tab.allCases, selection: $model.tab)
             MessageView(model: model)
             if let removed = model.removed { undoBar(removed) }
@@ -67,7 +65,6 @@ private struct ExtensionList: View {
             }
             .padding(.horizontal, -8)
         }
-        .animation(Theme.Motion.section, value: copiedCommand)
         .onAppear { searchFocused = true }
     }
 
@@ -156,12 +153,13 @@ private struct ExtensionList: View {
         .transition(.opacity)
     }
 
-    private func copyClaudeCommand() {
-        guard model.copyClaudeCommand() else { return }
-        copiedCommand = true
+    private func copyBuildPrompt() {
+        guard model.copyBuildPrompt() else { return }
+        toast("Prompt copied. Paste it into Claude Code, Codex or any coding agent.")
+        copiedPrompt = true
         Task {
             try? await Task.sleep(for: .seconds(4))
-            copiedCommand = false
+            copiedPrompt = false
         }
     }
 

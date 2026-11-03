@@ -10,7 +10,7 @@ Capitalized folders follow SwiftPM and app bundle conventions. Lowercase folders
 - `Tests/VozTests`: unit tests. `Tests/Fixtures` holds cases for `voz --eval`.
 - `Resources`: files `scripts/make-app.sh` copies into `voz.app`: Info.plist, icons, sounds, fonts and the extension host in `Resources/Extensions`.
 - `scripts`: build, test, signing and release scripts used locally and by `.github/workflows`.
-- `examples`: published sample extensions, linked from `EXTENSIONS.md`.
+- `examples`: published sample extensions, linked from the extension API reference.
 - `install.sh`, `appcast.xml`: installer and update feed. See release hazards.
 
 ## Code map
@@ -29,8 +29,8 @@ One SwiftPM executable target, `Sources/Voz`, grouped by feature. `Tests/VozTest
 
 - Builds must work with the Command Line Tools on Apple Silicon and macOS 26. Xcode-only tools are not available locally.
 - Extension failures must not block dictation. Text-changing hooks have deadlines. Observation hooks do not delay delivery.
-- Extension API only grows: since `apiVersion` 4, never remove or change a member. When you add one, bump `apiVersion` in `host.ts` and `voz.d.ts` (`voz new` copies it into the template), and add a row to the Versions table in `EXTENSIONS.md`. Older surfaces live in `versionChanges` in `host.ts`, each with a test that loads a package declaring that version. An API with "no users" can still have published ones: search npm for the `voz-package` keyword first. Packages written for a newer API still load, so extensions check for new members (`if (ctx.ask)`) instead of raising `apiVersion`. Document new members that way.
-- Without installed extensions, Bun stays absent. Extensions run unsandboxed in a separate process. Read `EXTENSIONS.md` before you change their interface.
+- Extension API only grows: since `apiVersion` 4, never remove or change a member. When you add one, bump `apiVersion` in `host.ts` and `voz.d.ts` (`voz new` copies it into the template), and add a row to the Versions table in `Resources/Extensions/voz-extension/reference.md`. Older surfaces live in `versionChanges` in `host.ts`, each with a test that loads a package declaring that version. An API with "no users" can still have published ones: search npm for the `voz-package` keyword first. Packages written for a newer API still load, so extensions check for new members (`if (ctx.ask)`) instead of raising `apiVersion`. Document new members that way.
+- Without installed extensions, Bun stays absent. Extensions run unsandboxed in a separate process. Read the voz-extension skill in `Resources/Extensions/voz-extension` before you change their interface. It is the only extension guide: `voz guide`, `~/.voz` and `voz new` folders all get it from there.
 - Keep transcript text, vocabulary and app names out of telemetry. Usage analytics require opt-in. Read the README privacy section before you change privacy behavior.
 - Keep the native menu bar UI and its theme. Add optional behavior through extension primitives.
 - Test files cannot import `Testing` and `Foundation` together under the Command Line Tools. Put Foundation helpers in `Tests/VozTests/TestSupport.swift`.
@@ -78,4 +78,4 @@ Voz is a dictation app that people and agents drive the same way. Everything you
 - `install.sh` and `appcast.xml` stay at the repo root. The landing page and shipped apps link to them.
 - Keep `disable-library-validation` until every release is notarized with a Developer ID.
 
-Local research and plans go in the gitignored `docs/`. Public docs are `README.md` and `EXTENSIONS.md`.
+Local research and plans go in the gitignored `docs/`. Public docs are `README.md` and the voz-extension skill. `EXTENSIONS.md` stays as a pointer, because shipped apps link to it.

@@ -23,15 +23,10 @@ final class ExtensionsModel: ObservableObject {
 
     private static let search = URL(string: "https://registry.npmjs.org/-/v1/search?text=keywords:voz-package&size=250")!
     private static let undoWindow: Duration = .seconds(5)
-    nonisolated static let claudeCommand = """
-    cd ~ && claude 'I want to build a Voz extension. Voz is a Mac dictation app. An extension is a TypeScript npm package that Voz runs with Bun, and it can change or act on what I dictate.
+    nonisolated static let buildPrompt = """
+    Build a Voz extension with me. Voz is my Mac dictation app, and extensions are TypeScript that it runs with Bun.
 
-    1. Read https://raw.githubusercontent.com/Joelheile/voz/main/EXTENSIONS.md first. It is the API reference, and its first table maps ideas to the primitive that fits.
-    2. Interview me with multiple-choice questions until you can say in one sentence what the extension does: what I say, what happens, and what it needs, such as an app, a setting or the on-device model. Write no code before that.
-    3. Run voz new with a name that starts with voz-, then work in the folder it creates. Follow AGENTS.md there, and read voz.d.ts for the exact types. Copy the style of https://github.com/Joelheile/voz/tree/main/examples.
-    4. Put the logic that decides things in plain functions with bun test tests. Keep index.ts thin. Fix causes: no empty catch blocks or made-up fallback values.
-    5. Drive Voz with its CLI, and run voz help to see every command. If it says Voz is not running, run voz start. voz extensions shows what loaded and any error, voz config <name> <key> <value> fills in settings, voz enable and voz disable turn extensions on and off, and voz <name> <id> runs a tool or action.
-    6. Done means bun test passes and voz dev . loads it with no errors in voz logs --extensions. Run voz dev in the background, because it keeps running. Show me the commands you ran and their output, then give me one sentence to dictate to try it.'
+    Use the voz-extension skill. If you don't have it, run voz guide and follow what it prints. Read Voz's current state first, then interview me about what I want before you write any code.
     """
     private let home: VozHome
     private let analytics: Analytics
@@ -210,7 +205,7 @@ final class ExtensionsModel: ObservableObject {
         }
     }
 
-    func copyClaudeCommand() -> Bool {
+    func copyBuildPrompt() -> Bool {
         do {
             try CommandLineTool.install()
         } catch CommandLineToolError.cancelled {
@@ -221,7 +216,7 @@ final class ExtensionsModel: ObservableObject {
             return false
         }
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(Self.claudeCommand, forType: .string)
+        NSPasteboard.general.setString(Self.buildPrompt, forType: .string)
         message = nil
         return true
     }

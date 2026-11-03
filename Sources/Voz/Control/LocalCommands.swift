@@ -50,9 +50,11 @@ enum LocalCommands {
 
     private static var guide: ControlCommand {
         ControlCommand(name: "guide", summary: "Print the guide to building extensions, written for you and your coding agent", input: .object([]), readOnly: true) { _ in
-            guard let text = try? String(contentsOf: ExtensionService.resources.appendingPathComponent("AGENTS.md"), encoding: .utf8) else {
+            let skill = ExtensionService.resources.appendingPathComponent(VozHome.skillName, isDirectory: true)
+            guard let guide = try? String(contentsOf: skill.appendingPathComponent("SKILL.md"), encoding: .utf8) else {
                 throw ControlError.failed("Voz could not find its extension guide. Reinstall Voz from voz.joels.tech.")
             }
+            let text = guide + "\nreference.md is in \(skill.path).\n"
             return ControlOutput(.string(text), text: text)
         }
     }
@@ -119,7 +121,7 @@ enum LocalCommands {
             let here = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
             let folder = try ExtensionTemplate.create(named: arguments["name"]?.string ?? "", in: here, from: ExtensionService.resources)
             let next = [
-                "Created \(folder.path). AGENTS.md there explains how to build it. Next:",
+                "Created \(folder.path). Ask your coding agent there to use the voz-extension skill. Next:",
                 "  voz dev \(folder.lastPathComponent)",
                 "  dictate \"say hello\" in any app",
                 "  npm publish when it works",
