@@ -153,6 +153,7 @@ enum DictationStage: String, Sendable {
 enum DictationErrorCode: String, Sendable {
     case microphoneDenied = "microphone_denied"
     case recorderStartFailed = "recorder_start_failed"
+    case recorderInterrupted = "recorder_interrupted"
     case transcriptionFailed = "transcription_failed"
 }
 

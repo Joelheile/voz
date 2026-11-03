@@ -86,6 +86,7 @@ final class Recorder {
     private(set) var isRecording = false
     let level = LiveLevel()
     var onSamples: (@Sendable ([Float]) -> Void)?
+    var onInterrupted: (@MainActor () -> Void)?
 
     init(preferredInput: @escaping @MainActor () -> String = { "" }) {
         self.preferredInput = preferredInput
@@ -148,9 +149,29 @@ final class Recorder {
         if let capture, capture.device != selectedInput() { self.capture = nil }
     }
 
+    /// Keeps recording on the next microphone, else ends the dictation instead of recording silence
+    private func microphoneLost(_ device: AudioDeviceID?) {
+        guard let capture, capture.device == device else { return }
+        self.capture = nil
+        guard isRecording else { return }
+        Log.app.notice("Microphone went away while recording, switching to the next one")
+        level.store(0)
+        do {
+            let replacement = try makeCapture()
+            try replacement.start()
+            self.capture = replacement
+        } catch {
+            Log.app.error("Microphone switch failed: \(error.localizedDescription, privacy: .private)")
+            onInterrupted?()
+        }
+    }
+
     private func makeCapture() throws -> MicrophoneQueue {
         let buffer = buffer, level = level
-        return try MicrophoneQueue(device: selectedInput()) { samples in
+        let device = selectedInput()
+        return try MicrophoneQueue(device: device, onDeviceLost: { [weak self] in
+            Task { @MainActor in self?.microphoneLost(device) }
+        }) { samples in
             level.store(AudioLevel.rms(of: samples))
             buffer.append(samples)
         }

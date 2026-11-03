@@ -19,8 +19,15 @@ final class MicrophoneQueue: @unchecked Sendable {
     /// Nil follows the system default input
     let device: AudioDeviceID?
     private let queue: AudioQueueRef
+    private let callbacks: DispatchQueue
+    private let deviceListener: AudioObjectPropertyListenerBlock?
 
-    init(device: AudioDeviceID?, onSamples: @escaping @Sendable ([Float]) -> Void) throws {
+    /// The queue stops delivering without an error when its device goes away, so `onDeviceLost` reports that
+    init(
+        device: AudioDeviceID?,
+        onDeviceLost: (@Sendable () -> Void)? = nil,
+        onSamples: @escaping @Sendable ([Float]) -> Void
+    ) throws {
         var format = AudioStreamBasicDescription(
             mSampleRate: RecordingFilter.sampleRate,
             mFormatID: kAudioFormatLinearPCM,
@@ -56,9 +63,21 @@ final class MicrophoneQueue: @unchecked Sendable {
         }
         self.device = device
         queue = created
+        self.callbacks = callbacks
+        if let device, let onDeviceLost {
+            let listener: AudioObjectPropertyListenerBlock = { _, _ in onDeviceLost() }
+            var address = Self.aliveAddress
+            deviceListener = AudioObjectAddPropertyListenerBlock(device, &address, callbacks, listener) == noErr ? listener : nil
+        } else {
+            deviceListener = nil
+        }
     }
 
     deinit {
+        if let device, let deviceListener {
+            var address = Self.aliveAddress
+            AudioObjectRemovePropertyListenerBlock(device, &address, callbacks, deviceListener)
+        }
         AudioQueueDispose(queue, true)
     }
 
@@ -68,6 +87,14 @@ final class MicrophoneQueue: @unchecked Sendable {
 
     func stop() {
         AudioQueueStop(queue, true)
+    }
+
+    private static var aliveAddress: AudioObjectPropertyAddress {
+        AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceIsAlive,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
     }
 
     private static func use(_ device: AudioDeviceID, on queue: AudioQueueRef) throws {
