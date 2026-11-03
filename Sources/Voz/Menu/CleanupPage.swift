@@ -141,8 +141,7 @@ struct CleanupPromptPage: View {
                 .scrollContentBackground(.hidden)
                 .padding(8)
                 .frame(height: 320)
-                .background(Theme.canvas, in: RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous).strokeBorder(Theme.hairline))
+                .background(Theme.selected, in: RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous))
         }
     }
 }

@@ -6,8 +6,8 @@ struct SectionLabel: View {
 
     var body: some View {
         Text(text)
-            .font(.meta)
-            .foregroundStyle(Theme.inkSecondary)
+            .font(.ui(11, weight: .semibold))
+            .foregroundStyle(Theme.inkTertiary)
     }
 }
 
@@ -21,7 +21,7 @@ enum PillKind {
         switch self {
         case .ink: Theme.ink
         case .accent: Theme.accent
-        case .quiet: Theme.selected
+        case .quiet: hovering ? Theme.selectedStrong : Theme.selected
         case .outline: hovering ? Theme.selected : .clear
         }
     }
@@ -45,8 +45,8 @@ enum PillSize {
 
     var height: CGFloat {
         switch self {
-        case .small: 28
-        case .regular: 34
+        case .small: 24
+        case .regular: 30
         }
     }
 }
@@ -68,15 +68,19 @@ private struct PillBody: View {
     let isEnabled: Bool
     @State private var hovering = false
 
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: size == .small ? 7 : Theme.Radius.control, style: .continuous)
+    }
+
     var body: some View {
         configuration.label
             .font(.ui(size == .small ? 12 : 13, weight: .medium))
             .foregroundStyle(kind.text)
-            .padding(.horizontal, size.height * 0.5)
+            .padding(.horizontal, size == .small ? 10 : 12)
             .frame(height: size.height)
-            .background(kind.fill(hovering: hovering), in: Capsule())
-            .overlay(Capsule().strokeBorder(kind.stroke))
-            .contentShape(Capsule())
+            .background(kind.fill(hovering: hovering), in: shape)
+            .overlay(shape.strokeBorder(kind.stroke))
+            .contentShape(shape)
             .opacity(isEnabled ? 1 : 0.4)
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(Theme.Motion.press, value: configuration.isPressed)
@@ -127,9 +131,9 @@ struct IconButton: View {
 
     var body: some View {
         Button(action: action) {
-            Icon(icon, size: 14)
+            Icon(icon, size: 15)
                 .foregroundStyle(hovering ? Theme.ink : Theme.inkSecondary)
-                .frame(width: 30, height: 30)
+                .frame(width: 28, height: 28)
                 .background(hovering ? Theme.selected : .clear, in: RoundedRectangle(cornerRadius: Theme.Radius.control))
                 .contentShape(Rectangle())
         }
@@ -142,10 +146,16 @@ struct IconButton: View {
 
 extension View {
     func fieldBackground(_ size: PillSize = .regular) -> some View {
-        padding(.horizontal, 12)
+        padding(.horizontal, 10)
             .frame(height: size.height)
-            .background(Theme.canvas, in: Capsule())
-            .overlay(Capsule().strokeBorder(Theme.hairline))
+            .background(Theme.selected, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+    }
+
+    func groupCard(padding: CGFloat = 12) -> some View {
+        self.padding(padding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.group, in: RoundedRectangle(cornerRadius: Theme.Radius.group, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.group, style: .continuous).strokeBorder(Theme.hairline))
     }
 
     func popIn(from scale: CGFloat = 0.6) -> some View {
@@ -245,7 +255,7 @@ struct PageBar<Trailing: View>: View {
             IconButton(icon: .chevronLeft, help: "Back", action: back)
                 .keyboardShortcut("[", modifiers: .command)
             Text(title)
-                .font(.display(17))
+                .font(.ui(15, weight: .semibold))
                 .foregroundStyle(Theme.ink)
             Spacer(minLength: 0)
             trailing
@@ -277,27 +287,54 @@ struct PanelGroup<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            if let title { SectionLabel(text: title) }
-            VStack(spacing: 0) { content }
+        VStack(alignment: .leading, spacing: 6) {
+            if let title { SectionLabel(text: title).padding(.leading, 4) }
+            VStack(spacing: 0) {
+                Group(subviews: content) { rows in
+                    ForEach(rows) { row in
+                        if row.id != rows.first?.id { RowDivider().padding(.leading, 12) }
+                        row.padding(.horizontal, 12)
+                    }
+                }
+            }
+            .groupCard(padding: 0)
         }
+    }
+}
+
+struct IconTile: View {
+    let icon: LucideIconName
+    let tint: Color
+
+    init(_ icon: LucideIconName, _ tint: Color) {
+        self.icon = icon
+        self.tint = tint
+    }
+
+    var body: some View {
+        Icon(icon, size: 13, strokeWidth: 1.75)
+            .foregroundStyle(.white)
+            .frame(width: 22, height: 22)
+            .background(tint.gradient, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
 }
 
 struct PanelRow<Control: View>: View {
     let title: String
     var detail: String?
+    var tile: IconTile?
     @ViewBuilder var control: Control
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
+            tile
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
                 if let detail {
                     Text(detail)
-                        .font(.meta)
-                        .lineSpacing(2)
-                        .foregroundStyle(Theme.inkSecondary)
+                        .font(.ui(11.5))
+                        .lineSpacing(1)
+                        .foregroundStyle(Theme.inkTertiary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -305,17 +342,18 @@ struct PanelRow<Control: View>: View {
             control
         }
         .frame(minHeight: Theme.Size.row)
-        .padding(.vertical, 2)
+        .padding(.vertical, 4)
     }
 }
 
 struct LinkRow: View {
     let title: String
     let value: String
+    var tile: IconTile?
     let action: () -> Void
 
     var body: some View {
-        ActionRow(title: title, value: value, action: action) { hovering in
+        ActionRow(title: title, value: value, tile: tile, action: action) { hovering in
             Icon(.chevronRight, size: 13)
                 .foregroundStyle(hovering ? Theme.ink : Theme.inkTertiary)
         }
@@ -325,6 +363,7 @@ struct LinkRow: View {
 struct ActionRow<Trailing: View>: View {
     let title: String
     let value: String
+    var tile: IconTile?
     let action: () -> Void
     @ViewBuilder var trailing: (Bool) -> Trailing
     @State private var hovering = false
@@ -332,13 +371,14 @@ struct ActionRow<Trailing: View>: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
+                if let tile { tile.padding(.trailing, 4) }
                 Text(title).font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
                 Spacer(minLength: 0)
-                Text(value).font(.meta).foregroundStyle(Theme.inkSecondary)
+                Text(value).font(.meta).foregroundStyle(Theme.inkTertiary)
                 trailing(hovering)
             }
             .frame(minHeight: Theme.Size.row)
-            .padding(.vertical, 2)
+            .padding(.vertical, 4)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -348,8 +388,8 @@ struct ActionRow<Trailing: View>: View {
 }
 
 extension ActionRow where Trailing == EmptyView {
-    init(title: String, value: String, action: @escaping () -> Void) {
-        self.init(title: title, value: value, action: action) { _ in EmptyView() }
+    init(title: String, value: String, tile: IconTile? = nil, action: @escaping () -> Void) {
+        self.init(title: title, value: value, tile: tile, action: action) { _ in EmptyView() }
     }
 }
 
@@ -381,7 +421,7 @@ struct TabBar<Tab: Hashable & RawRepresentable<String>>: View {
                     Text(tab.rawValue)
                         .font(.ui(12, weight: .medium))
                         .foregroundStyle(tab == selection ? Theme.ink : Theme.inkSecondary)
-                        .frame(maxWidth: .infinity, minHeight: 26)
+                        .frame(maxWidth: .infinity, minHeight: 22)
                         .background {
                             if tab == selection {
                                 RoundedRectangle(cornerRadius: Theme.Radius.control - 2, style: .continuous)
@@ -407,7 +447,7 @@ struct AccentSwitchStyle: ToggleStyle {
     func makeBody(configuration: Configuration) -> some View {
         Button { configuration.isOn.toggle() } label: {
             Capsule()
-                .fill(configuration.isOn ? Theme.accent : Theme.selected)
+                .fill(configuration.isOn ? Theme.accent : Theme.selectedStrong)
                 .frame(width: 30, height: 18)
                 .overlay(alignment: configuration.isOn ? .trailing : .leading) {
                     Circle()

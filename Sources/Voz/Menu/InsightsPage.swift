@@ -11,21 +11,22 @@ struct InsightsPage: View {
     private var loaded: Bool { !model.stats.days.isEmpty }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 10) {
             PageBar(title: "Insights", back: back) {
                 StarButton(title: "Star") { settings.starPromptDismissed = true }
             }
-            StreakSection(stats: model.stats, revealed: revealed)
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 10) {
                 TabBar(tabs: StatsPeriod.allCases, selection: $period)
-                WordsHeadline(stats: stats)
-                HStack(alignment: .top, spacing: Theme.Spacing.item) {
-                    PaceGauge(wordsPerMinute: stats.wordsPerMinute, revealed: revealed)
-                    TimeSaved(stats: stats, revealed: revealed)
+                WordsHeadline(stats: stats).padding(.horizontal, 4).padding(.vertical, 6)
+                HStack(alignment: .top, spacing: 8) {
+                    PaceGauge(wordsPerMinute: stats.wordsPerMinute, revealed: revealed).frame(maxHeight: .infinity, alignment: .top).groupCard()
+                    TimeSaved(stats: stats, revealed: revealed).frame(maxHeight: .infinity, alignment: .top).groupCard()
                 }
-                if !stats.topApps.isEmpty { TopApps(apps: stats.topApps) }
+                .fixedSize(horizontal: false, vertical: true)
+                if !stats.topApps.isEmpty { TopApps(apps: stats.topApps).groupCard() }
             }
             .animation(Theme.Motion.section, value: period)
+            StreakSection(stats: model.stats, revealed: revealed).groupCard()
         }
         .animation(Theme.Motion.section, value: model.stats)
         .onAppear { revealed = loaded }

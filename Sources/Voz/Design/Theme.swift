@@ -2,31 +2,35 @@ import AppKit
 import SwiftUI
 
 enum Theme {
-    static let canvas = Color(light: 0xF6F4EF, dark: 0x161618)
-    static let surface = Color(light: 0xFFFFFF, dark: 0x0E0E10)
-    static let raised = Color(light: 0xFFFFFF, dark: 0x3A3A3E)
-    static let ink = Color(light: 0x141414, dark: 0xF2F0EB)
-    static let inkSecondary = Color(light: 0x5F5C55, dark: 0xA5A29A)
-    static let inkTertiary = Color(light: 0x7B7870, dark: 0x7F7C75)
-    static let hairline = Color(light: 0x141414, dark: 0xFFFFFF, lightAlpha: 0.08, darkAlpha: 0.09)
-    static let selected = Color(light: 0xE9E6DF, dark: 0xFFFFFF, lightAlpha: 1, darkAlpha: 0.09)
-    static let accent = Color(light: 0x0057FF, dark: 0x2E6BFF)
+    static let canvas = Color(light: 0xF2F2F4, dark: 0x1C1C1F)
+    static let surface = Color(light: 0xFBFBFC, dark: 0x1E1E21)
+    static let raised = Color(light: 0xFFFFFF, dark: 0xFFFFFF, lightAlpha: 1, darkAlpha: 0.17)
+    static let group = Color(light: 0xFFFFFF, dark: 0xFFFFFF, lightAlpha: 0.62, darkAlpha: 0.05)
+    static let ink = Color(light: 0x1D1D1F, dark: 0xF5F5F7)
+    static let inkSecondary = Color(light: 0x000000, dark: 0xFFFFFF, lightAlpha: 0.56, darkAlpha: 0.6)
+    static let inkTertiary = Color(light: 0x000000, dark: 0xFFFFFF, lightAlpha: 0.4, darkAlpha: 0.4)
+    static let hairline = Color(light: 0x000000, dark: 0xFFFFFF, lightAlpha: 0.08, darkAlpha: 0.08)
+    static let selected = Color(light: 0x000000, dark: 0xFFFFFF, lightAlpha: 0.05, darkAlpha: 0.08)
+    static let selectedStrong = Color(light: 0x000000, dark: 0xFFFFFF, lightAlpha: 0.11, darkAlpha: 0.16)
+    static let accent = Color(light: 0x007AFF, dark: 0x0A84FF)
     static let recording = Color(light: 0xFF3B30, dark: 0xFF453A)
+    static let success = Color(light: 0x28CD41, dark: 0x30D158)
     static let failure = Color(nsColor: .systemOrange)
     static let onInk = Color(light: 0xFFFFFF, dark: 0x141414)
 
     enum Radius {
         static let control: CGFloat = 8
-        static let row: CGFloat = 12
-        static let panel: CGFloat = 22
+        static let row: CGFloat = 10
+        static let group: CGFloat = 12
+        static let panel: CGFloat = 18
     }
 
     enum Spacing {
-        static let item: CGFloat = 16
+        static let item: CGFloat = 12
     }
 
     enum Size {
-        static let row: CGFloat = 36
+        static let row: CGFloat = 38
     }
 
     enum Motion {

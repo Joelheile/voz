@@ -65,7 +65,6 @@ private struct ExtensionList: View {
                     }
                 }
             }
-            .padding(.horizontal, -8)
         }
         .animation(Theme.Motion.section, value: copiedCommand)
         .onAppear { searchFocused = true }
@@ -91,6 +90,7 @@ private struct ExtensionList: View {
                     }
                 }
             }
+            .groupCard(padding: 4)
         }
     }
 
@@ -118,6 +118,7 @@ private struct ExtensionList: View {
                     }
                 }
             }
+            .groupCard(padding: 4)
         } else if model.message == nil {
             empty(model.query.isEmpty ? "Nothing published yet" : "No matches")
         }

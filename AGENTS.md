@@ -32,7 +32,7 @@ One SwiftPM executable target, `Sources/Voz`, grouped by feature. `Tests/VozTest
 - Extension API only grows: since `apiVersion` 4, never remove or change a member. When you add one, bump `apiVersion` in `host.ts` and `voz.d.ts` (`voz new` copies it into the template), and add a row to the Versions table in `EXTENSIONS.md`. Older surfaces live in `versionChanges` in `host.ts`, each with a test that loads a package declaring that version. An API with "no users" can still have published ones: search npm for the `voz-package` keyword first. Packages written for a newer API still load, so extensions check for new members (`if (ctx.ask)`) instead of raising `apiVersion`. Document new members that way.
 - Without installed extensions, Bun stays absent. Extensions run unsandboxed in a separate process. Read `EXTENSIONS.md` before you change their interface.
 - Keep transcript text, vocabulary and app names out of telemetry. Usage analytics require opt-in. Read the README privacy section before you change privacy behavior.
-- Keep the native menu bar UI and its theme. Add optional behavior through extension primitives.
+- Keep the menu bar panel and notch in the Voz design system below. Add optional behavior through extension primitives.
 - Test files cannot import `Testing` and `Foundation` together under the Command Line Tools. Put Foundation helpers in `Tests/VozTests/TestSupport.swift`.
 
 ## CLI and MCP
@@ -54,8 +54,10 @@ Voz is a dictation app that people and agents drive the same way. Everything you
 ## Design
 
 - Every element earns its place. Signal only states that need attention, such as recording. Keep nav icons visible.
-- Use Lucide icons through `Icon`, not SF Symbols. Use stroke 1.25 in the popover and 2 to 2.25 in the indicator.
-- Take colors, radii and motion from `Theme`. Reuse `PanelGroup`, `PanelRow`, `IconButton` and the `.pill` and `.pressable` styles before you add a component.
+- Floating surfaces (the panel, ask card, note and permission tile) use system glass through `.glassEffect`, so they adapt to light and dark. The notch stays black in both modes.
+- Group settings in `PanelGroup` cards with dividers. Give top-level settings rows an `IconTile`. Show one status banner above the home search, only for states that need attention.
+- Use Lucide icons through `Icon`, not SF Symbols. Use stroke 1.25 in the popover, 1.75 inside an `IconTile` and 2 to 2.25 in the indicator.
+- Take colors, radii and motion from `Theme`. Reuse `PanelGroup`, `PanelRow`, `IconTile`, `IconButton`, `groupCard` and the `.pill` and `.pressable` styles before you add a component.
 - Motion gives feedback or shows a state change, never decoration. Keep it under 300ms and use ease-out or a spring with bounce 0.3 or less. Don't move anything on hover; change only color or background. Under Reduce Motion, keep opacity changes and drop movement.
 - Check UI changes with `.build/debug/Voz --render-design <new dir>` in light and dark.
 
