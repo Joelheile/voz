@@ -12,6 +12,8 @@ import { createInterface } from "node:readline";
 import type {
   Action,
   ActionHandle,
+  Answer,
+  AskOptions,
   Activity,
   AfterInsertEvent,
   AudioDropEvent,
@@ -135,7 +137,7 @@ class Registration {
   }
 }
 
-const apiVersion = 6;
+const apiVersion = 7;
 const loadTimeout = 3000;
 const write = process.stdout.write.bind(process.stdout);
 const send = (message: object) => write(JSON.stringify(message) + "\n");
@@ -218,7 +220,23 @@ function context(app: App): Context {
       if (!isLive()) throw new Error("openNote only works while a handler runs");
       return openNote(note);
     },
+    ask: (options) => {
+      if (!isLive()) return Promise.reject(new Error("ask only works while a handler runs"));
+      return ask(options, scope!);
+    },
   };
+}
+
+// The user may take a while to answer, so the handler's time stops until they do
+async function ask({ title, fields = [], buttons }: AskOptions, scope: RequestScope) {
+  if (buttons.length === 0) throw new Error("ask needs at least one button");
+  const remaining = scope.deadline - Date.now();
+  try {
+    const params = { title, fields, buttons, remaining };
+    return (await callSwift("ask", params, { id: scope.id, ...untimed() }, "Nobody answered the card")) as Answer;
+  } finally {
+    scope.deadline = Date.now() + remaining;
+  }
 }
 
 // Voz shows one note at a time, so a new note replaces the open one
@@ -508,7 +526,8 @@ function api(name: string, config: Config, registration: Registration): Extensio
         throw new Error("registerCommand needs { phrase, run }");
       const { phrase, run } = command;
       const at = command.at ?? "end";
-      if (at !== "start" && at !== "end") throw new Error(`Command "${phrase}" needs at: "start" or "end"`);
+      if (!["start", "end", "anywhere"].includes(at))
+        throw new Error(`Command "${phrase}" needs at: "start", "end" or "anywhere"`);
       const key = commandKey(phrase, at);
       const existing = commands.get(key);
       if (existing)
@@ -564,9 +583,15 @@ async function load() {
       loaded.push(entry.name);
     } catch (error) {
       registration.rollback();
-      errors.push({ extension: entry.name, message: describe(error) });
+      errors.push({ extension: entry.name, message: `${describe(error)}${newerApiHint(entry)}` });
     }
   }
+}
+
+// A package written for a newer API still loads, because it may check for newer members before it uses them
+function newerApiHint(entry: Entry) {
+  if (!entry.requires || entry.requires <= apiVersion) return "";
+  return `. It was written for Voz extension API ${entry.requires}, this Voz has ${apiVersion}. Update Voz.`;
 }
 
 async function loadEntry(entry: Entry, config: Config = {}, registration: Registration) {
@@ -575,9 +600,7 @@ async function loadEntry(entry: Entry, config: Config = {}, registration: Regist
       "No entry. Add voz.extensions to package.json, an extensions folder or an index.ts",
     );
   if (entry.requires && entry.requires > apiVersion)
-    throw new Error(
-      `Needs Voz extension API ${entry.requires}, this Voz has ${apiVersion}. Update Voz.`,
-    );
+    log(`${entry.name} was written for Voz extension API ${entry.requires}, this Voz has ${apiVersion}. Members it checks for may be missing.`);
   const module = await import(entry.path);
   if (typeof module.default !== "function")
     throw new Error("default export is not a function");
@@ -827,7 +850,7 @@ for await (const line of createInterface({ input: process.stdin })) {
   if (!line.trim()) continue;
   const request = parseRequest(line);
   if (!request) continue;
-  if (["generated", "transcribedFile", "liveStarted", "liveStopped"].includes(request.method)) {
+  if (["generated", "transcribedFile", "liveStarted", "liveStopped", "asked"].includes(request.method)) {
     settle(request.params);
     continue;
   }

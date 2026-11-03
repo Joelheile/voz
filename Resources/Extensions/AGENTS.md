@@ -25,7 +25,7 @@ The full types are in `~/.voz/node_modules/voz/index.d.ts`, or in `voz.d.ts` in 
 2. `beforeInsert`: before Voz types the text. Return `{ text }` to change it, `{ text: "" }` to type nothing, or nothing to keep it
 3. `afterInsert`: after Voz typed the text. Voz does not wait for it
 4. `afterRecording`: a 16 kHz mono WAV of the dictation. Voz does not wait for it
-5. `registerCommand({ phrase, run })`: runs when a dictation ends with `phrase`. Voz types the words before it first. With `at: "start"`, it runs when a dictation starts with `phrase`, types nothing and passes the words after it
+5. `registerCommand({ phrase, run })`: runs when a dictation ends with `phrase`. Voz types the words before it first. With `at: "start"`, it runs when a dictation starts with `phrase`, types nothing and passes the words after it. With `at: "anywhere"` (API 7), it runs when `phrase` appears anywhere, types nothing and passes the whole dictation. Older Voz rejects it, so check `apiVersion >= 7` from `import { apiVersion } from "voz"` first
 6. `registerSpeechModel({ id, name, transcribe })`: a speech model. `transcribe` gets a WAV `path` and returns `{ text }`
 7. `registerCleanupModel({ id, name, clean })`: replaces the on-device cleanup model. `clean` gets `text` and `prompt` and returns `{ text }`
 8. `registerCleanupStep({ id, name, run })`: a cleanup step. `run` gets `text` and returns `{ text }`
@@ -57,11 +57,12 @@ A tool is how a coding agent or AI app uses your extension. Design it for a read
 - `ctx.generate({ prompt, instructions, schema })` returns JSON from Apple's on-device model that fits a JSON schema (`object`, `array`, `string` with `enum`, `number`, `integer`, `boolean`). Use it in commands to turn speech into fields. Pass today's date and valid names in the prompt. It takes 1 to 3 seconds
 - `ctx.transcribe(path, { speakers: true })` transcribes an audio or video file with Parakeet and splits it into speaker turns. It fixes words from the user's dictionary, and the notch shows that Voz is transcribing. Use it in `voz.on("audioDrop", ...)`, which runs when the user drops an audio or video file on the notch
 - `await activity.transcribeLive({ systemAudio: true, speakers: true, onTranscript })` records the microphone, plus everything the Mac plays with `systemAudio`, and calls `onTranscript` with the whole transcript so far, a few seconds behind speech. Replace what you saved before, because earlier turns can change. `stop()` on the result returns the whole transcript. Recording stops when the activity ends
+- `ctx.ask({ title, fields, buttons })` shows a card under the notch and waits for a button. Fields are `text`, `date` (milliseconds) or `choice` with `options`. It returns `{ button, values }`, or `null` when the user closes it. Use it to confirm an action that is hard to undo, and let the user fix the fields first
 - `ctx.openNote({ title, text, onChange })` opens a small note the user can move. `onChange` gets the full text after the user pauses typing. Open it from an activity's `open`
 - Give feedback with `ctx.notify("Sent to Linear")`. It shows a short message under the menu bar. Await your work first: `ctx` calls after a handler returns do nothing
 - Anything the user may want to change is a setting. Declare it with `voz.settings({ key: { type, title, default } })`. `type` is `string`, `number` or `boolean`. A string can have `options` for a picker, `secret: true` for a token, or `required: true` when the extension can't work without it. Never ask the user to edit `settings.json`
 - Write files to `voz.paths.data`, never next to the extension, or Voz reloads it on every write
-- A package sets `"voz": { "apiVersion": 6 }` in `package.json`, the number in `voz.d.ts`. `voz new` writes it
+- A package sets `"voz": { "apiVersion": 7 }` in `package.json`, the oldest API it needs. `voz new` writes the current one. To use a member added later, check for it, such as `if (ctx.ask)`, and keep `apiVersion` low so older Voz versions still load the package
 - The user turns extensions on or off in the Extensions page, or with `voz enable <name>` and `voz disable <name>`. Don't build your own on/off switch
 - Log with `console.log`. Read it with `voz logs --extensions`, or watch it in `voz dev`
 - Use Bun and Node APIs (`fetch`, `Bun.spawn`, `node:fs`). Files in `~/.voz/extensions` can't import npm packages. If you need one, make a folder with a `package.json` and an `index.ts`, then run `voz install ./that-folder`

@@ -18,7 +18,8 @@ struct ExtensionHostTests {
         generate: @escaping @Sendable (GenerateParams) async throws -> String = { _ in throw ExtensionModelError.unavailable("not in tests") },
         transcribeFile: @escaping @Sendable (TranscribeFileParams) async throws -> FileTranscript = { _ in throw FileTranscriberError.needsParakeet },
         startLive: @escaping @Sendable (LiveStartParams, @escaping @Sendable (FileTranscript) async -> Void) async throws -> Void = { _, _ in throw FileTranscriberError.needsParakeet },
-        stopLive: @escaping @Sendable (LiveStopParams) async throws -> FileTranscript = { throw LiveSessionError.unknown($0.session) }
+        stopLive: @escaping @Sendable (LiveStopParams) async throws -> FileTranscript = { throw LiveSessionError.unknown($0.session) },
+        ask: @escaping @Sendable (AskParams) async -> AskAnswer? = { _ in nil }
     ) -> ExtensionHost {
         ExtensionHost(
             launch: .init(bun: installedBun!, script: hostScript, home: home, packageDirectories: packages.map(fileURL)),
@@ -28,7 +29,8 @@ struct ExtensionHostTests {
             generate: generate,
             transcribeFile: transcribeFile,
             startLive: startLive,
-            stopLive: stopLive
+            stopLive: stopLive,
+            ask: ask
         )
     }
 
@@ -87,6 +89,23 @@ struct ExtensionHostTests {
         await host.stop()
     }
 
+    @Test func anywhereCommandsGetTheWholeDictationAndRankBelowStartAndEnd() async throws {
+        try extensionFile("cal.ts", #"export default (voz) => voz.registerCommand({ phrase: "calendar", at: "anywhere", run: (e, ctx) => ctx.notify(e.text) })"#)
+        let actions = RecordedActions()
+        let host = makeHost(actions: actions)
+        let manifest = try await host.start()
+        #expect(manifest.commands.map(\.at) == [.anywhere])
+        let text = "Put lunch with Tom in my calendar tomorrow"
+        let match = try #require(VoiceCommands.match(text, commands: manifest.commands))
+        #expect(match == VoiceCommandMatch(phrase: "calendar", at: .anywhere, text: text))
+        #expect(VoiceCommands.match("Check the calendars", commands: manifest.commands) == nil)
+        let sendIt = ExtensionCommand(extension: "x", phrase: "send it", at: .end)
+        #expect(VoiceCommands.match("Add it to the calendar send it", commands: manifest.commands + [sendIt])?.at == .end)
+        #expect(await host.runCommand(match, app: app, timeout: .seconds(2)))
+        #expect(actions.all == [.notify(text)])
+        await host.stop()
+    }
+
     @Test func generateSendsTheSchemaInOrderAndReturnsParsedJSON() async throws {
         try extensionFile("extract.ts", #"export default (voz) => voz.registerCommand("todo", async (e, ctx) => { const result = await ctx.generate({ prompt: e.text, schema: { type: "object", properties: { title: { type: "string" }, when: { type: "string", enum: ["today", "tomorrow"] }, items: { type: "array", items: { type: "string" } } }, required: ["title"] } }); ctx.notify(`${result.title} ${result.when} ${result.items.length}`) }, { at: "start" })"#)
         let actions = RecordedActions()
@@ -105,6 +124,35 @@ struct ExtensionHostTests {
         #expect(params.schema.properties?[1].schema.choices == ["today", "tomorrow"])
         #expect(params.schema.properties?[2].schema.items?.type == "string")
         _ = try ExtensionModel.dynamicSchema(params.schema, name: "Result")
+        await host.stop()
+    }
+
+    @Test func askWaitsForTheUserPastTheCommandTimeout() async throws {
+        try extensionFile("ask.ts", #"export default (voz) => voz.registerCommand({ phrase: "calendar", at: "start", async run(e, ctx) { const answer = await ctx.ask({ title: "Add to calendar?", fields: [{ id: "title", label: "Title", type: "text", value: e.text }, { id: "start", label: "Starts", type: "date", value: 1000 }], buttons: ["Copy", "Add"] }); ctx.notify(answer ? `${answer.button} ${answer.values.title} ${answer.values.start}` : "closed") } })"#)
+        let actions = RecordedActions()
+        let asked = Mutex<AskParams?>(nil)
+        let host = makeHost(actions: actions, ask: { params in
+            asked.withLock { $0 = params }
+            try? await Task.sleep(for: .seconds(2))
+            return AskAnswer(button: "Add", values: ["title": .string("Lunch"), "start": .number(2000)])
+        })
+        _ = try await host.start()
+        #expect(await host.runCommand(VoiceCommandMatch(phrase: "calendar", at: .start, text: "lunch"), app: app, timeout: .seconds(1)))
+        #expect(actions.all == [.notify("Add Lunch 2000")])
+        let params = try #require(asked.withLock { $0 })
+        #expect(params.buttons == ["Copy", "Add"])
+        #expect(params.fields.map(\.type) == [.text, .date])
+        #expect(params.fields.first?.value == .string("lunch"))
+        await host.stop()
+    }
+
+    @Test func closingTheCardAnswersNull() async throws {
+        try extensionFile("ask.ts", #"export default (voz) => voz.registerCommand({ phrase: "calendar", at: "start", async run(e, ctx) { const answer = await ctx.ask({ title: "Add?", buttons: ["Add"] }); ctx.notify(answer === null ? "closed" : "answered") } })"#)
+        let actions = RecordedActions()
+        let host = makeHost(actions: actions)
+        _ = try await host.start()
+        #expect(await host.runCommand(VoiceCommandMatch(phrase: "calendar", at: .start, text: "x"), app: app, timeout: .seconds(2)))
+        #expect(actions.all == [.notify("closed")])
         await host.stop()
     }
 
@@ -403,7 +451,7 @@ struct ExtensionHostTests {
         await host.stop()
     }
 
-    @Test func disabledExtensionsAndNewerApiPackagesDoNotLoad() async throws {
+    @Test func disabledExtensionsDoNotLoadAndNewerApiPackagesLoadUntilTheyCallSomethingMissing() async throws {
         try writeFile(#"{"disabled":["off","pack"]}"#, named: "settings.json", in: home.root)
         try extensionFile("on.ts", #"import { apiVersion } from "voz"; export default (voz) => voz.on("beforeInsert", (e) => ({ text: `${e.text} ${apiVersion}` }))"#)
         try extensionFile("off.ts", #"export default (voz) => voz.on("beforeInsert", () => ({ text: "off ran" }))"#)
@@ -411,13 +459,17 @@ struct ExtensionHostTests {
         try writeFile(#"{"name":"pack"}"#, named: "package.json", in: pack)
         try writeFile(#"export default (voz) => voz.on("beforeInsert", () => ({ text: "pack ran" }))"#, named: "index.ts", in: pack.appendingPathComponent("extensions/a"))
         let future = home.packages.appendingPathComponent("node_modules/future")
-        try writeFile(#"{"name":"future","voz":{"apiVersion":7}}"#, named: "package.json", in: future)
-        try writeFile("export default () => {}", named: "index.ts", in: future)
-        let host = makeHost(packages: [pack.path, future.path])
+        try writeFile(#"{"name":"future","voz":{"apiVersion":8}}"#, named: "package.json", in: future)
+        try writeFile("export default (voz) => { if (voz.registerWidget) voz.registerWidget({}) }", named: "index.ts", in: future)
+        let needy = home.packages.appendingPathComponent("node_modules/needy")
+        try writeFile(#"{"name":"needy","voz":{"apiVersion":8}}"#, named: "package.json", in: needy)
+        try writeFile("export default (voz) => voz.registerWidget({})", named: "index.ts", in: needy)
+        let host = makeHost(packages: [pack.path, future.path, needy.path])
         let manifest = try await host.start()
-        #expect(manifest.extensions == ["on"])
-        #expect(manifest.errors.first?.message.contains("Update Voz") == true)
-        #expect(await host.beforeInsert(text: "hi", raw: "hi", app: app, timeout: .seconds(2)) == "hi 6")
+        #expect(manifest.extensions == ["on", "future"])
+        #expect(manifest.errors.map(\.extension) == ["needy"])
+        #expect(manifest.errors.first?.message.contains("written for Voz extension API 8, this Voz has 7. Update Voz.") == true)
+        #expect(await host.beforeInsert(text: "hi", raw: "hi", app: app, timeout: .seconds(2)) == "hi 7")
         await host.stop()
     }
 

@@ -22,6 +22,7 @@ actor ExtensionHost {
     private let transcribeFile: @Sendable (TranscribeFileParams) async throws -> FileTranscript
     private let startLive: @Sendable (LiveStartParams, @escaping @Sendable (FileTranscript) async -> Void) async throws -> Void
     private let stopLive: @Sendable (LiveStopParams) async throws -> FileTranscript
+    private let ask: @Sendable (AskParams) async -> AskAnswer?
     private var process: Process?
     private var input: FileHandle?
     private var buffer = Data()
@@ -29,6 +30,8 @@ actor ExtensionHost {
     private let writes = DispatchQueue(label: "com.joelheile.voz.extension-input")
     private var queuedBytes = 0
     private var pending: [Int: CheckedContinuation<Data?, Never>] = [:]
+    /// Requests whose handler waits on a card the user has not answered, so they don't time out
+    private var asking: [Int: Int] = [:]
     private var readyWaiter: CheckedContinuation<HostManifest, any Error>?
     private(set) var manifest: HostManifest?
 
@@ -40,7 +43,8 @@ actor ExtensionHost {
         generate: @escaping @Sendable (GenerateParams) async throws -> String = ExtensionModel.generate,
         transcribeFile: @escaping @Sendable (TranscribeFileParams) async throws -> FileTranscript = { _ in throw FileTranscriberError.needsParakeet },
         startLive: @escaping @Sendable (LiveStartParams, @escaping @Sendable (FileTranscript) async -> Void) async throws -> Void = { _, _ in throw FileTranscriberError.needsParakeet },
-        stopLive: @escaping @Sendable (LiveStopParams) async throws -> FileTranscript = { throw LiveSessionError.unknown($0.session) }
+        stopLive: @escaping @Sendable (LiveStopParams) async throws -> FileTranscript = { throw LiveSessionError.unknown($0.session) },
+        ask: @escaping @Sendable (AskParams) async -> AskAnswer? = { _ in nil }
     ) {
         self.launch = launch
         self.onAction = onAction
@@ -50,6 +54,7 @@ actor ExtensionHost {
         self.transcribeFile = transcribeFile
         self.startLive = startLive
         self.stopLive = stopLive
+        self.ask = ask
     }
 
     func start(timeout: Duration = .seconds(30)) async throws -> HostManifest {
@@ -202,10 +207,14 @@ actor ExtensionHost {
                     Task { await self?.wrote(line.count, id: id, error: message) }
                 }
             }
-            Task { [weak self] in
-                try? await Task.sleep(for: timeout)
-                await self?.expire(id, method: method)
-            }
+            scheduleExpiry(id, method: method, after: timeout)
+        }
+    }
+
+    private func scheduleExpiry(_ id: Int, method: String, after timeout: Duration) {
+        Task { [weak self] in
+            try? await Task.sleep(for: timeout)
+            await self?.expire(id, method: method)
         }
     }
 
@@ -276,6 +285,16 @@ actor ExtensionHost {
                     return "{}"
                 }
             }
+        case "ask":
+            guard let requestID = envelope.requestID else { return onLog("Extension asked outside a handler") }
+            decodeNotification(AskParams.self, line).map { params in
+                asking[requestID, default: 0] += 1
+                reply(to: params.call, deadline: params.deadline, as: "asked") { [weak self, ask] in
+                    let answer = await ask(params)
+                    await self?.answered(requestID, remaining: .milliseconds(params.remaining))
+                    return String(decoding: try JSONEncoder().encode(answer), as: UTF8.self)
+                }
+            }
         case "stopLive":
             decodeNotification(LiveStopParams.self, line).map { params in
                 reply(to: params.call, deadline: params.deadline, as: "liveStopped") { [stopLive] in
@@ -336,8 +355,15 @@ actor ExtensionHost {
         pending.removeValue(forKey: id)?.resume(returning: data)
     }
 
+    private func answered(_ id: Int, remaining: Duration) {
+        asking[id, default: 1] -= 1
+        guard asking[id] == 0 else { return }
+        asking[id] = nil
+        scheduleExpiry(id, method: "handler", after: remaining)
+    }
+
     private func expire(_ id: Int, method: String) {
-        guard pending[id] != nil else { return }
+        guard pending[id] != nil, asking[id] == nil else { return }
         onLog("Extension \(method) timed out")
         resolve(id, with: nil)
     }
