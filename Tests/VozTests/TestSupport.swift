@@ -42,7 +42,14 @@ let hostScript = URL(fileURLWithPath: #filePath)
     .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     .appendingPathComponent("Resources/Extensions/host.ts")
 
-let extensionResources = hostScript.deletingLastPathComponent()
+/// `Resources/Extensions` with the skill copied in, as `scripts/make-app.sh` lays them out in the app
+let extensionResources: URL = {
+    let repo = hostScript.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let resources = FileManager.default.temporaryDirectory.appendingPathComponent("voz-resources-\(UUID().uuidString)", isDirectory: true)
+    try! FileManager.default.copyItem(at: hostScript.deletingLastPathComponent(), to: resources)
+    try! FileManager.default.copyItem(at: repo.appendingPathComponent("skills/\(VozHome.skillName)"), to: resources.appendingPathComponent(VozHome.skillName))
+    return resources
+}()
 
 func temporaryHome() -> VozHome {
     VozHome(root: FileManager.default.temporaryDirectory.appendingPathComponent("voz-home-\(UUID().uuidString)"))

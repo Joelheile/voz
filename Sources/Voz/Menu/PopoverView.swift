@@ -52,7 +52,7 @@ struct PopoverView: View {
             case .insights:
                 InsightsPage(model: sources.stats, settings: sources.settings, back: model.goBack)
             case .extensions:
-                ExtensionsPage(model: sources.extensions, catalog: sources.catalog, settings: sources.settings, back: model.goBack)
+                ExtensionsPage(model: sources.extensions, catalog: sources.catalog, settings: sources.settings, toast: model.actions.toast, back: model.goBack)
             case .feedback:
                 FeedbackPage(settings: sources.settings, toast: model.actions.toast, back: model.goBack)
             case .cleanupPrompt:
