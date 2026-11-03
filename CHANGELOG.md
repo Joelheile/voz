@@ -4,6 +4,9 @@ Newest first. To get beta changes now, turn on Beta updates under What's new in 
 
 ## In beta
 
+- Extensions can ask you to check details in a card under the notch
+- Extensions made for a newer Voz now load instead of asking you to update
+- Extension commands can now trigger on a phrase said anywhere in your dictation
 - Dictation starts while music plays, during meetings and with Bluetooth headphones
 - Opening Voz after an update no longer leaves an invisible old copy running
 - When an update is ready, Update appears at the bottom of the menu
