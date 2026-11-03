@@ -95,7 +95,11 @@ struct PauseDetector: Sendable {
     private var segmentStart = 0
     private var speechFrames = 0
     private var silentFrames = 0
+    private var trailingSilentFrames = 0
     private var recentLevels: [Float] = []
+
+    /// How long the speaker has been quiet, across segment cuts
+    var trailingSilence: Duration { .milliseconds(trailingSilentFrames * Self.frameSamples * 1000 / Int(RecordingFilter.sampleRate)) }
 
     init() {}
 
@@ -123,9 +127,11 @@ struct PauseDetector: Sendable {
         if rms >= max(floor * Self.noiseFloorMultiplier, Self.absoluteThreshold) {
             speechFrames += 1
             silentFrames = 0
+            trailingSilentFrames = 0
             return false
         }
         silentFrames += 1
+        trailingSilentFrames += 1
         let segmentSeconds = Self.seconds(processedSamples - segmentStart)
         let requiredSilence = segmentSeconds >= Self.relaxedAfterSeconds ? Self.relaxedPauseSeconds : Self.pauseSeconds
         return Self.seconds(silentFrames * Self.frameSamples) >= requiredSilence

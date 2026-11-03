@@ -96,7 +96,12 @@ final class StreamingDictation {
         self.cleanupEnabled = cleanupEnabled
         self.steps = steps
         self.extensions = extensions
+        if cleanupEnabled, extensions.model == nil {
+            Task { cleaner.prewarm(CleanupSetup(plan: await plan.value, vocabulary: vocabulary, languages: languages)) }
+        }
     }
+
+    var trailingSilence: Duration { detector.trailingSilence }
 
     func feed(_ samples: [Float]) {
         guard !closed else { return }

@@ -129,11 +129,14 @@ final class Dictation {
         }
     }
 
+    /// Keeps recording briefly after release to catch the last word, and stops early once the speaker is already quiet
     private func stopAfterTrailingWords() {
         let released = ContinuousClock.now
         phase = .transcribing
         Task {
-            try? await Task.sleep(for: .milliseconds(300))
+            while ContinuousClock.now - released < .milliseconds(300), (streaming?.trailingSilence ?? .zero) < .milliseconds(150) {
+                try? await Task.sleep(for: .milliseconds(20))
+            }
             stopAndTranscribe(released: released)
         }
     }

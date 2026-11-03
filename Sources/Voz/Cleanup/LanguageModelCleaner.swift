@@ -26,7 +26,10 @@ final class LanguageModelCleaner {
     func prewarm(_ setup: CleanupSetup) {
         guard availabilityDescription == nil else { return }
         if running != nil { return }
-        if let session, setup == self.setup, isReusable(session) { return }
+        if let session, setup == self.setup, isReusable(session) {
+            session.prewarm(promptPrefix: Prompt(CleanupInstructions.promptPrefix))
+            return
+        }
         self.setup = setup
         startSession()
     }
