@@ -25,7 +25,7 @@ The full types are in `~/.voz/node_modules/voz/index.d.ts`, or in `voz.d.ts` in 
 2. `beforeInsert`: before Voz types the text. Return `{ text }` to change it, `{ text: "" }` to type nothing, or nothing to keep it
 3. `afterInsert`: after Voz typed the text. Voz does not wait for it
 4. `afterRecording`: a 16 kHz mono WAV of the dictation. Voz does not wait for it
-5. `registerCommand({ phrase, run })`: runs when a dictation ends with `phrase`. Voz types the words before it first. With `at: "start"`, it runs when a dictation starts with `phrase`, types nothing and passes the words after it
+5. `registerCommand({ phrase, run })`: runs when a dictation ends with `phrase`. Voz types the words before it first. With `at: "start"`, it runs when a dictation starts with `phrase`, types nothing and passes the words after it. With `at: "anywhere"` (API 7), it runs when `phrase` appears anywhere, types nothing and passes the whole dictation. Older Voz rejects it, so check `apiVersion >= 7` from `import { apiVersion } from "voz"` first
 6. `registerSpeechModel({ id, name, transcribe })`: a speech model. `transcribe` gets a WAV `path` and returns `{ text }`
 7. `registerCleanupModel({ id, name, clean })`: replaces the on-device cleanup model. `clean` gets `text` and `prompt` and returns `{ text }`
 8. `registerCleanupStep({ id, name, run })`: a cleanup step. `run` gets `text` and returns `{ text }`

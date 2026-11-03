@@ -261,7 +261,7 @@ final class ExtensionService {
     func prepare(_ text: String, raw: String, app: HostApp) async -> ExtensionDelivery {
         guard let host, let manifest else { return ExtensionDelivery(text: text, command: nil) }
         let match = VoiceCommands.match(text, commands: manifest.commands)
-        if let match, match.at == .start { return ExtensionDelivery(text: "", command: match) }
+        if let match, match.at != .end { return ExtensionDelivery(text: "", command: match) }
         var delivered = match?.text ?? text
         if manifest.subscribes(to: .beforeInsert), !delivered.isEmpty {
             delivered = await host.beforeInsert(text: delivered, raw: raw, app: app, timeout: Self.insertTimeout)

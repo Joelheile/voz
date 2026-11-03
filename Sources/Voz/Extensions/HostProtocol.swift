@@ -46,7 +46,16 @@ struct HostComponent: Decodable, Equatable, Hashable, Sendable {
 }
 
 enum CommandPosition: String, Codable, Sendable {
-    case start, end
+    case start, end, anywhere
+
+    /// A command at the start wins over one at the end, which wins over one anywhere
+    var rank: Int {
+        switch self {
+        case .start: 2
+        case .end: 1
+        case .anywhere: 0
+        }
+    }
 }
 
 struct ExtensionCommand: Decodable, Equatable, Hashable, Sendable {
@@ -450,14 +459,24 @@ enum VoiceCommands {
         let candidates = commands
             .map { (command: $0, words: WordTokens.alphanumeric($0.phrase)) }
             .filter { !$0.words.isEmpty && $0.words.count <= words.count }
-            .sorted { ($0.command.at == .start ? 1 : 0, $0.words.count) > ($1.command.at == .start ? 1 : 0, $1.words.count) }
+            .sorted { ($0.command.at.rank, $0.words.count) > ($1.command.at.rank, $1.words.count) }
         for candidate in candidates {
+            if candidate.command.at == .anywhere {
+                guard contains(candidate.words, in: words, of: text) else { continue }
+                return VoiceCommandMatch(phrase: candidate.command.phrase, at: .anywhere, text: text.trimmingCharacters(in: separators))
+            }
             let spoken = candidate.command.at == .start ? words.prefix(candidate.words.count) : words.suffix(candidate.words.count)
             guard spoken.map({ text[$0].lowercased() }) == candidate.words, let first = spoken.first, let last = spoken.last else { continue }
             let rest = candidate.command.at == .start ? text[last.upperBound...] : text[..<first.lowerBound]
             return VoiceCommandMatch(phrase: candidate.command.phrase, at: candidate.command.at, text: rest.trimmingCharacters(in: separators))
         }
         return nil
+    }
+
+    private static func contains(_ phrase: [String], in words: [Range<String.Index>], of text: String) -> Bool {
+        let spoken = words.map { text[$0].lowercased() }
+        guard spoken.count >= phrase.count else { return false }
+        return (0...(spoken.count - phrase.count)).contains { Array(spoken[$0..<($0 + phrase.count)]) == phrase }
     }
 
     private static func wordRanges(in text: String) -> [Range<String.Index>] {

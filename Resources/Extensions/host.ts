@@ -526,7 +526,8 @@ function api(name: string, config: Config, registration: Registration): Extensio
         throw new Error("registerCommand needs { phrase, run }");
       const { phrase, run } = command;
       const at = command.at ?? "end";
-      if (at !== "start" && at !== "end") throw new Error(`Command "${phrase}" needs at: "start" or "end"`);
+      if (!["start", "end", "anywhere"].includes(at))
+        throw new Error(`Command "${phrase}" needs at: "start", "end" or "anywhere"`);
       const key = commandKey(phrase, at);
       const existing = commands.get(key);
       if (existing)

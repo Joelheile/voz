@@ -158,7 +158,8 @@ export type CleanupStep = {
 
 export type Command = {
   phrase: string;
-  at?: "start" | "end";
+  /** "anywhere" runs when the phrase is any whole words of the dictation and passes the whole text. Since API 7. */
+  at?: "start" | "end" | "anywhere";
   run(event: CommandEvent, ctx: Context): Awaitable<void>;
 };
 

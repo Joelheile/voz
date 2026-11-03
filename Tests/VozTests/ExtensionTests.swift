@@ -89,6 +89,23 @@ struct ExtensionHostTests {
         await host.stop()
     }
 
+    @Test func anywhereCommandsGetTheWholeDictationAndRankBelowStartAndEnd() async throws {
+        try extensionFile("cal.ts", #"export default (voz) => voz.registerCommand({ phrase: "calendar", at: "anywhere", run: (e, ctx) => ctx.notify(e.text) })"#)
+        let actions = RecordedActions()
+        let host = makeHost(actions: actions)
+        let manifest = try await host.start()
+        #expect(manifest.commands.map(\.at) == [.anywhere])
+        let text = "Put lunch with Tom in my calendar tomorrow"
+        let match = try #require(VoiceCommands.match(text, commands: manifest.commands))
+        #expect(match == VoiceCommandMatch(phrase: "calendar", at: .anywhere, text: text))
+        #expect(VoiceCommands.match("Check the calendars", commands: manifest.commands) == nil)
+        let sendIt = ExtensionCommand(extension: "x", phrase: "send it", at: .end)
+        #expect(VoiceCommands.match("Add it to the calendar send it", commands: manifest.commands + [sendIt])?.at == .end)
+        #expect(await host.runCommand(match, app: app, timeout: .seconds(2)))
+        #expect(actions.all == [.notify(text)])
+        await host.stop()
+    }
+
     @Test func generateSendsTheSchemaInOrderAndReturnsParsedJSON() async throws {
         try extensionFile("extract.ts", #"export default (voz) => voz.registerCommand("todo", async (e, ctx) => { const result = await ctx.generate({ prompt: e.text, schema: { type: "object", properties: { title: { type: "string" }, when: { type: "string", enum: ["today", "tomorrow"] }, items: { type: "array", items: { type: "string" } } }, required: ["title"] } }); ctx.notify(`${result.title} ${result.when} ${result.items.length}`) }, { at: "start" })"#)
         let actions = RecordedActions()
