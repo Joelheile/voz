@@ -88,9 +88,9 @@ An extension does four kinds of things. The kind sets how much time it gets:
 | `voz.registerCleanupModel(model)`   | Adds a cleanup model to Settings. `model` has `id`, `name` and `clean(event, ctx)`, which returns `{ text }`.                                                                                                                                                                                                                                                                                                                                     |
 | `voz.registerCleanupStep(step)`     | Adds a cleanup step you can turn on in the extension's details. `step` has `id`, `name` and `run(event, ctx)`, which returns `{ text }` or nothing to keep the text.                                                                                                                                                                                                                                                                              |
 | `voz.registerCommand(command)`      | Runs `command.run(event, ctx)` when a dictation ends with `command.phrase`. Voz inserts the words before the phrase, then runs the command. With `at: "start"`, it runs when a dictation starts with the phrase: Voz inserts nothing and passes the words after the phrase. With `at: "anywhere"` (API 7), it runs when the phrase appears anywhere: Voz inserts nothing and passes the whole dictation. Start beats end, and end beats anywhere. |
-| `voz.registerAction(action)`        | Adds a button to the bottom row of the Voz panel. `action` has `id`, `name`, an optional `hotkey` such as `"ctrl+opt+j"`, `hidden` and `run(ctx)`. Returns a handle with `update({ hidden })`. See [Actions](#actions).                                                                                                                                                                                                                           |
+| `voz.registerAction(action)`        | Adds a button to the bottom row of the Voz panel. `action` has `id`, `name`, an optional `hotkey` such as `"ctrl+opt+j"`, `hidden`, an optional Lucide `icon` such as `"audio-lines"` and `run(ctx)`. Returns a handle with `update({ hidden })`. See [Actions](#actions).                                                                                                                                                                        |
 | `voz.registerTool(tool)`            | Adds a command agents and the terminal run as `voz <extension> <id>`, and AI apps call over MCP. `tool` has `id`, `description`, an optional object schema `input`, `positional`, `readOnly` and `run(input, ctx)`, which returns JSON. See [Tools](#tools).                                                                                                                                                                                      |
-| `voz.startActivity(activity)`       | Shows that something keeps running, with an optional Stop button. Returns `{ end(), transcribeLive(options) }`. See [Activities](#activities).                                                                                                                                                                                                                                                                                                    |
+| `voz.startActivity(activity)`       | Shows that something keeps running, with an optional Stop button. Returns `{ end(), stop(), transcribeLive(options) }`; `stop()` runs your `stop` handler as if the user pressed Stop. See [Activities](#activities).                                                                                                                                                                                                                                                                                                    |
 | `voz.addHistory(entry)`             | Adds an entry to the Voz history, such as a meeting transcript. See [History](#history).                                                                                                                                                                                                                                                                                                                                                          |
 | `voz.generate(request)`                         | Asks a model outside a handler, for background work such as learning. Takes the same request as `ctx.generate`, and `model: "on-device"` runs Apple's model whatever the user picked. See [Background work](#background-work).                       |
 | `voz.registerList(list)`                        | Adds a list to the extension's page in Settings, such as what it learned, with a delete button on each row. See [Lists](#lists).                                                                                                                      |
@@ -121,7 +121,7 @@ Every handler gets `(event, ctx)`.
 - `ctx.generate({ prompt, instructions, schema, model, effort })`: asks the user's AI model for JSON that fits `schema`. See [On-device model](#on-device-model)
 - `ctx.models()`: lists the models the user's account offers and which one each tier runs
 - `ctx.transcribe(path, { speakers })`: transcribes an audio or video file with Parakeet. See [Audio files](#audio-files)
-- `ctx.openNote({ title, text, onChange })`: opens a small note the user can move and type in. See [Notes](#notes)
+- `ctx.openNote({ title, text, onChange })`: opens a Markdown note under the notch. See [Notes](#notes)
 - `ctx.ask({ title, fields, buttons })`: shows a card under the notch and waits until the user presses a button. See [Ask](#ask)
 - `ctx.field()`: reads the focused text field, its selection and the text around it. `ctx.select(range)` selects part of it, so `insert` replaces that part. See [Text fields](#text-fields)
 - `ctx.busy(run)`: shows a working state in the notch that the user can cancel while `run` runs. See [Busy](#busy)
@@ -238,6 +238,7 @@ const settings = voz.settings({
 
 - Each setting has `type` (`string`, `number` or `boolean`), `title`, `default` and an optional `description`
 - A string with `options` shows a picker. A string with `secret` hides what you type
+- A string with `folder: true` shows a button that opens a folder picker. The value is the folder's full path. Expand a `~` in your default yourself
 - A string with `required` shows "Needs setup" on the extension's row until the user fills it in
 - Voz saves the values under `config.<extension name>` in `~/.voz/settings.json` and reloads the extension when they change
 - A missing value, or one of the wrong type, gives the default. The values are typed, so `settings.limit` is a `number`
@@ -289,7 +290,7 @@ voz.registerAction({ id: "edit", name: "Edit", hotkey: "rightopt", when: "select
 
 An action runs until it finishes, so it can record or transcribe for as long as it needs.
 
-Every action also has a Run button in the extension's details on the Extensions page. Set `hidden: true` when the action does not apply right now, such as a setup step that is done. A hidden action leaves the panel, but stays in the details and keeps its hotkey. `registerAction` returns a handle. Call `update({ hidden })` when your state changes.
+With an `icon`, the action is an icon in the panel's nav bar, next to Dictionary and Settings, and its name shows on hover. Without one, it is a button with its name. Every action also has a Run button in the extension's details on the Extensions page. Set `hidden: true` when the action does not apply right now, such as a setup step that is done. A hidden action leaves the panel, but stays in the details and keeps its hotkey. `registerAction` returns a handle. Call `update({ hidden })` when your state changes.
 
 ```ts
 const connect = voz.registerAction({
@@ -361,7 +362,7 @@ The agent calling your tool sees only its name, description and schema:
 
 ## Activities
 
-An activity shows that something keeps running, such as a recording. While one runs, the Voz menu bar icon gets a dot, and the Voz panel shows its title, how long it has run and a Stop button.
+An activity shows that something keeps running, such as a recording. While one runs, the Voz menu bar icon gets a dot, and the panel's nav bar shows how long it has run, with a Stop button.
 
 ```ts
 const recording = voz.startActivity({
@@ -404,13 +405,29 @@ const live = await meeting.transcribeLive({
 - `stop()` returns the final transcript
 - Recording stops when you call `stop()` or the activity ends. `stop()` still returns the transcript after the activity ended
 - Voz fixes words from the user's dictionary
-- It uses the microphone picked in Settings. The first time, macOS asks the user to allow Voz to record system audio. Without headphones, the microphone also hears the speakers, so other people's words can appear twice
+- It uses the microphone picked in Settings. The first time, macOS asks the user to allow Voz to record system audio. Without headphones, the microphone also hears the speakers, so other people's words can appear twice. Pass `you: true` with `systemAudio` to fix that, see below
 - The first live diarization downloads a 190 MB model. It fails when the user picked Apple speech in Settings
 - Voz keeps no audio
+- When the microphone stops delivering, or the Mac switches its speakers, Voz restarts the recording on the current devices. A few seconds go missing, the transcript keeps going
+- With `you: true` and `systemAudio`, Voz transcribes your microphone and the call apart. Your turns have `you: true` and `speaker` 0, the call's speakers count from 1. Words the microphone heard from the speakers within 1.5 seconds of the call drop out, so the call doesn't appear twice without headphones. It takes about twice the processing
+
+```ts
+const live = await meeting.transcribeLive({
+  systemAudio: true,
+  speakers: true,
+  you: true,
+  onTranscript: save,
+});
+const lines = (await live.stop()).turns.map(
+  (turn) => `${turn.you ? "You" : `Speaker ${turn.speaker}`}: ${turn.text}`,
+);
+```
 
 ### Notes
 
-`ctx.openNote` opens a small note under the menu bar. The user can move it, type a few lines, and close it with Esc. Voz shows one note at a time, so a new note replaces the open one.
+`ctx.openNote` opens a note under the notch. While the user points at it or types, it opens up to write in. Otherwise it shrinks to its last two lines, so it stays out of the way during a call. While a live transcription runs, the short note shows the last two lines Voz heard instead, and a warning when Voz can't hear the meeting. It doesn't take the keyboard until the user clicks it. The user can copy it and close it with Esc. Voz shows one note at a time, so a new note replaces the open one.
+
+The note styles Markdown as the user types: `#` headings, `-` and `1.` lists, `- [ ]` checkboxes they can click, `**bold**` and `` `code` ``. Return continues a list. The text stays plain Markdown, so save it as it is.
 
 ```ts
 voz.startActivity({
@@ -456,6 +473,8 @@ if (answer?.button === "Add")
 - The last button is the main one, and Return presses it
 - `answer` is `{ button, values }` with each field's value by `id`, or `null` when the user closes the card with Esc or the close button
 - Voz shows one card at a time, so a new card closes the open one, which answers `null`
+- A card with only buttons fits one row, like a notification. Give it a `message` under the title and a Lucide `icon`, such as `"audio-lines"`.
+- `voz.ask` shows the same card when no handler runs, such as when your extension notices a meeting start. It waits as long as the user takes
 
 ## Busy
 
@@ -513,6 +532,7 @@ voz.addHistory({
 - `text` is what the history shows, searches and copies
 - `seconds` is how long the recording was. It is optional
 - `file` is the full path of a file with the same content, such as the Markdown transcript you saved. It is optional
+- `copies` lists other parts the user can copy on their own, such as `[{ name: "Notes", text: notes }, { name: "Transcript", text: transcript }]`. Hovering the entry shows a button for each, and right-clicking lists them. It is optional
 - Entries from extensions don't count toward Insights
 - Entries show a puzzle icon. To pick your own, set a [Lucide](https://lucide.dev/icons) name in `package.json`, such as `{ "voz": { "icon": "file-volume" } }`. Loose files keep the puzzle
 
@@ -637,7 +657,7 @@ voz remove voz-jira
 - Packages only change when you run `voz update`. Voz never updates them on its own
 - Voz never runs install scripts
 - Installed packages are listed in `~/.voz/settings.json`
-- See [Versions](#versions) for `"voz": { "apiVersion": 7 }` in `package.json`
+- See [Versions](#versions) for `"voz": { "apiVersion": 8 }` in `package.json`
 
 ## What the user wrote
 
@@ -689,7 +709,7 @@ setInterval(async () => {
 
 ## Versions
 
-`"voz": { "apiVersion": 7 }` in `package.json` names the oldest Voz API your package needs. Keep it as low as you can, because people run older Voz versions:
+`"voz": { "apiVersion": 8 }` in `package.json` names the oldest Voz API your package needs. Keep it as low as you can, because people run older Voz versions:
 
 - `voz new` writes the current version. The number is also in `voz.d.ts` as `apiVersion`, and `import { apiVersion } from "voz"` gives the version of the Voz that runs
 - To use something newer, check for it instead of raising the number. Your package then keeps working everywhere, and gets the new feature where Voz has it:
@@ -715,7 +735,7 @@ What each version changed, and what older packages keep:
 
 | Version | Changes                                                                                                                                                                                                                                                 | Older packages keep                                                         |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| 8       | Adds `ctx.field` with `thread`, `ctx.select`, `ctx.busy`, `voz.history`, `instruction` for `ctx.insert`, `model` and `effort` for `ctx.generate`, `ctx.models`, `voz.screen` with `"screen": true` in `package.json`, `voz.generate` with `model: "on-device"`, `voz.registerList`, modifier taps such as `"rightopt"` as hotkeys, and `when` for actions |                                                                                           |
+| 8       | Adds `ctx.field` with `thread`, `ctx.select`, `ctx.busy`, `voz.history`, `instruction` for `ctx.insert`, `model` and `effort` for `ctx.generate`, `ctx.models`, `voz.screen` with `"screen": true` in `package.json`, `voz.generate` with `model: "on-device"`, `voz.registerList`, modifier taps such as `"rightopt"` as hotkeys, and `when` for actions. Adds `you` to `transcribeLive`, `copies` to `addHistory` and `folder` to string settings. Actions take an `icon`, `voz.ask` and `voz.openNote` work outside a handler, `ask` takes a `message` and an `icon`, and a running activity can `stop()` itself. Notes style Markdown and sit under the notch |                                                                             |
 | 7       | Adds `ctx.ask` and `at: "anywhere"`                                                                                                                                                                                                                     |                                                                             |
 | 6       | Adds `open` to activities, `transcribeLive` on a running activity, `ctx.openNote`, `website` to `ctx.app`, and `voz.registerTool` with `positional`                                                                                                     |                                                                             |
 | 5       | Adds `mode` to the `beforeCleanup` event and result                                                                                                                                                                                                     |                                                                             |

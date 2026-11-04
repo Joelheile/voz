@@ -20,9 +20,11 @@ struct SpeakerTurn: Codable, Equatable, Sendable {
     let start: Double
     let end: Double
     let text: String
+    /// Set on turns from the user's own microphone, when live transcription keeps it apart from the call
+    var you: Bool? = nil
 
     func applying(_ rules: [VocabularyRule], words: [String]) -> SpeakerTurn {
-        SpeakerTurn(speaker: speaker, start: start, end: end, text: VocabularyCasing.apply(words, to: VocabularyRule.apply(rules, to: text)))
+        SpeakerTurn(speaker: speaker, start: start, end: end, text: VocabularyCasing.apply(words, to: VocabularyRule.apply(rules, to: text)), you: you)
     }
 }
 

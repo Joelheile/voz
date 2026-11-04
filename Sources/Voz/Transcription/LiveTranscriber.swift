@@ -67,7 +67,7 @@ enum LiveTranscript {
         var merged: [SpeakerTurn] = []
         for turn in turns {
             if let last = merged.last, last.speaker == turn.speaker {
-                merged[merged.count - 1] = SpeakerTurn(speaker: last.speaker, start: last.start, end: turn.end, text: "\(last.text) \(turn.text)")
+                merged[merged.count - 1] = SpeakerTurn(speaker: last.speaker, start: last.start, end: turn.end, text: "\(last.text) \(turn.text)", you: last.you)
             } else {
                 merged.append(turn)
             }
@@ -79,6 +79,19 @@ enum LiveTranscript {
             turns: merged
         )
     }
+
+    /// Puts the user's microphone and the call back in time order. The microphone's turns are speaker 0.
+    static func combine(you: FileTranscript, call: FileTranscript) -> FileTranscript {
+        let turns = (you.turns + call.turns).sorted { $0.start < $1.start }
+        return make(turns, seconds: max(you.seconds, call.seconds))
+    }
+}
+
+/// Which stream a live transcriber hears. With separate streams, the microphone drops what the speakers played.
+enum LiveRole: Sendable {
+    case mixed
+    case microphone(LiveEcho)
+    case system(LiveEcho)
 }
 
 /// Transcribes a live stream in chunks and sends the whole transcript so far whenever the diarizer catches up
@@ -90,6 +103,7 @@ actor LiveTranscriber {
     private let transcriber: Transcriber
     private let model: SpeechModel
     private let vocabulary: VocabularyStore?
+    private let role: LiveRole
     private let onTranscript: @Sendable (FileTranscript) async -> Void
     private var diarizer: Nemotron3Diarizer?
     private var chunker = LiveChunker()
@@ -98,10 +112,14 @@ actor LiveTranscriber {
     private var frames = 0
     private var emitted: [SpeakerTurn] = []
 
-    init(transcriber: Transcriber, model: SpeechModel, vocabulary: VocabularyStore?, onTranscript: @escaping @Sendable (FileTranscript) async -> Void) {
+    init(
+        transcriber: Transcriber, model: SpeechModel, vocabulary: VocabularyStore?, role: LiveRole = .mixed,
+        onTranscript: @escaping @Sendable (FileTranscript) async -> Void
+    ) {
         self.transcriber = transcriber
         self.model = model
         self.vocabulary = vocabulary
+        self.role = role
         self.onTranscript = onTranscript
     }
 
@@ -120,11 +138,17 @@ actor LiveTranscriber {
     func finish() async throws -> FileTranscript {
         let seconds = chunker.seconds
         try await process(chunker.flush() ?? AudioChunk(start: seconds, samples: []), isLast: true)
+        if case .system(let echo) = role { await echo.finish() }
         return LiveTranscript.make(emitted, seconds: seconds)
     }
 
     private func process(_ chunk: AudioChunk, isLast: Bool) async throws {
-        let words = try await recognize(chunk)
+        var words = await recognizeOrSkip(chunk)
+        switch role {
+        case .mixed: break
+        case .system(let echo): await echo.heard(words, until: chunk.start + Double(chunk.samples.count) / RecordingFilter.sampleRate)
+        case .microphone(let echo): words = await echo.removeEcho(from: words)
+        }
         var spans: [SpeakerSpan] = []
         var diarizedUntil = Double.infinity
         if let diarizer {
@@ -139,13 +163,27 @@ actor LiveTranscriber {
         let known = vocabulary?.wordsOrLogged() ?? []
         let ready = turns.take(words, spans: spans, diarizedUntil: diarizedUntil)
         guard !ready.isEmpty else { return }
-        emitted += ready.map { $0.applying(rules, words: known) }
+        emitted += ready.map { turn in
+            let fixed = turn.applying(rules, words: known)
+            guard case .microphone = role else { return fixed }
+            return SpeakerTurn(speaker: 0, start: fixed.start, end: fixed.end, text: fixed.text, you: true)
+        }
         await onTranscript(LiveTranscript.make(emitted, seconds: chunker.seconds))
+    }
+
+    /// One chunk the model fails on loses those seconds, not the whole meeting
+    private func recognizeOrSkip(_ chunk: AudioChunk) async -> [TimedWord] {
+        do {
+            return try await recognize(chunk)
+        } catch {
+            Log.extensions.error("Live transcription skipped \(chunk.samples.count / Int(RecordingFilter.sampleRate), privacy: .public) seconds: \(error.localizedDescription, privacy: .public)")
+            return []
+        }
     }
 
     private func recognize(_ chunk: AudioChunk) async throws -> [TimedWord] {
         guard !chunk.samples.isEmpty else { return [] }
-        let result = try await transcriber.recognize(chunk.samples, model: model) { _ in }
+        let result = try await transcriber.recognize(chunk.samples, model: model)
         return buildWordTimings(from: result.tokenTimings ?? []).map {
             TimedWord(text: $0.word, start: chunk.start + $0.startTime, end: chunk.start + $0.endTime)
         }

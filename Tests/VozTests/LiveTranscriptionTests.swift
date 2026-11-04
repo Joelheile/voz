@@ -65,3 +65,52 @@ struct LiveTranscriptTests {
         ]))
     }
 }
+
+struct LiveEchoTests {
+    private func words(_ text: String, from start: Double) -> [TimedWord] {
+        text.split(separator: " ").enumerated().map { TimedWord(text: String($1), start: start + Double($0) * 0.4, end: start + Double($0) * 0.4 + 0.3) }
+    }
+
+    @Test func dropsWhatTheMicrophoneHeardFromTheSpeakers() {
+        let played = words("Did you finish the quarterly report", from: 10)
+        let heard = words("did you finish the quarterly report", from: 10.2)
+        #expect(LiveEcho.remove(heard, played: played).isEmpty)
+    }
+
+    @Test func keepsTheUsersOwnWordsAndShortOverlaps() {
+        let played = words("so the report is late", from: 10)
+        let heard = words("yes so I will send it", from: 10.1)
+        #expect(LiveEcho.remove(heard, played: played).map(\.text) == ["yes", "so", "I", "will", "send", "it"])
+    }
+
+    @Test func keepsWordsThatMatchOnlyLongBefore() {
+        let played = words("quarterly report", from: 0)
+        let heard = words("quarterly report", from: 30)
+        #expect(LiveEcho.remove(heard, played: played).count == 2)
+    }
+
+    @Test func waitsForTheSystemAudioThenFilters() async {
+        let echo = LiveEcho()
+        Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            await echo.heard(words("quarterly report numbers", from: 1), until: 5)
+        }
+        let kept = await echo.removeEcho(from: words("quarterly report numbers", from: 1.1))
+        #expect(kept.isEmpty)
+    }
+}
+
+struct LiveTranscriptCombineTests {
+    @Test func putsTheUsersTurnsAndTheCallInTimeOrder() {
+        let you = FileTranscript(text: "Almost.", seconds: 8, speakers: 1, turns: [SpeakerTurn(speaker: 0, start: 4, end: 5, text: "Almost.", you: true)])
+        let call = FileTranscript(text: "Done? Great.", seconds: 9, speakers: 1, turns: [
+            SpeakerTurn(speaker: 1, start: 0, end: 2, text: "Done?"),
+            SpeakerTurn(speaker: 1, start: 6, end: 7, text: "Great."),
+        ])
+        let combined = LiveTranscript.combine(you: you, call: call)
+        #expect(combined.turns.map(\.text) == ["Done?", "Almost.", "Great."])
+        #expect(combined.turns.map(\.you) == [nil, true, nil])
+        #expect(combined.speakers == 2)
+        #expect(combined.seconds == 9)
+    }
+}

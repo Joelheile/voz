@@ -6,10 +6,15 @@ struct LevelBars: View {
     let model: IndicatorModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var isLive: Bool { model.state == .recording }
+    private var isLive: Bool { model.state == .recording || model.state == .activity }
+    /// Meetings run for an hour, so their bars redraw less often than a dictation's
+    private var frameInterval: Double? {
+        if reduceMotion { return 1.0 / 15 }
+        return model.state == .activity ? 1.0 / 30 : nil
+    }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: reduceMotion ? 1.0 / 15 : nil, paused: !isLive)) { timeline in
+        TimelineView(.animation(minimumInterval: frameInterval, paused: !isLive)) { timeline in
             let time = timeline.date.timeIntervalSinceReferenceDate
             HStack(spacing: LevelBarsGeometry.barSpacing) {
                 ForEach(0...LevelBarsGeometry.barCount, id: \.self) { slot in

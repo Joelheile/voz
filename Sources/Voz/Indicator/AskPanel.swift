@@ -1,10 +1,13 @@
 import AppKit
+import LucideSwift
 import SwiftUI
 
 @MainActor
 @Observable
 final class AskModel {
     var title = ""
+    var message: String?
+    var icon: LucideIconName?
     var fields: [AskField] = []
     var buttons: [String] = []
     var texts: [String: String] = [:]
@@ -12,6 +15,8 @@ final class AskModel {
 
     func load(_ params: AskParams) {
         title = params.title
+        message = params.message
+        icon = params.icon.flatMap(ExtensionsModel.lucideIcon(named:))
         fields = params.fields
         buttons = params.buttons
         texts = [:]
@@ -106,6 +111,44 @@ struct AskView: View {
     private var isSingleText: Bool { model.fields.count == 1 && model.fields[0].type == .text }
 
     var body: some View {
+        Group {
+            if model.fields.isEmpty, model.buttons.count > 1 { prompt } else { form }
+        }
+        .frame(width: AskController.width)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous))
+        .onAppear { if isSingleText { focused = model.fields[0].id } }
+    }
+
+    /// A question with only buttons fits one row, like a notification, and its first button dismisses it
+    private var prompt: some View {
+        HStack(spacing: 10) {
+            if let icon = model.icon {
+                Icon(icon, size: 16)
+                    .foregroundStyle(Theme.ink)
+                    .frame(width: 32, height: 32)
+                    .background(Theme.selected, in: RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous))
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(model.title)
+                    .font(.ui(13, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+                if let message = model.message {
+                    Text(message)
+                        .font(.ui(12))
+                        .foregroundStyle(Theme.inkSecondary)
+                }
+            }
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            buttons(.small)
+        }
+        .padding(.leading, model.icon == nil ? 14 : 10)
+        .padding(.trailing, 10)
+        .padding(.vertical, 10)
+    }
+
+    private var form: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 0) {
                 Text(model.title)
@@ -132,24 +175,28 @@ struct AskView: View {
                     }
                 }
             }
-            HStack(spacing: 6) {
+            HStack(spacing: 0) {
                 Spacer(minLength: 0)
-                ForEach(Array(model.buttons.enumerated()), id: \.offset) { index, button in
-                    if index == model.buttons.count - 1 {
-                        Button(button) { onAnswer(button) }
-                            .buttonStyle(.pill(.accent, .regular))
-                            .keyboardShortcut(.defaultAction)
-                    } else {
-                        Button(button) { onAnswer(button) }
-                            .buttonStyle(.pill(.quiet, .regular))
-                    }
-                }
+                buttons(.regular)
             }
         }
         .padding(12)
-        .frame(width: AskController.width)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous))
-        .onAppear { if isSingleText { focused = model.fields[0].id } }
+    }
+
+    private func buttons(_ size: PillSize) -> some View {
+        HStack(spacing: 6) {
+            ForEach(Array(model.buttons.enumerated()), id: \.offset) { index, button in
+                if index == model.buttons.count - 1 {
+                    Button(button) { onAnswer(button) }
+                        .buttonStyle(.pill(.accent, size))
+                        .keyboardShortcut(.defaultAction)
+                } else {
+                    Button(button) { onAnswer(button) }
+                        .buttonStyle(.pill(.quiet, size))
+                }
+            }
+        }
+        .fixedSize()
     }
 
     @ViewBuilder

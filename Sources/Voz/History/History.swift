@@ -120,6 +120,11 @@ final class HistoryStore: Sendable {
             try database.create(index: "draft_on_threadID", on: DraftRecord.databaseTableName, columns: ["threadID", "createdAt"])
             try database.create(index: "draft_on_source", on: DraftRecord.databaseTableName, columns: ["source", "createdAt"])
         }
+        migrator.registerMigration("v7-history-copies") { database in
+            try database.alter(table: TranscriptRecord.databaseTableName) { table in
+                table.add(column: "copies", .text)
+            }
+        }
         return migrator
     }
 
@@ -239,6 +244,7 @@ struct TranscriptRecord: Codable, FetchableRecord, PersistableRecord, Identifiab
     var source: String?
     var file: String?
     var threadID: UUID?
+    var copies: [HistoryCopy]?
 
     init(
         id: UUID = UUID(),
@@ -256,7 +262,8 @@ struct TranscriptRecord: Codable, FetchableRecord, PersistableRecord, Identifiab
         cleanupTimedOut: Bool = false,
         source: String? = nil,
         file: String? = nil,
-        threadID: UUID? = nil
+        threadID: UUID? = nil,
+        copies: [HistoryCopy]? = nil
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -275,10 +282,11 @@ struct TranscriptRecord: Codable, FetchableRecord, PersistableRecord, Identifiab
         self.source = source
         self.file = file
         self.threadID = threadID
+        self.copies = copies
     }
 
     init(_ entry: ExtensionHistoryEntry) {
         self.init(rawText: entry.text, audioSeconds: entry.seconds, sttMs: 0, totalMs: 0, model: entry.extension,
-                  appBundleID: nil, appName: nil, source: entry.extension, file: entry.file)
+                  appBundleID: nil, appName: nil, source: entry.extension, file: entry.file, copies: entry.copies)
     }
 }

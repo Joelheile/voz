@@ -103,7 +103,10 @@ private struct HomePage: View {
     private var isSearching: Bool { !history.query.isEmpty }
     private var showsSearch: Bool { isSearching || !records.isEmpty }
 
-    private var needsAttention: Bool { model.status != .ready }
+    /// Recording shows in the notch, so the menu only mentions it with the first dictation's hint
+    private var needsAttention: Bool {
+        model.status == .recording ? !model.hint.isEmpty : model.status != .ready
+    }
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -114,7 +117,6 @@ private struct HomePage: View {
                 }
                 header(proxy: proxy)
                 transcripts
-                ForEach(catalog.activities, id: \.id, content: activityRow)
                 if let words = starPromptWords {
                     StarCard(
                         words: words,
@@ -249,7 +251,7 @@ private struct HomePage: View {
             height: Self.rowHeight,
             selected: selectedID == record.id,
             copied: model.copiedID == record.id,
-            copy: { model.copy(record) },
+            copy: { model.copy(record, part: $0) },
             delete: { history.delete(record) },
             hover: { hovering in
                 if hovering {
@@ -260,24 +262,6 @@ private struct HomePage: View {
             }
         )
         .id(record.id)
-    }
-
-    private func activityRow(_ activity: ExtensionActivity) -> some View {
-        HStack(spacing: 8) {
-            Text(activity.title).font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink).lineLimit(1)
-            Text(activity.since, style: .timer).font(.meta).monospacedDigit().foregroundStyle(Theme.inkSecondary)
-            Spacer(minLength: 8)
-            if activity.openable {
-                Button("Open") { catalog.open(activity) }
-                    .buttonStyle(.pill(.quiet, .small))
-                    .fixedSize()
-            }
-            if activity.stoppable {
-                Button("Stop") { catalog.stop(activity) }
-                    .buttonStyle(.pill(.quiet, .small))
-                    .fixedSize()
-            }
-        }
     }
 
     private func countMilestoneShow() {
@@ -292,8 +276,17 @@ private struct HomePage: View {
         settings.milestoneShows = 0
     }
 
+    private var visibleActions: [ExtensionAction] { catalog.actions.filter { !$0.hidden } }
+    /// Actions with an icon sit in the nav bar. The rest stay buttons with their name.
+    private var iconActions: [(action: ExtensionAction, icon: LucideIconName)] {
+        visibleActions.compactMap { action in action.icon.flatMap(ExtensionsModel.lucideIcon(named:)).map { (action, $0) } }
+    }
+    private var namedActions: [ExtensionAction] {
+        visibleActions.filter { $0.icon.flatMap(ExtensionsModel.lucideIcon(named:)) == nil }
+    }
+
     private var hasActions: Bool {
-        updater.availableVersion != nil || milestone != nil || catalog.actions.contains { !$0.hidden }
+        updater.availableVersion != nil || milestone != nil || !namedActions.isEmpty
     }
 
     private var footer: some View {
@@ -307,6 +300,15 @@ private struct HomePage: View {
             }
             RowDivider()
             HStack(spacing: 2) {
+                ForEach(catalog.activities, id: \.id) { activity in
+                    ActivityPill(activity: activity, catalog: catalog)
+                        .transition(.opacity)
+                }
+                ForEach(iconActions, id: \.action.id) { item in
+                    NavButton(icon: item.icon, help: item.action.hotkeyLabel.map { "\(item.action.name) (\($0))" } ?? item.action.name) {
+                        catalog.run(item.action)
+                    }
+                }
                 NavButton(icon: .chartNoAxesColumn, help: "Insights") {
                     markMilestonesSeen()
                     model.page = .insights
@@ -327,7 +329,7 @@ private struct HomePage: View {
                     .buttonStyle(.pill(.accent, .small))
                     .fixedSize()
             }
-            ForEach(catalog.actions.filter { !$0.hidden }, id: \.id) { action in
+            ForEach(namedActions, id: \.id) { action in
                 Button(action.name) { catalog.run(action) }
                     .buttonStyle(.pill(.quiet, .small))
                     .fixedSize()
@@ -394,12 +396,12 @@ private struct TranscriptRow: View {
     let height: CGFloat
     let selected: Bool
     let copied: Bool
-    let copy: () -> Void
+    let copy: (HistoryCopy?) -> Void
     let delete: () -> Void
     let hover: (Bool) -> Void
 
     var body: some View {
-        Button(action: copy) {
+        Button { copy(nil) } label: {
             HStack(alignment: .top, spacing: 10) {
                 if record.source == nil {
                     AppIcon(bundleID: record.appBundleID, size: 22)
@@ -425,7 +427,10 @@ private struct TranscriptRow: View {
         .buttonStyle(.pressable(0.99))
         .help(record.source.map { "From \($0)" } ?? record.finalText)
         .contextMenu {
-            Button("Copy", action: copy)
+            Button("Copy") { copy(nil) }
+            ForEach(record.copies ?? [], id: \.name) { part in
+                Button("Copy \(part.name.lowercased())") { copy(part) }
+            }
             if let file = record.file {
                 Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: file)]) }
             }
@@ -436,7 +441,9 @@ private struct TranscriptRow: View {
     }
 
     private var text: AttributedString {
-        let snippet = TranscriptSnippet.text(record.finalText, around: query)
+        // Extensions such as meetings add Markdown summaries. Dictations stay as typed.
+        let shown = record.source == nil ? record.finalText : NoteMarkdown.plain(record.finalText)
+        let snippet = TranscriptSnippet.text(shown, around: query)
         var attributed = AttributedString(snippet)
         if snippet.hasPrefix("… "), let ellipsisEnd = attributed.index(attributed.startIndex, offsetByCharacters: 2) as AttributedString.Index? {
             attributed[attributed.startIndex..<ellipsisEnd].foregroundColor = Theme.inkTertiary
@@ -452,7 +459,14 @@ private struct TranscriptRow: View {
 
     @ViewBuilder
     private var trailing: some View {
-        if copied {
+        if let copies = record.copies, !copies.isEmpty, selected, !copied {
+            HStack(spacing: 4) {
+                ForEach(copies, id: \.name) { part in
+                    CopyPartButton(name: part.name) { copy(part) }
+                }
+            }
+            .transition(.opacity)
+        } else if copied {
             Text("Copied")
                 .font(.ui(11, weight: .medium))
                 .foregroundStyle(Theme.accent)
@@ -467,15 +481,38 @@ private struct TranscriptRow: View {
     }
 }
 
+/// A small text button that copies one part of a history entry, such as its transcript
+private struct CopyPartButton: View {
+    let name: String
+    let action: () -> Void
+    @State private var hovering = false
+
+    private let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
+
+    var body: some View {
+        Button(action: action) {
+            Text(name)
+                .font(.ui(11, weight: .medium))
+                .foregroundStyle(hovering ? Theme.ink : Theme.inkSecondary)
+                .padding(.horizontal, 7)
+                .frame(height: 20)
+                .background(hovering ? Theme.selectedStrong : Theme.selected, in: shape)
+                .contentShape(shape)
+        }
+        .buttonStyle(.pressable(0.96))
+        .onHover { hovering = $0 }
+        .animation(Theme.Motion.hover, value: hovering)
+        .help("Copy \(name.lowercased())")
+    }
+}
+
 private struct RecordingMark: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dimmed = false
 
     var body: some View {
-        Circle()
-            .fill(Theme.recording)
-            .frame(width: 8, height: 8)
-            .background(Circle().fill(Theme.recording.opacity(0.25)).padding(-3))
+        Icon(.circleDot, size: 14)
+            .foregroundStyle(Theme.recording)
             .opacity(dimmed ? 0.35 : 1)
             .animation(.easeInOut(duration: 1.1).repeatForever(), value: dimmed)
             .onAppear { dimmed = !reduceMotion }
@@ -564,6 +601,38 @@ private struct MilestoneBadge: View {
         .onHover { hovering = $0 }
         .animation(Theme.Motion.hover, value: hovering)
     }
+}
+
+/// A running activity, such as a meeting, in the nav bar: its time, then Pause or Play, or Stop when it can't pause
+private struct ActivityPill: View {
+    let activity: ExtensionActivity
+    let catalog: ExtensionCatalog
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if !activity.stoppable {
+                ProgressView().controlSize(.mini).frame(width: 14, height: 14)
+            }
+            Text(
+                timerInterval: activity.since...activity.since.addingTimeInterval(Self.longest),
+                countsDown: false
+            )
+            .font(.meta)
+            .monospacedDigit()
+            .foregroundStyle(Theme.inkSecondary)
+            .padding(.trailing, activity.stoppable ? 0 : 4)
+            if activity.stoppable {
+                IconButton(icon: .square, help: "Stop: \(activity.title)") { catalog.stop(activity) }
+            }
+        }
+        .padding(.leading, 10)
+        .frame(minHeight: 30)
+        .fixedSize()
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(activity.title)
+    }
+
+    private static let longest: TimeInterval = 24 * 3600
 }
 
 private struct NavButton: View {

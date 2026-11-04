@@ -295,7 +295,7 @@ final class ExtensionsModel: ObservableObject {
         return package?.icon.flatMap(lucideIcon(named:)) ?? .puzzle
     }
 
-    private nonisolated static func lucideIcon(named kebabName: String) -> LucideIconName? {
+    nonisolated static func lucideIcon(named kebabName: String) -> LucideIconName? {
         let words = kebabName.split(separator: "-")
         let camelName = words.prefix(1).joined() + words.dropFirst().map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined()
         return LucideIconName(rawValue: camelName)

@@ -578,9 +578,37 @@ private struct SettingControl: View {
             }
             .labelsHidden()
             .fixedSize()
+        case (.string, _) where field.folder == true:
+            Button(action: chooseFolder) {
+                HStack(spacing: 6) {
+                    Icon(.folder, size: 13).foregroundStyle(Theme.inkSecondary)
+                    Text(value.text.isEmpty ? "Choose" : URL(fileURLWithPath: value.text).lastPathComponent)
+                        .font(.meta)
+                        .foregroundStyle(Theme.ink)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                .frame(maxWidth: Self.fieldWidth, alignment: .leading)
+                .fieldBackground(.small)
+            }
+            .buttonStyle(.pressable(0.97))
+            .help(value.text.isEmpty ? "Choose a folder" : value.text)
         default:
             entry
         }
+    }
+
+    private func chooseFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.prompt = "Choose"
+        panel.message = field.title
+        if !value.text.isEmpty { panel.directoryURL = URL(fileURLWithPath: (value.text as NSString).expandingTildeInPath) }
+        NSApp.activate()
+        guard panel.runModal() == .OK, let url = panel.url, url.path != value.text else { return }
+        save(.string(url.path))
     }
 
     private var entry: some View {

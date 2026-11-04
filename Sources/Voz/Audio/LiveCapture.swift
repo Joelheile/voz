@@ -40,22 +40,28 @@ enum LiveCaptureError: LocalizedError {
     }
 }
 
-/// Records the microphone, and optionally everything the Mac plays, as 16 kHz mono
+enum LiveSource: Sendable {
+    case mixed, microphone, system
+}
+
+/// Records the microphone, and optionally everything the Mac plays, as 16 kHz mono. With `separate`, the two arrive on their own.
 final class LiveCapture: @unchecked Sendable {
     private static let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: RecordingFilter.sampleRate, channels: 1, interleaved: false)!
 
     private let microphone: AudioDeviceID?
     private let systemAudio: Bool
-    private let onSamples: @Sendable ([Float]) -> Void
+    private let separate: Bool
+    private let onSamples: @Sendable (LiveSource, [Float]) -> Void
     private let mix = Mutex(LiveMix())
     private var microphoneQueue: MicrophoneQueue?
     private var tap = AudioObjectID(kAudioObjectUnknown)
     private var device = AudioObjectID(kAudioObjectUnknown)
     private var ioProc: AudioDeviceIOProcID?
 
-    init(microphone: AudioDeviceID?, systemAudio: Bool, onSamples: @escaping @Sendable ([Float]) -> Void) {
+    init(microphone: AudioDeviceID?, systemAudio: Bool, separate: Bool = false, onSamples: @escaping @Sendable (LiveSource, [Float]) -> Void) {
         self.microphone = microphone
         self.systemAudio = systemAudio
+        self.separate = separate && systemAudio
         self.onSamples = onSamples
     }
 
@@ -86,7 +92,8 @@ final class LiveCapture: @unchecked Sendable {
     private func startMicrophone() throws {
         let queue = try MicrophoneQueue(device: microphone) { [weak self] samples in
             guard let self else { return }
-            deliver(systemAudio ? mix.withLock { $0.add(mic: samples) } : samples)
+            if separate { return deliver(samples, from: .microphone) }
+            deliver(systemAudio ? mix.withLock { $0.add(mic: samples) } : samples, from: .mixed)
         }
         try queue.start()
         microphoneQueue = queue
@@ -118,13 +125,14 @@ final class LiveCapture: @unchecked Sendable {
                 let pcm = AVAudioPCMBuffer(pcmFormat: tapFormat, bufferListNoCopy: input, deallocator: nil),
                 let samples = resampler.convert(pcm)
             else { return }
-            deliver(mix.withLock { $0.add(system: samples) })
+            if separate { return deliver(samples, from: .system) }
+            deliver(mix.withLock { $0.add(system: samples) }, from: .mixed)
         }, "create IO proc")
         try check(AudioDeviceStart(device, ioProc), "start IO")
     }
 
-    private func deliver(_ samples: [Float]) {
-        if !samples.isEmpty { onSamples(samples) }
+    private func deliver(_ samples: [Float], from source: LiveSource) {
+        if !samples.isEmpty { onSamples(source, samples) }
     }
 
     private static func defaultOutputUID() throws -> String {

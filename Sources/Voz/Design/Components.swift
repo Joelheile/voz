@@ -126,12 +126,14 @@ extension ButtonStyle where Self == QuietTextButtonStyle {
 struct IconButton: View {
     let icon: LucideIconName
     let help: String
+    var size: CGFloat = 15
+    var strokeWidth: CGFloat = 1.25
     let action: () -> Void
     @State private var hovering = false
 
     var body: some View {
         Button(action: action) {
-            Icon(icon, size: 15)
+            Icon(icon, size: size, strokeWidth: strokeWidth)
                 .foregroundStyle(hovering ? Theme.ink : Theme.inkSecondary)
                 .frame(width: 28, height: 28)
                 .background(hovering ? Theme.selected : .clear, in: RoundedRectangle(cornerRadius: Theme.Radius.control))

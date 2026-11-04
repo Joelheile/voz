@@ -294,6 +294,7 @@ actor ExtensionHost {
         case "actions": decodeNotification(ActionsParams.self, line).map { onAction(.actions($0.actions)) }
         case "startActivity": decodeNotification(ExtensionActivity.self, line).map { onAction(.startActivity($0)) }
         case "endActivity": decodeNotification(IDParams.self, line).map { onAction(.endActivity($0.id)) }
+        case "stopActivity": decodeNotification(IDParams.self, line).map { onAction(.stopActivity($0.id)) }
         case "openNote": decodeNotification(ExtensionNote.self, line).map { onAction(.openNote($0)) }
         case "closeNote": decodeNotification(IDParams.self, line).map { onAction(.closeNote($0.id)) }
         case "addHistory": decodeNotification(ExtensionHistoryEntry.self, line).map { onAction(.addHistory($0)) }
@@ -320,8 +321,13 @@ actor ExtensionHost {
                 }
             }
         case "ask":
-            guard let requestID = envelope.requestID else { return onLog("Extension asked outside a handler") }
             decodeNotification(AskParams.self, line).map { params in
+                // Asked outside a handler, such as when a meeting starts, so no handler waits on the answer
+                guard let requestID = envelope.requestID else {
+                    return reply(to: params.call, deadline: params.deadline, as: "asked") { [ask] in
+                        String(decoding: try JSONEncoder().encode(await ask(params)), as: UTF8.self)
+                    }
+                }
                 asking[requestID, default: 0] += 1
                 reply(to: params.call, deadline: params.deadline, as: "asked") { [weak self, ask] in
                     let answer = await ask(params)

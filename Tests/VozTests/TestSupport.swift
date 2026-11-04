@@ -116,6 +116,8 @@ func startedActivity(_ id: String, _ title: String, since seconds: Double, stopp
     .startActivity(ExtensionActivity(id: id, title: title, since: Date(timeIntervalSince1970: seconds), stoppable: stoppable, openable: openable))
 }
 
+func date(_ seconds: Double) -> Date { Date(timeIntervalSince1970: seconds) }
+
 private struct HostLaunch: Encodable {
     let home: String
     let settings: String

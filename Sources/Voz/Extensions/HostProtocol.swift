@@ -73,6 +73,7 @@ struct ExtensionAction: Decodable, Equatable, Hashable, Sendable {
     let name: String
     let hotkey: String?
     let hidden: Bool
+    var icon: String? = nil
     let `extension`: String
     var when: ActionCondition? = nil
 
@@ -133,6 +134,7 @@ struct SettingField: Decodable, Equatable, Sendable {
     let `default`: SettingValue
     let options: [String]?
     let secret: Bool?
+    let folder: Bool?
     let required: Bool?
 
     func needsValue(in config: [String: SettingValue]) -> Bool {
@@ -237,6 +239,7 @@ enum HostAction: Equatable, Sendable {
     case notify(String)
     case startActivity(ExtensionActivity)
     case endActivity(String)
+    case stopActivity(String)
     case openNote(ExtensionNote)
     case closeNote(String)
     case addHistory(ExtensionHistoryEntry)
@@ -300,6 +303,8 @@ struct AskParams: Decodable, Equatable, Sendable {
     let call: Int
     let deadline: Double
     let title: String
+    var message: String?
+    var icon: String?
     let fields: [AskField]
     let buttons: [String]
     /// Milliseconds the handler had left when it asked. Its clock restarts with this much once the user answers.
@@ -355,6 +360,13 @@ struct ExtensionHistoryEntry: Decodable, Equatable, Sendable {
     let text: String
     let seconds: Double
     let file: String?
+    var copies: [HistoryCopy]? = nil
+}
+
+/// Another part of a history entry the user can copy on its own, such as a meeting's notes or transcript
+struct HistoryCopy: Codable, Equatable, Sendable {
+    let name: String
+    let text: String
 }
 
 struct HostLaunchArguments: Encodable {
@@ -396,6 +408,7 @@ struct LiveStartParams: Decodable, Sendable {
     let activity: String
     let speakers: Bool
     let systemAudio: Bool
+    let you: Bool?
     let deadline: Double
 }
 

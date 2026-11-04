@@ -63,6 +63,17 @@ import Testing
         #expect(utcSearchDays("invoice", at: noon) == nil)
     }
 
+    @Test func extensionEntriesKeepTheirPartsToCopy() throws {
+        let path = makeTemporaryStorePath()
+        defer { removeFile(atPath: path) }
+        let parts = [HistoryCopy(name: "Notes", text: "ship fri"), HistoryCopy(name: "Transcript", text: "Speaker 1: Ship it")]
+        try HistoryStore(path: path).insert(TranscriptRecord(ExtensionHistoryEntry(extension: "voz-meeting", text: "Summary", seconds: 60, file: nil, copies: parts)))
+        try HistoryStore(path: path).insert(makeRecord("plain", at: 2))
+        let saved = try HistoryStore(path: path).search("")
+        #expect(saved.first { $0.source == "voz-meeting" }?.copies == parts)
+        #expect(saved.first { $0.source == nil }?.copies == nil)
+    }
+
     @Test func recordsPersistOnDiskUntilDeleted() async throws {
         let path = makeTemporaryStorePath()
         defer { removeFile(atPath: path) }

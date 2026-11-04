@@ -83,7 +83,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 updater: updater
             ),
             analytics: analytics,
-            copy: { [output] in output.copy($0.finalText) },
+            copy: { [output] in output.copy($0) },
             checkForUpdates: { [weak self] in self?.updater.checkForUpdates() },
             retryModel: { [weak self] in self?.retryModel() },
             finishSetup: { [weak self] in self?.finishSetup() },
@@ -115,9 +115,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if case .done = outcome { self?.suggestStarIfDue() }
         }
         indicator.onCancelWork = { [weak self] in self?.extensions.cancelWork() }
+        indicator.live = extensions.liveStatus
         indicator.onOpenActivity = { [catalog = extensions.catalog] in catalog.open($0) }
+        indicator.onStopActivity = { [catalog = extensions.catalog] in catalog.stop($0) }
         extensions.catalog.$activities
-            .map { $0.first(where: \.openable) }
+            .map { $0.first(where: \.openable) ?? $0.first }
             .removeDuplicates()
             .sink { [indicator] in indicator.show($0) }
             .store(in: &cancellables)

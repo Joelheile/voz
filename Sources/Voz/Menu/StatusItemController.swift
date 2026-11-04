@@ -98,7 +98,7 @@ final class StatusItemController: NSObject {
         dictation: Dictation,
         sources: PopoverSources,
         analytics: Analytics,
-        copy: @escaping (TranscriptRecord) -> Void,
+        copy: @escaping (String) -> Void,
         checkForUpdates: @escaping () -> Void,
         retryModel: @escaping () -> Void,
         finishSetup: @escaping () -> Void,

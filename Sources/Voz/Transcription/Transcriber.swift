@@ -73,13 +73,17 @@ actor Transcriber {
         return TranscriptionResult(text: text, audioSeconds: result.duration, processingSeconds: result.processingTime, model: model.rawValue)
     }
 
-    func recognize(_ samples: [Float], model: SpeechModel, progress: @escaping @Sendable (Double) -> Void) async throws -> ASRResult {
+    /// FluidAudio shares one progress stream per model, and two readers crash it. Live chunks run side by side, so they pass no `progress`.
+    func recognize(_ samples: [Float], model: SpeechModel, progress: (@Sendable (Double) -> Void)? = nil) async throws -> ASRResult {
         let manager = try await manager(for: model)
-        let fractions = await manager.transcriptionProgressStream
-        let reporter = Task {
-            for try await fraction in fractions { progress(fraction) }
+        var reporter: Task<Void, any Error>?
+        if let progress {
+            let fractions = await manager.transcriptionProgressStream
+            reporter = Task {
+                for try await fraction in fractions { progress(fraction) }
+            }
         }
-        defer { reporter.cancel() }
+        defer { reporter?.cancel() }
         var decoderState = TdtDecoderState.make()
         return try await manager.transcribe(samples, decoderState: &decoderState, language: scriptFilter)
     }
