@@ -91,7 +91,11 @@ private struct HomePage: View {
     @State private var usage: UsageStats?
 
     private var milestone: Milestone? { usage.flatMap { Milestone.unseen(in: $0, seen: settings.milestonesSeen) } }
-    private var asksForStar: Bool { !settings.starPromptDismissed && usage.map(StarPrompt.isDue) == true }
+    private var starPromptWords: Int? {
+        guard !settings.starPromptDismissed, let usage,
+              StarPrompt.isDue(in: usage, dismissals: settings.starPromptDismissals) else { return nil }
+        return usage[.all].words
+    }
 
     private var records: [TranscriptRecord] { history.records }
     private var isSearching: Bool { !history.query.isEmpty }
@@ -109,8 +113,12 @@ private struct HomePage: View {
                 header(proxy: proxy)
                 transcripts
                 ForEach(catalog.activities, id: \.id, content: activityRow)
-                if asksForStar {
-                    StarCard { withAnimation(Theme.Motion.section) { settings.starPromptDismissed = true } }
+                if let words = starPromptWords {
+                    StarCard(
+                        words: words,
+                        starred: { withAnimation(Theme.Motion.section) { settings.starPromptDismissed = true } },
+                        dismiss: { withAnimation(Theme.Motion.section) { settings.starPromptDismissals += 1 } }
+                    )
                 }
                 footer
             }
@@ -497,6 +505,8 @@ private struct IndeterminateBar: View {
 }
 
 private struct StarCard: View {
+    let words: Int
+    let starred: () -> Void
     let dismiss: () -> Void
 
     var body: some View {
@@ -506,14 +516,17 @@ private struct StarCard: View {
                 .padding(.top, 1)
             VStack(alignment: .leading, spacing: 10) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Enjoying Voz?").font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
-                    Text("It's free and open source. A star on GitHub helps other developers find it.")
+                    Text("You've dictated \(words.formatted()) words with Voz")
+                        .font(.ui(13, weight: .medium))
+                        .foregroundStyle(Theme.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Enjoying it? Give it a star on GitHub so other developers can find it.")
                         .font(.meta)
                         .lineSpacing(2)
                         .foregroundStyle(Theme.inkSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                StarButton(title: "Star on GitHub", kind: .accent, starred: dismiss)
+                StarButton(title: "Star on GitHub", kind: .accent, starred: starred)
             }
             Spacer(minLength: 0)
             IconButton(icon: .x, help: "Dismiss", action: dismiss)

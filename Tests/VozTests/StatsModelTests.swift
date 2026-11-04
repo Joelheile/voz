@@ -74,7 +74,16 @@ import Testing
     }
 
     @Test func asksForAStarAfterTenDictations() {
-        #expect(!StarPrompt.isDue(in: usage(dictations: 9)))
-        #expect(StarPrompt.isDue(in: usage(dictations: 10)))
+        #expect(!StarPrompt.isDue(in: usage(dictations: 9), dismissals: 0))
+        #expect(StarPrompt.isDue(in: usage(dictations: 10), dismissals: 0))
+    }
+
+    @Test func asksOnceMoreAfterADismissal() {
+        #expect(!StarPrompt.isDue(in: usage(dictations: 99), dismissals: 1))
+        #expect(StarPrompt.isDue(in: usage(dictations: 100), dismissals: 1))
+    }
+
+    @Test func stopsAskingAfterTheSecondDismissal() {
+        #expect(!StarPrompt.isDue(in: usage(dictations: 10_000), dismissals: 2))
     }
 }

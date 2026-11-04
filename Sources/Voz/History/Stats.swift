@@ -220,9 +220,10 @@ struct Milestone: Equatable {
 }
 
 enum StarPrompt {
-    static let dictations = 10
+    static let asks = [10, 100]
 
-    static func isDue(in stats: UsageStats) -> Bool {
-        stats[.all].dictations >= dictations
+    static func isDue(in stats: UsageStats, dismissals: Int) -> Bool {
+        guard dismissals < asks.count else { return false }
+        return stats[.all].dictations >= asks[dismissals]
     }
 }
