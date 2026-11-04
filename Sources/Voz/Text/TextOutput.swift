@@ -3,7 +3,7 @@ import AppKit
 @MainActor
 final class TextOutput {
     private static let pasteDelay: TimeInterval = 0.05
-    private static let restoreDelay: TimeInterval = 0.25
+    private static let restoreDelay: TimeInterval = 1.0
     private static let privateMarkers = [NSPasteboard.PasteboardType("org.nspasteboard.TransientType"), NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType")]
 
     private let settings: AppSettings
