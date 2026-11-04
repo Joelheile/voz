@@ -126,6 +126,11 @@ private struct HomePage: View {
     @ViewBuilder
     private var statusAction: some View {
         switch model.status {
+        case .loadingModel:
+            Button("Cancel") { settings.speechModel = SpeechModel.appleSpeech.rawValue }
+                .buttonStyle(.pill(.quiet, .small))
+                .fixedSize()
+                .help("Stop the download and use Apple speech")
         case let .permissionNeeded(fix):
             Button(fix.buttonTitle) { model.actions.fixPermission(fix) }
                 .buttonStyle(.pill(.ink, .small))
