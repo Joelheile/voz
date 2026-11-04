@@ -332,9 +332,8 @@ private struct ListingDetail: View {
                 .keyboardShortcut("[", modifiers: .command)
                 .padding(.leading, -6)
                 .padding(.trailing, -4)
-            Monogram(name: listing.name, size: 40)
             VStack(alignment: .leading, spacing: 2) {
-                Text(ExtensionsModel.displayName(listing.name)).font(.display(15)).foregroundStyle(Theme.ink)
+                Text(ExtensionsModel.displayName(listing.name)).font(.display(17)).foregroundStyle(Theme.ink)
                 Text("\(listing.publisher) \(listing.version)").font(.meta).foregroundStyle(Theme.inkTertiary).textSelection(.enabled)
             }
             Spacer(minLength: 0)
