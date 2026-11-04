@@ -319,7 +319,7 @@ private struct ListingDetail: View {
                             .padding(12)
                     }
             }
-            DetailHeader(name: listing.name, summary: listing.summary, byline: "\(listing.publisher) · \(listing.version)") {
+            DetailHeader(name: listing.name, summary: listing.summary, byline: "\(listing.publisher) \(listing.version)") {
                 Group {
                     if let stage = model.stage(for: listing.name) {
                         StageLabel(text: stage.label)
