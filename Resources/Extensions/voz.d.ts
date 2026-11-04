@@ -52,6 +52,25 @@ export type GenerateRequest<S extends Schema> = {
   prompt: string;
   instructions?: string;
   schema: S;
+  /**
+   * A tier, which runs the newest model of that tier on the user's account, or an exact ID from `ctx.models()`.
+   * An ID from another provider runs as the same tier, so `claude-opus-5-5` runs GPT-6.1 Sol for a ChatGPT user.
+   * Apple's on-device model ignores it. Default `balanced`.
+   * `on-device` runs Apple's model on the Mac whatever the user picked: free and private, for background work such as learning.
+   */
+  model?: ModelTier | "on-device" | (string & {});
+  /** How long the model thinks first. Default: the least it allows, which suits most writing. */
+  effort?: "low" | "medium" | "high";
+};
+
+/** `fast`: Haiku or Luna. `balanced`: Sonnet or Terra. `strong`: Opus or Sol. `max`: Fable or Astra. */
+export type ModelTier = "fast" | "balanced" | "strong" | "max";
+export type ModelInfo = { id: string; name: string; tier?: ModelTier };
+/** The models the user's account offers. `tiers` says which model each tier runs right now. */
+export type Models = {
+  provider: "apple" | "chatgpt" | "claude";
+  tiers: Partial<Record<ModelTier, string>>;
+  models: ModelInfo[];
 };
 
 export type TranscribeOptions = { speakers?: boolean };
@@ -103,19 +122,85 @@ export type Answer = {
   values: Record<string, string | number>;
 } | null;
 
+/** Offsets count UTF-16 code units, like JavaScript string indexes. */
+export type TextRange = { start: number; length: number };
+/**
+ * The text field that has focus. `before` and `after` hold the text on screen around it, such as the messages above a reply box.
+ * `label` is the field's description, title or placeholder. `window` is the window title.
+ * `thread` is the conversation the window shows, named after its title without unread counts or the app name. Pass its `id` to `voz.history`.
+ */
+export type Field = {
+  text: string;
+  selection: TextRange;
+  role: string;
+  label?: string;
+  window?: string;
+  before: string;
+  after: string;
+  thread?: Thread;
+};
+
+export type Thread = { id: string; title: string };
+
+/** `instruction` is what the user asked for, saved with the draft so `voz.history` can show it later. */
+export type InsertOptions = { instruction?: string };
+
+/** With `source`, only drafts that extension inserted. Without it, dictations too. `limit` defaults to 20, at most 100. */
+export type HistoryQuery = { thread?: string; source?: string; limit?: number };
+
+/**
+ * Something the user wrote, newest first. `text` is what ended up in the field: the user's edit when they changed a draft.
+ * Drafts also have the extension that wrote them as `source`, the `instruction`, the `input` it replaced, the `output` it inserted, and the `outcome`.
+ * `outcome` is `unknown` while Voz still watches the field or when it could not read it.
+ */
+export type Written = {
+  kind: "dictation" | "draft";
+  text: string;
+  /** Milliseconds since 1970, like `Date.now()` */
+  at: number;
+  thread?: string;
+  source?: string;
+  instruction?: string;
+  input?: string;
+  output?: string;
+  outcome?: "unknown" | "kept" | "edited" | "sent" | "removed";
+  /** The bundle ID of the app it was written in, when Voz knows the conversation */
+  app?: string;
+  /** The conversation's title, such as a person or channel, as in `Thread` */
+  threadTitle?: string;
+};
+
+/**
+ * The window in front, read through Accessibility. `text` is what it shows, top to bottom, without password fields, and with keys, tokens,
+ * card numbers and IBANs hidden. `thread` is the conversation it shows, as in `Field`.
+ */
+export type ScreenText = { app: string; window: string; thread?: string; text: string };
+
 export type TransformContext = { app: App };
 
 export type Context = TransformContext & {
-  insert(text: string): void;
+  /** Types text into the focused app. Voz saves it as a draft and watches whether the user keeps, edits, sends or removes it. */
+  insert(text: string, options?: InsertOptions): void;
   press(key: string): void;
   notify(text: string): void;
   generate<const S extends Schema>(
     request: GenerateRequest<S>,
   ): Promise<Generated<S>>;
   transcribe(path: string, options?: TranscribeOptions): Promise<Transcript>;
+  /** Lists the models `generate` can use with the AI model the user picked in Settings. */
+  models(): Promise<Models>;
   openNote(note: NoteOptions): Note;
   /** Shows a card under the notch and waits for the user to press a button. The handler's time stops while it waits. */
   ask(options: AskOptions): Promise<Answer>;
+  /** Reads the focused text field through Accessibility. `null` for password fields, when no text field has focus, or when the app hides its text. */
+  field(): Promise<Field | null>;
+  /** Selects a range in the focused text field, so `insert` replaces it. `false` when the app refuses. */
+  select(range: TextRange): Promise<boolean>;
+  /**
+   * Shows a working state in the notch while `run` runs, then a checkmark, or a shake when it throws. The handler's time stops meanwhile.
+   * Esc or the X in the notch aborts `signal` and resolves `undefined` right away. Pass `signal` to `fetch` so the request stops too.
+   */
+  busy<T>(run: (signal: AbortSignal) => Promise<T>): Promise<T | undefined>;
 };
 
 /** `light` only removes fillers and fixes punctuation. `heavy` also applies the prompt, self-corrections, numbers and lists. */
@@ -166,7 +251,13 @@ export type Command = {
 export type Action = {
   id: string;
   name: string;
+  /**
+   * A chord such as "ctrl+opt+e", or a modifier key tapped on its own: "rightopt", "leftopt", "rightcmd", "leftcmd",
+   * "rightshift", "leftshift", "rightctrl", "leftctrl" or "fn". Actions can share a hotkey when `when` tells them apart.
+   */
   hotkey?: string;
+  /** "selection" runs this action only when text is selected. Another action on the same hotkey without `when` runs otherwise. */
+  when?: "selection";
   hidden?: boolean;
   run(ctx: Context): Awaitable<void>;
 };
@@ -186,6 +277,22 @@ export type Tool<S extends ObjectSchema = ObjectSchema> = {
   readOnly?: boolean;
   /** Return within 60 seconds. After that the caller gets an error. */
   run(input: Generated<S>, ctx: Context): Awaitable<unknown>;
+};
+
+/** A row in a list the user sees on the extension's page in Settings */
+export type ListItem = { id: string; title: string; detail?: string };
+
+/**
+ * A list on the extension's page in Settings, such as what it learned. Voz calls `items` when the page opens.
+ * With `remove`, each row gets a delete button.
+ */
+export type List = {
+  id: string;
+  title: string;
+  /** One line under the title, saying what the rows are */
+  description?: string;
+  items(): Awaitable<ListItem[]>;
+  remove?(id: string): Awaitable<void>;
 };
 
 export type ActionHandle = {
@@ -264,8 +371,22 @@ export type ExtensionAPI = {
   registerCleanupStep(step: CleanupStep): void;
   registerAction(action: Action): ActionHandle;
   registerTool<const S extends ObjectSchema>(tool: Tool<S>): void;
+  registerList(list: List): void;
+  /**
+   * Asks a model outside a handler, for background work. Use `model: "on-device"` to keep it on the Mac and free.
+   * Without it, it runs the model the user picked. Times out after 60 seconds.
+   */
+  generate<const S extends Schema>(request: GenerateRequest<S>): Promise<Generated<S>>;
   startActivity(activity: Activity): RunningActivity;
   addHistory(entry: HistoryEntry): void;
+  /** What the user wrote through Voz: dictations, and drafts with what happened to them. Read-only. */
+  history(query?: HistoryQuery): Promise<Written[]>;
+  /**
+   * Reads the window in front now. Null when Voz can't read it, as in password managers and private browser windows.
+   * Needs `"screen": true` under `"voz"` in the package.json, and the Extensions page shows that the extension reads the screen.
+   * Voz keeps nothing: the extension decides what to store, in `paths.data`.
+   */
+  screen(): Promise<ScreenText | null>;
   settings<Schema extends SettingsSchema>(
     schema: Schema,
   ): SettingsValues<Schema>;
@@ -273,6 +394,6 @@ export type ExtensionAPI = {
 
 export type Extension = (voz: ExtensionAPI) => Awaitable<void>;
 
-export const apiVersion: 7;
+export const apiVersion: 8;
 
 export function defineExtension(extension: Extension): Extension;

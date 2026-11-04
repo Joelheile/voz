@@ -19,7 +19,11 @@ struct ExtensionHostTests {
         transcribeFile: @escaping @Sendable (TranscribeFileParams) async throws -> FileTranscript = { _ in throw FileTranscriberError.needsParakeet },
         startLive: @escaping @Sendable (LiveStartParams, @escaping @Sendable (FileTranscript) async -> Void) async throws -> Void = { _, _ in throw FileTranscriberError.needsParakeet },
         stopLive: @escaping @Sendable (LiveStopParams) async throws -> FileTranscript = { throw LiveSessionError.unknown($0.session) },
-        ask: @escaping @Sendable (AskParams) async -> AskAnswer? = { _ in nil }
+        ask: @escaping @Sendable (AskParams) async -> AskAnswer? = { _ in nil },
+        field: @escaping @Sendable () async -> FocusedField? = { nil },
+        select: @escaping @Sendable (TextRange) async -> Bool = { _ in false },
+        history: @escaping @Sendable (HistoryParams) async throws -> [WrittenText] = { _ in [] },
+        screen: @escaping @Sendable () async -> ScreenText? = { nil }
     ) -> ExtensionHost {
         ExtensionHost(
             launch: .init(bun: installedBun!, script: hostScript, home: home, packageDirectories: packages.map(fileURL)),
@@ -30,7 +34,11 @@ struct ExtensionHostTests {
             transcribeFile: transcribeFile,
             startLive: startLive,
             stopLive: stopLive,
-            ask: ask
+            ask: ask,
+            field: field,
+            select: select,
+            history: history,
+            screen: screen
         )
     }
 
@@ -71,7 +79,7 @@ struct ExtensionHostTests {
         #expect(manifest.commands.map(\.phrase) == ["send it"])
         #expect(await host.beforeInsert(text: "hello", raw: "hello", app: app, timeout: .seconds(2)) == "")
         #expect(await host.runCommand(VoiceCommandMatch(phrase: "send it", at: .end, text: "hello"), app: app, timeout: .seconds(2)))
-        #expect(actions.all == [.insert("elsewhere"), .insert("[hello]"), .press("cmd+return"), .notify("sent")])
+        #expect(actions.all == [.insert(Insertion(text: "elsewhere", source: "a-route")), .insert(Insertion(text: "[hello]", source: "c-send")), .press("cmd+return"), .notify("sent")])
         await host.stop()
     }
 
@@ -143,6 +151,139 @@ struct ExtensionHostTests {
         #expect(params.buttons == ["Copy", "Add"])
         #expect(params.fields.map(\.type) == [.text, .date])
         #expect(params.fields.first?.value == .string("lunch"))
+        await host.stop()
+    }
+
+    @Test func busyWorkRunsPastTheCommandTimeout() async throws {
+        try extensionFile("slow.ts", #"export default (voz) => voz.registerCommand({ phrase: "reply", at: "start", async run(e, ctx) { const text = await ctx.busy(async () => { await Bun.sleep(1500); return "done" }); ctx.notify(text) } })"#)
+        let actions = RecordedActions()
+        let host = makeHost(actions: actions)
+        _ = try await host.start()
+        #expect(await host.runCommand(VoiceCommandMatch(phrase: "reply", at: .start, text: "x"), app: app, timeout: .seconds(1)))
+        #expect(actions.all == [.busy("busy/1"), .idle("busy/1", succeeded: true), .notify("done")])
+        await host.stop()
+    }
+
+    @Test func cancellingBusyWorkAbortsItsSignal() async throws {
+        try extensionFile("slow.ts", #"export default (voz) => voz.registerAction({ id: "wait", name: "Wait", async run(ctx) { let aborted = false; const result = await ctx.busy((signal) => new Promise((resolve) => signal.addEventListener("abort", () => { aborted = true; resolve("late") }))); ctx.notify(`${result} ${aborted}`) } })"#)
+        let actions = RecordedActions()
+        let host = makeHost(actions: actions)
+        _ = try await host.start()
+        let run = Task { await host.runAction("slow/wait", app: app, timeout: .seconds(5)) }
+        while !actions.all.contains(.busy("busy/1")) { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(await host.cancelBusy("busy/1", timeout: .seconds(2)))
+        #expect(await run.value)
+        #expect(actions.all.last == .notify("undefined true"))
+        await host.stop()
+    }
+
+    @Test func failedBusyWorkEndsAndRejects() async throws {
+        try extensionFile("slow.ts", #"export default (voz) => voz.registerAction({ id: "fail", name: "Fail", async run(ctx) { try { await ctx.busy(async () => { throw new Error("offline") }) } catch (error) { ctx.notify(error.message) } } })"#)
+        let actions = RecordedActions()
+        let host = makeHost(actions: actions)
+        _ = try await host.start()
+        #expect(await host.runAction("slow/fail", app: app, timeout: .seconds(2)))
+        #expect(actions.all == [.busy("busy/1"), .idle("busy/1", succeeded: false), .notify("offline")])
+        await host.stop()
+    }
+
+    @Test func actionsRewriteTheFocusedFieldThroughSelectAndInsert() async throws {
+        try extensionFile("rewrite.ts", #"export default (voz) => voz.registerAction({ id: "shout", name: "Shout", async run(ctx) { const field = await ctx.field(); const selected = await ctx.select({ start: 0, length: field.text.length }); ctx.insert(`${field.text.toUpperCase()} ${field.selection.start} ${field.label} ${field.before} ${selected}`, { instruction: field.thread.title }) } })"#)
+        let actions = RecordedActions()
+        let selected = Mutex<TextRange?>(nil)
+        let field = FocusedField(text: "hi tom", selection: TextRange(start: 3, length: 0), role: "AXTextArea", label: "Reply", window: nil, before: "Tom: lunch?", after: "",
+                                 thread: makeThread("Tom"))
+        let host = makeHost(actions: actions, field: { field }, select: { range in
+            selected.withLock { $0 = range }
+            return true
+        })
+        _ = try await host.start()
+        #expect(await host.runAction("rewrite/shout", app: app, timeout: .seconds(2)))
+        #expect(actions.all == [.insert(Insertion(text: "HI TOM 3 Reply Tom: lunch? true", source: "rewrite", instruction: "Tom"))])
+        #expect(selected.withLock { $0 } == TextRange(start: 0, length: 6))
+        await host.stop()
+    }
+
+    @Test func historyPassesTheQueryAndReturnsWhatYouWrote() async throws {
+        try extensionFile("reply.ts", #"export default (voz) => voz.registerAction({ id: "read", name: "Read", async run(ctx) { const [first] = await voz.history({ thread: "T", source: "reply", limit: 2.5 }); ctx.notify(`${first.kind} ${first.text} ${first.outcome} ${first.thread ?? "none"} ${(await voz.history()).length}`) } })"#)
+        let actions = RecordedActions()
+        let queries = Mutex<[HistoryParams]>([])
+        let host = makeHost(actions: actions, history: { params in
+            queries.withLock { $0.append(params) }
+            return [WrittenText(kind: .draft, text: "see you at 1", at: 1, thread: nil, source: "reply", instruction: nil, input: "", output: "See you at 1!", outcome: .edited)]
+        })
+        _ = try await host.start()
+        #expect(await host.runAction("reply/read", app: app, timeout: .seconds(2)))
+        #expect(actions.all == [.notify("draft see you at 1 edited none 1")])
+        let sent = queries.withLock { $0 }
+        #expect(sent.map(\.thread) == ["T", nil])
+        #expect(sent.map(\.source) == ["reply", nil])
+        #expect(sent.map(\.limit) == [2, nil])
+        await host.stop()
+    }
+
+    @Test func aListShowsWhatAnExtensionLearnedInTheBackground() async throws {
+        try extensionFile("style.ts", #"""
+            export default (voz) => {
+              const rules = ["Short"];
+              voz.registerList({ id: "style", title: "Writing style", items: () => rules.map((title, i) => ({ id: String(i), title })), remove: (id) => { rules.splice(Number(id), 1) } });
+              voz.generate({ prompt: "learn", schema: { type: "object", properties: { rule: { type: "string" } } }, model: "on-device" }).then(({ rule }) => rules.push(rule));
+            }
+            """#)
+        let models = Mutex<[String?]>([])
+        let host = makeHost(generate: { params in
+            models.withLock { $0.append(params.model) }
+            return #"{"rule":"No greetings"}"#
+        })
+        let manifest = try await host.start()
+        #expect(manifest.lists == [SettingsList(id: "style/style", title: "Writing style", description: "", removable: true, extension: "style")])
+        var items: [SettingsListItem] = []
+        for _ in 0..<100 where items.count < 2 {
+            items = try await host.list("style/style", timeout: .seconds(2))
+            if items.count < 2 { try await Task.sleep(for: .milliseconds(20)) }
+        }
+        #expect(items.map(\.title) == ["Short", "No greetings"])
+        #expect(models.withLock { $0 } == ["on-device"])
+        #expect(try await host.list("style/style", remove: "0", timeout: .seconds(2)).map(\.title) == ["No greetings"])
+        await host.stop()
+    }
+
+    @Test func browseKnowsWhichPackagesReadTheScreen() {
+        #expect(manifestReadsScreen(#"{"name": "voz-reply", "voz": {"apiVersion": 8, "screen": true}}"#))
+        #expect(!manifestReadsScreen(#"{"name": "voz-edit", "voz": {"apiVersion": 8}}"#))
+        #expect(!manifestReadsScreen("not json"))
+    }
+
+    @Test func onlyPackagesThatAskCanReadTheScreen() async throws {
+        let run = #"export default (voz) => voz.registerAction({ id: "read", name: "Read", async run(ctx) { try { const seen = await voz.screen(); ctx.notify(`${seen.app} ${seen.window} ${seen.text} ${seen.thread ?? "none"}`) } catch (error) { ctx.notify(error.message) } } })"#
+        let reader = home.packages.appendingPathComponent("node_modules/voz-reader")
+        try writeFile(#"{"name":"voz-reader","voz":{"apiVersion":8,"screen":true}}"#, named: "package.json", in: reader)
+        try writeFile(run, named: "index.ts", in: reader)
+        let other = home.packages.appendingPathComponent("node_modules/voz-other")
+        try writeFile(#"{"name":"voz-other","voz":{"apiVersion":8}}"#, named: "package.json", in: other)
+        try writeFile(run, named: "index.ts", in: other)
+        let actions = RecordedActions()
+        let reads = Mutex(0)
+        let host = makeHost(packages: [reader.path, other.path], actions: actions, screen: {
+            reads.withLock { $0 += 1 }
+            return ScreenText(app: "Linear", window: "VOZ-12", thread: nil, text: "invoice export fails")
+        })
+        let manifest = try await host.start()
+        #expect(manifest.screen == ["voz-reader"])
+        #expect(await host.runAction("voz-reader/read", app: app, timeout: .seconds(2)))
+        #expect(await host.runAction("voz-other/read", app: app, timeout: .seconds(2)))
+        #expect(actions.all == [.notify("Linear VOZ-12 invoice export fails none"), .notify(#"voz-other needs "screen": true under "voz" in its package.json to read the screen"#)])
+        #expect(reads.withLock { $0 } == 1)
+        await host.stop()
+    }
+
+    @Test func fieldIsNullWithoutAReadableTextField() async throws {
+        try extensionFile("rewrite.ts", #"export default (voz) => voz.registerAction({ id: "read", name: "Read", async run(ctx) { ctx.notify(String(await ctx.field())) } })"#)
+        let actions = RecordedActions()
+        let host = makeHost(actions: actions)
+        _ = try await host.start()
+        #expect(await host.runAction("rewrite/read", app: app, timeout: .seconds(2)))
+        #expect(actions.all == [.notify("null")])
         await host.stop()
     }
 
@@ -418,6 +559,17 @@ struct ExtensionHostTests {
         await host.stop()
     }
 
+    @Test func sharedHotkeyRunsTheSelectionActionWithASelection() {
+        let reply = ExtensionAction(id: "reply/reply", name: "Reply", hotkey: "rightopt", hidden: false, extension: "reply")
+        let edit = ExtensionAction(id: "edit/edit", name: "Edit", hotkey: "rightopt", hidden: false, extension: "edit", when: .selection)
+        #expect(ExtensionAction.pick([edit, reply], hasSelection: true) == edit)
+        #expect(ExtensionAction.pick([edit, reply], hasSelection: false) == reply)
+        #expect(ExtensionAction.pick([edit], hasSelection: false) == edit)
+        #expect(reply.hotkeyLabel == "Right ⌥")
+        #expect(Hotkey.tap(named: "RightOpt")?.keyCode == 61)
+        #expect(Hotkey.tap(named: "opt") == nil)
+    }
+
     @Test func hiddenActionsLeaveThePanelAndUpdatesReachVoz() async throws {
         try extensionFile("setup.ts", #"export default (voz) => { const done = voz.registerAction({ id: "done", name: "Done", hidden: true, run() {} }); const connect = voz.registerAction({ id: "connect", name: "Connect", hotkey: "ctrl+opt+t", run() { connect.update({ hidden: true }); done.update({ hidden: false }) } }) }"#)
         let actions = RecordedActions()
@@ -459,17 +611,17 @@ struct ExtensionHostTests {
         try writeFile(#"{"name":"pack"}"#, named: "package.json", in: pack)
         try writeFile(#"export default (voz) => voz.on("beforeInsert", () => ({ text: "pack ran" }))"#, named: "index.ts", in: pack.appendingPathComponent("extensions/a"))
         let future = home.packages.appendingPathComponent("node_modules/future")
-        try writeFile(#"{"name":"future","voz":{"apiVersion":8}}"#, named: "package.json", in: future)
+        try writeFile(#"{"name":"future","voz":{"apiVersion":9}}"#, named: "package.json", in: future)
         try writeFile("export default (voz) => { if (voz.registerWidget) voz.registerWidget({}) }", named: "index.ts", in: future)
         let needy = home.packages.appendingPathComponent("node_modules/needy")
-        try writeFile(#"{"name":"needy","voz":{"apiVersion":8}}"#, named: "package.json", in: needy)
+        try writeFile(#"{"name":"needy","voz":{"apiVersion":9}}"#, named: "package.json", in: needy)
         try writeFile("export default (voz) => voz.registerWidget({})", named: "index.ts", in: needy)
         let host = makeHost(packages: [pack.path, future.path, needy.path])
         let manifest = try await host.start()
         #expect(manifest.extensions == ["on", "future"])
         #expect(manifest.errors.map(\.extension) == ["needy"])
-        #expect(manifest.errors.first?.message.contains("written for Voz extension API 8, this Voz has 7. Update Voz.") == true)
-        #expect(await host.beforeInsert(text: "hi", raw: "hi", app: app, timeout: .seconds(2)) == "hi 7")
+        #expect(manifest.errors.first?.message.contains("written for Voz extension API 9, this Voz has 8. Update Voz.") == true)
+        #expect(await host.beforeInsert(text: "hi", raw: "hi", app: app, timeout: .seconds(2)) == "hi 8")
         await host.stop()
     }
 
@@ -666,6 +818,28 @@ struct ExtensionHostTests {
     #expect(try parseSource("git:github.com/me/repo") == .git(host: "github.com", path: "me/repo", ref: nil))
     for raw in ["git:../me/repo", "git:./me/repo", "https://../me/repo"] {
         #expect(throws: PackageSourceError.unrecognized(raw)) { try parseSource(raw) }
+    }
+}
+
+struct FieldContextTests {
+    /// 0 window ─ 1 thread [2 "Tom: lunch?", 3 "Ana: 12?"] ─ 4 composer [5 field, 6 "Send"] ─ 7 footer [8 "Draft saved", 9 text area "notes" [10 "notes"]]
+    private let children: [Int: [Int]] = [0: [1, 4, 7], 1: [2, 3], 4: [5, 6], 7: [8, 9], 9: [10]]
+    private let text: [Int: String] = [2: "Tom: lunch?", 3: "Ana: 12?", 6: "Send", 8: "Draft saved", 9: "notes", 10: "notes"]
+
+    private func parent(_ node: Int) -> Int? {
+        children.first { $0.value.contains(node) }?.key
+    }
+
+    @Test func readsSiblingsOutwardInScreenOrder() {
+        let around = FieldReader.surroundingText(of: 5, parent: parent, children: { children[$0] ?? [] }, text: { text[$0] })
+        #expect(around.before == "Tom: lunch?\nAna: 12?")
+        #expect(around.after == "Send\nDraft saved\nnotes")
+    }
+
+    @Test func keepsTheTextNearestTheField() {
+        let around = FieldReader.surroundingText(of: 5, limits: (before: 8, after: 6), parent: parent, children: { children[$0] ?? [] }, text: { text[$0] })
+        #expect(around.before == "Ana: 12?")
+        #expect(around.after == "Send\nD")
     }
 }
 

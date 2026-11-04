@@ -128,6 +128,12 @@ struct PackageListing: Codable, Equatable, Identifiable, Sendable {
             .map(PackageListing.init)
     }
 
+    /// Reads `"voz": { "screen": true }` from a package.json
+    static func readsScreen(_ manifest: Data) -> Bool {
+        let object = try? JSONSerialization.jsonObject(with: manifest) as? [String: Any]
+        return (object?["voz"] as? [String: Any])?["screen"] as? Bool == true
+    }
+
     static func decodePackument(_ data: Data) throws -> PackageListing {
         try PackageListing(JSONDecoder().decode(Packument.self, from: data))
     }

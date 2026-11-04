@@ -6,11 +6,11 @@ The full API for Voz extensions. The exact types are in `voz.d.ts` in a package 
 
 - Quick start, Examples, Loose files
 - API: every member, event and `ctx` call
-- On-device model, Audio files, Settings, Actions, Tools
-- Activities, Live transcription, Notes, Ask, History
+- On-device model, Background work, Audio files, Settings, Lists, Actions, Tools
+- Activities, Live transcription, Notes, Ask, Busy, Text fields, History
 - Per-app prompts, Models and cleanup steps
 - Limits: time budgets and what Voz does when they run out
-- Packages, Versions, Settings file, Bun, Security
+- Packages, What the user wrote, What the user saw, Versions, Settings file, Bun, Security
 
 ## Quick start
 
@@ -55,6 +55,8 @@ Each example is a published package you can install or copy as a starting point:
 | [voz-send-it](https://github.com/Joelheile/voz/tree/main/examples/send-it)   | Types the words before "send it", then presses Return             | `registerCommand`, `settings` |
 | [voz-mail](https://github.com/Joelheile/voz/tree/main/examples/mail)         | Formats dictations in Mail or Outlook as an email                 | `beforeCleanup`, `settings`   |
 | [voz-launcher](https://github.com/Joelheile/voz/tree/main/examples/launcher) | Runs dictations that start with "computer" instead of typing them | `beforeInsert`, `settings`    |
+| [voz-edit](https://github.com/Joelheile/voz/tree/main/examples/edit)         | Changes what you just dictated when you say "edit shorter"        | `ctx.field`, `ctx.busy`, `afterInsert`, `voz.history` |
+| [voz-reply](https://github.com/Joelheile/voz/tree/main/examples/reply)       | Drafts a reply in your tone from the conversation on screen       | `ctx.field`, `ctx.busy`, `voz.history`, `voz.screen` |
 
 ## Loose files
 
@@ -90,6 +92,10 @@ An extension does four kinds of things. The kind sets how much time it gets:
 | `voz.registerTool(tool)`            | Adds a command agents and the terminal run as `voz <extension> <id>`, and AI apps call over MCP. `tool` has `id`, `description`, an optional object schema `input`, `positional`, `readOnly` and `run(input, ctx)`, which returns JSON. See [Tools](#tools).                                                                                                                                                                                      |
 | `voz.startActivity(activity)`       | Shows that something keeps running, with an optional Stop button. Returns `{ end(), transcribeLive(options) }`. See [Activities](#activities).                                                                                                                                                                                                                                                                                                    |
 | `voz.addHistory(entry)`             | Adds an entry to the Voz history, such as a meeting transcript. See [History](#history).                                                                                                                                                                                                                                                                                                                                                          |
+| `voz.generate(request)`                         | Asks a model outside a handler, for background work such as learning. Takes the same request as `ctx.generate`, and `model: "on-device"` runs Apple's model whatever the user picked. See [Background work](#background-work).                       |
+| `voz.registerList(list)`                        | Adds a list to the extension's page in Settings, such as what it learned, with a delete button on each row. See [Lists](#lists).                                                                                                                      |
+| `voz.history(query)`                            | Reads what the user wrote through Voz: dictations, and drafts extensions inserted with what the user did with them. Read-only. See [What the user wrote](#what-the-user-wrote).                                                                       |
+| `voz.screen()`                                  | Reads the text of the window in front. Needs `"screen": true` in `package.json`, and Voz shows that the extension reads the screen. Voz keeps nothing. See [What the user saw](#what-the-user-saw).                                                       |
 | `voz.settings(schema)`              | Adds a settings form to the extension's row in the Extensions page, and returns the values. See [Settings](#settings).                                                                                                                                                                                                                                                                                                                            |
 | `voz.name`                          | The extension name: the file name, or the package name.                                                                                                                                                                                                                                                                                                                                                                                           |
 | `voz.paths`                         | `data` is `~/.voz/data/<name>`, a folder for the extension's own files.                                                                                                                                                                                                                                                                                                                                                                           |
@@ -109,19 +115,22 @@ Every handler gets `(event, ctx)`.
 `ctx` has the members below. In `beforeCleanup`, `beforeInsert` and cleanup steps, `ctx` has only `app`, because the others take longer than those 300 ms allow.
 
 - `ctx.app`: `bundleID` and `name` of the front app, and `website`, the hostname of the focused web page such as `github.com`. Voz reads it through Accessibility in Safari, Firefox and Chromium browsers, and never sends the path
-- `ctx.insert(text)`: inserts text into the front app
+- `ctx.insert(text, { instruction })`: inserts text into the front app. Voz saves it as a draft and watches what the user does with it. `instruction` is optional: what the user asked for. See [What the user wrote](#what-the-user-wrote)
 - `ctx.press(key)`: presses a key, such as `"return"`, `"cmd+return"` or `"shift+tab"`. Modifiers: `cmd`, `shift`, `opt`, `ctrl`
 - `ctx.notify(text)`: shows a short message under the menu bar
-- `ctx.generate({ prompt, instructions, schema })`: asks Apple's on-device model for JSON that fits `schema`. See [On-device model](#on-device-model)
+- `ctx.generate({ prompt, instructions, schema, model, effort })`: asks the user's AI model for JSON that fits `schema`. See [On-device model](#on-device-model)
+- `ctx.models()`: lists the models the user's account offers and which one each tier runs
 - `ctx.transcribe(path, { speakers })`: transcribes an audio or video file with Parakeet. See [Audio files](#audio-files)
 - `ctx.openNote({ title, text, onChange })`: opens a small note the user can move and type in. See [Notes](#notes)
 - `ctx.ask({ title, fields, buttons })`: shows a card under the notch and waits until the user presses a button. See [Ask](#ask)
+- `ctx.field()`: reads the focused text field, its selection and the text around it. `ctx.select(range)` selects part of it, so `insert` replaces that part. See [Text fields](#text-fields)
+- `ctx.busy(run)`: shows a working state in the notch that the user can cancel while `run` runs. See [Busy](#busy)
 
 Extensions can use any Bun or Node API, such as `fetch`, `Bun.spawn` and `node:fs`.
 
 ## On-device model
 
-`ctx.generate` runs Apple's on-device model, the same one Voz uses for cleanup. Nothing leaves the Mac. Use it to turn a dictation into fields:
+`ctx.generate` runs the model the user picks under Settings > AI model. The first time you press an extension's hotkey, Voz asks you to pick ChatGPT, a Claude API key or Apple's on-device model. Apple's is the same one Voz uses for cleanup, and nothing leaves the Mac. You can switch later with `voz ai`. Voz keeps those sign-ins in the Keychain, so extensions never see them. Use it to turn a dictation into fields:
 
 ```ts
 voz.registerCommand({
@@ -148,9 +157,36 @@ voz.registerCommand({
 
 - `schema` is a subset of JSON Schema: `object` with `properties` and `required`, `array` with `items`, `string` with an optional `enum`, `number`, `integer` and `boolean`. Each one can have a `description`, which the model reads
 - The result is typed from the schema. Properties not in `required` may be missing. A `required` name that is not in `properties` rejects the call
+- `model` picks a tier: `fast`, `balanced` (the default), `strong` or `max`. Each runs the newest model of that tier on the user's account, such as Haiku or Luna for `fast` and Opus or Sol for `strong`. Use `fast` for quick edits and `strong` for a reply someone will read
+- `model` also takes an exact ID from `ctx.models()` or `voz models`. An ID from the provider the user didn't pick runs as the same tier, so `claude-opus-5-5` runs GPT-6.1 Sol for a ChatGPT user
+- `effort: "low" | "medium" | "high"` lets the model think first. Leave it out for writing: the default is the least each model allows, which is fastest
+- Apple's model ignores `model` and `effort`
 - Voz orders the output the way you order `properties`. Put the fields the model should decide first at the top
 - The model is small. Give it the facts it can't know, such as today's date or the list of valid names, and use `enum` for fixed choices. Do date math in code
 - It takes one to three seconds, so call it in a command, an action or `afterInsert`. It fails if the handler's time runs out, or if Apple Intelligence is off
+
+### Background work
+
+`voz.generate` takes the same request as `ctx.generate` and runs outside a handler, such as on a timer. With `model: "on-device"`, it runs Apple's model whatever the user picked, so learning stays on the Mac and costs nothing. A small model can distill what the user does into short notes, and the user's picked model writes with them:
+
+```ts
+setInterval(async () => {
+  const drafts = await voz.history({ source: voz.name, limit: 50 });
+  const changed = drafts.filter((written) => written.outcome === "edited");
+  if (changed.length === 0) return;
+  const { rules } = await voz.generate({
+    instructions: "List short rules about how the user changes drafts. Style only, never content.",
+    prompt: changed.map((written) => `<draft>${written.output}</draft><sent>${written.text}</sent>`).join("\n"),
+    schema: { type: "object", properties: { rules: { type: "array", items: { type: "string" } } }, required: ["rules"] },
+    model: "on-device",
+  });
+  save(rules);
+}, 5 * 60_000);
+```
+
+- It times out after 60 seconds, and fails when Apple Intelligence is off. Catch the error: learning can wait for the next run
+- Apple's model reads about 4,000 tokens. Send a few short examples per call
+- Without `model: "on-device"`, it runs the model the user picked, and the text goes to that provider
 
 ## Audio files
 
@@ -209,6 +245,23 @@ const settings = voz.settings({
 
 `~/.voz/settings.json` is a plain file. Do not keep secrets there that you would not keep in your shell profile.
 
+## Lists
+
+`voz.registerList(list)` shows rows on the extension's page in Settings, such as what it learned about the user. Voz calls `items` when the page opens. With `remove`, each row gets a delete button:
+
+```ts
+voz.registerList({
+  id: "style",
+  title: "Writing style",
+  description: "What Reply learned from your edits",
+  items: () => notes.all().map((note) => ({ id: String(note.id), title: note.rule, detail: note.example })),
+  remove: (id) => notes.delete(Number(id)),
+});
+```
+
+- Each item has `id`, `title` and an optional `detail`
+- Lists show only in Settings. To let agents and the terminal read and change the same rows, also register [tools](#tools)
+
 ## Actions
 
 An action is a button in the Voz panel, with an optional global hotkey.
@@ -224,7 +277,17 @@ voz.registerAction({
 });
 ```
 
-The hotkey uses the same keys as `ctx.press`. If another app holds the hotkey, Voz shows a message and the button still works. An action runs until it finishes, so it can record or transcribe for as long as it needs.
+The hotkey uses the same keys as `ctx.press`. If another app holds the hotkey, Voz shows a message and the button still works.
+
+A hotkey can also be one modifier key tapped on its own: `"rightopt"`, `"leftopt"`, `"rightcmd"`, `"leftcmd"`, `"rightshift"`, `"leftshift"`, `"rightctrl"`, `"leftctrl"` or `"fn"`. A tap is a quick press and release with no other key or click in between, so typing with that modifier doesn't run it. Voz skips a tap on the user's dictation key.
+
+Two actions can share a hotkey when `when` tells them apart. `when: "selection"` runs an action when text is selected in the focused field. The action without `when` runs otherwise. Without such an action, the hotkey runs the `when` action anyway, so a tap never does nothing. Reply and Edit share right Option this way:
+
+```ts
+voz.registerAction({ id: "edit", name: "Edit", hotkey: "rightopt", when: "selection", run: edit });
+```
+
+An action runs until it finishes, so it can record or transcribe for as long as it needs.
 
 Every action also has a Run button in the extension's details on the Extensions page. Set `hidden: true` when the action does not apply right now, such as a setup step that is done. A hidden action leaves the panel, but stays in the details and keeps its hotkey. `registerAction` returns a handle. Call `update({ hidden })` when your state changes.
 
@@ -394,6 +457,47 @@ if (answer?.button === "Add")
 - `answer` is `{ button, values }` with each field's value by `id`, or `null` when the user closes the card with Esc or the close button
 - Voz shows one card at a time, so a new card closes the open one, which answers `null`
 
+## Busy
+
+`ctx.busy(run)` shows a working state in the notch while `run` runs, then a checkmark, or a shake when `run` throws. The user cancels with Esc or the X in the notch. Then `signal` aborts and `busy` resolves `undefined` right away. The handler's time stops while it runs, so a slow model call doesn't time out.
+
+```ts
+const reply = await ctx.busy((signal) => fetch(url, { method: "POST", body, signal }).then((response) => response.json()));
+if (reply === undefined) return;
+```
+
+- Pass `signal` to `fetch` and other calls that take one, so they stop when the user cancels
+- Use it instead of `ctx.notify("Working…")`. The notch shows that something runs, and the user can stop it
+
+## Text fields
+
+`ctx.field()` reads the text field that has focus in the front app through Accessibility. Use it with `ctx.select` and `ctx.insert` to rewrite what the user is typing, or to draft a reply to the conversation above the field.
+
+```ts
+const field = await ctx.field();
+if (!field) return ctx.notify("Click into a text field first");
+const { start, length } = field.selection;
+const target = length > 0 ? field.text.slice(start, start + length) : field.text;
+const rewritten = await rewrite(target, field.before);
+if (length === 0 && !(await ctx.select({ start: 0, length: field.text.length }))) ctx.press("cmd+a");
+ctx.insert(rewritten);
+```
+
+- `field` has `text`, `selection` as `{ start, length }`, `role` such as `AXTextArea`, `label` (the field's description, title or placeholder), and `window`, the window title
+- `thread` is the conversation the window shows, as `{ id, title }`. The title is the window title without unread counts or the app name, such as `Anna Schmidt` for `(3) Anna Schmidt - Slack`. It is missing when the title names only the app. Pass `id` to [`voz.history`](#what-the-user-wrote)
+- `before` holds up to 6,000 characters of text on screen before the field, such as the messages above a reply box, and `after` up to 1,500 characters after it
+- Offsets count UTF-16 code units, the same as JavaScript string indexes
+- `field()` returns `null` for password fields, when no text field has focus, and when Voz has no Accessibility permission
+- `select(range)` returns `false` when the app ignores it. Fall back to `ctx.press("cmd+a")` to replace the whole field
+- `insert` pastes, so it replaces the selection and the user can undo it with Cmd+Z
+
+What Accessibility shows depends on the app:
+
+- Native apps such as Mail, Notes and Messages expose the field and the text around it
+- Chromium browsers build their web tree a few seconds after Voz starts or the browser comes to the front. Electron apps such as Slack build it after the first read, so the first `field()` there can return `null`
+- Some web editors, such as Google Docs, draw text themselves and expose little or no text
+- `before` and `after` read what the app exposes near the field. They can include buttons and labels, and miss text the app keeps off screen
+
 ## History
 
 `voz.addHistory` adds an entry to the Voz history, next to dictations. The user can search it, copy it, and open its file in Finder.
@@ -535,6 +639,54 @@ voz remove voz-jira
 - Installed packages are listed in `~/.voz/settings.json`
 - See [Versions](#versions) for `"voz": { "apiVersion": 7 }` in `package.json`
 
+## What the user wrote
+
+`voz.history` returns what the user wrote through Voz, newest first, so an extension can write like them or learn from what they kept. It reads two things Voz saves on its own:
+
+- Dictations, with the conversation they went into
+- Drafts: text an extension inserted with `ctx.insert`, the text it replaced, and what the user did with it
+
+```ts
+const field = await ctx.field();
+const examples = await voz.history({ thread: field?.thread?.id, limit: 20 });
+const reply = await draft(field.before, examples.map((written) => written.text));
+ctx.insert(reply, { instruction: "reply" });
+```
+
+- `thread` limits it to one conversation. `source` limits it to drafts one extension inserted, such as `voz.name`. Without `source`, dictations come too. `limit` is 20 unless you set it, and at most 100
+- Each item has `kind` (`dictation` or `draft`), `text`, and `at` in milliseconds like `Date.now()`. `text` is what ended up in the field: the user's version when they changed a draft
+- Drafts also have `source`, `instruction`, `input` (the text it replaced, empty for a new reply), `output` (what the extension inserted) and `outcome`
+- When Voz knows the conversation, items also have `app`, its bundle ID, and `threadTitle`, such as a person or channel
+- After an insert, Voz reads the field every second for up to two minutes, until the user leaves the conversation. `outcome` is `kept`, `edited`, `removed`, or `sent` when the field empties while the window stays, as when a chat sends the message. It is `unknown` while Voz watches, and when it can't find the draft in the field
+- Edits elsewhere in the field don't count. Text the user types right against the draft does
+- `history` is read-only. Extensions can't change or delete what Voz saved, and keep their own data in `voz.paths.data`
+- Entries from `voz.addHistory` don't show up here
+
+The user sees the same drafts with `voz drafts`.
+
+## What the user saw
+
+`voz.screen()` reads the text of the window in front, so an extension can learn what the user works on and what a chat said before it scrolled away. Voz reads it only when the extension calls, and keeps none of it. Your extension decides what to store, in `voz.paths.data`, and for how long.
+
+Ask for it in `package.json`. Voz then tells users that your extension reads the screen: in Browse before they install, after `voz install`, with an eye on the Extensions page, and in `voz extensions`:
+
+```json
+{ "voz": { "apiVersion": 8, "screen": true } }
+```
+
+```ts
+setInterval(async () => {
+  const screen = await voz.screen();
+  if (screen) save(screen);
+}, 5_000);
+```
+
+- It returns `{ app, window, thread, text }`, or `null` when Voz can't read the window. `thread` is the conversation the window shows, the same `id` as `ctx.field().thread`
+- `text` is what the window shows through Accessibility, top to bottom, up to 20,000 characters. Voz never takes screenshots
+- Voz skips password fields, password managers, private browser windows and the lock screen, and hides API keys, tokens, private keys, card numbers and IBANs before your extension sees the text
+- Without `"screen": true`, `voz.screen()` fails with an error that says so
+- Tell users what you keep and how they delete it, and let them turn it off. [voz-reply](https://github.com/Joelheile/voz/tree/main/examples/reply) keeps 30 days in SQLite, has settings to stop or skip apps, and adds `voz reply search` and `voz reply forget`
+
 ## Versions
 
 `"voz": { "apiVersion": 7 }` in `package.json` names the oldest Voz API your package needs. Keep it as low as you can, because people run older Voz versions:
@@ -563,6 +715,7 @@ What each version changed, and what older packages keep:
 
 | Version | Changes                                                                                                                                                                                                                                                 | Older packages keep                                                         |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| 8       | Adds `ctx.field` with `thread`, `ctx.select`, `ctx.busy`, `voz.history`, `instruction` for `ctx.insert`, `model` and `effort` for `ctx.generate`, `ctx.models`, `voz.screen` with `"screen": true` in `package.json`, `voz.generate` with `model: "on-device"`, `voz.registerList`, modifier taps such as `"rightopt"` as hotkeys, and `when` for actions |                                                                                           |
 | 7       | Adds `ctx.ask` and `at: "anywhere"`                                                                                                                                                                                                                     |                                                                             |
 | 6       | Adds `open` to activities, `transcribeLive` on a running activity, `ctx.openNote`, `website` to `ctx.app`, and `voz.registerTool` with `positional`                                                                                                     |                                                                             |
 | 5       | Adds `mode` to the `beforeCleanup` event and result                                                                                                                                                                                                     |                                                                             |

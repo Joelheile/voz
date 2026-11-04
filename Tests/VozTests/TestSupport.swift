@@ -51,6 +51,18 @@ let extensionResources: URL = {
     return resources
 }()
 
+func makeThread(_ title: String) -> FieldThread {
+    FieldThread(id: UUID(), title: title)
+}
+
+func makeDraft(_ output: String, source: String = "reply", at seconds: Double, thread: UUID? = nil, input: String = "") -> DraftRecord {
+    DraftRecord(createdAt: Date(timeIntervalSince1970: seconds), source: source, threadID: thread, input: input, output: output)
+}
+
+func epoch(_ seconds: Double) -> Date {
+    Date(timeIntervalSince1970: seconds)
+}
+
 func temporaryHome() -> VozHome {
     VozHome(root: FileManager.default.temporaryDirectory.appendingPathComponent("voz-home-\(UUID().uuidString)"))
 }
@@ -354,4 +366,13 @@ func swapItems(atPath first: String, withItemAtPath second: String) -> Bool {
 func utcSearchDays(_ query: String, at seconds: Double) -> [Double]? {
     TranscriptSearch(query, now: Date(timeIntervalSince1970: seconds), calendar: utcCalendar)
         .days.map { [$0.start.timeIntervalSince1970, $0.end.timeIntervalSince1970] }
+}
+
+/// An unsigned JWT with the given claims, like the ID token OpenAI's token endpoint returns
+func fakeIDToken(_ claims: String) -> String {
+    ["{\"alg\":\"none\"}", claims].map { ChatGPTAccount.base64URL(Data($0.utf8)) }.joined(separator: ".") + ".signature"
+}
+
+func manifestReadsScreen(_ json: String) -> Bool {
+    PackageListing.readsScreen(Data(json.utf8))
 }

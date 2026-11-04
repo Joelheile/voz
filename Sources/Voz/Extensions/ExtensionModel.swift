@@ -33,6 +33,9 @@ struct GenerateParams: Decodable, Sendable {
     let prompt: String
     let instructions: String?
     let schema: GenerationSpec
+    /// A tier such as `balanced`, or an exact model ID. Apple's model ignores it
+    let model: String?
+    let effort: ModelEffort?
     let deadline: Double
 }
 
@@ -51,7 +54,27 @@ enum ExtensionModelError: Error, LocalizedError {
 }
 
 enum ExtensionModel {
+    /// The model name that runs Apple's model whatever the user picked, for background work such as learning
+    static let onDevice = "on-device"
+
     static func generate(_ params: GenerateParams) async throws -> String {
+        switch params.model == onDevice ? .apple : AIProvider.current {
+        case .apple: try await generateOnDevice(params)
+        case .chatgpt: try await cloud(params, name: "ChatGPT", CloudModel.generateWithChatGPT)
+        case .claude: try await cloud(params, name: "Claude", CloudModel.generateWithClaude)
+        }
+    }
+
+    static func models() async throws -> String {
+        String(decoding: try JSONEncoder().encode(try await ModelLists.shared.list(for: AIProvider.current)), as: UTF8.self)
+    }
+
+    private static func cloud(_ params: GenerateParams, name: String, _ generate: @escaping @Sendable (GenerateParams) async throws -> String) async throws -> String {
+        let timeout = Duration.milliseconds(params.deadline - Date().timeIntervalSince1970 * 1000)
+        return try await withTimeout(timeout, onTimeout: CloudModelError.failed("\(name) ran out of time")) { try await generate(params) }
+    }
+
+    private static func generateOnDevice(_ params: GenerateParams) async throws -> String {
         let model = SystemLanguageModel(guardrails: .permissiveContentTransformations)
         if case .unavailable(let reason) = model.availability { throw ExtensionModelError.unavailable("\(reason)") }
         let schema = try GenerationSchema(root: dynamicSchema(params.schema, name: "Result"), dependencies: [])

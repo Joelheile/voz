@@ -27,6 +27,7 @@ private enum SettingsKey {
     static let logIncludesText = "logIncludesText"
     static let microphone = "microphone"
     static let languages = "languages"
+    static let aiAccount = "aiAccount"
 }
 
 @MainActor
@@ -122,6 +123,16 @@ final class AppSettings: ObservableObject {
             }
         }
     }
+    /// The model extensions write with. Only `AIModels` changes it, after a sign-in or key checks out
+    @Published var aiModel: AIProvider {
+        didSet { defaults.set(aiModel.rawValue, forKey: AIProvider.defaultsKey) }
+    }
+    /// False until you pick a model, so the first AI hotkey can ask which one
+    var hasPickedAIModel: Bool { defaults.string(forKey: AIProvider.defaultsKey) != nil }
+    /// The ChatGPT email, so Settings can show who is signed in without reading the Keychain
+    @Published var aiAccount: String {
+        didSet { defaults.set(aiAccount, forKey: SettingsKey.aiAccount) }
+    }
     @Published var isCapturingHotkey = false
     private let home: VozHome
     private var loadingPipeline = false
@@ -178,6 +189,8 @@ final class AppSettings: ObservableObject {
         errorReportsEnabled = defaults.bool(forKey: SettingsKey.errorReportsEnabled)
         logIncludesText = defaults.bool(forKey: SettingsKey.logIncludesText)
         cleanupPrompt = defaults.string(forKey: SettingsKey.cleanupPrompt) ?? CleanupPrompt.standard
+        aiModel = defaults.string(forKey: AIProvider.defaultsKey).flatMap(AIProvider.init) ?? .apple
+        aiAccount = defaults.string(forKey: SettingsKey.aiAccount) ?? ""
         let choices = PipelineChoices.standard
         speechModel = choices.speechModel
         cleanupModel = choices.cleanupModel

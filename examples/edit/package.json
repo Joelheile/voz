@@ -1,0 +1,20 @@
+{
+  "name": "voz-edit",
+  "version": "0.1.0",
+  "description": "Change what you just dictated, or any text field, by saying how",
+  "keywords": [
+    "voz-package"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Joelheile/voz.git",
+    "directory": "examples/edit"
+  },
+  "files": [
+    "index.ts"
+  ],
+  "voz": {
+    "apiVersion": 8
+  }
+}

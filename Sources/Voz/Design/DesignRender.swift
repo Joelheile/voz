@@ -12,6 +12,7 @@ enum DesignRender {
         let fixture = try Fixture()
         fixture.sources.stats.start()
         await fixture.sources.extensions.load()
+        await fixture.sources.extensions.checkScreen("voz-tone")
         try await Task.sleep(for: .milliseconds(500))
         for (suffix, name) in appearances {
             let appearance = NSAppearance(named: name)!
@@ -96,6 +97,12 @@ enum DesignRender {
             }
             let ask = AskModel()
             ask.load(Self.calendarAsk)
+            let edit = AskModel()
+            edit.load(Self.editAsk)
+            try write(AskView(model: edit, onAnswer: { _ in }, onClose: {}), to: outputDirectory, name: "ask-edit-\(suffix)", appearance: appearance)
+            let pick = AskModel()
+            pick.load(AIModels.pickCard)
+            try write(AskView(model: pick, onAnswer: { _ in }, onClose: {}), to: outputDirectory, name: "ask-model-\(suffix)", appearance: appearance)
             try write(AskView(model: ask, onAnswer: { _ in }, onClose: {}), to: outputDirectory, name: "ask-calendar-\(suffix)", appearance: appearance)
             for step in SetupStep.allCases {
                 fixture.sources.setup.step = step
@@ -116,6 +123,15 @@ enum DesignRender {
             AskField(id: "calendar", label: "Calendar", type: .choice, value: .string("Home"), options: ["Home", "Work", "Family"]),
         ],
         buttons: ["Copy", "Add"],
+        remaining: 0
+    )
+
+    private static let editAsk = AskParams(
+        call: 0,
+        deadline: 0,
+        title: "How should it change?",
+        fields: [AskField(id: "instruction", label: "Leave empty to fix mistakes", type: .text, value: .string(""), options: nil)],
+        buttons: ["Shorter", "Clearer", "Edit"],
         remaining: 0
     )
 
@@ -169,6 +185,7 @@ enum DesignRender {
         ("cleanup-prompt", .cleanupPrompt),
         ("cleanup-steps", .cleanupSteps),
         ("languages", .languages),
+        ("ai-model", .aiModel),
         ("whats-new", .whatsNew),
         ("tour", .tour),
     ]
@@ -233,7 +250,7 @@ private final class Fixture {
             stats: StatsModel(store: history),
             vocabulary: VocabularyModel(store: history.vocabulary, analytics: analytics),
             setup: SetupModel(analytics: analytics) {},
-            extensions: ExtensionsModel(analytics: analytics, home: home, cache: nil, fetch: { _ in Self.listings }),
+            extensions: ExtensionsModel(analytics: analytics, home: home, cache: nil, fetch: { url in url.lastPathComponent == "latest" ? Self.screenReader : Self.listings }),
             catalog: ExtensionCatalog(),
             updater: Updater(settings: settings, isBusy: { false })
         )
@@ -256,6 +273,7 @@ private final class Fixture {
         }
     }
 
+    nonisolated private static let screenReader = Data(#"{"voz": {"screen": true}}"#.utf8)
     nonisolated private static let listings = Data("""
     {"objects": [
       {"downloads": {"monthly": 5310}, "package": {"date": "2026-10-30T09:12:00.000Z", "links": {"npm": "https://www.npmjs.com/package/voz-tone"}, "name": "voz-tone", "description": "Rewrites your dictation in the tone of each app", "version": "1.4.0", "publisher": {"username": "mara"}}},

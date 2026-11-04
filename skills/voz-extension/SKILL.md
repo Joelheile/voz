@@ -64,6 +64,10 @@ Done when you can say the extension in one sentence and the user says yes. Write
 | Something agents and the terminal can run                         | `registerTool`                                                  |
 | Something that keeps running, such as a meeting recording         | `startActivity`, `transcribeLive`, `ctx.openNote`, `addHistory` |
 | A check before acting                                             | `ctx.ask`                                                       |
+| Rewriting or replying to what the user is typing                  | `ctx.field`, `ctx.select`, `ctx.busy`                           |
+| Writing like the user, or learning from what they changed         | `voz.history`, `voz.generate`                                   |
+| What the extension learned, so the user can remove it             | `registerList`                                                  |
+| What the user works on, and chats that scrolled away              | `voz.screen`                                                    |
 
 `beforeCleanup`, `beforeInsert` and cleanup steps get 300 ms and only `ctx.app`: string work only. Put network and model calls in commands, actions, tools or `afterInsert`. See Limits in [references/api.md](references/api.md).
 

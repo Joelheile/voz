@@ -81,7 +81,7 @@ private struct ExtensionList: View {
             VStack(spacing: 2) {
                 ForEach(model.installedRows, id: \.name) { item in
                     if item.name != model.installedRows.first?.name { RowDivider().padding(.horizontal, 8) }
-                    ExtensionRow(name: item.name, summary: model.summary(for: item), dimmed: !model.isEnabled(item.name), attention: attention(for: item)) {
+                    ExtensionRow(name: item.name, summary: model.summary(for: item), dimmed: !model.isEnabled(item.name), attention: attention(for: item), readsScreen: catalog.readsScreen(item.name)) {
                         model.selected = item.name
                     } trailing: {
                         Toggle(item.name, isOn: Binding { model.isEnabled(item.name) } set: { model.setEnabled(item.name, $0) })
@@ -179,6 +179,7 @@ private struct ExtensionRow<Trailing: View>: View {
     var downloads = 0
     var dimmed = false
     var attention: String?
+    var readsScreen = false
     let open: () -> Void
     @ViewBuilder var trailing: Trailing
     @State private var hovering = false
@@ -189,6 +190,7 @@ private struct ExtensionRow<Trailing: View>: View {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Text(ExtensionsModel.displayName(name)).font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
+                        if readsScreen { ScreenFlag() }
                         if let attention {
                             Text(attention).font(.ui(11, weight: .medium)).foregroundStyle(Theme.accent)
                         }
@@ -228,6 +230,15 @@ private struct ExtensionRow<Trailing: View>: View {
         .onHover { hovering = $0 }
         .animation(Theme.Motion.hover, value: hovering)
         .animation(Theme.Motion.section, value: dimmed)
+    }
+}
+
+/// Marks extensions that read the window in front, wherever they are listed
+private struct ScreenFlag: View {
+    var body: some View {
+        Icon(.eye, size: 12)
+            .foregroundStyle(Theme.inkTertiary)
+            .help("Reads your screen")
     }
 }
 
@@ -283,6 +294,12 @@ private struct ListingDetail: View {
         VStack(alignment: .leading, spacing: 16) {
             header
             MessageView(model: model)
+            if model.screenReaders.contains(listing.name) {
+                PanelGroup(title: "Before you install") {
+                    PanelRow(title: "Reads your screen", detail: "The text of the window in front, without passwords or keys") { ScreenFlag() }
+                }
+                .transition(.opacity)
+            }
             VStack(alignment: .leading, spacing: 10) {
                 if let summary = listing.summary {
                     Text(summary)
@@ -295,6 +312,8 @@ private struct ListingDetail: View {
             }
         }
         .padding(.bottom, 2)
+        .animation(Theme.Motion.section, value: model.screenReaders.contains(listing.name))
+        .task(id: listing.name) { await model.checkScreen(listing.name) }
         .onExitCommand { model.selected = nil }
     }
 
@@ -420,6 +439,9 @@ private struct InstalledDetail: View {
                             }
                         }
                     }
+                    ForEach(catalog.lists(for: item.name), id: \.id) { list in
+                        ExtensionListGroup(list: list, catalog: catalog)
+                    }
                     footer
                 }
             }
@@ -456,8 +478,12 @@ private struct InstalledDetail: View {
         let commands = catalog.commands(for: item.name)
         let actions = catalog.actions(for: item.name)
         let steps = catalog.cleanupSteps(for: item.name)
-        if !commands.isEmpty || !actions.isEmpty || !steps.isEmpty {
+        let readsScreen = catalog.readsScreen(item.name)
+        if !commands.isEmpty || !actions.isEmpty || !steps.isEmpty || readsScreen {
             PanelGroup(title: "What it adds") {
+                if readsScreen {
+                    PanelRow(title: "Reads your screen", detail: "The text of the window in front, without passwords or keys") { ScreenFlag() }
+                }
                 ForEach(commands, id: \.self) { command in
                     PanelRow(title: "\u{201C}\(command.phrase)\u{201D}", detail: "Voice command") { EmptyView() }
                 }
@@ -580,5 +606,47 @@ private struct SettingControl: View {
         let entered = field.type == .number ? Double(text).map(SettingValue.number) : .string(text)
         guard let entered else { return text = value.text }
         if entered != value { save(entered) }
+    }
+}
+
+/// A list an extension fills, such as what Reply learned about your writing. It loads when the page opens.
+struct ExtensionListGroup: View {
+    let list: SettingsList
+    @ObservedObject var catalog: ExtensionCatalog
+    @State private var items: [SettingsListItem]?
+    @State private var error: String?
+
+    var body: some View {
+        PanelGroup(title: list.title) {
+            if let items, !items.isEmpty {
+                ForEach(items, id: \.self) { item in
+                    PanelRow(title: item.title, detail: item.detail) {
+                        if list.removable {
+                            IconButton(icon: .x, help: "Remove") { load(removing: item.id) }
+                        }
+                    }
+                }
+            } else {
+                PanelRow(title: status, detail: list.description.isEmpty ? nil : list.description) {}
+            }
+        }
+        .animation(Theme.Motion.section, value: items)
+        .task(id: list) { load() }
+    }
+
+    private var status: String {
+        if let error { return error }
+        return items == nil ? "Loading" : "Nothing yet"
+    }
+
+    private func load(removing remove: String? = nil) {
+        Task {
+            do {
+                items = try await catalog.items(list, removing: remove)
+                error = nil
+            } catch {
+                self.error = error.localizedDescription
+            }
+        }
     }
 }

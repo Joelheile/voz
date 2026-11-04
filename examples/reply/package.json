@@ -1,0 +1,23 @@
+{
+  "name": "voz-reply",
+  "version": "0.1.0",
+  "description": "Draft replies that sound like you, in any chat or email",
+  "keywords": [
+    "voz-package"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Joelheile/voz.git",
+    "directory": "examples/reply"
+  },
+  "files": [
+    "index.ts",
+    "memory.ts",
+    "style.ts"
+  ],
+  "voz": {
+    "apiVersion": 8,
+    "screen": true
+  }
+}

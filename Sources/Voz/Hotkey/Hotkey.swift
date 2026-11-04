@@ -70,6 +70,16 @@ struct Hotkey: Hashable, Sendable, Codable {
 }
 
 extension Hotkey {
+    private static let tapNames: [String: UInt16] = [
+        "rightcmd": 54, "leftcmd": 55, "leftshift": 56, "rightshift": 60,
+        "leftopt": 58, "rightopt": 61, "leftctrl": 59, "rightctrl": 62, "fn": 63,
+    ]
+
+    /// A modifier key tapped on its own, named the way extensions write it: "rightopt"
+    static func tap(named name: String) -> Hotkey? {
+        tapNames[name.lowercased()].map { Hotkey(keyCode: $0, modifiers: []) }
+    }
+
     private static let modifierKeyNames: [UInt16: String] = [
         54: "Right ⌘", 55: "Left ⌘",
         56: "Left ⇧", 60: "Right ⇧",

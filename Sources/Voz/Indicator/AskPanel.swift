@@ -100,6 +100,10 @@ struct AskView: View {
     @Bindable var model: AskModel
     let onAnswer: (String) -> Void
     let onClose: () -> Void
+    @FocusState private var focused: String?
+
+    /// A card that asks for one text needs no label column: the label becomes the placeholder, and you can type right away
+    private var isSingleText: Bool { model.fields.count == 1 && model.fields[0].type == .text }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -116,10 +120,12 @@ struct AskView: View {
                 PanelGroup {
                     ForEach(model.fields, id: \.id) { field in
                         HStack(spacing: 10) {
-                            Text(field.label)
-                                .font(.ui(12))
-                                .foregroundStyle(Theme.inkTertiary)
-                                .frame(width: 64, alignment: .leading)
+                            if !isSingleText {
+                                Text(field.label)
+                                    .font(.ui(12))
+                                    .foregroundStyle(Theme.inkTertiary)
+                                    .frame(width: 64, alignment: .leading)
+                            }
                             control(for: field)
                         }
                         .frame(minHeight: 34)
@@ -143,14 +149,16 @@ struct AskView: View {
         .padding(12)
         .frame(width: AskController.width)
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous))
+        .onAppear { if isSingleText { focused = model.fields[0].id } }
     }
 
     @ViewBuilder
     private func control(for field: AskField) -> some View {
         switch field.type {
         case .text:
-            TextField("", text: text(field.id))
+            TextField("", text: text(field.id), prompt: isSingleText ? Text(field.label).foregroundStyle(Theme.inkTertiary) : nil)
                 .textFieldStyle(.plain)
+                .focused($focused, equals: field.id)
                 .font(.ui(13))
                 .foregroundStyle(Theme.ink)
         case .date:

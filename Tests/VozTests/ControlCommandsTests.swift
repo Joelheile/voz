@@ -13,10 +13,49 @@ struct ControlCommandsTests {
         #expect(reply.stdout.range(of: "invoice paid")!.lowerBound < reply.stdout.range(of: "send the invoice")!.lowerBound)
     }
 
-    @Test func lastPrintsOnlyTheText() async throws {
+    @Test func draftsShowWhatYouDidWithEachInsertByExtension() async throws {
+        let (commands, _) = try makeControlCommands()
+        let drafts = commands.history.drafts
+        let anna = try drafts.thread(app: "com.tinyspeck.slackmacgap", title: "Anna")
+        let reply = makeDraft("See you at 1!", source: "voz-reply", at: 1, thread: anna.id)
+        try drafts.insert(reply)
+        try drafts.finish(reply.id, result: "see you at 1", outcome: .sent)
+        try drafts.insert(makeDraft("Fixed.", source: "edit", at: 2))
+        let center = ControlCenter(commands: commands.all)
+
+        let text = await center.handle(["drafts", "reply"], json: false)
+        #expect(text.exit == 0)
+        #expect(text.stdout.contains("voz-reply  Anna  sent  see you at 1"))
+        #expect(!text.stdout.contains("Fixed."))
+
+        let json = await center.handle(["drafts", "--limit", "1"], json: true).stdout
+        #expect(json.contains("\"output\" : \"Fixed.\""))
+        #expect(json.contains("\"outcome\" : \"unknown\""))
+        #expect(!json.contains("See you at 1!"))
+    }
+
+        @Test func lastPrintsOnlyTheText() async throws {
         let (commands, _) = try makeControlCommands([makeRecord("first", at: 1), makeRecord("second", at: 2)])
         let reply = await ControlCenter(commands: commands.all).handle(["last"], json: false)
         #expect(reply.stdout == "second\n")
+    }
+
+    @Test func aiShowsTheModelAndChecksWhatYouPick() async throws {
+        let (commands, _) = try makeControlCommands()
+        let center = ControlCenter(commands: commands.all)
+        #expect(await center.handle(["ai"], json: false).stdout == "Apple\n")
+        #expect(await center.handle(["ai"], json: true).stdout.contains("\"model\" : \"apple\""))
+        let same = await center.handle(["ai", "apple"], json: true)
+        #expect(same.exit == 0)
+        #expect(same.stdout.contains("\"changed\" : false"))
+        let unknown = await center.handle(["ai", "gemini"], json: false)
+        #expect(unknown.exit == 2)
+        let noKey = await center.handle(["ai", "claude"], json: false)
+        #expect(noKey.exit == 2)
+        #expect(noKey.stderr.contains("voz ai claude -"))
+        let models = await center.handle(["models"], json: true)
+        #expect(models.exit == 0)
+        #expect(models.stdout.contains("\"provider\" : \"apple\""))
     }
 
     @Test func badDateIsAUsageError() async throws {

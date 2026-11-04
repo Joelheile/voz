@@ -11,9 +11,11 @@ import { basename, extname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import type {
   Action,
+  List,
   ActionHandle,
   Answer,
   AskOptions,
+  Field,
   Activity,
   AfterInsertEvent,
   AudioDropEvent,
@@ -31,6 +33,9 @@ import type {
   Context,
   GenerateRequest,
   Generated,
+  HistoryQuery,
+  ScreenText,
+  Written,
   Extension,
   ExtensionAPI,
   LiveTranscribeOptions,
@@ -92,11 +97,12 @@ type CleanRequest = { model: string; text: string; prompt: string; app: App };
 type StepRequest = { step: string; text: string; app: App };
 type ActionRequest = { action: string; app: App };
 type ToolRequest = { tool: string; input: never; app: App };
+type ListRequest = { list: string; remove?: string };
 type ActivityRequest = { activity: string; app: App };
 type NoteChange = { note: string; text: string };
 type LiveUpdate = { session: string; transcript: Transcript };
 type Component = { id: string; name: string };
-type Entry = { name: string; path?: string; requires?: number };
+type Entry = { name: string; path?: string; requires?: number; screen?: boolean };
 type LoadError = { extension: string; message: string };
 type Request = { id?: number; method: string; params: never; deadline: number };
 type RequestScope = { id?: number; deadline: number; active: boolean };
@@ -112,7 +118,7 @@ type VersionChange = {
 };
 type PackageManifest = {
   name?: string;
-  voz?: { apiVersion?: number; extensions?: string[] };
+  voz?: { apiVersion?: number; extensions?: string[]; screen?: boolean };
 };
 
 class Registration {
@@ -137,7 +143,7 @@ class Registration {
   }
 }
 
-const apiVersion = 7;
+const apiVersion = 8;
 const loadTimeout = 3000;
 const write = process.stdout.write.bind(process.stdout);
 const send = (message: object) => write(JSON.stringify(message) + "\n");
@@ -172,6 +178,7 @@ const cleanupModels = new Map<string, CleanupModel>();
 const cleanupSteps = new Map<string, CleanupStep>();
 const actions = new Map<string, Action & { extension: string }>();
 const tools = new Map<string, Tool & { extension: string }>();
+const lists = new Map<string, List & { extension: string }>();
 const activities = new Map<string, Activity>();
 let lastActivity = 0;
 let openedNote: { id: string; onChange: NoteOptions["onChange"] } | undefined;
@@ -180,9 +187,12 @@ const liveSessions = new Map<string, LiveTranscribeOptions["onTranscript"]>();
 let lastSession = 0;
 const calls = new Map<number, PendingCall>();
 let lastCall = 0;
+const busyWork = new Map<string, AbortController>();
+let lastBusy = 0;
 let isReady = false;
 const settingsSchemas = new Map<string, SettingsSchema>();
 const loaded: string[] = [];
+const screenReaders: string[] = [];
 const bus = new EventEmitter();
 const errors: LoadError[] = [];
 
@@ -196,16 +206,19 @@ Bun.plugin({
   },
 });
 
-function context(app: App): Context {
+// The extension that owns a registered id such as "reply/draft"
+const owner = (id: string) => id.slice(0, id.indexOf("/"));
+
+function context(app: App, extension: string): Context {
   const scope = requestScope.getStore();
   const isLive = () => scope?.active === true && Date.now() < scope.deadline;
-  const action = (method: string, params: { text: string } | { key: string }) => {
+  const action = (method: string, params: object) => {
     if (!isLive()) return log(`Dropped ctx.${method}: it ran after its handler finished or ran out of time`);
     send({ method, params, requestID: scope!.id });
   };
   return {
     app,
-    insert: (text) => action("insert", { text }),
+    insert: (text, options) => action("insert", { text, source: extension, instruction: options?.instruction }),
     press: (key) => action("press", { key }),
     notify: (text) => action("notify", { text }),
     generate: (request) => {
@@ -224,6 +237,22 @@ function context(app: App): Context {
       if (!isLive()) return Promise.reject(new Error("ask only works while a handler runs"));
       return ask(options, scope!);
     },
+    models: () => {
+      if (!isLive()) return Promise.reject(new Error("models only works while a handler runs"));
+      return callSwift("models", {}, scope!, "Listing models ran out of time") as Promise<Models>;
+    },
+    field: () => {
+      if (!isLive()) return Promise.reject(new Error("field only works while a handler runs"));
+      return callSwift("field", {}, scope!, "Reading the text field ran out of time") as Promise<Field | null>;
+    },
+    select: ({ start, length }) => {
+      if (!isLive()) return Promise.reject(new Error("select only works while a handler runs"));
+      return callSwift("select", { start, length }, scope!, "Selecting text ran out of time") as Promise<boolean>;
+    },
+    busy: (run) => {
+      if (!isLive()) return Promise.reject(new Error("busy only works while a handler runs"));
+      return busy(run, scope!);
+    },
   };
 }
 
@@ -237,6 +266,32 @@ async function ask({ title, fields = [], buttons }: AskOptions, scope: RequestSc
   } finally {
     scope.deadline = Date.now() + remaining;
   }
+}
+
+// The handler's time stops while it works, and the user can cancel the work from the notch
+async function busy<T>(run: (signal: AbortSignal) => Promise<T>, scope: RequestScope) {
+  const id = `busy/${++lastBusy}`;
+  const controller = new AbortController();
+  const remaining = scope.deadline - Date.now();
+  const cancelled = new Promise<undefined>((resolve) => controller.signal.addEventListener("abort", () => resolve(undefined)));
+  busyWork.set(id, controller);
+  scope.deadline = untimed().deadline;
+  send({ method: "busy", params: { id }, requestID: scope.id });
+  let ok = false;
+  try {
+    const result = await Promise.race([run(controller.signal), cancelled]);
+    ok = true;
+    return result;
+  } finally {
+    busyWork.delete(id);
+    scope.deadline = Date.now() + remaining;
+    send({ method: "idle", params: { id, ok, remaining }, requestID: scope.id });
+  }
+}
+
+async function cancelBusy({ id }: { id: string }) {
+  busyWork.get(id)?.abort();
+  return {};
 }
 
 // Voz shows one note at a time, so a new note replaces the open one
@@ -315,8 +370,8 @@ function wireSchema(schema: Schema): WireSchema {
 }
 
 function generate<S extends Schema>(request: GenerateRequest<S>, scope: RequestScope) {
-  const params = { prompt: request.prompt, instructions: request.instructions, schema: wireSchema(request.schema) };
-  return callSwift("generate", params, scope, "The on-device model ran out of time") as Promise<Generated<S>>;
+  const params = { prompt: request.prompt, instructions: request.instructions, schema: wireSchema(request.schema), model: request.model, effort: request.effort };
+  return callSwift("generate", params, scope, "The model ran out of time") as Promise<Generated<S>>;
 }
 
 function transcribeFile(path: string, options: TranscribeOptions | undefined, scope: RequestScope) {
@@ -327,7 +382,24 @@ function transcribeFile(path: string, options: TranscribeOptions | undefined, sc
 // Work that outlives a handler, such as a meeting, has no handler deadline. A day stands in for no limit.
 const untimed = () => ({ deadline: Date.now() + 86_400_000 });
 
-function callSwift(method: string, params: object, scope: Pick<RequestScope, "id" | "deadline">, timeoutMessage: string) {
+const historyTimeout = 5_000;
+
+function history({ thread, source, limit }: HistoryQuery = {}) {
+  if (thread !== undefined && typeof thread !== "string") return Promise.reject(new Error("history needs thread as a string id"));
+  if (source !== undefined && typeof source !== "string") return Promise.reject(new Error("history needs source as a string"));
+  if (limit !== undefined && !(limit >= 0)) return Promise.reject(new Error("history needs limit as a number from 0"));
+  const params = { thread, source, limit: limit === undefined ? undefined : Math.floor(limit) };
+  return callSwift("history", params, { id: undefined, deadline: Date.now() + historyTimeout }, "Reading history ran out of time") as Promise<Written[]>;
+}
+
+function screen(name: string, readsScreen: boolean) {
+  return () => {
+    if (!readsScreen) return Promise.reject(new Error(`${name} needs "screen": true under "voz" in its package.json to read the screen`));
+    return callSwift("screen", {}, { id: undefined, deadline: Date.now() + historyTimeout }, "Reading the screen ran out of time") as Promise<ScreenText | null>;
+  };
+}
+
+function callSwift(method: string, params: object, scope: { id: RequestScope["id"] | undefined; deadline: number }, timeoutMessage: string) {
   const call = ++lastCall;
   return new Promise<object>((resolve, reject) => {
     const timer = setTimeout(() => settle({ call, error: timeoutMessage }), scope.deadline - Date.now());
@@ -369,6 +441,7 @@ function register<T extends Component>(
 }
 
 function registerAction(extension: string, action: Action, registration: Registration): ActionHandle {
+  if (action.when !== undefined && action.when !== "selection") throw new Error(`Action ${action.id} has when "${action.when}". Use "selection" or leave it out`);
   const registered = register(actions, "action", extension, { ...action, extension }, registration);
   return {
     update({ hidden }) {
@@ -379,12 +452,13 @@ function registerAction(extension: string, action: Action, registration: Registr
 }
 
 function wireActions() {
-  return [...actions.values()].map(({ id, name, hotkey, hidden, extension }) => ({
+  return [...actions.values()].map(({ id, name, hotkey, hidden, extension, when }) => ({
     id,
     name,
     hotkey,
     hidden: hidden === true,
     extension,
+    when,
   }));
 }
 
@@ -397,6 +471,24 @@ function registerTool(extension: string, tool: Tool, registration: Registration)
   const id = `${extension}/${tool.id}`;
   setRegistered(tools, id, { ...tool, id, extension }, registration);
 }
+
+function registerList(extension: string, list: List, registration: Registration) {
+  if (!list?.id || !list.title || typeof list.items !== "function") throw new Error("A list needs an id, a title and items");
+  const id = `${extension}/${list.id}`;
+  setRegistered(lists, id, { ...list, id, extension }, registration);
+}
+
+function wireLists() {
+  return [...lists.values()].map(({ id, title, description, remove, extension }) => ({
+    id,
+    title,
+    description: description ?? "",
+    removable: typeof remove === "function",
+    extension,
+  }));
+}
+
+const backgroundGenerateTimeout = 60_000;
 
 const emptyInput: ObjectSchema = { type: "object", properties: {} };
 
@@ -476,7 +568,7 @@ function looseEntries(directory: string): Entry[] {
 function packageEntries(directory: string): Entry[] {
   const manifest = readJSON<PackageManifest>(join(directory, "package.json")) ?? {};
   const name: string = manifest.name ?? basename(directory);
-  const origin = { requires: manifest.voz?.apiVersion };
+  const origin = { requires: manifest.voz?.apiVersion, screen: manifest.voz?.screen === true };
   const declared: string[] | undefined = manifest.voz?.extensions;
   if (declared)
     return declared.map((path, index) => ({
@@ -498,7 +590,7 @@ function isDisabled(name: string, disabled: string[]) {
   return disabled.some((off) => name === off || name.startsWith(`${off}/`));
 }
 
-function api(name: string, config: Config, registration: Registration): ExtensionAPI {
+function api(name: string, config: Config, registration: Registration, readsScreen = false): ExtensionAPI {
   const data = join(launch.home, "data", name);
   mkdirSync(data, { recursive: true });
   return {
@@ -542,6 +634,8 @@ function api(name: string, config: Config, registration: Registration): Extensio
       register(cleanupSteps, "cleanup step", name, step, registration),
     registerAction: (action) => registerAction(name, action, registration),
     registerTool: (tool) => registerTool(name, tool as Tool, registration),
+    registerList: (list) => registerList(name, list, registration),
+    generate: (request) => generate(request, { deadline: Date.now() + backgroundGenerateTimeout, active: true }),
     startActivity(activity) {
       if (!activity.title) throw new Error("An activity needs a title");
       const id = `${name}/${++lastActivity}`;
@@ -549,6 +643,8 @@ function api(name: string, config: Config, registration: Registration): Extensio
       send({ method: "startActivity", params: { id, title: activity.title, since: activity.since ?? Date.now(), stoppable: !!activity.stop, openable: !!activity.open } });
       return { end: () => endActivity(id), transcribeLive: (options) => transcribeLive(id, options) };
     },
+    history,
+    screen: screen(name, readsScreen),
     addHistory(entry) {
       if (!entry.text) throw new Error("A history entry needs text");
       send({ method: "addHistory", params: { extension: name, text: entry.text, seconds: entry.seconds ?? 0, file: entry.file } });
@@ -581,6 +677,7 @@ async function load() {
       await withinLoadTimeout(loadEntry(entry, settings.config?.[entry.name], registration));
       registration.commit();
       loaded.push(entry.name);
+      if (entry.screen) screenReaders.push(entry.name);
     } catch (error) {
       registration.rollback();
       errors.push({ extension: entry.name, message: `${describe(error)}${newerApiHint(entry)}` });
@@ -607,7 +704,7 @@ async function loadEntry(entry: Entry, config: Config = {}, registration: Regist
   const writtenFor = entry.requires ?? 1;
   const surface = versionChanges
     .filter((change) => writtenFor < change.version)
-    .reduce((surface, change) => change.restore(surface, config, registration), api(entry.name, config, registration));
+    .reduce((surface, change) => change.restore(surface, config, registration), api(entry.name, config, registration, entry.screen));
   await module.default(surface);
 }
 
@@ -666,11 +763,10 @@ const isExpired = () => Date.now() >= requestScope.getStore()!.deadline;
 const cleanupModes: CleanupMode[] = ["light", "heavy"];
 
 async function beforeCleanup({ prompt, mode, app }: CleanupRequest) {
-  const ctx = context(app);
   for (const handler of handlers.get("beforeCleanup") ?? []) {
     if (isExpired()) break;
     try {
-      const result = (await handler.run({ prompt, mode }, ctx)) as BeforeCleanupResult;
+      const result = (await handler.run({ prompt, mode }, context(app, handler.extension))) as BeforeCleanupResult;
       if (isExpired()) break;
       if (result && typeof result.prompt === "string") prompt = result.prompt;
       if (result && cleanupModes.includes(result.mode as CleanupMode)) mode = result.mode!;
@@ -682,11 +778,10 @@ async function beforeCleanup({ prompt, mode, app }: CleanupRequest) {
 }
 
 async function beforeInsert({ text, raw, app }: InsertRequest) {
-  const ctx = context(app);
   for (const handler of handlers.get("beforeInsert") ?? []) {
     if (isExpired()) break;
     try {
-      const result = (await handler.run({ text, raw }, ctx)) as BeforeInsertResult;
+      const result = (await handler.run({ text, raw }, context(app, handler.extension))) as BeforeInsertResult;
       if (isExpired()) break;
       if (result && typeof result.text === "string") text = result.text;
       if (!text) break;
@@ -698,12 +793,11 @@ async function beforeInsert({ text, raw, app }: InsertRequest) {
 }
 
 async function emit({ event, payload, app }: EmitRequest) {
-  const ctx = context(app);
   let failed = false;
   await Promise.all(
     (handlers.get(event) ?? []).map(async (handler) => {
       try {
-        await handler.run(payload, ctx);
+        await handler.run(payload, context(app, handler.extension));
       } catch (error) {
         failed = true;
         log(`${handler.extension} ${event} failed: ${describe(error)}`);
@@ -720,14 +814,14 @@ function commandKey(phrase: string, at: CommandPosition) {
 async function command({ phrase, at, text, app }: CommandRequest) {
   const match = commands.get(commandKey(phrase, at));
   if (!match) return { handled: false };
-  await match.run({ text }, context(app));
+  await match.run({ text }, context(app, match.extension));
   return { handled: true };
 }
 
 async function transcribe({ model, path, seconds, app }: TranscribeRequest) {
   const result = await find(speechModels, "speech model", model).transcribe(
     { path, seconds },
-    context(app),
+    context(app, owner(model)),
   );
   if (!result || typeof result.text !== "string") throw new Error("Speech model must return string text");
   return { text: result.text };
@@ -736,7 +830,7 @@ async function transcribe({ model, path, seconds, app }: TranscribeRequest) {
 async function clean({ model, text, prompt, app }: CleanRequest) {
   const result = await find(cleanupModels, "cleanup model", model).clean(
     { text, prompt },
-    context(app),
+    context(app, owner(model)),
   );
   if (!result || typeof result.text !== "string") throw new Error("Cleanup model must return string text");
   return { text: result.text };
@@ -745,23 +839,36 @@ async function clean({ model, text, prompt, app }: CleanRequest) {
 async function cleanupStep({ step, text, app }: StepRequest) {
   const result = await find(cleanupSteps, "cleanup step", step).run(
     { text },
-    context(app),
+    context(app, owner(step)),
   );
   return { text: result && typeof result.text === "string" ? result.text : text };
 }
 
 async function action({ action, app }: ActionRequest) {
-  await find(actions, "action", action).run(context(app));
+  const found = find(actions, "action", action);
+  await found.run(context(app, found.extension));
   return {};
 }
 
 async function tool({ tool, input, app }: ToolRequest) {
   try {
-    return { result: (await find(tools, "tool", tool).run(input, context(app))) ?? null };
+    const found = find(tools, "tool", tool);
+    return { result: (await found.run(input, context(app, found.extension))) ?? null };
   } catch (error) {
     log(`${tool} failed: ${describe(error)}`);
     return { error: error instanceof Error ? error.message : String(error) };
   }
+}
+
+// The page in Settings reads a list when it opens, and removes one row at a time
+async function list({ list, remove }: ListRequest) {
+  const found = find(lists, "list", list);
+  if (remove !== undefined) {
+    if (!found.remove) throw new Error(`${list} can't remove rows`);
+    await found.remove(remove);
+  }
+  const items = await found.items();
+  return { items: items.map(({ id, title, detail }) => ({ id: String(id), title: String(title), detail: detail === undefined ? undefined : String(detail) })) };
 }
 
 function endActivity(id: string) {
@@ -771,7 +878,7 @@ function endActivity(id: string) {
 async function openActivity({ activity, app }: ActivityRequest) {
   const open = activities.get(activity)?.open;
   if (!open) throw new Error(`Unknown activity ${activity}`);
-  await open(context(app));
+  await open(context(app, owner(activity)));
   return {};
 }
 
@@ -784,7 +891,7 @@ async function stopActivity({ activity, app }: ActivityRequest) {
   const stop = activities.get(activity)?.stop;
   if (!stop) throw new Error(`Unknown activity ${activity}`);
   endActivity(activity);
-  await stop(context(app));
+  await stop(context(app, owner(activity)));
   return {};
 }
 
@@ -792,9 +899,11 @@ const methods = {
   beforeCleanup,
   action,
   tool,
+  list,
   openActivity,
   stopActivity,
   noteChanged,
+  cancelBusy,
   beforeInsert,
   clean,
   cleanupStep,
@@ -837,11 +946,13 @@ send({
     cleanupSteps: components(cleanupSteps),
     actions: wireActions(),
     tools: wireTools(),
+    lists: wireLists(),
     settings: [...settingsSchemas].map(([extension, schema]) => ({
       extension,
       fields: Object.entries(schema).map(([key, setting]) => ({ key, ...setting })),
     })),
     errors,
+    screen: screenReaders,
   },
 });
 isReady = true;
@@ -850,7 +961,7 @@ for await (const line of createInterface({ input: process.stdin })) {
   if (!line.trim()) continue;
   const request = parseRequest(line);
   if (!request) continue;
-  if (["generated", "transcribedFile", "liveStarted", "liveStopped", "asked"].includes(request.method)) {
+  if (["generated", "transcribedFile", "liveStarted", "liveStopped", "asked", "fieldRead", "selected", "historyRead", "modelsRead", "screenRead"].includes(request.method)) {
     settle(request.params);
     continue;
   }

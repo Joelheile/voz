@@ -66,6 +66,7 @@ struct SettingsPage: View {
                     .frame(width: 156)
             }
             LinkRow(title: "Cleanup", value: settings.cleanupEnabled ? "On" : "Off", tile: IconTile(.wandSparkles, Color(nsColor: .systemPurple))) { model.page = .cleanup }
+            LinkRow(title: "AI model", value: settings.aiModel.name, tile: IconTile(.bot, Color(nsColor: .systemIndigo))) { model.page = .aiModel }
         }
         PanelGroup(title: "While recording") {
             MicrophonePicker(selection: $settings.microphone)
