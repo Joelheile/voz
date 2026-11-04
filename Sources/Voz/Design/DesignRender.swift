@@ -258,10 +258,10 @@ private final class Fixture {
 
     nonisolated private static let listings = Data("""
     {"objects": [
-      {"downloads": {"monthly": 5310}, "package": {"name": "voz-tone", "description": "Rewrites your dictation in the tone of each app", "version": "1.4.0", "publisher": {"username": "mara"}}},
-      {"downloads": {"monthly": 3720}, "package": {"name": "voz-snippets", "description": "Say a shortcut, get your address, signature or links", "version": "2.0.1", "publisher": {"username": "jonas"}}},
-      {"downloads": {"monthly": 1840}, "package": {"name": "voz-obsidian", "description": "Appends each dictation to today's daily note", "version": "0.9.2", "publisher": {"username": "lee"}}},
-      {"downloads": {"monthly": 410}, "package": {"name": "voz-linear", "description": "Say new ticket to file a Linear issue", "version": "0.3.0", "publisher": {"username": "sam"}}}
+      {"downloads": {"monthly": 5310}, "package": {"date": "2026-10-30T09:12:00.000Z", "links": {"npm": "https://www.npmjs.com/package/voz-tone"}, "name": "voz-tone", "description": "Rewrites your dictation in the tone of each app", "version": "1.4.0", "publisher": {"username": "mara"}}},
+      {"downloads": {"monthly": 3720}, "package": {"date": "2026-10-12T09:12:00.000Z", "links": {"npm": "https://www.npmjs.com/package/voz-snippets"}, "name": "voz-snippets", "description": "Say a shortcut, get your address, signature or links", "version": "2.0.1", "publisher": {"username": "jonas"}}},
+      {"downloads": {"monthly": 1840}, "package": {"date": "2026-08-02T09:12:00.000Z", "links": {"npm": "https://www.npmjs.com/package/voz-obsidian"}, "name": "voz-obsidian", "description": "Appends each dictation to today's daily note", "version": "0.9.2", "publisher": {"username": "lee"}}},
+      {"downloads": {"monthly": 410}, "package": {"date": "2026-06-20T09:12:00.000Z", "links": {"npm": "https://www.npmjs.com/package/voz-linear"}, "name": "voz-linear", "description": "Say new ticket to file a Linear issue", "version": "0.3.0", "publisher": {"username": "sam"}}}
     ]}
     """.utf8)
 

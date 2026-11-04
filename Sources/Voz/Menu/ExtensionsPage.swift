@@ -1,4 +1,5 @@
 import AppKit
+import LucideSwift
 import SwiftUI
 
 struct ExtensionsPage: View {
@@ -103,7 +104,7 @@ private struct ExtensionList: View {
         } else if !model.browseRows.isEmpty {
             VStack(spacing: 2) {
                 ForEach(model.browseRows) { listing in
-                    ExtensionRow(name: listing.name, summary: listing.summary, publisher: listing.publisher, downloads: listing.monthlyDownloads) {
+                    ExtensionRow(name: listing.name, summary: listing.summary, publisher: listing.publisher, downloads: listing.monthlyDownloads, updated: listing.published) {
                         model.selected = listing.name
                     } trailing: {
                         if let stage = model.stage(for: listing.name) {
@@ -176,6 +177,7 @@ private struct ExtensionRow<Trailing: View>: View {
     let summary: String?
     var publisher: String?
     var downloads = 0
+    var updated: Date?
     var dimmed = false
     var attention: String?
     let open: () -> Void
@@ -211,6 +213,10 @@ private struct ExtensionRow<Trailing: View>: View {
                                         Text(downloads.formatted(.number.notation(.compactName)))
                                     }
                                     .help("\(downloads.formatted()) downloads in the last month")
+                                }
+                                if let updated {
+                                    Text(updated.formatted(.relative(presentation: .named)))
+                                        .help("Updated \(updated.formatted(date: .abbreviated, time: .omitted))")
                                 }
                             }
                             .font(.ui(11))
@@ -287,7 +293,7 @@ private struct DetailHeader<Control: View>: View {
             }
             if let summary {
                 Text(summary)
-                    .font(.ui(13))
+                    .font(.ui(15))
                     .lineSpacing(3)
                     .foregroundStyle(Theme.ink)
                     .fixedSize(horizontal: false, vertical: true)
@@ -297,13 +303,23 @@ private struct DetailHeader<Control: View>: View {
 }
 
 private struct ListingDetail: View {
+    private static let trust = "Extensions run on your Mac with the same access as Voz, so they can read your transcripts and files. Install ones from people you trust."
+
     let listing: PackageListing
     @ObservedObject var model: ExtensionsModel
+    @State private var showsTrust = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            PageBar(title: "Browse") { model.selected = nil }
-            DetailHeader(name: listing.name, summary: listing.summary, byline: "\(listing.name) \(listing.version)") {
+            PageBar(title: "Browse") { model.selected = nil } trailing: {
+                IconButton(icon: .info, help: Self.trust) { showsTrust.toggle() }
+                    .popover(isPresented: $showsTrust, arrowEdge: .bottom) {
+                        PageNote(text: Self.trust)
+                            .frame(width: 240)
+                            .padding(12)
+                    }
+            }
+            DetailHeader(name: listing.name, summary: listing.summary, byline: "\(listing.publisher) · \(listing.version)") {
                 Group {
                     if let stage = model.stage(for: listing.name) {
                         StageLabel(text: stage.label)
@@ -318,18 +334,40 @@ private struct ListingDetail: View {
                 .animation(Theme.Motion.section, value: model.stage(for: listing.name))
             }
             MessageView(model: model)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("By \(listing.publisher)\(listing.monthlyDownloads > 0 ? ", \(listing.monthlyDownloads.formatted()) downloads last month" : "")")
-                HStack(spacing: 4) {
-                    Text("It runs on your Mac and can read your transcripts and files.")
-                    if let page = listing.page { Link("Source", destination: page) }
-                }
-            }
-            .font(.meta)
-            .foregroundStyle(Theme.inkTertiary)
-            .fixedSize(horizontal: false, vertical: true)
+            facts
         }
         .onExitCommand { model.selected = nil }
+    }
+
+    private var facts: some View {
+        HStack(spacing: 14) {
+            if listing.monthlyDownloads > 0 {
+                Fact(icon: .download, text: "\(listing.monthlyDownloads.formatted(.number.notation(.compactName)))/mo")
+                    .help("\(listing.monthlyDownloads.formatted()) downloads in the last month")
+            }
+            if let published = listing.published {
+                Fact(icon: .clock, text: published.formatted(.relative(presentation: .named)))
+                    .help("Updated \(published.formatted(date: .abbreviated, time: .omitted))")
+            }
+            if let page = listing.page {
+                Link(destination: page) { Fact(icon: .arrowUpRight, text: "npm") }
+                    .help("Open the package page")
+            }
+        }
+        .font(.meta)
+        .foregroundStyle(Theme.inkTertiary)
+    }
+}
+
+private struct Fact: View {
+    let icon: LucideIconName
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Icon(icon, size: 12)
+            Text(text).monospacedDigit()
+        }
     }
 }
 
