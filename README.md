@@ -14,17 +14,17 @@ Free, open source dictation that runs on your Mac. Missing a feature? Your codin
 
 <a href="https://voz.tools"><img src=".github/images/demo.webp" width="720" alt="The Voz launch film: dictation cleaned in real time, spoken commands for your calendar, todos and notes, and a coding agent building a missing feature as an extension."></a>
 
-[Website](https://voz.tools), [Extensions](https://voz.tools/extensions/)
+[Download](https://voz.tools/download), [Website](https://voz.tools), [Extensions](https://voz.tools/extensions/)
 
 </div>
 
 ## Install
 
-You need macOS 26 on Apple Silicon. Paste this in Terminal:
+You need macOS 26 on Apple Silicon.
 
-```
-curl -fsSL https://voz.tools/install | bash
-```
+1. [Download Voz](https://voz.tools/download).
+2. Open the disk image and drag Voz into Applications.
+3. Open Voz. It walks you through the rest.
 
 ## How it works
 

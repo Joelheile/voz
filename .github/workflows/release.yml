@@ -95,35 +95,34 @@ jobs:
           cat "$RELEASE/notes.md"
           python3 scripts/changelog.py "$CHANNEL" "$VERSION"
 
-      - name: Import signing identity
+      - name: Import Developer ID identity
         env:
-          P12_BASE64: ${{ secrets.VOZ_SIGNING_P12 }}
-          P12_PASSWORD: ${{ secrets.VOZ_SIGNING_P12_PASSWORD }}
-        run: scripts/import-signing-identity.sh
+          P12_BASE64: ${{ secrets.DEVELOPER_ID_P12 }}
+          P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+        run: |
+          scripts/import-signing-identity.sh
+          identity=$(security find-identity -v -p codesigning "$KEYCHAIN" | awk '/Developer ID Application: .*\(G2CSKBA739\)/ { print $2; exit }')
+          [[ -n "$identity" ]] || { echo "No Developer ID Application identity for team G2CSKBA739 in DEVELOPER_ID_P12" >&2; exit 1; }
+          { echo "SIGNING_IDENTITY=$identity"; echo "TIMESTAMP=http://timestamp.apple.com/ts01"; } >> "$GITHUB_ENV"
 
       - name: Build and sign
         run: scripts/make-app.sh "$VERSION" "$BUILD"
 
-      - name: Notarize (optional)
+      - name: Notarize app
         env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          P12_BASE64: ${{ secrets.DEVELOPER_ID_P12 }}
-          P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+          NOTARY_KEY: ${{ secrets.NOTARY_KEY }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: scripts/notarize.sh build/voz.app
+
+      - name: Build and notarize disk image
+        env:
+          NOTARY_KEY: ${{ secrets.NOTARY_KEY }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
         run: |
-          if [[ -z "$APPLE_ID" || -z "$APPLE_APP_PASSWORD" || -z "$APPLE_TEAM_ID" || -z "$P12_BASE64" ]]; then
-            echo "Notarization secrets not set. Skipping."
-            exit 0
-          fi
-          scripts/import-signing-identity.sh
-          identity=$(security find-identity -v -p codesigning "$KEYCHAIN" | awk '/Developer ID Application/ { print $2; exit }')
-          [[ -n "$identity" ]] || { echo "No Developer ID Application identity in DEVELOPER_ID_P12" >&2; exit 1; }
-          SIGNING_IDENTITY=$identity TIMESTAMP=http://timestamp.apple.com/ts01 scripts/make-app.sh "$VERSION" "$BUILD"
-          ditto -c -k --keepParent build/voz.app build/notarize.zip
-          xcrun notarytool submit build/notarize.zip \
-            --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
-          xcrun stapler staple build/voz.app
+          scripts/make-dmg.sh "$RELEASE/voz.dmg"
+          scripts/notarize.sh "$RELEASE/voz.dmg"
 
       - name: Upload debug symbols
         env:
@@ -189,11 +188,11 @@ jobs:
 
       - name: Create GitHub release
         run: |
-          archive=$RELEASE/voz-$VERSION.zip
+          assets=("$RELEASE/voz-$VERSION.zip" "$RELEASE/voz.dmg")
           if [[ "$CHANNEL" == stable ]]; then
-            gh release create "$TAG" "$archive" --title "voz $VERSION" --notes-file "$RELEASE/notes.md" --verify-tag
+            gh release create "$TAG" "${assets[@]}" --title "voz $VERSION" --notes-file "$RELEASE/notes.md" --verify-tag
           else
-            gh release create "$TAG" "$archive" --title "voz $VERSION" --notes-file "$RELEASE/notes.md" \
+            gh release create "$TAG" "${assets[@]}" --title "voz $VERSION" --notes-file "$RELEASE/notes.md" \
               --target "$GITHUB_SHA" --prerelease
           fi
 
