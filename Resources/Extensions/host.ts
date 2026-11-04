@@ -257,11 +257,12 @@ function context(app: App, extension: string): Context {
 }
 
 // The user may take a while to answer, so the handler's time stops until they do
-async function ask({ title, fields = [], buttons }: AskOptions, scope: RequestScope) {
+async function ask({ title, message, icon, fields = [], buttons }: AskOptions, scope?: RequestScope) {
   if (buttons.length === 0) throw new Error("ask needs at least one button");
+  if (!scope) return (await callSwift("ask", { title, message, icon, fields, buttons, remaining: 0 }, untimed(), "Nobody answered the card")) as Answer;
   const remaining = scope.deadline - Date.now();
   try {
-    const params = { title, fields, buttons, remaining };
+    const params = { title, message, icon, fields, buttons, remaining };
     return (await callSwift("ask", params, { id: scope.id, ...untimed() }, "Nobody answered the card")) as Answer;
   } finally {
     scope.deadline = Date.now() + remaining;
@@ -311,7 +312,7 @@ function openNote({ title, text, onChange }: NoteOptions) {
 async function transcribeLive(activity: string, options: LiveTranscribeOptions = {}): Promise<LiveTranscription> {
   if (!activities.has(activity)) throw new Error("transcribeLive only works while its activity runs");
   const session = `live/${++lastSession}`;
-  const params = { session, activity, speakers: options.speakers ?? false, systemAudio: options.systemAudio ?? false };
+  const params = { session, activity, speakers: options.speakers ?? false, systemAudio: options.systemAudio ?? false, you: options.you ?? false };
   // Updates can arrive before Voz confirms the start
   liveSessions.set(session, options.onTranscript);
   try {
@@ -452,11 +453,12 @@ function registerAction(extension: string, action: Action, registration: Registr
 }
 
 function wireActions() {
-  return [...actions.values()].map(({ id, name, hotkey, hidden, extension, when }) => ({
+  return [...actions.values()].map(({ id, name, hotkey, hidden, icon, extension, when }) => ({
     id,
     name,
     hotkey,
     hidden: hidden === true,
+    icon,
     extension,
     when,
   }));
@@ -641,13 +643,20 @@ function api(name: string, config: Config, registration: Registration, readsScre
       const id = `${name}/${++lastActivity}`;
       activities.set(id, activity);
       send({ method: "startActivity", params: { id, title: activity.title, since: activity.since ?? Date.now(), stoppable: !!activity.stop, openable: !!activity.open } });
-      return { end: () => endActivity(id), transcribeLive: (options) => transcribeLive(id, options) };
+      return {
+        end: () => endActivity(id),
+        stop: () => { if (activities.has(id)) send({ method: "stopActivity", params: { id } }); },
+        transcribeLive: (options) => transcribeLive(id, options),
+      };
     },
     history,
     screen: screen(name, readsScreen),
+    ask: (options) => ask(options),
+    openNote: (note) => openNote(note),
     addHistory(entry) {
       if (!entry.text) throw new Error("A history entry needs text");
-      send({ method: "addHistory", params: { extension: name, text: entry.text, seconds: entry.seconds ?? 0, file: entry.file } });
+      const copies = entry.copies?.filter((copy) => copy.name && copy.text);
+      send({ method: "addHistory", params: { extension: name, text: entry.text, seconds: entry.seconds ?? 0, file: entry.file, copies } });
     },
     settings<Schema extends SettingsSchema>(schema: Schema) {
       for (const [key, setting] of Object.entries(schema)) checkSetting(key, setting);

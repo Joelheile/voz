@@ -90,7 +90,7 @@ enum PopoverPage {
 }
 
 struct PopoverActions {
-    var copy: (TranscriptRecord) -> Void = { _ in }
+    var copy: (String) -> Void = { _ in }
     var fixPermission: (PermissionFix) -> Void = { _ in }
     var retryModel: () -> Void = {}
     var checkForUpdates: () -> Void = {}
@@ -117,8 +117,8 @@ final class PopoverModel: ObservableObject {
         page = page.parent
     }
 
-    func copy(_ record: TranscriptRecord) {
-        actions.copy(record)
+    func copy(_ record: TranscriptRecord, part: HistoryCopy? = nil) {
+        actions.copy(part?.text ?? record.finalText)
         copiedID = record.id
         copiedReset?.cancel()
         copiedReset = Task {

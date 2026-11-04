@@ -32,6 +32,11 @@ final class ExtensionCatalog: ObservableObject {
     fileprivate var performStop: (ExtensionActivity) -> Void = { _ in }
     fileprivate var performOpen: (ExtensionActivity) -> Void = { _ in }
 
+    init(actions: [ExtensionAction] = [], activities: [ExtensionActivity] = []) {
+        self.actions = actions
+        self.activities = activities
+    }
+
     func run(_ action: ExtensionAction) {
         perform(action)
     }
@@ -141,11 +146,12 @@ final class ExtensionService {
     private let settings: AppSettings
     private let fileTranscriber: FileTranscriber
     private let live: LiveSessions
-    private let note = NoteController()
+    private let note: NoteController
     private let asker = AskController()
     private let drafts: DraftStore
     private let draftWatcher: DraftWatcher
     let catalog = ExtensionCatalog()
+    var liveStatus: LiveStatus { live.status }
     var onWorking: () -> Void = {}
     var onWorked: (_ succeeded: Bool) -> Void = { _ in }
     var onFileProgress: (Double) -> Void = { _ in }
@@ -182,6 +188,7 @@ final class ExtensionService {
         self.settings = settings
         self.fileTranscriber = fileTranscriber
         live = LiveSessions(transcriber: fileTranscriber.transcriber, vocabulary: fileTranscriber.vocabulary, settings: settings)
+        note = NoteController(live: live.status)
         catalog.perform = { [weak self] action in self?.runAction(action) }
         catalog.performTool = { [weak self] tool, input in
             guard let host = self?.host else { throw ControlError.failed("Extensions are not running, so \(tool.id) can't run.") }
@@ -594,8 +601,11 @@ final class ExtensionService {
         case .endActivity(let id):
             catalog.activities.removeAll { $0.id == id }
             live.endActivity(id)
+        case .stopActivity(let id):
+            if let activity = catalog.activities.first(where: { $0.id == id && $0.stoppable }) { stopActivity(activity) }
         case .openNote(let opened):
-            note.show(opened)
+            // A note that opens with a running activity, such as notes for a meeting, waits under the notch
+            note.show(opened, quietly: !catalog.activities.isEmpty)
         case .closeNote(let id):
             note.close(id)
         case .addHistory(let entry):

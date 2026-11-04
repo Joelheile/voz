@@ -9,6 +9,7 @@ final class IndicatorController {
     private static let closeDuration = Duration.milliseconds(300)
     private static let dropGrace = Duration.milliseconds(200)
     private static let sampleInterval = 1.0 / 120
+    private static let activitySampleInterval = 1.0 / 30
     private static let hoverInterval = 1.0 / 30
     private static let dragCheckInterval = 1.0 / 20
 
@@ -28,14 +29,23 @@ final class IndicatorController {
     private var lastSampleTime = 0.0
     private var activity: ExtensionActivity?
     var levelSource: () -> Float = { 0 }
+    var live: LiveStatus? {
+        get { model.live }
+        set { model.live = newValue }
+    }
     var onCancelWork: () -> Void = {}
     var onOpenActivity: (ExtensionActivity) -> Void = { _ in }
+    var onStopActivity: (ExtensionActivity) -> Void = { _ in }
 
     init() {
         model.onCancel = { [weak self] in self?.cancelWork() }
         model.onOpen = { [weak self] in
             guard let self, let activity = self.activity else { return }
             self.onOpenActivity(activity)
+        }
+        model.onStop = { [weak self] in
+            guard let self, let activity = self.activity else { return }
+            self.onStopActivity(activity)
         }
         let reposition: @Sendable (Notification) -> Void = { [weak self] _ in
             MainActor.assumeIsolated { self?.repositionIfVisible() }
@@ -99,6 +109,9 @@ final class IndicatorController {
         setCancelable(false)
         model.recordingStart = activity.since
         model.recordingEnd = nil
+        model.canStop = activity.stoppable
+        model.levels.reset()
+        startSampling(every: Self.activitySampleInterval)
         model.state = .activity
         expandAfterPresenting()
         trackHover()
@@ -266,11 +279,11 @@ final class IndicatorController {
         model.preview = ""
     }
 
-    private func startSampling() {
+    private func startSampling(every interval: Double = IndicatorController.sampleInterval) {
         sampler?.invalidate()
         smoother = LevelSmoother()
         lastSampleTime = Date.now.timeIntervalSinceReferenceDate
-        let timer = Timer(timeInterval: Self.sampleInterval, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.sampleLevel() }
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -279,10 +292,12 @@ final class IndicatorController {
 
     private func sampleLevel() {
         let now = Date.now.timeIntervalSinceReferenceDate
-        let level = smoother.update(target: levelSource(), elapsedSeconds: now - lastSampleTime)
+        let source = model.state == .activity ? live?.level.normalized ?? 0 : levelSource()
+        let level = smoother.update(target: source, elapsedSeconds: now - lastSampleTime)
         lastSampleTime = now
         model.levels.append(level, at: now)
-        panel.ignoresMouseEvents = !isMouseOverPreview
+        // The hover tracker decides clicks while an activity shows
+        if model.state != .activity { panel.ignoresMouseEvents = !isMouseOverPreview }
     }
 
     private var isMouseOverPreview: Bool {

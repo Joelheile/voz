@@ -30,6 +30,8 @@ struct IndicatorLayout: Equatable, Sendable {
 
     static let sideWidth: CGFloat = 68
     static let seamOverlap: CGFloat = 1
+    /// The notch shape's top corners curve outward this far on each side of its black body
+    static let notchFlare: CGFloat = 6
     static let pillSize = CGSize(width: 108, height: 32)
     static let pillGap: CGFloat = 8
     static let bottomGap: CGFloat = 16

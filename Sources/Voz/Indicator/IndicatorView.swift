@@ -1,3 +1,4 @@
+import LucideSwift
 import Observation
 import SwiftUI
 
@@ -118,7 +119,7 @@ struct IndicatorView: View {
 
     private var notchShape: NotchShape {
         NotchShape(
-            topRadius: 6,
+            topRadius: IndicatorLayout.notchFlare,
             bottomRadius: showsPreview ? 20 : model.isExpanded ? 14 : 10
         )
     }
@@ -315,9 +316,12 @@ final class IndicatorModel {
     var progress: Double?
     var canCancel = false
     var isHovering = false
+    var live: LiveStatus?
+    var canStop = false
     @ObservationIgnored var previewFrame = CGRect.zero
     @ObservationIgnored var onCancel: () -> Void = {}
     @ObservationIgnored var onOpen: () -> Void = {}
+    @ObservationIgnored var onStop: () -> Void = {}
     @ObservationIgnored var levels = LevelHistory()
 }
 
@@ -333,16 +337,20 @@ struct IndicatorLeading: View {
         }
     }
 
+    private var timerOpacity: Double {
+        return model.state == .recording || model.state == .activity ? 0.9 : 0.4
+    }
+
     private var timer: some View {
         Text(
-            timerInterval: model.recordingStart...model.recordingStart.addingTimeInterval(3600),
+            timerInterval: model.recordingStart...model.recordingStart.addingTimeInterval(24 * 3600),
             pauseTime: model.recordingEnd,
             countsDown: false,
             showsHours: false
         )
         .font(.ui(12, weight: .medium))
         .monospacedDigit()
-        .foregroundStyle(.primary.opacity(model.state == .recording || model.state == .activity ? 0.9 : 0.4))
+        .foregroundStyle(.primary.opacity(timerOpacity))
         .animation(.easeOut(duration: 0.2), value: model.state)
     }
 }
@@ -370,17 +378,71 @@ struct IndicatorTrailing: View {
             case .dropTarget:
                 DropArrow(isTargeted: model.isDropTargeted).transition(swap)
             case .activity:
-                Icon(.notebookPen, size: 15, strokeWidth: 2)
-                    .foregroundStyle(.primary.opacity(model.isHovering ? 1 : 0.6))
-                    .animation(Theme.Motion.hover, value: model.isHovering)
-                    .transition(swap)
+                if model.isHovering, model.canStop {
+                    ActivityControls(model: model).transition(swap)
+                } else if !model.canStop {
+                    ProgressDots().transition(swap)
+                } else if model.live?.stalled == true {
+                    ResultSymbol(icon: .triangleAlert, color: Theme.failure, effect: .bounce)
+                        .help("Voz can't hear the meeting and is reconnecting")
+                        .transition(swap)
+                } else if model.live?.running == true {
+                    ActivityLevel(model: model).transition(swap)
+                } else {
+                    Icon(.audioLines, size: 15, strokeWidth: 2)
+                        .foregroundStyle(.primary.opacity(model.isHovering ? 1 : 0.6))
+                        .animation(Theme.Motion.hover, value: model.isHovering)
+                        .transition(swap)
+                }
             }
         }
         .animation(reduceMotion ? IndicatorMotion.reducedMotion : IndicatorMotion.stateSwap, value: model.state)
+        .animation(reduceMotion ? IndicatorMotion.reducedMotion : IndicatorMotion.stateSwap, value: model.live?.stalled)
+        .animation(reduceMotion ? IndicatorMotion.reducedMotion : IndicatorMotion.stateSwap, value: model.live?.running)
+        .animation(reduceMotion ? IndicatorMotion.reducedMotion : IndicatorMotion.stateSwap, value: model.isHovering)
     }
 
     private var swap: AnyTransition {
         reduceMotion ? .opacity : AnyTransition(.blurReplace)
+    }
+}
+
+/// The meeting's sound as one Lucide icon that brightens while someone speaks
+struct ActivityLevel: View {
+    let model: IndicatorModel
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 15)) { _ in
+            Icon(.audioLines, size: 15)
+                .foregroundStyle(Theme.accent)
+                .opacity(0.45 + 0.55 * Double(min(1, model.levels.latest)))
+        }
+        .padding(.trailing, LevelBarsGeometry.trailingInset)
+    }
+}
+
+/// Stop for a running activity, such as a meeting. They show while the pointer is on the notch.
+struct ActivityControls: View {
+    let model: IndicatorModel
+
+    var body: some View {
+        HStack(spacing: 4) {
+            if model.canStop {
+                control(.square, help: "Stop", color: Theme.recording, action: model.onStop)
+            }
+        }
+    }
+
+    private func control(_ icon: LucideIconName, help: String, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Icon(icon, size: 15)
+                .foregroundStyle(color)
+                .frame(width: 24, height: 24)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.pressable(0.9))
+        .help(help)
+        .accessibilityLabel(help)
     }
 }
 

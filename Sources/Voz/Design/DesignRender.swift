@@ -22,6 +22,9 @@ enum DesignRender {
             for (title, page) in pages {
                 try write(fixture.popover(page: page), to: outputDirectory, name: "popover-\(title)-\(suffix)", appearance: appearance)
             }
+            for (title, activity) in Fixture.meetingActivities {
+                try write(fixture.popover(activity: activity), to: outputDirectory, name: "popover-meeting-\(title)-\(suffix)", appearance: appearance)
+            }
             fixture.sources.extensions.selected = "voz-tone"
             try write(fixture.popover(page: .extensions), to: outputDirectory, name: "popover-extension-detail-\(suffix)", appearance: appearance)
             fixture.sources.extensions.selected = nil
@@ -84,16 +87,58 @@ enum DesignRender {
                     )
                 }
             }
-            for (title, text) in [("empty", ""), ("written", "Ask Luca about the API bump\nShip the notch note on Friday")] {
-                let note = NoteModel()
-                note.title = "Weekly sync"
-                note.text = text
-                try write(
-                    NoteView(model: note, onEdit: {}, onClose: {}).frame(width: NoteController.size.width, height: NoteController.size.height),
-                    to: outputDirectory,
-                    name: "note-\(title)-\(suffix)",
-                    appearance: appearance
-                )
+            for (title, text) in [("empty", ""), ("written", "# Weekly sync\nAsk Luca about the **API bump**\n## Decisions\n- Notes open from the notch\n  - Summary lands in `~/Meetings`\n    - One file per meeting\n1. Review the draft\n- [x] Pick a backup folder\n- [ ] Ship on Friday")] {
+                for expanded in [false, true] {
+                    let note = NoteModel()
+                    note.title = "Weekly sync"
+                    note.text = text
+                    note.focused = expanded
+                    try write(
+                        NoteView(model: note, onEdit: {}, onClose: {})
+                            .frame(width: NoteController.width, height: expanded ? NoteController.expandedHeight : NoteController.compactHeight),
+                        to: outputDirectory,
+                        name: "note-\(title)-\(expanded ? "open" : "compact")-\(suffix)",
+                        appearance: appearance
+                    )
+                }
+            }
+            for (title, stalled) in [("live", false), ("stalled", true)] {
+                let live = LiveStatus()
+                live.begin()
+                live.hear("Speaker 1: so the plan is to ship on Friday. You: Milan, can you own the changelog? Speaker 1: yes, I'll write it tonight and send it over")
+                live.stalled = stalled
+                for expanded in [false, true] {
+                    let note = NoteModel()
+                    note.title = "Notes"
+                    note.text = "# Release\n- Ship Friday\n- Milan owns the changelog\n- [ ] Send the draft tonight"
+                    note.live = live
+                    note.focused = expanded
+                    try write(
+                        NoteView(model: note, onEdit: {}, onClose: {})
+                            .frame(width: NoteController.width, height: expanded ? NoteController.expandedHeight : NoteController.compactHeight),
+                        to: outputDirectory,
+                        name: "note-meeting-\(title)-\(expanded ? "open" : "compact")-\(suffix)",
+                        appearance: appearance
+                    )
+                }
+                let model = IndicatorModel()
+                model.isExpanded = true
+                model.state = .activity
+                model.live = live
+                model.canStop = true
+                model.recordingStart = Date().addingTimeInterval(-754)
+                for (index, level) in [0.2, 0.6, 0.4, 0.8, 0.3, 0.7, 0.5].enumerated() {
+                    model.levels.append(Float(level), at: Date.now.timeIntervalSinceReferenceDate - Double(7 - index) * 0.08)
+                }
+                for (style, hasNotch) in [("notch", true), ("floating", false)] {
+                    try write(
+                        IndicatorView(model: model, layout: previewLayout(hasNotch: hasNotch))
+                            .environment(\.colorScheme, hasNotch || name == .darkAqua ? .dark : .light),
+                        to: outputDirectory,
+                        name: "indicator-\(style)-meeting-\(title)-\(suffix)",
+                        appearance: appearance
+                    )
+                }
             }
             let ask = AskModel()
             ask.load(Self.calendarAsk)
@@ -104,12 +149,19 @@ enum DesignRender {
             pick.load(AIModels.pickCard)
             try write(AskView(model: pick, onAnswer: { _ in }, onClose: {}), to: outputDirectory, name: "ask-model-\(suffix)", appearance: appearance)
             try write(AskView(model: ask, onAnswer: { _ in }, onClose: {}), to: outputDirectory, name: "ask-calendar-\(suffix)", appearance: appearance)
+            ask.load(Self.meetingAsk)
+            try write(AskView(model: ask, onAnswer: { _ in }, onClose: {}), to: outputDirectory, name: "ask-meeting-\(suffix)", appearance: appearance)
             for step in SetupStep.allCases {
                 fixture.sources.setup.step = step
                 try write(fixture.popover(needsSetup: true), to: outputDirectory, name: "popover-setup-\(step)-\(suffix)", appearance: appearance)
             }
         }
     }
+
+    private static let meetingAsk = AskParams(
+        call: 0, deadline: 0, title: "Zoom call started", message: "Record it and take notes?", icon: "audio-lines",
+        fields: [], buttons: ["Not now", "Record"], remaining: 0
+    )
 
     private static let calendarAsk = AskParams(
         call: 0,
@@ -251,10 +303,31 @@ private final class Fixture {
             vocabulary: VocabularyModel(store: history.vocabulary, analytics: analytics),
             setup: SetupModel(analytics: analytics) {},
             extensions: ExtensionsModel(analytics: analytics, home: home, cache: nil, fetch: { url in url.lastPathComponent == "latest" ? Self.screenReader : Self.listings }),
-            catalog: ExtensionCatalog(),
+            catalog: ExtensionCatalog(actions: [Self.meetingAction]),
             updater: Updater(settings: settings, isBusy: { false })
         )
         status.update(.parakeetUltra, .ready(bytes: 483_000_000))
+    }
+
+    nonisolated static let meetingAction = ExtensionAction(
+        id: "voz-meeting/meeting", name: "Record meeting", hotkey: "ctrl+opt+m", hidden: false, icon: "audio-lines", extension: "voz-meeting"
+    )
+    nonisolated static let meetingActivities = [
+        ("recording", ExtensionActivity(id: "1", title: "Recording meeting", since: Date().addingTimeInterval(-754), stoppable: true, openable: true)),
+        ("saving", ExtensionActivity(id: "2", title: "Saving meeting", since: Date().addingTimeInterval(-8), stoppable: false, openable: false)),
+    ]
+
+    func popover(activity: ExtensionActivity) -> some View {
+        let action = Self.meetingAction
+        let hidden = ExtensionAction(id: action.id, name: action.name, hotkey: action.hotkey, hidden: true, icon: action.icon, extension: action.extension)
+        let sources = PopoverSources(
+            settings: settings, modelStatus: status, history: self.sources.history, stats: self.sources.stats,
+            vocabulary: self.sources.vocabulary, setup: self.sources.setup, extensions: self.sources.extensions,
+            catalog: ExtensionCatalog(actions: [hidden], activities: [activity]), updater: self.sources.updater
+        )
+        let model = PopoverModel()
+        model.hint = Self.hint(for: .ready, settings: settings)
+        return PopoverView(model: model, sources: sources)
     }
 
     func popover(status: PopoverStatus = .ready, hint: String = "", page: PopoverPage = .home, needsSetup: Bool = false) -> some View {
@@ -306,7 +379,8 @@ private final class Fixture {
             result.append(record(text: texts[index], at: now.addingTimeInterval(-seconds), app: apps[index]))
         }
         result.insert(TranscriptRecord(ExtensionHistoryEntry(
-            extension: "voz-meeting", text: "Speaker 1: Let's start with the release plan for Friday.", seconds: 1_800, file: "/tmp/standup.md"
+            extension: "voz-meeting", text: "Release plan: ship Friday, Milan owns the changelog", seconds: 1_800, file: "/tmp/standup.md",
+            copies: [HistoryCopy(name: "Notes", text: "ship fri"), HistoryCopy(name: "Transcript", text: "Speaker 1: Let's start with the release plan for Friday.")]
         )), at: 1)
         for day in 0..<30 where day % 5 != 3 {
             for entry in 0..<(1 + day % 3) {

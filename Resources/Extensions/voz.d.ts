@@ -79,6 +79,8 @@ export type Turn = {
   start: number;
   end: number;
   text: string;
+  /** True on turns from the user's own microphone, with `you` in `transcribeLive`. Their `speaker` is 0. */
+  you?: boolean;
 };
 export type Transcript = {
   text: string;
@@ -86,9 +88,10 @@ export type Transcript = {
   speakers: number;
   turns: Turn[];
 };
-/** `systemAudio` mixes everything the Mac plays, such as a call, into the microphone. `onTranscript` gets the whole transcript so far, a few seconds behind speech. Earlier turns can change. */
+/** `systemAudio` mixes everything the Mac plays, such as a call, into the microphone. With `you`, Voz keeps the microphone apart, marks its turns and drops the call's echo from it. `onTranscript` gets the whole transcript so far, a few seconds behind speech. Earlier turns can change. */
 export type LiveTranscribeOptions = TranscribeOptions & {
   systemAudio?: boolean;
+  you?: boolean;
   onTranscript?(transcript: Transcript): void;
 };
 export type LiveTranscription = { stop(): Promise<Transcript> };
@@ -113,6 +116,10 @@ export type AskField =
 /** The last button is the main one. */
 export type AskOptions = {
   title: string;
+  /** A line under the title */
+  message?: string;
+  /** A Lucide icon name, such as `"audio-lines"`, shown beside the title */
+  icon?: string;
   fields?: AskField[];
   buttons: string[];
 };
@@ -259,6 +266,8 @@ export type Action = {
   /** "selection" runs this action only when text is selected. Another action on the same hotkey without `when` runs otherwise. */
   when?: "selection";
   hidden?: boolean;
+  /** A Lucide icon name, such as `"audio-lines"`, shown next to the name in the Voz panel. API 8. */
+  icon?: string;
   run(ctx: Context): Awaitable<void>;
 };
 
@@ -309,11 +318,15 @@ export type Activity = {
 
 export type RunningActivity = {
   end(): void;
+  /** Stops the activity as if the user pressed Stop, so its `stop` handler runs with a `ctx` */
+  stop(): void;
   /** Listens until `stop()` or until the activity ends. */
   transcribeLive(options?: LiveTranscribeOptions): Promise<LiveTranscription>;
 };
 
-export type HistoryEntry = { text: string; seconds?: number; file?: string };
+/** Another part of an entry the user can copy on its own, such as a meeting's notes. */
+export type HistoryCopy = { name: string; text: string };
+export type HistoryEntry = { text: string; seconds?: number; file?: string; copies?: HistoryCopy[] };
 
 type SettingBase = { title: string; description?: string };
 
@@ -323,6 +336,8 @@ export type Setting =
       default: string;
       options?: string[];
       secret?: boolean;
+      /** Shows a folder picker. The value is the folder's full path. */
+      folder?: boolean;
       required?: boolean;
     })
   | (SettingBase & { type: "number"; default: number })
@@ -378,6 +393,9 @@ export type ExtensionAPI = {
    */
   generate<const S extends Schema>(request: GenerateRequest<S>): Promise<Generated<S>>;
   startActivity(activity: Activity): RunningActivity;
+  /** Like `ctx.ask` and `ctx.openNote`, for moments no handler runs, such as when a meeting starts */
+  ask(options: AskOptions): Promise<Answer>;
+  openNote(note: NoteOptions): Note;
   addHistory(entry: HistoryEntry): void;
   /** What the user wrote through Voz: dictations, and drafts with what happened to them. Read-only. */
   history(query?: HistoryQuery): Promise<Written[]>;

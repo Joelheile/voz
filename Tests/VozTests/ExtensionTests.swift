@@ -297,6 +297,34 @@ struct ExtensionHostTests {
         await host.stop()
     }
 
+    @Test func extensionsAskOutsideAHandler() async throws {
+        try extensionFile("meeting.ts", #"export default async (voz) => { const answer = await voz.ask({ title: "Record the meeting?", message: "Zoom is on", icon: "audio-lines", buttons: ["Not now", "Record"] }); voz.startActivity({ title: answer.button, since: 1000 }) }"#)
+        let actions = RecordedActions()
+        let asked = Mutex<AskParams?>(nil)
+        let host = makeHost(actions: actions, ask: { params in
+            asked.withLock { $0 = params }
+            return AskAnswer(button: "Record", values: [:])
+        })
+        _ = try await host.start()
+        let params = asked.withLock { $0 }
+        #expect(params?.title == "Record the meeting?")
+        #expect(params?.message == "Zoom is on")
+        #expect(params?.icon == "audio-lines")
+        for _ in 0..<40 where actions.all.isEmpty { try await Task.sleep(for: .milliseconds(50)) }
+        #expect(actions.all == [startedActivity("meeting/1", "Record", since: 1, stoppable: false)])
+        await host.stop()
+    }
+
+    @Test func extensionsOpenNotesOutsideAHandler() async throws {
+        try extensionFile("meeting.ts", #"export default (voz) => { voz.openNote({ title: "Meeting", text: "Agenda" }) }"#)
+        let actions = RecordedActions()
+        let host = makeHost(actions: actions)
+        _ = try await host.start()
+        for _ in 0..<40 where actions.all.isEmpty { try await Task.sleep(for: .milliseconds(50)) }
+        #expect(actions.all == [.openNote(ExtensionNote(id: "note/1", title: "Meeting", text: "Agenda"))])
+        await host.stop()
+    }
+
     @Test func generateFailuresRejectInsideTheExtension() async throws {
         try extensionFile("extract.ts", #"export default (voz) => voz.registerCommand("todo", async (e, ctx) => { try { await ctx.generate({ prompt: e.text, schema: { type: "object", properties: {} } }) } catch (error) { ctx.notify(error.message) } }, { at: "start" })"#)
         let actions = RecordedActions()
@@ -504,6 +532,20 @@ struct ExtensionHostTests {
         await host.stop()
     }
 
+    @Test func anExtensionCanAskVozToStopItsActivity() async throws {
+        try extensionFile("meeting.ts", #"export default (voz) => { voz.startActivity({ title: "Recording meeting", since: 1000, stop: () => {} }).stop(); const ended = voz.startActivity({ title: "Sync", since: 1000, stop: () => {} }); ended.end(); ended.stop() }"#)
+        let actions = RecordedActions()
+        let host = makeHost(actions: actions)
+        _ = try await host.start()
+        #expect(actions.all == [
+            startedActivity("meeting/1", "Recording meeting", since: 1, stoppable: true),
+            .stopActivity("meeting/1"),
+            startedActivity("meeting/2", "Sync", since: 1, stoppable: true),
+            .endActivity("meeting/2"),
+        ])
+        await host.stop()
+    }
+
     @Test func openingAnActivityShowsANoteThatReportsEdits() async throws {
         try extensionFile("meeting.ts", #"export default (voz) => { voz.startActivity({ title: "Meeting", since: 1000, open(ctx) { const note = ctx.openNote({ title: "Meeting", text: "Agenda", onChange(text) { voz.addHistory({ text }); note.close() } }) } }) }"#)
         let actions = RecordedActions()
@@ -537,12 +579,24 @@ struct ExtensionHostTests {
         _ = try await host.start()
         #expect(await host.runAction("meeting/listen", app: app, timeout: .seconds(2)))
         #expect(await host.stopActivity("meeting/1", app: app, timeout: .seconds(2)))
-        #expect(started.withLock { $0 }.map { [$0.session, $0.activity, "\($0.speakers)", "\($0.systemAudio)"] } == ["live/1", "meeting/1", "true", "true"])
+        #expect(started.withLock { $0 }.map { [$0.session, $0.activity, "\($0.speakers)", "\($0.systemAudio)", "\($0.you == true)"] } == ["live/1", "meeting/1", "true", "true", "false"])
         #expect(actions.all == [
             startedActivity("meeting/1", "Meeting", since: 1, stoppable: true),
             .addHistory(ExtensionHistoryEntry(extension: "meeting", text: "1:Hi.", seconds: 0, file: nil)),
             .endActivity("meeting/1"),
             .notify("1 Hi."),
+        ])
+        await host.stop()
+    }
+
+    @Test func historyEntriesCarryPartsToCopyAndSettingsPickFolders() async throws {
+        try extensionFile("meeting.ts", #"export default (voz) => { voz.settings({ folder: { type: "string", title: "Folder", default: "/tmp", folder: true } }); voz.addHistory({ text: "Summary", copies: [{ name: "Notes", text: "ship fri" }, { name: "Empty", text: "" }] }) }"#)
+        let actions = RecordedActions()
+        let host = makeHost(actions: actions)
+        let manifest = try await host.start()
+        #expect(manifest.settings.first?.fields.first?.folder == true)
+        #expect(actions.all == [
+            .addHistory(ExtensionHistoryEntry(extension: "meeting", text: "Summary", seconds: 0, file: nil, copies: [HistoryCopy(name: "Notes", text: "ship fri")])),
         ])
         await host.stop()
     }
@@ -571,18 +625,18 @@ struct ExtensionHostTests {
     }
 
     @Test func hiddenActionsLeaveThePanelAndUpdatesReachVoz() async throws {
-        try extensionFile("setup.ts", #"export default (voz) => { const done = voz.registerAction({ id: "done", name: "Done", hidden: true, run() {} }); const connect = voz.registerAction({ id: "connect", name: "Connect", hotkey: "ctrl+opt+t", run() { connect.update({ hidden: true }); done.update({ hidden: false }) } }) }"#)
+        try extensionFile("setup.ts", #"export default (voz) => { const done = voz.registerAction({ id: "done", name: "Done", hidden: true, run() {} }); const connect = voz.registerAction({ id: "connect", name: "Connect", hotkey: "ctrl+opt+t", icon: "plug", run() { connect.update({ hidden: true }); done.update({ hidden: false }) } }) }"#)
         let actions = RecordedActions()
         let host = makeHost(actions: actions)
         let manifest = try await host.start()
         #expect(manifest.actions == [
             ExtensionAction(id: "setup/done", name: "Done", hotkey: nil, hidden: true, extension: "setup"),
-            ExtensionAction(id: "setup/connect", name: "Connect", hotkey: "ctrl+opt+t", hidden: false, extension: "setup"),
+            ExtensionAction(id: "setup/connect", name: "Connect", hotkey: "ctrl+opt+t", hidden: false, icon: "plug", extension: "setup"),
         ])
         #expect(await host.runAction("setup/connect", app: app, timeout: .seconds(2)))
         #expect(actions.all.last == .actions([
             ExtensionAction(id: "setup/done", name: "Done", hotkey: nil, hidden: false, extension: "setup"),
-            ExtensionAction(id: "setup/connect", name: "Connect", hotkey: "ctrl+opt+t", hidden: true, extension: "setup"),
+            ExtensionAction(id: "setup/connect", name: "Connect", hotkey: "ctrl+opt+t", hidden: true, icon: "plug", extension: "setup"),
         ]))
         await host.stop()
     }
