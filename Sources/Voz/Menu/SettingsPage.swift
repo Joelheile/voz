@@ -26,7 +26,7 @@ struct SettingsPage: View {
                 IconButton(icon: .scrollText, help: "What's new") { model.page = .whatsNew }
             }
             CappedScrollView(maxHeight: 640) {
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 22) {
                     if !allGranted { permissions }
                     dictation
                     general

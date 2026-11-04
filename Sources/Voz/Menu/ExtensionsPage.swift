@@ -29,6 +29,7 @@ struct ExtensionsPage: View {
 }
 
 private struct ExtensionList: View {
+    private static let dividerInset: CGFloat = 8 + 36 + 12
     @ObservedObject var model: ExtensionsModel
     @ObservedObject var catalog: ExtensionCatalog
     let toast: (String) -> Void
@@ -80,6 +81,7 @@ private struct ExtensionList: View {
         } else {
             VStack(spacing: 2) {
                 ForEach(model.installedRows, id: \.name) { item in
+                    if item.name != model.installedRows.first?.name { RowDivider().padding(.leading, Self.dividerInset) }
                     ExtensionRow(name: item.name, summary: model.summary(for: item), dimmed: !model.isEnabled(item.name), attention: attention(for: item)) {
                         model.selected = item.name
                     } trailing: {
@@ -104,6 +106,7 @@ private struct ExtensionList: View {
         } else if !model.browseRows.isEmpty {
             VStack(spacing: 2) {
                 ForEach(model.browseRows) { listing in
+                    if listing.id != model.browseRows.first?.id { RowDivider().padding(.leading, Self.dividerInset) }
                     ExtensionRow(name: listing.name, summary: listing.summary, publisher: listing.publisher, downloads: listing.monthlyDownloads, updated: listing.published) {
                         model.selected = listing.name
                     } trailing: {
@@ -187,9 +190,9 @@ private struct ExtensionRow<Trailing: View>: View {
     var body: some View {
         HStack(spacing: 10) {
             Button(action: open) {
-                HStack(alignment: .top, spacing: 10) {
-                    Monogram(name: name, size: 32)
-                    VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .center, spacing: 12) {
+                    Monogram(name: name, size: 36)
+                    VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 6) {
                             Text(ExtensionsModel.displayName(name)).font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
                             if let attention {
@@ -206,21 +209,20 @@ private struct ExtensionRow<Trailing: View>: View {
                         }
                         if let publisher {
                             HStack(spacing: 10) {
-                                Text(publisher)
+                                Fact(icon: .user, text: publisher)
                                 if downloads > 0 {
-                                    HStack(spacing: 3) {
-                                        Icon(.download, size: 11)
-                                        Text(downloads.formatted(.number.notation(.compactName)))
-                                    }
-                                    .help("\(downloads.formatted()) downloads in the last month")
+                                    Fact(icon: .download, text: downloads.formatted(.number.notation(.compactName)))
+                                        .help("\(downloads.formatted()) downloads in the last month")
                                 }
                                 if let updated {
-                                    Text(updated.formatted(.relative(presentation: .named)))
+                                    Fact(icon: .clock, text: updated.formatted(.relative(presentation: .named)))
                                         .help("Updated \(updated.formatted(date: .abbreviated, time: .omitted))")
                                 }
                             }
                             .font(.ui(11))
+                            .lineLimit(1)
                             .foregroundStyle(Theme.inkTertiary)
+                            .padding(.top, 2)
                         }
                     }
                     Spacer(minLength: 0)
@@ -232,7 +234,7 @@ private struct ExtensionRow<Trailing: View>: View {
             trailing
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 8)
+        .padding(.vertical, 10)
         .background(hovering ? Theme.selected : .clear, in: RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous))
         .onHover { hovering = $0 }
         .animation(Theme.Motion.hover, value: hovering)

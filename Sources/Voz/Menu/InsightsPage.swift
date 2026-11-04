@@ -18,7 +18,7 @@ struct InsightsPage: View {
             TodayHero(stats: model.stats, revealed: revealed).groupCard(padding: 14)
             VStack(alignment: .leading, spacing: 10) {
                 TabBar(tabs: StatsPeriod.allCases, selection: $period)
-                WordsHeadline(stats: stats).padding(.horizontal, 4).padding(.vertical, 6)
+                WordsHeadline(stats: stats).padding(.vertical, 6)
                 HStack(alignment: .top, spacing: 8) {
                     PaceGauge(wordsPerMinute: stats.wordsPerMinute, revealed: revealed).frame(maxHeight: .infinity, alignment: .top).groupCard()
                     TimeSaved(stats: stats, revealed: revealed).frame(maxHeight: .infinity, alignment: .top).groupCard()
@@ -49,14 +49,15 @@ private struct TodayHero: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 12) {
-                streak
-                Spacer(minLength: 0)
-                VStack(alignment: .trailing, spacing: 6) {
-                    TodayMetric(value: today.words.formatted(), label: today.words == 1 ? "word today" : "words today")
-                    TodayMetric(value: StatsFormat.duration(today.savedSeconds), label: "saved today")
+            HStack(alignment: .top, spacing: 0) {
+                TodayMetric(value: stats.streak.formatted(), label: "day streak") {
+                    Icon(.flame, size: 18, strokeWidth: 2)
+                        .foregroundStyle(dictatedToday ? Theme.accent : Theme.inkTertiary)
                 }
+                TodayMetric(value: today.words.formatted(), label: today.words == 1 ? "word today" : "words today")
+                TodayMetric(value: StatsFormat.duration(today.savedSeconds), label: "saved today")
             }
+            .animation(Theme.Motion.section, value: dictatedToday)
             ActivityGrid(days: stats.days, revealed: revealed, hovered: $hovered)
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(caption)
@@ -72,23 +73,6 @@ private struct TodayHero: View {
         }
     }
 
-    private var streak: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(alignment: .center, spacing: 6) {
-                Icon(.flame, size: 22, strokeWidth: 2)
-                    .foregroundStyle(dictatedToday ? Theme.accent : Theme.inkTertiary)
-                Text(stats.streak.formatted())
-                    .font(.display(40))
-                    .foregroundStyle(Theme.ink)
-                    .contentTransition(.numericText())
-            }
-            Text("day streak")
-                .font(.ui(13, weight: .medium))
-                .foregroundStyle(Theme.inkSecondary)
-        }
-        .animation(Theme.Motion.section, value: dictatedToday)
-    }
-
     private var caption: String {
         if let hovered {
             let words = hovered.words == 1 ? "1 word" : "\(hovered.words.formatted()) words"
@@ -100,20 +84,33 @@ private struct TodayHero: View {
     }
 }
 
-private struct TodayMetric: View {
+private struct TodayMetric<Accessory: View>: View {
     let value: String
     let label: String
+    @ViewBuilder var accessory: Accessory
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 0) {
-            Text(value)
-                .font(.display(20))
-                .foregroundStyle(Theme.ink)
-                .contentTransition(.numericText())
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .center, spacing: 4) {
+                accessory
+                Text(value)
+                    .font(.display(28))
+                    .foregroundStyle(Theme.ink)
+                    .contentTransition(.numericText())
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
             Text(label)
                 .font(.meta)
                 .foregroundStyle(Theme.inkTertiary)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+extension TodayMetric where Accessory == EmptyView {
+    init(value: String, label: String) {
+        self.init(value: value, label: label) { EmptyView() }
     }
 }
 
