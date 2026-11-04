@@ -29,7 +29,6 @@ struct ExtensionsPage: View {
 }
 
 private struct ExtensionList: View {
-    private static let dividerInset: CGFloat = 8 + 36 + 12
     @ObservedObject var model: ExtensionsModel
     @ObservedObject var catalog: ExtensionCatalog
     let toast: (String) -> Void
@@ -81,7 +80,7 @@ private struct ExtensionList: View {
         } else {
             VStack(spacing: 2) {
                 ForEach(model.installedRows, id: \.name) { item in
-                    if item.name != model.installedRows.first?.name { RowDivider().padding(.leading, Self.dividerInset) }
+                    if item.name != model.installedRows.first?.name { RowDivider().padding(.horizontal, 8) }
                     ExtensionRow(name: item.name, summary: model.summary(for: item), dimmed: !model.isEnabled(item.name), attention: attention(for: item)) {
                         model.selected = item.name
                     } trailing: {
@@ -90,7 +89,6 @@ private struct ExtensionList: View {
                     }
                 }
             }
-            .groupCard(padding: 4)
         }
     }
 
@@ -106,8 +104,8 @@ private struct ExtensionList: View {
         } else if !model.browseRows.isEmpty {
             VStack(spacing: 2) {
                 ForEach(model.browseRows) { listing in
-                    if listing.id != model.browseRows.first?.id { RowDivider().padding(.leading, Self.dividerInset) }
-                    ExtensionRow(name: listing.name, summary: listing.summary, publisher: listing.publisher, downloads: listing.monthlyDownloads, updated: listing.published) {
+                    if listing.id != model.browseRows.first?.id { RowDivider().padding(.horizontal, 8) }
+                    ExtensionRow(name: listing.name, summary: listing.summary, publisher: listing.publisher, downloads: listing.monthlyDownloads) {
                         model.selected = listing.name
                     } trailing: {
                         if let stage = model.stage(for: listing.name) {
@@ -119,7 +117,6 @@ private struct ExtensionList: View {
                     }
                 }
             }
-            .groupCard(padding: 4)
         } else if model.message == nil {
             empty(model.query.isEmpty ? "Nothing published yet" : "No matches")
         }
@@ -180,7 +177,6 @@ private struct ExtensionRow<Trailing: View>: View {
     let summary: String?
     var publisher: String?
     var downloads = 0
-    var updated: Date?
     var dimmed = false
     var attention: String?
     let open: () -> Void
@@ -190,43 +186,36 @@ private struct ExtensionRow<Trailing: View>: View {
     var body: some View {
         HStack(spacing: 10) {
             Button(action: open) {
-                HStack(alignment: .center, spacing: 12) {
-                    Monogram(name: name, size: 36)
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(spacing: 6) {
-                            Text(ExtensionsModel.displayName(name)).font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
-                            if let attention {
-                                Text(attention).font(.ui(11, weight: .medium)).foregroundStyle(Theme.accent)
-                            }
-                        }
-                        if let summary {
-                            Text(summary)
-                                .font(.meta)
-                                .lineSpacing(2)
-                                .lineLimit(2)
-                                .foregroundStyle(Theme.inkSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        if let publisher {
-                            HStack(spacing: 10) {
-                                Fact(icon: .user, text: publisher)
-                                if downloads > 0 {
-                                    Fact(icon: .download, text: downloads.formatted(.number.notation(.compactName)))
-                                        .help("\(downloads.formatted()) downloads in the last month")
-                                }
-                                if let updated {
-                                    Fact(icon: .clock, text: updated.formatted(.relative(presentation: .named)))
-                                        .help("Updated \(updated.formatted(date: .abbreviated, time: .omitted))")
-                                }
-                            }
-                            .font(.ui(11))
-                            .lineLimit(1)
-                            .foregroundStyle(Theme.inkTertiary)
-                            .padding(.top, 2)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text(ExtensionsModel.displayName(name)).font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
+                        if let attention {
+                            Text(attention).font(.ui(11, weight: .medium)).foregroundStyle(Theme.accent)
                         }
                     }
-                    Spacer(minLength: 0)
+                    if let summary {
+                        Text(summary)
+                            .font(.meta)
+                            .lineSpacing(2)
+                            .lineLimit(2)
+                            .foregroundStyle(Theme.inkSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if let publisher {
+                        HStack(spacing: 10) {
+                            Fact(icon: .user, text: publisher)
+                            if downloads > 0 {
+                                Fact(icon: .download, text: downloads.formatted(.number.notation(.compactName)))
+                                    .help("\(downloads.formatted()) downloads in the last month")
+                            }
+                        }
+                        .font(.ui(11))
+                        .lineLimit(1)
+                        .foregroundStyle(Theme.inkTertiary)
+                        .padding(.top, 2)
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .opacity(dimmed ? 0.5 : 1)
                 .contentShape(Rectangle())
             }
@@ -239,26 +228,6 @@ private struct ExtensionRow<Trailing: View>: View {
         .onHover { hovering = $0 }
         .animation(Theme.Motion.hover, value: hovering)
         .animation(Theme.Motion.section, value: dimmed)
-    }
-}
-
-private struct Monogram: View {
-    private static let hues: [Double] = [0.6, 0.38, 0.08, 0.92, 0.75, 0.5]
-
-    let name: String
-    let size: CGFloat
-
-    private var hue: Color {
-        let seed = name.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) & 0xFFFF }
-        return Color(hue: Self.hues[seed % Self.hues.count], saturation: 0.7, brightness: 0.8)
-    }
-
-    var body: some View {
-        Text(ExtensionsModel.displayName(name).prefix(1))
-            .font(.wordmark(size * 0.5))
-            .foregroundStyle(hue)
-            .frame(width: size, height: size)
-            .background(hue.opacity(0.16), in: RoundedRectangle(cornerRadius: size * 0.28, style: .continuous))
     }
 }
 
@@ -285,7 +254,6 @@ private struct DetailHeader<Control: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
-                Monogram(name: name, size: 44)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(ExtensionsModel.displayName(name)).font(.display(15)).foregroundStyle(Theme.ink)
                     Text(byline).font(.meta).foregroundStyle(Theme.inkTertiary).textSelection(.enabled)

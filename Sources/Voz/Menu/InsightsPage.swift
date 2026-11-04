@@ -24,7 +24,7 @@ struct InsightsPage: View {
                     TimeSaved(stats: stats, revealed: revealed).frame(maxHeight: .infinity, alignment: .top).groupCard()
                 }
                 .fixedSize(horizontal: false, vertical: true)
-                if !stats.topApps.isEmpty { TopApps(apps: stats.topApps).groupCard() }
+                if !stats.topApps.isEmpty { TopApps(apps: stats.topApps).padding(.top, 8) }
             }
             .animation(Theme.Motion.section, value: period)
         }
