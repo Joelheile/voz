@@ -146,6 +146,10 @@ Each command becomes a tool, such as `history`, `vocabulary_add` or `voz-jira_is
 
 Dictation runs on your Mac. Your audio and transcripts stay there unless an extension you install sends them somewhere.
 
+Extensions that write with an AI model ask you to pick one the first time you press their hotkey: ChatGPT, Claude or Apple's on-device model. Change it under Settings > AI model. With ChatGPT or Claude, the text they send goes to OpenAI or Anthropic under your account, and Voz keeps the sign-in in your Keychain.
+
+Voz never records your screen. An extension can read the text of the window in front only if its package declares it, and the Extensions page and `voz extensions` show which ones do. Voz reads through Accessibility, never screenshots. It skips password fields, password managers, private browser windows and the lock screen, and hides keys, tokens, card numbers and IBANs before the extension sees the text. voz-reply keeps 30 days on your Mac, and `voz reply forget` deletes it. It learns your writing style with Apple's model on your Mac, whatever model you picked, so that learning never leaves your Mac.
+
 Voz sends PostHog, without your IP address:
 
 - An anonymous ping on install, on update and on each day you dictate, with the app version, macOS version, chip and speech model
@@ -155,7 +159,9 @@ Voz sends PostHog, without your IP address:
 
 None of these contain what you dictate. The local log at `~/Library/Logs/Voz/voz-logs.jsonl` includes your text only when you turn on Include text under Privacy.
 
-Voz asks for System Audio Recording to mute other apps while you dictate, and it saves no audio. Extensions see the app you dictate into and, in browsers, the hostname, never the full address. An AI app you connect with `voz mcp` can read your history, so connect only apps you trust.
+When an extension types text for you, such as a reply draft, Voz saves it with the window title and reads the field for up to two minutes to see whether you kept, changed or sent it. Dictations also save the window title, such as a chat name. All of this stays in the history on your Mac, and extensions you install can read it.
+
+Voz asks for System Audio Recording to mute other apps while you dictate, and it saves no audio. Extensions see the app you dictate into and, in browsers, the hostname, never the full address. An AI app you connect with `voz mcp` can read your history and drafts, so connect only apps you trust.
 
 Found a vulnerability? Open a [private advisory](https://github.com/Joelheile/voz/security/advisories/new), not a public issue.
 

@@ -15,6 +15,7 @@ final class HistoryStore: Sendable {
 
     private let queue: DatabaseQueue
     let vocabulary: VocabularyStore
+    let drafts: DraftStore
 
     init(path: String? = nil) throws {
         var configuration = Configuration()
@@ -25,6 +26,7 @@ final class HistoryStore: Sendable {
             ?? DatabaseQueue(configuration: configuration)
         try Self.migrator.migrate(queue)
         vocabulary = VocabularyStore(queue: queue)
+        drafts = DraftStore(queue: queue)
     }
 
     private static var migrator: DatabaseMigrator {
@@ -89,6 +91,34 @@ final class HistoryStore: Sendable {
                 table.column("finalText")
                 table.column("appName")
             }
+        }
+        migrator.registerMigration("v7-threads-drafts") { database in
+            try database.create(table: ThreadRecord.databaseTableName) { table in
+                table.primaryKey("id", .blob)
+                table.column("app", .text).notNull()
+                table.column("title", .text).notNull()
+                table.column("createdAt", .datetime).notNull()
+                table.column("seenAt", .datetime).notNull()
+                table.uniqueKey(["app", "title"])
+            }
+            try database.alter(table: TranscriptRecord.databaseTableName) { table in
+                table.add(column: "threadID", .blob).references(ThreadRecord.databaseTableName, onDelete: .setNull)
+            }
+            try database.create(index: "transcript_on_threadID", on: TranscriptRecord.databaseTableName, columns: ["threadID", "createdAt"])
+            try database.create(table: DraftRecord.databaseTableName) { table in
+                table.primaryKey("id", .blob)
+                table.column("createdAt", .datetime).notNull()
+                table.column("source", .text).notNull()
+                table.column("threadID", .blob).references(ThreadRecord.databaseTableName, onDelete: .setNull)
+                table.column("transcriptID", .blob).references(TranscriptRecord.databaseTableName, onDelete: .setNull)
+                table.column("instruction", .text)
+                table.column("input", .text).notNull()
+                table.column("output", .text).notNull()
+                table.column("result", .text)
+                table.column("outcome", .text).notNull()
+            }
+            try database.create(index: "draft_on_threadID", on: DraftRecord.databaseTableName, columns: ["threadID", "createdAt"])
+            try database.create(index: "draft_on_source", on: DraftRecord.databaseTableName, columns: ["source", "createdAt"])
         }
         return migrator
     }
@@ -208,6 +238,7 @@ struct TranscriptRecord: Codable, FetchableRecord, PersistableRecord, Identifiab
     var cleanupTimedOut: Bool
     var source: String?
     var file: String?
+    var threadID: UUID?
 
     init(
         id: UUID = UUID(),
@@ -224,7 +255,8 @@ struct TranscriptRecord: Codable, FetchableRecord, PersistableRecord, Identifiab
         cleanupMs: Int = 0,
         cleanupTimedOut: Bool = false,
         source: String? = nil,
-        file: String? = nil
+        file: String? = nil,
+        threadID: UUID? = nil
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -242,6 +274,7 @@ struct TranscriptRecord: Codable, FetchableRecord, PersistableRecord, Identifiab
         self.cleanupTimedOut = cleanupTimedOut
         self.source = source
         self.file = file
+        self.threadID = threadID
     }
 
     init(_ entry: ExtensionHistoryEntry) {

@@ -22,16 +22,17 @@ final class IndicatorController {
     private var hoverTracker: Timer?
     private var dragWatch: Timer?
     private var isInvitingDrop = false
-    private var cancelledFile = false
+    private var cancelledWork = false
+    private var escapeMonitor: Any?
     private var smoother = LevelSmoother()
     private var lastSampleTime = 0.0
     private var activity: ExtensionActivity?
     var levelSource: () -> Float = { 0 }
-    var onCancelFile: () -> Void = {}
+    var onCancelWork: () -> Void = {}
     var onOpenActivity: (ExtensionActivity) -> Void = { _ in }
 
     init() {
-        model.onCancel = { [weak self] in self?.cancelFile() }
+        model.onCancel = { [weak self] in self?.cancelWork() }
         model.onOpen = { [weak self] in
             guard let self, let activity = self.activity else { return }
             self.onOpenActivity(activity)
@@ -50,7 +51,7 @@ final class IndicatorController {
         clearPreview()
         if !panel.isVisible { present() }
         model.levels.reset()
-        model.canCancel = false
+        setCancelable(false)
         stopHoverTracking()
         startSampling()
         model.recordingStart = .now
@@ -63,7 +64,7 @@ final class IndicatorController {
         guard panel.isVisible else { return }
         lifecycle?.cancel()
         stopTimer()
-        model.canCancel = false
+        setCancelable(false)
         model.state = .transcribing
         model.isExpanded = true
     }
@@ -72,6 +73,7 @@ final class IndicatorController {
         guard panel.isVisible else { return }
         lifecycle?.cancel()
         stopTimer()
+        setCancelable(false)
         model.state = state
         if state == .failed { model.shakeCount += 1 }
         let hold = holdDuration(for: state)
@@ -94,7 +96,7 @@ final class IndicatorController {
         lifecycle?.cancel()
         clearPreview()
         if !panel.isVisible { present() }
-        model.canCancel = false
+        setCancelable(false)
         model.recordingStart = activity.since
         model.recordingEnd = nil
         model.state = .activity
@@ -174,7 +176,8 @@ final class IndicatorController {
         }
     }
 
-    func showFileTranscribing() {
+    /// Shows work you can cancel with the X or Esc, such as a file transcription or an extension waiting on a model
+    func showWorking() {
         lifecycle?.cancel()
         if !panel.isVisible { present() }
         panel.ignoresMouseEvents = true
@@ -182,8 +185,8 @@ final class IndicatorController {
         model.recordingStart = .now
         model.recordingEnd = nil
         model.progress = nil
-        model.canCancel = true
-        cancelledFile = false
+        setCancelable(true)
+        cancelledWork = false
         model.state = .transcribing
         model.isExpanded = true
         trackHover()
@@ -194,16 +197,29 @@ final class IndicatorController {
         model.progress = fraction
     }
 
-    func finishFile(succeeded: Bool) {
-        guard lastPhase == .idle, model.state == .transcribing, !cancelledFile else { return }
+    func finishWork(succeeded: Bool) {
+        guard lastPhase == .idle, model.state == .transcribing, !cancelledWork else { return }
         showOutcome(succeeded ? .done : .failed)
     }
 
-    private func cancelFile() {
+    private func cancelWork() {
         guard model.state == .transcribing, model.canCancel else { return }
-        cancelledFile = true
-        onCancelFile()
+        cancelledWork = true
+        onCancelWork()
         hide()
+    }
+
+    private func setCancelable(_ cancelable: Bool) {
+        model.canCancel = cancelable
+        if cancelable, escapeMonitor == nil {
+            escapeMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard event.keyCode == 53 else { return }
+                MainActor.assumeIsolated { self?.cancelWork() }
+            }
+        } else if !cancelable, let escapeMonitor {
+            NSEvent.removeMonitor(escapeMonitor)
+            self.escapeMonitor = nil
+        }
     }
 
     func shake() {
@@ -326,6 +342,7 @@ final class IndicatorController {
 
     private func collapseAndHide() {
         stopTimer()
+        setCancelable(false)
         model.isInvitingDrop = false
         model.isExpanded = false
         lifecycle = Task { [weak self] in

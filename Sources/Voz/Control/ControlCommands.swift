@@ -21,8 +21,8 @@ struct ControlCommands {
     static let printWait = Duration.seconds(90)
 
     func all() -> [ControlCommand] {
-        [status] + LocalCommands.all(inTerminal: false) + [dictationCommand("start"), dictationCommand("stop"), dictationCommand("toggle"), historyCommand, last,
-         vocabularyList, vocabularyAdd, vocabularyRemove, extensionList, search, enable(true), enable(false), config, settingsCommand, feedback, commandList]
+        [status] + LocalCommands.all(inTerminal: false) + [dictationCommand("start"), dictationCommand("stop"), dictationCommand("toggle"), historyCommand, last, draftList,
+         vocabularyList, vocabularyAdd, vocabularyRemove, extensionList, search, enable(true), enable(false), config, settingsCommand, aiCommand, modelList, feedback, commandList]
             + catalog.tools.map(tool) + catalog.actions.filter { !$0.hidden }.map(action)
     }
 
@@ -134,6 +134,50 @@ struct ControlCommands {
         }
     }
 
+    // MARK: Drafts
+
+    private struct Draft: Encodable {
+        let date: Date
+        let source: String
+        let app: String?
+        let thread: String?
+        let instruction: String?
+        let input: String
+        let output: String
+        let result: String?
+        let outcome: DraftOutcome
+    }
+
+    private var draftList: ControlCommand {
+        ControlCommand(
+            name: "drafts",
+            summary: "List text extensions inserted, and whether you kept, edited, sent or removed it",
+            input: .object([
+                .init(name: "source", schema: .string("Extension name, such as \"reply\""), optional: true),
+                .init(name: "limit", schema: .integer("How many to return, 20 unless you say"), optional: true),
+            ]),
+            positionals: ["source"],
+            readOnly: true
+        ) { arguments in
+            let sources = arguments["source"]?.string.map { name in name.hasPrefix("voz-") ? [name, String(name.dropFirst(4))] : [name, "voz-\(name)"] }
+            let limit = arguments["limit"].flatMap { if case .number(let n) = $0 { Int(n) } else { nil } } ?? 20
+            let rows = try history.drafts.recent(sources: sources, limit: max(1, limit))
+            let drafts = rows.map { row in
+                Draft(date: row.draft.createdAt, source: row.draft.source, app: row.thread?.app, thread: row.thread?.title, instruction: row.draft.instruction,
+                      input: row.draft.input, output: row.draft.output, result: row.draft.result, outcome: row.draft.outcome)
+            }
+            let text = drafts.isEmpty ? "No drafts yet. Extensions such as reply save one each time they insert text." : drafts.map(Self.line).joined(separator: "\n")
+            return try ControlOutput(drafts, text: text)
+        }
+    }
+
+    private static func line(_ draft: Draft) -> String {
+        let format = DateFormatter()
+        format.dateFormat = "yyyy-MM-dd HH:mm"
+        let text = (draft.result ?? draft.output).replacingOccurrences(of: "\n", with: " ")
+        return [format.string(from: draft.date), draft.source, draft.thread ?? "No thread", draft.outcome.rawValue, text].joined(separator: "  ")
+    }
+
     // MARK: Vocabulary
 
     private struct Term: Encodable {
@@ -175,6 +219,69 @@ struct ControlCommands {
             let word = arguments["word"]?.string ?? ""
             guard try history.vocabulary.remove(word: word) else { return .message("\(word) is not in your vocabulary.", changed: false) }
             return .message("Removed \(word).")
+        }
+    }
+
+    // MARK: AI model
+
+    private struct AIStatus: Encodable {
+        let model: String
+        let account: String?
+    }
+
+    private var aiCommand: ControlCommand {
+        ControlCommand(
+            name: "ai",
+            summary: "Show or pick the model extensions write with: apple on your Mac, your ChatGPT plan, or a Claude API key",
+            input: .object([
+                .init(name: "model", schema: .string("apple, chatgpt to sign in with your browser, or claude", choices: AIProvider.allCases.map(\.rawValue)), optional: true),
+                .init(name: "key", schema: .string("Claude API key. Pass - to read it from stdin"), optional: true),
+            ]),
+            positionals: ["model", "key"]
+        ) { arguments in
+            guard let raw = arguments["model"]?.string else {
+                let account = settings.aiAccount.isEmpty ? nil : settings.aiAccount
+                let status = AIStatus(model: settings.aiModel.rawValue, account: account)
+                return try ControlOutput(status, text: [settings.aiModel.name, account].compactMap(\.self).joined(separator: "  "))
+            }
+            guard let model = AIProvider(rawValue: raw) else {
+                throw ControlError.usage("Pick apple, chatgpt or claude, not \"\(raw)\".\(ControlArguments.suggestion(for: raw, in: AIProvider.allCases.map(\.rawValue)))")
+            }
+            do {
+                switch model {
+                case .apple:
+                    if settings.aiModel == .apple { return .message("Extensions already use Apple's model.", changed: false) }
+                    let revoked = await AIModels.useApple(settings)
+                    return .message(revoked ? "Extensions now use Apple's model on your Mac." : "Extensions now use Apple's model. OpenAI didn't confirm the sign-out, so remove Voz under Connected apps in ChatGPT settings.")
+                case .chatgpt:
+                    let email = try await AIModels.signInToChatGPT(settings)
+                    return .message("Signed in to ChatGPT as \(email). Extensions now use your plan.")
+                case .claude:
+                    guard let key = arguments["key"]?.string else {
+                        throw ControlError.usage("Add your key, such as pbpaste | voz ai claude -. Create one at platform.claude.com/settings/keys")
+                    }
+                    try await AIModels.useClaude(key: key, settings)
+                    return .message("Extensions now use Claude with your API key.")
+                }
+            } catch let error as CloudModelError {
+                throw ControlError.failed(error.localizedDescription)
+            }
+        }
+    }
+
+    private var modelList: ControlCommand {
+        ControlCommand(name: "models", summary: "List the models extensions can ask for, and which one each tier runs", input: .object([]), readOnly: true) { _ in
+            let list: AIModelList
+            do {
+                list = try await ModelLists.shared.list(for: settings.aiModel)
+            } catch let error as CloudModelError {
+                throw ControlError.failed(error.localizedDescription)
+            }
+            let tierOf = Dictionary(list.tiers.map { ($1, $0) }) { first, _ in first }
+            let lines = list.models.map { model in
+                [tierOf[model.id] ?? "", model.id, model.name].joined(separator: "  ").trimmingCharacters(in: .whitespaces)
+            }
+            return try ControlOutput(list, text: lines.joined(separator: "\n"))
         }
     }
 
@@ -224,6 +331,8 @@ struct ControlCommands {
         let enabled: Bool
         let loaded: Bool
         let error: String?
+        /// Its package.json asks to read the text of the window in front
+        let readsScreen: Bool
         let commands: [String]
         let settings: [SettingItem]
     }
@@ -247,13 +356,14 @@ struct ControlCommands {
                     enabled: !disabled.contains(item.name),
                     loaded: catalog.isLoaded(item.name),
                     error: catalog.error(for: item.name),
+                    readsScreen: catalog.readsScreen(item.name),
                     commands: catalog.tools(for: item.name).map(\.id) + catalog.actions(for: item.name).map(\.id),
                     settings: settingItems(for: item.name)
                 )
             }
             let text = items.isEmpty
                 ? "No extensions installed. Find one with voz search."
-                : items.map { [$0.name, $0.version ?? "", $0.enabled ? "on" : "off", $0.error ?? $0.description ?? ""].filter { !$0.isEmpty }.joined(separator: "  ") }.joined(separator: "\n")
+                : items.map { [$0.name, $0.version ?? "", $0.enabled ? "on" : "off", $0.readsScreen ? "reads screen" : "", $0.error ?? $0.description ?? ""].filter { !$0.isEmpty }.joined(separator: "  ") }.joined(separator: "\n")
             return try ControlOutput(items, text: text)
         }
     }

@@ -32,8 +32,12 @@ struct HostManifest: Decodable, Equatable, Sendable {
     let cleanupSteps: [HostComponent]
     let actions: [ExtensionAction]
     let tools: [ExtensionTool]
+    /// Missing from hosts older than API 8
+    let lists: [SettingsList]?
     let settings: [ExtensionSettings]
     let errors: [LoadError]
+    /// Extensions whose package.json asks to read the screen
+    let screen: [String]?
 
     func subscribes(to hook: HostHook) -> Bool {
         events.contains(hook.rawValue)
@@ -70,8 +74,21 @@ struct ExtensionAction: Decodable, Equatable, Hashable, Sendable {
     let hotkey: String?
     let hidden: Bool
     let `extension`: String
+    var when: ActionCondition? = nil
 
-    var hotkeyLabel: String? { hotkey.flatMap { try? KeyChord(parsing: $0).label } }
+    var hotkeyLabel: String? {
+        hotkey.flatMap { Hotkey.tap(named: $0)?.displayName ?? (try? KeyChord(parsing: $0).label) }
+    }
+
+    /// Of the actions that share a hotkey, the one whose `when` holds. Actions without `when` run otherwise,
+    /// and with none of those, the hotkey still runs the first action instead of doing nothing.
+    static func pick(_ candidates: [ExtensionAction], hasSelection: Bool) -> ExtensionAction? {
+        candidates.first { $0.when == .selection && hasSelection } ?? candidates.first { $0.when == nil } ?? candidates.first
+    }
+}
+
+enum ActionCondition: String, Decodable, Sendable {
+    case selection
 }
 
 struct ExtensionTool: Decodable, Equatable, Sendable {
@@ -82,6 +99,21 @@ struct ExtensionTool: Decodable, Equatable, Sendable {
     /// Inputs you can type without a flag, in order: `voz jira issue PROJ-1`
     let positional: [String]?
     let `extension`: String
+}
+
+/// A list on an extension's page in Settings, such as what Reply learned about your writing
+struct SettingsList: Decodable, Equatable, Sendable {
+    let id: String
+    let title: String
+    let description: String
+    let removable: Bool
+    let `extension`: String
+}
+
+struct SettingsListItem: Codable, Equatable, Hashable, Sendable {
+    let id: String
+    let title: String
+    let detail: String?
 }
 
 struct ExtensionSettings: Decodable, Equatable, Sendable {
@@ -200,7 +232,7 @@ enum HostEvent: Encodable, Sendable {
 }
 
 enum HostAction: Equatable, Sendable {
-    case insert(String)
+    case insert(Insertion)
     case press(String)
     case notify(String)
     case startActivity(ExtensionActivity)
@@ -209,6 +241,22 @@ enum HostAction: Equatable, Sendable {
     case closeNote(String)
     case addHistory(ExtensionHistoryEntry)
     case actions([ExtensionAction])
+    case busy(String)
+    case idle(String, succeeded: Bool)
+}
+
+struct BusyParams: Decodable {
+    let id: String
+}
+
+struct IdleParams: Decodable {
+    let id: String
+    let ok: Bool
+    let remaining: Double
+}
+
+struct BusyCancel: Encodable {
+    let id: String
 }
 
 struct ActionsParams: Decodable {
@@ -271,6 +319,35 @@ struct AskField: Decodable, Equatable, Sendable {
 struct AskAnswer: Encodable, Equatable, Sendable {
     let button: String
     let values: [String: JSONValue]
+}
+
+struct FieldParams: Decodable, Equatable, Sendable {
+    let call: Int
+    let deadline: Double
+}
+
+/// Text an extension inserts. `source` names the extension, so Voz can save it as a draft.
+struct Insertion: Decodable, Equatable, Sendable {
+    let text: String
+    var source: String? = nil
+    var instruction: String? = nil
+}
+
+struct HistoryParams: Decodable, Equatable, Sendable {
+    let call: Int
+    let deadline: Double
+    let thread: String?
+    let source: String?
+    let limit: Int?
+}
+
+struct SelectParams: Decodable, Equatable, Sendable {
+    let call: Int
+    let deadline: Double
+    let start: Int
+    let length: Int
+
+    var range: TextRange { TextRange(start: start, length: length) }
 }
 
 struct ExtensionHistoryEntry: Decodable, Equatable, Sendable {
@@ -379,6 +456,15 @@ struct ToolParams: Encodable {
     let tool: String
     let input: [String: JSONValue]
     let app: HostApp
+}
+
+struct ListParams: Encodable {
+    let list: String
+    let remove: String?
+}
+
+struct ListResult: Decodable {
+    let items: [SettingsListItem]
 }
 
 struct ToolResult: Decodable {

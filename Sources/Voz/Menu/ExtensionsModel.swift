@@ -52,6 +52,8 @@ final class ExtensionsModel: ObservableObject {
     }
 
     @Published var query = ""
+    /// Listings whose latest package.json asks to read the screen, so Browse can say so before you install
+    @Published private(set) var screenReaders: Set<String> = []
     @Published var tab = Tab.installed
     @Published var selected: String?
     @Published private(set) var listings: [PackageListing]
@@ -131,6 +133,12 @@ final class ExtensionsModel: ObservableObject {
         }
         tab = .browse
         selected = name
+    }
+
+    func checkScreen(_ name: String) async {
+        let url = URL(string: "https://registry.npmjs.org/\(name.replacingOccurrences(of: "/", with: "%2F"))/latest")!
+        guard let data = try? await fetch(url), PackageListing.readsScreen(data) else { return }
+        screenReaders.insert(name)
     }
 
     func install(_ listing: PackageListing) async {

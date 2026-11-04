@@ -74,7 +74,9 @@ enum LocalCommands {
             terminalOnly: true
         ) { arguments in
             let source = try await Packages.install(arguments["package"]?.string ?? "")
-            return .message("\(Packages.warning)\nInstalled \(source.description).")
+            let manifest = try? Data(contentsOf: source.directory(in: VozHome()).appendingPathComponent("package.json"))
+            let screen = manifest.map(PackageListing.readsScreen) == true ? "\nIt reads your screen: the text of the window in front, without passwords or keys." : ""
+            return .message("\(Packages.warning)\nInstalled \(source.description).\(screen)")
         }
     }
 

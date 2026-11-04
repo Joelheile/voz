@@ -18,10 +18,16 @@ final class ExtensionCatalog: ObservableObject {
     @Published fileprivate(set) var tools: [ExtensionTool] = []
     @Published fileprivate(set) var activities: [ExtensionActivity] = []
     @Published fileprivate(set) var settings: [ExtensionSettings] = []
+    @Published fileprivate(set) var lists: [SettingsList] = []
     @Published fileprivate(set) var hostError: String?
+    /// Extensions whose package.json asks to read the screen
+    @Published fileprivate(set) var screenReaders: [String] = []
     fileprivate var perform: (ExtensionAction) -> Void = { _ in }
     fileprivate var performTool: (ExtensionTool, [String: JSONValue]) async throws -> JSONValue = { tool, _ in
         throw ControlError.failed("Extensions are not running, so \(tool.id) can't run.")
+    }
+    fileprivate var performList: (SettingsList, String?) async throws -> [SettingsListItem] = { list, _ in
+        throw ControlError.failed("Extensions are not running, so \(list.title) can't load.")
     }
     fileprivate var performStop: (ExtensionActivity) -> Void = { _ in }
     fileprivate var performOpen: (ExtensionActivity) -> Void = { _ in }
@@ -32,6 +38,15 @@ final class ExtensionCatalog: ObservableObject {
 
     func call(_ tool: ExtensionTool, input: [String: JSONValue]) async throws -> JSONValue {
         try await performTool(tool, input)
+    }
+
+    /// The rows of `list`, after removing the row `remove` when given
+    func items(_ list: SettingsList, removing remove: String? = nil) async throws -> [SettingsListItem] {
+        try await performList(list, remove)
+    }
+
+    func lists(for name: String) -> [SettingsList] {
+        lists.filter { Self.belongs($0.extension, to: name) }
     }
 
     func tools(for name: String) -> [ExtensionTool] {
@@ -56,6 +71,10 @@ final class ExtensionCatalog: ObservableObject {
 
     func cleanupSteps(for name: String) -> [HostComponent] {
         cleanupSteps.filter { Self.belongs($0.id, to: name) }
+    }
+
+    func readsScreen(_ name: String) -> Bool {
+        screenReaders.contains { Self.belongs($0, to: name) }
     }
 
     func actions(for name: String) -> [ExtensionAction] {
@@ -84,6 +103,8 @@ final class ExtensionCatalog: ObservableObject {
         actions = manifest?.actions ?? []
         tools = manifest?.tools ?? []
         settings = manifest?.settings ?? []
+        lists = manifest?.lists ?? []
+        screenReaders = manifest?.screen ?? []
         hostError = nil
     }
 
@@ -107,6 +128,9 @@ final class ExtensionService {
     private static let pingTimeout: Duration = .seconds(2)
     /// Actions and events that nothing waits for run until they finish. A day stands in for no limit.
     private static let untimed: Duration = .seconds(86_400)
+    nonisolated private static let historyLimit = 20
+    /// A draft that replaces a dictation this recent is linked to it
+    private static let draftDictationWindow: TimeInterval = 600
     private static let healthyUptime: Duration = .seconds(60)
     nonisolated private static let audioDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("voz-extension-audio", isDirectory: true)
     nonisolated static let resources = Bundle.main.resourceURL!.appendingPathComponent("Extensions", isDirectory: true)
@@ -119,13 +143,17 @@ final class ExtensionService {
     private let live: LiveSessions
     private let note = NoteController()
     private let asker = AskController()
+    private let drafts: DraftStore
+    private let draftWatcher: DraftWatcher
     let catalog = ExtensionCatalog()
-    var onFileTranscribing: () -> Void = {}
-    var onFileTranscribed: (_ succeeded: Bool) -> Void = { _ in }
+    var onWorking: () -> Void = {}
+    var onWorked: (_ succeeded: Bool) -> Void = { _ in }
     var onFileProgress: (Double) -> Void = { _ in }
     var onHistory: (ExtensionHistoryEntry) -> Void = { _ in }
     private var runningDrops = 0
     private var fileTranscriptions: [UUID: Task<FileTranscript, any Error>] = [:]
+    /// Work extensions run inside `ctx.busy`, which you can cancel from the notch
+    private var busyWork: Set<String> = []
     private var host: ExtensionHost?
     private var manifest: HostManifest?
     private var restarts = 0
@@ -138,13 +166,18 @@ final class ExtensionService {
     private var watchdog: Task<Void, Never>?
     private var watcher: FileWatcher?
     private var loadedExtensionSettings: Data?
-    private lazy var hotkeys = ActionHotkeys { [weak self] id in
-        guard let action = self?.catalog.actions.first(where: { $0.id == id }) else { return }
-        self?.runAction(action)
+    private lazy var hotkeys = ActionHotkeys(dictationKey: { [unowned self] in settings.hotkey }) { [weak self] ids in
+        guard let self else { return }
+        let candidates = ids.compactMap { id in self.catalog.actions.first { $0.id == id } }
+        let hasSelection = candidates.contains { $0.when != nil }
+            && NSWorkspace.shared.frontmostApplication.flatMap { FieldReader.selection(pid: $0.processIdentifier) }.map { !$0.text.isEmpty } == true
+        if let action = ExtensionAction.pick(candidates, hasSelection: hasSelection) { pickModelThenRun(action) }
     }
 
-    init(output: TextOutput, toast: ToastController, settings: AppSettings, fileTranscriber: FileTranscriber) {
+    init(output: TextOutput, toast: ToastController, settings: AppSettings, fileTranscriber: FileTranscriber, drafts: DraftStore) {
         self.output = output
+        self.drafts = drafts
+        draftWatcher = DraftWatcher(store: drafts)
         self.toast = toast
         self.settings = settings
         self.fileTranscriber = fileTranscriber
@@ -153,6 +186,10 @@ final class ExtensionService {
         catalog.performTool = { [weak self] tool, input in
             guard let host = self?.host else { throw ControlError.failed("Extensions are not running, so \(tool.id) can't run.") }
             return try await host.runTool(tool.id, input: input, app: await HostApp.front().value, timeout: Self.toolTimeout)
+        }
+        catalog.performList = { [weak self] list, remove in
+            guard let host = self?.host else { throw ControlError.failed("Extensions are not running, so \(list.title) can't load.") }
+            return try await host.list(list.id, remove: remove, timeout: Self.toolTimeout)
         }
         catalog.performStop = { [weak self] activity in self?.stopActivity(activity) }
         catalog.performOpen = { [weak self] activity in self?.openActivity(activity) }
@@ -292,6 +329,16 @@ final class ExtensionService {
         try FileManager.default.setAttributes([.posixPermissions: AppStorage.filePermissions], ofItemAtPath: file.path)
     }
 
+    /// The app the user types in. Voz's own panels never count, because Accessibility can't read Voz from inside Voz.
+    private static func frontTarget() -> (pid: pid_t, app: NSRunningApplication)? {
+        guard let app = NSWorkspace.shared.frontmostApplication, app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return nil }
+        return (app.processIdentifier, app)
+    }
+
+    private static func frontTargetPID() -> pid_t? {
+        frontTarget()?.pid
+    }
+
     func inserted(_ text: String, raw: String, app: HostApp) {
         guard let host, manifest?.subscribes(to: .afterInsert) == true else { return }
         Task { await host.emit(.afterInsert(text: text, raw: raw), app: app, timeout: Self.untimed) }
@@ -315,6 +362,20 @@ final class ExtensionService {
             if !handled {
                 Log.extensions.error("Voice command was not handled: \(command.phrase, privacy: .public)")
                 toast.show("Voice command failed")
+            }
+        }
+    }
+
+    /// Until you pick an AI model, a hotkey asks which one first, leading with ChatGPT
+    private func pickModelThenRun(_ action: ExtensionAction) {
+        guard !settings.hasPickedAIModel else { return runAction(action) }
+        Task {
+            guard let answer = await asker.ask(AIModels.pickCard) else { return }
+            do {
+                if try await AIModels.pick(answer, settings) { return runAction(action) }
+                toast.show("Signed in. Press \(action.hotkeyLabel ?? "the hotkey") again")
+            } catch {
+                toast.show(error.localizedDescription)
             }
         }
     }
@@ -395,7 +456,37 @@ final class ExtensionService {
                 guard let self else { throw CancellationError() }
                 return try await self.live.stop(params.session)
             },
-            ask: { [weak self] params in await self?.asker.ask(params) }
+            ask: { [weak self] params in await self?.asker.ask(params) },
+            field: { [drafts] in
+                guard let (pid, app) = await Self.frontTarget() else { return nil }
+                return await Task.detached {
+                    guard var field = FieldReader.read(pid: pid) else { return nil }
+                    if let thread = try? drafts.thread(app: app.bundleIdentifier, window: field.window, appName: app.localizedName) {
+                        field.thread = FieldThread(id: thread.id, title: thread.title)
+                    }
+                    return field
+                }.value
+            },
+            select: { range in
+                guard let pid = await Self.frontTargetPID() else { return false }
+                return await Task.detached { FieldReader.select(range, pid: pid) }.value
+            },
+            history: { [drafts] params in
+                let thread = params.thread.map(UUID.init(uuidString:))
+                if case .some(nil) = thread { return [] }
+                return try drafts.written(thread: thread ?? nil, source: params.source, limit: params.limit ?? Self.historyLimit)
+            },
+            screen: { [drafts] in
+                guard let (pid, app) = await Self.frontTarget(), let bundleID = app.bundleIdentifier,
+                      !ScreenText.excluded.contains(bundleID) else { return nil }
+                let name = app.localizedName ?? bundleID
+                return await Task.detached {
+                    guard let seen = FieldReader.windowText(pid: pid, limit: ScreenText.maxText),
+                          !ScreenText.isPrivate(app: bundleID, window: seen.window, toolbar: seen.toolbar) else { return nil }
+                    let thread = try? drafts.thread(app: bundleID, window: seen.window, appName: name)
+                    return ScreenText(app: name, window: seen.window, thread: thread?.id, text: Redaction.redact(seen.text))
+                }.value
+            }
         )
         let manifest = try await host.start()
         for error in manifest.errors { Log.extensions.error("\(error.extension, privacy: .public) failed to load: \(error.message, privacy: .public)") }
@@ -438,8 +529,12 @@ final class ExtensionService {
         }
     }
 
-    func cancelFileTranscriptions() {
+    func cancelWork() {
         for task in fileTranscriptions.values { task.cancel() }
+        let cancelled = busyWork
+        busyWork = []
+        guard let host else { return }
+        for id in cancelled { Task { _ = await host.cancelBusy(id, timeout: Self.pingTimeout) } }
     }
 
     private func transcribe(_ params: TranscribeFileParams) async throws -> FileTranscript {
@@ -463,13 +558,13 @@ final class ExtensionService {
             }
         }
         guard runningDrops == 0 else { return try await cancellable(transcribe) }
-        onFileTranscribing()
+        onWorking()
         do {
             let transcript = try await cancellable(transcribe)
-            onFileTranscribed(true)
+            onWorked(true)
             return transcript
         } catch {
-            onFileTranscribed(false)
+            onWorked(false)
             throw error
         }
     }
@@ -484,8 +579,8 @@ final class ExtensionService {
 
     private func perform(_ action: HostAction) async {
         switch action {
-        case .insert(let text):
-            await output.deliver(text)
+        case .insert(let insertion):
+            await insert(insertion)
         case .press(let key):
             do {
                 output.press(try KeyChord(parsing: key))
@@ -507,7 +602,41 @@ final class ExtensionService {
             onHistory(entry)
         case .actions(let actions):
             show(actions)
+        case .busy(let id):
+            busyWork.insert(id)
+            if busyWork.count == 1 { onWorking() }
+        case .idle(let id, let succeeded):
+            guard busyWork.remove(id) != nil, busyWork.isEmpty else { return }
+            onWorked(succeeded)
         }
+    }
+
+    /// Saves what an extension inserts as a draft, with the text it replaced, then watches what you do with it
+    private func insert(_ insertion: Insertion) async {
+        guard let source = insertion.source, !insertion.text.isEmpty, let (pid, app) = Self.frontTarget() else {
+            await output.deliver(insertion.text)
+            return
+        }
+        let before = await Task.detached { FieldReader.selection(pid: pid) }.value
+        await output.deliver(insertion.text)
+        let draft: DraftRecord
+        do {
+            let thread = try drafts.thread(app: app.bundleIdentifier, window: before?.window, appName: app.localizedName)
+            let input = before?.text ?? ""
+            draft = DraftRecord(
+                source: source,
+                threadID: thread?.id,
+                transcriptID: try drafts.transcriptID(replacedBy: input, since: Date().addingTimeInterval(-Self.draftDictationWindow)),
+                instruction: insertion.instruction,
+                input: input,
+                output: insertion.text
+            )
+            try drafts.insert(draft)
+        } catch {
+            Log.extensions.error("Could not save a draft: \(error.localizedDescription, privacy: .public)")
+            return
+        }
+        draftWatcher.watch(draft, pid: pid)
     }
 
     private func show(_ actions: [ExtensionAction]) {
@@ -520,6 +649,10 @@ final class ExtensionService {
         watchdog?.cancel()
         asker.close()
         hotkeys.unregisterAll()
+        if !busyWork.isEmpty {
+            busyWork = []
+            onWorked(false)
+        }
         host = nil
         manifest = nil
         endActivities()

@@ -168,7 +168,7 @@ struct FileProgress: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.pressable(0.92))
-        .accessibilityLabel("Cancel transcription")
+        .accessibilityLabel("Cancel")
         .animation(reduceMotion ? nil : .linear(duration: 0.2), value: model.progress)
         .animation(.easeOut(duration: 0.15), value: model.isHovering)
     }

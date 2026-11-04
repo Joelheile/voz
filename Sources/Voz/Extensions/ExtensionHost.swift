@@ -19,10 +19,15 @@ actor ExtensionHost {
     private let onLog: @Sendable (String) -> Void
     private let onExit: @Sendable (Int32) -> Void
     private let generate: @Sendable (GenerateParams) async throws -> String
+    private let models: @Sendable () async throws -> String
     private let transcribeFile: @Sendable (TranscribeFileParams) async throws -> FileTranscript
     private let startLive: @Sendable (LiveStartParams, @escaping @Sendable (FileTranscript) async -> Void) async throws -> Void
     private let stopLive: @Sendable (LiveStopParams) async throws -> FileTranscript
     private let ask: @Sendable (AskParams) async -> AskAnswer?
+    private let field: @Sendable () async -> FocusedField?
+    private let select: @Sendable (TextRange) async -> Bool
+    private let history: @Sendable (HistoryParams) async throws -> [WrittenText]
+    private let screen: @Sendable () async -> ScreenText?
     private var process: Process?
     private var input: FileHandle?
     private var buffer = Data()
@@ -30,7 +35,7 @@ actor ExtensionHost {
     private let writes = DispatchQueue(label: "com.joelheile.voz.extension-input")
     private var queuedBytes = 0
     private var pending: [Int: CheckedContinuation<Data?, Never>] = [:]
-    /// Requests whose handler waits on a card the user has not answered, so they don't time out
+    /// Requests whose handler waits on a card the user has not answered or on busy work, so they don't time out
     private var asking: [Int: Int] = [:]
     private var readyWaiter: CheckedContinuation<HostManifest, any Error>?
     private(set) var manifest: HostManifest?
@@ -41,20 +46,30 @@ actor ExtensionHost {
         onLog: @escaping @Sendable (String) -> Void,
         onExit: @escaping @Sendable (Int32) -> Void,
         generate: @escaping @Sendable (GenerateParams) async throws -> String = ExtensionModel.generate,
+        models: @escaping @Sendable () async throws -> String = ExtensionModel.models,
         transcribeFile: @escaping @Sendable (TranscribeFileParams) async throws -> FileTranscript = { _ in throw FileTranscriberError.needsParakeet },
         startLive: @escaping @Sendable (LiveStartParams, @escaping @Sendable (FileTranscript) async -> Void) async throws -> Void = { _, _ in throw FileTranscriberError.needsParakeet },
         stopLive: @escaping @Sendable (LiveStopParams) async throws -> FileTranscript = { throw LiveSessionError.unknown($0.session) },
-        ask: @escaping @Sendable (AskParams) async -> AskAnswer? = { _ in nil }
+        ask: @escaping @Sendable (AskParams) async -> AskAnswer? = { _ in nil },
+        field: @escaping @Sendable () async -> FocusedField? = { nil },
+        select: @escaping @Sendable (TextRange) async -> Bool = { _ in false },
+        history: @escaping @Sendable (HistoryParams) async throws -> [WrittenText] = { _ in [] },
+        screen: @escaping @Sendable () async -> ScreenText? = { nil }
     ) {
         self.launch = launch
         self.onAction = onAction
         self.onLog = onLog
         self.onExit = onExit
         self.generate = generate
+        self.models = models
         self.transcribeFile = transcribeFile
         self.startLive = startLive
         self.stopLive = stopLive
         self.ask = ask
+        self.field = field
+        self.select = select
+        self.history = history
+        self.screen = screen
     }
 
     func start(timeout: Duration = .seconds(30)) async throws -> HostManifest {
@@ -133,12 +148,26 @@ actor ExtensionHost {
         return response.result?.result ?? .null
     }
 
+    /// Reads a list for its page in Settings, after removing the row `remove` when given
+    func list(_ id: String, remove: String? = nil, timeout: Duration) async throws -> [SettingsListItem] {
+        guard let data = await request("list", ListParams(list: id, remove: remove), timeout: timeout) else {
+            throw ControlError.failed("\(id) did not answer within \(timeout.components.seconds) seconds. Read voz logs --extensions to see why.")
+        }
+        let response = try JSONDecoder().decode(HostResponse<ListResult>.self, from: data)
+        if let error = response.error { throw ControlError.failed(error) }
+        return response.result?.items ?? []
+    }
+
     func stopActivity(_ id: String, app: HostApp, timeout: Duration) async -> Bool {
         decodeResult(EmptyParams.self, from: await request("stopActivity", ActivityParams(activity: id, app: app), timeout: timeout)) != nil
     }
 
     func openActivity(_ id: String, app: HostApp, timeout: Duration) async -> Bool {
         decodeResult(EmptyParams.self, from: await request("openActivity", ActivityParams(activity: id, app: app), timeout: timeout)) != nil
+    }
+
+    func cancelBusy(_ id: String, timeout: Duration) async -> Bool {
+        decodeResult(EmptyParams.self, from: await request("cancelBusy", BusyCancel(id: id), timeout: timeout)) != nil
     }
 
     func noteChanged(_ id: String, text: String, timeout: Duration) async -> Bool {
@@ -255,10 +284,11 @@ actor ExtensionHost {
             resolve(id, with: line)
             return
         }
+        if envelope.method == "idle" { return idle(line, requestID: envelope.requestID) }
         if let requestID = envelope.requestID, pending[requestID] == nil { return }
         switch envelope.method {
         case "ready": ready(line)
-        case "insert": decodeNotification(TextParams.self, line).map { onAction(.insert($0.text)) }
+        case "insert": decodeNotification(Insertion.self, line).map { onAction(.insert($0)) }
         case "press": decodeNotification(PressParams.self, line).map { onAction(.press($0.key)) }
         case "notify": decodeNotification(TextParams.self, line).map { onAction(.notify($0.text)) }
         case "actions": decodeNotification(ActionsParams.self, line).map { onAction(.actions($0.actions)) }
@@ -271,6 +301,10 @@ actor ExtensionHost {
         case "generate":
             decodeNotification(GenerateParams.self, line).map { params in
                 reply(to: params.call, deadline: params.deadline, as: "generated") { [generate] in try await generate(params) }
+            }
+        case "models":
+            decodeNotification(FieldParams.self, line).map { params in
+                reply(to: params.call, deadline: params.deadline, as: "modelsRead") { [models] in try await models() }
             }
         case "transcribeFile":
             decodeNotification(TranscribeFileParams.self, line).map { params in
@@ -293,6 +327,36 @@ actor ExtensionHost {
                     let answer = await ask(params)
                     await self?.answered(requestID, remaining: .milliseconds(params.remaining))
                     return String(decoding: try JSONEncoder().encode(answer), as: UTF8.self)
+                }
+            }
+        case "busy":
+            guard let requestID = envelope.requestID else { return onLog("Extension was busy outside a handler") }
+            decodeNotification(BusyParams.self, line).map { params in
+                asking[requestID, default: 0] += 1
+                onAction(.busy(params.id))
+            }
+        case "field":
+            decodeNotification(FieldParams.self, line).map { params in
+                reply(to: params.call, deadline: params.deadline, as: "fieldRead") { [field] in
+                    String(decoding: try JSONEncoder().encode(await field()), as: UTF8.self)
+                }
+            }
+        case "select":
+            decodeNotification(SelectParams.self, line).map { params in
+                reply(to: params.call, deadline: params.deadline, as: "selected") { [select] in
+                    await select(params.range) ? "true" : "false"
+                }
+            }
+        case "history":
+            decodeNotification(HistoryParams.self, line).map { params in
+                reply(to: params.call, deadline: params.deadline, as: "historyRead") { [history] in
+                    String(decoding: try JSONEncoder().encode(try await history(params)), as: UTF8.self)
+                }
+            }
+        case "screen":
+            decodeNotification(FieldParams.self, line).map { params in
+                reply(to: params.call, deadline: params.deadline, as: "screenRead") { [screen] in
+                    String(decoding: try JSONEncoder().encode(await screen()), as: UTF8.self)
                 }
             }
         case "stopLive":
@@ -353,6 +417,13 @@ actor ExtensionHost {
 
     private func resolve(_ id: Int, with data: Data?) {
         pending.removeValue(forKey: id)?.resume(returning: data)
+    }
+
+    /// Ends busy work even after its handler finished, so the notch never stays stuck
+    private func idle(_ line: Data, requestID: Int?) {
+        guard let params = decodeNotification(IdleParams.self, line) else { return }
+        if let requestID, asking[requestID] != nil { answered(requestID, remaining: .milliseconds(params.remaining)) }
+        onAction(.idle(params.id, succeeded: params.ok))
     }
 
     private func answered(_ id: Int, remaining: Duration) {

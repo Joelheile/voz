@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 
 @MainActor
 final class DictationPipeline {
@@ -162,7 +162,7 @@ final class DictationPipeline {
     }
 
     private func save(_ transcript: StreamedTranscript, finalText: String, app: HostApp, released: ContinuousClock.Instant) async -> TranscriptRecord {
-        let record = TranscriptRecord(
+        var record = TranscriptRecord(
             rawText: transcript.raw,
             finalText: finalText,
             audioSeconds: transcript.audioSeconds,
@@ -175,6 +175,7 @@ final class DictationPipeline {
             cleanupMs: transcript.cleaned.milliseconds,
             cleanupTimedOut: transcript.cleaned.timedOut
         )
+        record.threadID = await thread(in: app)
         do {
             try await history.insert(record)
         } catch {
@@ -182,5 +183,14 @@ final class DictationPipeline {
             Analytics.report(.historySaveFailed)
         }
         return record
+    }
+
+    /// The conversation the dictation went into, read from the front window's title
+    private func thread(in app: HostApp) async -> UUID? {
+        guard let front = NSWorkspace.shared.frontmostApplication, front.bundleIdentifier == app.bundleID else { return nil }
+        let pid = front.processIdentifier, drafts = history.drafts
+        return await Task.detached {
+            try? drafts.thread(app: app.bundleID, window: FieldReader.windowTitle(pid: pid), appName: app.name)?.id
+        }.value
     }
 }

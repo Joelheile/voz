@@ -19,7 +19,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         output: output,
         toast: toast,
         settings: settings,
-        fileTranscriber: FileTranscriber(transcriber: transcriber, vocabulary: history.vocabulary)
+        fileTranscriber: FileTranscriber(transcriber: transcriber, vocabulary: history.vocabulary),
+        drafts: history.drafts
     )
     private var vocabularyWords: [String] = []
     private lazy var vocabularyLearner = VocabularyLearner(
@@ -113,7 +114,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             showOutcome(outcome)
             if case .done = outcome { self?.suggestStarIfDue() }
         }
-        indicator.onCancelFile = { [weak self] in self?.extensions.cancelFileTranscriptions() }
+        indicator.onCancelWork = { [weak self] in self?.extensions.cancelWork() }
         indicator.onOpenActivity = { [catalog = extensions.catalog] in catalog.open($0) }
         extensions.catalog.$activities
             .map { $0.first(where: \.openable) }
@@ -121,11 +122,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .sink { [indicator] in indicator.show($0) }
             .store(in: &cancellables)
         extensions.onFileProgress = { [weak self] fraction in self?.indicator.showFileProgress(fraction) }
-        extensions.onFileTranscribing = { [weak self] in
+        extensions.onWorking = { [weak self] in
             guard let self, self.dictation.phase == .idle else { return }
-            self.indicator.showFileTranscribing()
+            self.indicator.showWorking()
         }
-        extensions.onFileTranscribed = { [weak self] succeeded in self?.indicator.finishFile(succeeded: succeeded) }
+        extensions.onWorked = { [weak self] succeeded in self?.indicator.finishWork(succeeded: succeeded) }
         extensions.onHistory = { [history] entry in
             do {
                 try history.insert(TranscriptRecord(entry))
@@ -186,11 +187,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func transcribeDropped(_ file: URL) {
-        indicator.showFileTranscribing()
+        indicator.showWorking()
         Task {
             let succeeded = await extensions.dropAudio(file)
             if !succeeded { Log.app.error("Dropped .\(file.pathExtension, privacy: .public) file failed in the extension") }
-            indicator.finishFile(succeeded: succeeded)
+            indicator.finishWork(succeeded: succeeded)
         }
     }
 
