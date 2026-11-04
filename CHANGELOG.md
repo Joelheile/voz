@@ -4,6 +4,26 @@ Newest first. To get beta changes now, turn on Beta updates under What's new in 
 
 ## In beta
 
+- Take notes under the notch and copy notes or the transcript from history
+- See the live transcript and elapsed time in the notch during a meeting
+- Pick ChatGPT or Claude under Settings > AI model for better writing
+- Tap right Option in a chat and Reply drafts your answer in your voice
+- Select text and tap right Option to tell Edit how to change it
+- See which extensions read your screen before you install them
+- Reply learns how you write in each app and lists it in Settings
+- Download Voz as a disk image and open it without a security warning
+- The star card shows how many words you've dictated with Voz
+- Cancel a speech model download from the menu bar
+- Dictated text now pastes into slow apps instead of your old clipboard
+- See your streak, today's words and time saved first in Insights
+- Insights now comes first in the menu footer
+- Search history by words in any order, app name, today or yesterday, even with typos
+- Extension pages show what each one does first, with downloads and last update below
+- Click Build your own in Extensions, and any coding agent builds one with you
+- Build your own sets up the extension skill for Claude Code and Codex in every project
+- The menu bar panel has a cleaner look, with grouped settings and clear status
+- Updates install on their own while you're away from your Mac
+- Opening Voz from the disk image moves it to Applications and ejects the image
 - Voz no longer freezes for a few seconds when you switch to a Chrome window
 - Dictation records from your default microphone when the one you picked won't start
 - Text appears sooner after you let go of the hotkey

@@ -131,15 +131,13 @@ Each command becomes a tool, such as `history`, `vocabulary_add` or `voz-jira_is
 ## What's new
 
 <!-- changelog -->
-
-- Voz no longer freezes for a few seconds when you switch to a Chrome window
-- Dictation records from your default microphone when the one you picked won't start
-- Text appears sooner after you let go of the hotkey
-- Extensions can ask you to check details in a card under the notch
-- Extensions made for a newer Voz now load instead of asking you to update
+- Take notes under the notch and copy notes or the transcript from history
+- See the live transcript and elapsed time in the notch during a meeting
+- Pick ChatGPT or Claude under Settings > AI model for better writing
+- Tap right Option in a chat and Reply drafts your answer in your voice
+- Select text and tap right Option to tell Edit how to change it
 
 [See everything new](CHANGELOG.md)
-
 <!-- /changelog -->
 
 ## Privacy
