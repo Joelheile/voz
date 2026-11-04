@@ -23,7 +23,7 @@ struct SettingsPage: View {
         VStack(alignment: .leading, spacing: 12) {
             PageBar(title: "Settings", back: model.goBack) {
                 IconButton(icon: .messageSquare, help: "Feedback") { model.page = .feedback }
-                IconButton(icon: .sparkles, help: "What's new") { model.page = .whatsNew }
+                IconButton(icon: .scrollText, help: "What's new") { model.page = .whatsNew }
             }
             CappedScrollView(maxHeight: 640) {
                 VStack(alignment: .leading, spacing: 14) {

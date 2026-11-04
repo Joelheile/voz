@@ -292,11 +292,11 @@ private struct HomePage: View {
             }
             RowDivider()
             HStack(spacing: 2) {
-                NavButton(icon: .bookA, help: "Dictionary") { model.page = .dictionary }
                 NavButton(icon: .chartNoAxesColumn, help: "Insights") {
                     markMilestonesSeen()
                     model.page = .insights
                 }
+                NavButton(icon: .bookA, help: "Dictionary") { model.page = .dictionary }
                 NavButton(icon: .puzzle, help: extensionsHelp, badge: extensions.updateCount > 0) { model.page = .extensions }
                 NavButton(icon: .settings, help: "Settings") { model.page = .settings }
                     .keyboardShortcut(",", modifiers: .command)
