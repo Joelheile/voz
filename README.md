@@ -5,7 +5,7 @@
 **Type at the speed you talk.**
 
 Tap right Command, say what you mean, and clean text appears in any app.<br>
-Free, open source and on your Mac. Missing a feature? Your coding agent writes it as an extension.
+Free, open source dictation that runs on your Mac. Missing a feature? Your coding agent writes it as an extension.
 
 [![Star Voz on GitHub](https://img.shields.io/github/stars/Joelheile/voz?style=social&label=Star)](https://github.com/Joelheile/voz)
 [![License: MIT](https://img.shields.io/github/license/Joelheile/voz)](LICENSE)
@@ -36,7 +36,7 @@ Voz types this at your cursor:
 
 > Tell Kaitlyn the deck is ready.
 
-Speech recognition and cleanup run on your Mac, so Voz works offline. There is no account and no word limit.
+Speech to text runs on your Mac with NVIDIA's Parakeet model in 25 languages, and Apple's on-device model cleans up the text. So Voz works offline, in your editor, browser, terminal or Claude Code. There is no account and no word limit.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/images/ready-dark.png">
