@@ -27,6 +27,42 @@ import Testing
         #expect(try store.search("  ").count == 3)
     }
 
+    @Test func searchMatchesEveryWordInAnyOrderAcrossTextAndApp() throws {
+        let store = try HistoryStore()
+        try store.insert(makeRecord("Send the invoice to Anna", at: 1))
+        var slack = makeRecord("Standup moved to Friday", at: 2)
+        slack.appName = "Slack"
+        try store.insert(slack)
+        #expect(try store.search("anna invoice").map(\.finalText) == ["Send the invoice to Anna"])
+        #expect(try store.search("slack friday").map(\.finalText) == ["Standup moved to Friday"])
+        #expect(try store.search("voice").map(\.finalText) == ["Send the invoice to Anna"])
+    }
+
+    @Test func searchFallsBackToCloseMatchesForTypos() throws {
+        let store = try HistoryStore()
+        try store.insert(makeRecord("Book the quarterly planning meeting", at: 1))
+        try store.insert(makeRecord("Buy oat milk", at: 2))
+        #expect(try store.search("quartrly planing").map(\.finalText) == ["Book the quarterly planning meeting"])
+        #expect(try store.search("zebra crossing").isEmpty)
+    }
+
+    @Test func searchIndexForgetsDeletedTranscripts() throws {
+        let store = try HistoryStore()
+        let record = makeRecord("Renew the passport", at: 1)
+        try store.insert(record)
+        #expect(try store.recent(matching: "passport", limit: 5).count == 1)
+        try store.delete(id: record.id)
+        #expect(try store.search("passport").isEmpty)
+    }
+
+    @Test func todayAndYesterdayFilterByDay() {
+        let midnight = 1_792_627_200.0
+        let noon = midnight + 12 * 3_600
+        #expect(utcSearchDays("today", at: noon) == [midnight, midnight + 86_400])
+        #expect(utcSearchDays("invoice yesterday", at: noon) == [midnight - 86_400, midnight])
+        #expect(utcSearchDays("invoice", at: noon) == nil)
+    }
+
     @Test func recordsPersistOnDiskUntilDeleted() async throws {
         let path = makeTemporaryStorePath()
         defer { removeFile(atPath: path) }

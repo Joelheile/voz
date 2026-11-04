@@ -350,3 +350,8 @@ func makeTemporaryDirectory() throws -> String {
 func swapItems(atPath first: String, withItemAtPath second: String) -> Bool {
     renamex_np(first, second, UInt32(RENAME_SWAP)) == 0
 }
+
+func utcSearchDays(_ query: String, at seconds: Double) -> [Double]? {
+    TranscriptSearch(query, now: Date(timeIntervalSince1970: seconds), calendar: utcCalendar)
+        .days.map { [$0.start.timeIntervalSince1970, $0.end.timeIntervalSince1970] }
+}
