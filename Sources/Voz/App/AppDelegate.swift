@@ -332,9 +332,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func suggestStarIfDue() {
         guard !settings.starToastShown, !settings.starPromptDismissed else { return }
         Task {
-            guard let usage = await historyModel.usage(), StarPrompt.isDue(in: usage) else { return }
+            guard let usage = await historyModel.usage(), StarPrompt.isDue(in: usage, dismissals: settings.starPromptDismissals) else { return }
             settings.starToastShown = true
-            toast.show("Enjoying Voz? Star it on GitHub from the menu bar.")
+            toast.show("Enjoying Voz? Give it a star on GitHub from the menu bar.")
         }
     }
 

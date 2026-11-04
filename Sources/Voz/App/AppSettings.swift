@@ -21,6 +21,7 @@ private enum SettingsKey {
     static let cleanupPrompt = "cleanupPrompt"
     static let starPromptDismissed = "starPromptDismissed"
     static let starToastShown = "starToastShown"
+    static let starPromptDismissals = "starPromptDismissals"
     static let milestonesSeen = "milestonesSeen"
     static let milestoneShows = "milestoneShows"
     static let logIncludesText = "logIncludesText"
@@ -74,6 +75,9 @@ final class AppSettings: ObservableObject {
     }
     @Published var starToastShown: Bool {
         didSet { defaults.set(starToastShown, forKey: SettingsKey.starToastShown) }
+    }
+    @Published var starPromptDismissals: Int {
+        didSet { defaults.set(starPromptDismissals, forKey: SettingsKey.starPromptDismissals) }
     }
     @Published var milestonesSeen: [String: Int] {
         didSet { defaults.set(milestonesSeen, forKey: SettingsKey.milestonesSeen) }
@@ -160,6 +164,7 @@ final class AppSettings: ObservableObject {
         onboardingCompleted = defaults.bool(forKey: SettingsKey.onboardingCompleted)
         starPromptDismissed = defaults.bool(forKey: SettingsKey.starPromptDismissed)
         starToastShown = defaults.bool(forKey: SettingsKey.starToastShown)
+        starPromptDismissals = defaults.integer(forKey: SettingsKey.starPromptDismissals)
         milestoneShows = defaults.integer(forKey: SettingsKey.milestoneShows)
         milestonesSeen = defaults.dictionary(forKey: SettingsKey.milestonesSeen) as? [String: Int] ?? [:]
         microphone = defaults.string(forKey: SettingsKey.microphone) ?? MicrophoneOptions.systemDefault
