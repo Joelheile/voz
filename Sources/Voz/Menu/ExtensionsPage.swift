@@ -1,10 +1,12 @@
 import AppKit
+import LucideSwift
 import SwiftUI
 
 struct ExtensionsPage: View {
     @ObservedObject var model: ExtensionsModel
     @ObservedObject var catalog: ExtensionCatalog
     @ObservedObject var settings: AppSettings
+    let toast: (String) -> Void
     let back: () -> Void
 
     var body: some View {
@@ -16,7 +18,7 @@ struct ExtensionsPage: View {
                 ListingDetail(listing: listing, model: model)
                     .transition(.opacity)
             } else {
-                ExtensionList(model: model, catalog: catalog, back: back)
+                ExtensionList(model: model, catalog: catalog, toast: toast, back: back)
                     .transition(.opacity)
             }
         }
@@ -29,31 +31,28 @@ struct ExtensionsPage: View {
 private struct ExtensionList: View {
     @ObservedObject var model: ExtensionsModel
     @ObservedObject var catalog: ExtensionCatalog
+    let toast: (String) -> Void
     let back: () -> Void
     @FocusState private var searchFocused: Bool
-    @State private var copiedCommand = false
+    @State private var copiedPrompt = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             PageBar(title: "Extensions", back: back) {
                 HStack(spacing: 4) {
                     IconButton(icon: .folderOpen, help: "Open extensions folder", action: model.openExtensionsFolder)
-                    Button(action: copyClaudeCommand) {
+                    Button(action: copyBuildPrompt) {
                         ZStack {
-                            crossfading("Create", visible: !copiedCommand)
-                            crossfading("Copied", visible: copiedCommand)
+                            crossfading("Build your own", visible: !copiedPrompt)
+                            crossfading("Copied", visible: copiedPrompt)
                         }
                     }
                     .buttonStyle(.pill(.accent, .small))
                     .fixedSize()
-                    .help("Copy a prompt that has Claude Code build an extension with you")
+                    .help("Copy a prompt that has your coding agent build an extension with you")
                 }
             }
             SearchField(text: $model.query, prompt: "Search extensions", focused: $searchFocused)
-            if copiedCommand {
-                PageNote(text: "Prompt copied. Paste it into Terminal to build your extension with Claude Code.")
-                    .transition(.opacity)
-            }
             TabBar(tabs: ExtensionsModel.Tab.allCases, selection: $model.tab)
             MessageView(model: model)
             if let removed = model.removed { undoBar(removed) }
@@ -65,9 +64,7 @@ private struct ExtensionList: View {
                     }
                 }
             }
-            .padding(.horizontal, -8)
         }
-        .animation(Theme.Motion.section, value: copiedCommand)
         .onAppear { searchFocused = true }
     }
 
@@ -83,6 +80,7 @@ private struct ExtensionList: View {
         } else {
             VStack(spacing: 2) {
                 ForEach(model.installedRows, id: \.name) { item in
+                    if item.name != model.installedRows.first?.name { RowDivider().padding(.horizontal, 8) }
                     ExtensionRow(name: item.name, summary: model.summary(for: item), dimmed: !model.isEnabled(item.name), attention: attention(for: item)) {
                         model.selected = item.name
                     } trailing: {
@@ -106,6 +104,7 @@ private struct ExtensionList: View {
         } else if !model.browseRows.isEmpty {
             VStack(spacing: 2) {
                 ForEach(model.browseRows) { listing in
+                    if listing.id != model.browseRows.first?.id { RowDivider().padding(.horizontal, 8) }
                     ExtensionRow(name: listing.name, summary: listing.summary, publisher: listing.publisher, downloads: listing.monthlyDownloads) {
                         model.selected = listing.name
                     } trailing: {
@@ -156,12 +155,13 @@ private struct ExtensionList: View {
         .transition(.opacity)
     }
 
-    private func copyClaudeCommand() {
-        guard model.copyClaudeCommand() else { return }
-        copiedCommand = true
+    private func copyBuildPrompt() {
+        guard model.copyBuildPrompt() else { return }
+        toast("Prompt copied. Paste it into Claude Code, Codex or any coding agent.")
+        copiedPrompt = true
         Task {
             try? await Task.sleep(for: .seconds(4))
-            copiedCommand = false
+            copiedPrompt = false
         }
     }
 
@@ -186,40 +186,36 @@ private struct ExtensionRow<Trailing: View>: View {
     var body: some View {
         HStack(spacing: 10) {
             Button(action: open) {
-                HStack(alignment: .top, spacing: 10) {
-                    Monogram(name: name, size: 32)
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 6) {
-                            Text(ExtensionsModel.displayName(name)).font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
-                            if let attention {
-                                Text(attention).font(.ui(11, weight: .medium)).foregroundStyle(Theme.accent)
-                            }
-                        }
-                        if let summary {
-                            Text(summary)
-                                .font(.meta)
-                                .lineSpacing(2)
-                                .lineLimit(2)
-                                .foregroundStyle(Theme.inkSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        if let publisher {
-                            HStack(spacing: 10) {
-                                Text(publisher)
-                                if downloads > 0 {
-                                    HStack(spacing: 3) {
-                                        Icon(.download, size: 11)
-                                        Text(downloads.formatted(.number.notation(.compactName)))
-                                    }
-                                    .help("\(downloads.formatted()) downloads in the last month")
-                                }
-                            }
-                            .font(.ui(11))
-                            .foregroundStyle(Theme.inkTertiary)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text(ExtensionsModel.displayName(name)).font(.ui(13, weight: .medium)).foregroundStyle(Theme.ink)
+                        if let attention {
+                            Text(attention).font(.ui(11, weight: .medium)).foregroundStyle(Theme.accent)
                         }
                     }
-                    Spacer(minLength: 0)
+                    if let summary {
+                        Text(summary)
+                            .font(.meta)
+                            .lineSpacing(2)
+                            .lineLimit(2)
+                            .foregroundStyle(Theme.inkSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if let publisher {
+                        HStack(spacing: 10) {
+                            Fact(icon: .user, text: publisher)
+                            if downloads > 0 {
+                                Fact(icon: .download, text: downloads.formatted(.number.notation(.compactName)))
+                                    .help("\(downloads.formatted()) downloads in the last month")
+                            }
+                        }
+                        .font(.ui(11))
+                        .lineLimit(1)
+                        .foregroundStyle(Theme.inkTertiary)
+                        .padding(.top, 2)
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .opacity(dimmed ? 0.5 : 1)
                 .contentShape(Rectangle())
             }
@@ -227,31 +223,11 @@ private struct ExtensionRow<Trailing: View>: View {
             trailing
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 8)
+        .padding(.vertical, 10)
         .background(hovering ? Theme.selected : .clear, in: RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous))
         .onHover { hovering = $0 }
         .animation(Theme.Motion.hover, value: hovering)
         .animation(Theme.Motion.section, value: dimmed)
-    }
-}
-
-private struct Monogram: View {
-    private static let hues: [Double] = [0.6, 0.38, 0.08, 0.92, 0.75, 0.5]
-
-    let name: String
-    let size: CGFloat
-
-    private var hue: Color {
-        let seed = name.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) & 0xFFFF }
-        return Color(hue: Self.hues[seed % Self.hues.count], saturation: 0.7, brightness: 0.8)
-    }
-
-    var body: some View {
-        Text(ExtensionsModel.displayName(name).prefix(1))
-            .font(.wordmark(size * 0.5))
-            .foregroundStyle(hue)
-            .frame(width: size, height: size)
-            .background(hue.opacity(0.16), in: RoundedRectangle(cornerRadius: size * 0.28, style: .continuous))
     }
 }
 
@@ -278,7 +254,6 @@ private struct DetailHeader<Control: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
-                Monogram(name: name, size: 44)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(ExtensionsModel.displayName(name)).font(.display(15)).foregroundStyle(Theme.ink)
                     Text(byline).font(.meta).foregroundStyle(Theme.inkTertiary).textSelection(.enabled)
@@ -288,7 +263,7 @@ private struct DetailHeader<Control: View>: View {
             }
             if let summary {
                 Text(summary)
-                    .font(.ui(13))
+                    .font(.ui(15))
                     .lineSpacing(3)
                     .foregroundStyle(Theme.ink)
                     .fixedSize(horizontal: false, vertical: true)
@@ -298,39 +273,111 @@ private struct DetailHeader<Control: View>: View {
 }
 
 private struct ListingDetail: View {
+    private static let trust = "Extensions run on your Mac with the same access as Voz, so they can read your transcripts and files. Install ones from people you trust."
+
     let listing: PackageListing
     @ObservedObject var model: ExtensionsModel
+    @State private var showsTrust = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            PageBar(title: "Browse") { model.selected = nil }
-            DetailHeader(name: listing.name, summary: listing.summary, byline: "\(listing.name) \(listing.version)") {
-                Group {
-                    if let stage = model.stage(for: listing.name) {
-                        StageLabel(text: stage.label)
-                    } else {
-                        Button("Install") { Task { await model.install(listing) } }
-                            .buttonStyle(.pill(.accent, .small))
-                            .keyboardShortcut(.defaultAction)
-                            .disabled(model.working != nil)
+        VStack(alignment: .leading, spacing: 16) {
+            header
+            MessageView(model: model)
+            VStack(alignment: .leading, spacing: 10) {
+                if let summary = listing.summary {
+                    Text(summary)
+                        .font(.ui(15))
+                        .lineSpacing(4)
+                        .foregroundStyle(Theme.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                facts
+            }
+        }
+        .padding(.bottom, 2)
+        .onExitCommand { model.selected = nil }
+    }
+
+    private var header: some View {
+        HStack(spacing: 4) {
+            IconButton(icon: .chevronLeft, help: "Back to Browse") { model.selected = nil }
+                .keyboardShortcut("[", modifiers: .command)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(ExtensionsModel.displayName(listing.name))
+                    .font(.ui(15, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+                Text(listing.version)
+                    .font(.meta)
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.inkTertiary)
+                    .textSelection(.enabled)
+            }
+            .lineLimit(1)
+            Spacer(minLength: 8)
+            IconButton(icon: .info, help: Self.trust) { showsTrust.toggle() }
+                .popover(isPresented: $showsTrust, arrowEdge: .bottom) {
+                    PageNote(text: Self.trust)
+                        .frame(width: 240)
+                        .padding(12)
+                }
+            install
+                .padding(.leading, 4)
+        }
+        .padding(.leading, -6)
+    }
+
+    private var install: some View {
+        Group {
+            if let stage = model.stage(for: listing.name) {
+                StageLabel(text: stage.label)
+            } else {
+                Button("Install") { Task { await model.install(listing) } }
+                    .buttonStyle(.pill(.accent, .small))
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(model.working != nil)
+            }
+        }
+        .transition(.blurReplace)
+        .animation(Theme.Motion.section, value: model.stage(for: listing.name))
+    }
+
+    private var facts: some View {
+        HStack(spacing: 12) {
+            Fact(icon: .user, text: listing.publisher)
+            if listing.monthlyDownloads > 0 {
+                Fact(icon: .download, text: "\(listing.monthlyDownloads.formatted(.number.notation(.compactName)))/mo")
+                    .help("\(listing.monthlyDownloads.formatted()) downloads in the last month")
+            }
+            if let published = listing.published {
+                Fact(icon: .clock, text: published.formatted(.relative(presentation: .named)))
+                    .help("Updated \(published.formatted(date: .abbreviated, time: .omitted))")
+            }
+            Spacer(minLength: 0)
+            if let page = listing.page {
+                Link(destination: page) {
+                    HStack(spacing: 2) {
+                        Text("npm")
+                        Icon(.arrowUpRight, size: 12)
                     }
                 }
-                .transition(.blurReplace)
-                .animation(Theme.Motion.section, value: model.stage(for: listing.name))
+                    .help("Open the package page")
             }
-            MessageView(model: model)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("By \(listing.publisher)\(listing.monthlyDownloads > 0 ? ", \(listing.monthlyDownloads.formatted()) downloads last month" : "")")
-                HStack(spacing: 4) {
-                    Text("It runs on your Mac and can read your transcripts and files.")
-                    if let page = listing.page { Link("Source", destination: page) }
-                }
-            }
-            .font(.meta)
-            .foregroundStyle(Theme.inkTertiary)
-            .fixedSize(horizontal: false, vertical: true)
         }
-        .onExitCommand { model.selected = nil }
+        .font(.meta)
+        .lineLimit(1)
+        .foregroundStyle(Theme.inkTertiary)
+    }
+}
+
+private struct Fact: View {
+    let icon: LucideIconName
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Icon(icon, size: 12)
+            Text(text).monospacedDigit()
+        }
     }
 }
 

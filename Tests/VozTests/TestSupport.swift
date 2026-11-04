@@ -42,7 +42,14 @@ let hostScript = URL(fileURLWithPath: #filePath)
     .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     .appendingPathComponent("Resources/Extensions/host.ts")
 
-let extensionResources = hostScript.deletingLastPathComponent()
+/// `Resources/Extensions` with the skill copied in, as `scripts/make-app.sh` lays them out in the app
+let extensionResources: URL = {
+    let repo = hostScript.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let resources = FileManager.default.temporaryDirectory.appendingPathComponent("voz-resources-\(UUID().uuidString)", isDirectory: true)
+    try! FileManager.default.copyItem(at: hostScript.deletingLastPathComponent(), to: resources)
+    try! FileManager.default.copyItem(at: repo.appendingPathComponent("skills/\(VozHome.skillName)"), to: resources.appendingPathComponent(VozHome.skillName))
+    return resources
+}()
 
 func temporaryHome() -> VozHome {
     VozHome(root: FileManager.default.temporaryDirectory.appendingPathComponent("voz-home-\(UUID().uuidString)"))
@@ -342,4 +349,9 @@ func makeTemporaryDirectory() throws -> String {
 /// Swaps two paths the way Sparkle installs an update.
 func swapItems(atPath first: String, withItemAtPath second: String) -> Bool {
     renamex_np(first, second, UInt32(RENAME_SWAP)) == 0
+}
+
+func utcSearchDays(_ query: String, at seconds: Double) -> [Double]? {
+    TranscriptSearch(query, now: Date(timeIntervalSince1970: seconds), calendar: utcCalendar)
+        .days.map { [$0.start.timeIntervalSince1970, $0.end.timeIntervalSince1970] }
 }

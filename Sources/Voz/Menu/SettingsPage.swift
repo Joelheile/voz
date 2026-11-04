@@ -22,18 +22,11 @@ struct SettingsPage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             PageBar(title: "Settings", back: model.goBack) {
-                HStack(spacing: 6) {
-                    Button { model.page = .feedback } label: {
-                        HStack(spacing: 5) { Icon(.messageSquare, size: 12); Text("Feedback") }
-                    }
-                    Button { model.page = .whatsNew } label: {
-                        HStack(spacing: 5) { Icon(.sparkles, size: 12); Text("What's new") }
-                    }
-                }
-                .buttonStyle(.pill(.outline, .small))
+                IconButton(icon: .messageSquare, help: "Feedback") { model.page = .feedback }
+                IconButton(icon: .scrollText, help: "What's new") { model.page = .whatsNew }
             }
             CappedScrollView(maxHeight: 640) {
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 22) {
                     if !allGranted { permissions }
                     dictation
                     general
@@ -53,34 +46,34 @@ struct SettingsPage: View {
 
     @ViewBuilder
     private var dictation: some View {
-        PanelGroup {
-            PanelRow(title: "Shortcut", detail: capture.warning) {
+        PanelGroup(title: "Dictation") {
+            PanelRow(title: "Shortcut", detail: capture.warning, tile: IconTile(.keyboard, Color(nsColor: .systemGray))) {
                 Button(capture.isListening ? capture.preview?.displayName ?? "Press keys…" : settings.hotkey.displayName) {
                     capture.isListening ? capture.cancel() : capture.begin()
                 }
                 .buttonStyle(.pill(capture.isListening ? .accent : .quiet, .small))
             }
-            PanelRow(title: "Mode") {
+            PanelRow(title: "Mode", tile: IconTile(.mic, Color(nsColor: .systemIndigo))) {
                 TabBar(tabs: TalkMode.allCases, selection: settings.talkMode)
                     .frame(width: 120)
             }
-            LinkRow(title: "Speech model", value: speechModelName) { model.page = .speechModel }
-            LinkRow(title: "Languages", value: SpeechLanguage.summary(of: settings.languages)) { model.page = .languages }
+            LinkRow(title: "Speech model", value: speechModelName, tile: IconTile(.cpu, Color(nsColor: .systemTeal))) { model.page = .speechModel }
+            LinkRow(title: "Languages", value: SpeechLanguage.summary(of: settings.languages), tile: IconTile(.globe, Color(nsColor: .systemBlue))) { model.page = .languages }
         }
         PanelGroup(title: "Text") {
-            PanelRow(title: "Output") {
+            PanelRow(title: "Output", tile: IconTile(.type, Color(nsColor: .systemOrange))) {
                 TabBar(tabs: OutputMode.allCases, selection: settings.outputMode)
                     .frame(width: 156)
             }
-            LinkRow(title: "Cleanup", value: settings.cleanupEnabled ? "On" : "Off") { model.page = .cleanup }
+            LinkRow(title: "Cleanup", value: settings.cleanupEnabled ? "On" : "Off", tile: IconTile(.wandSparkles, Color(nsColor: .systemPurple))) { model.page = .cleanup }
         }
         PanelGroup(title: "While recording") {
             MicrophonePicker(selection: $settings.microphone)
-            PanelRow(title: "Live preview", detail: "Draft text under the indicator") {
+            PanelRow(title: "Live preview", detail: "Draft text under the indicator", tile: IconTile(.textCursorInput, Color(nsColor: .systemCyan))) {
                 Toggle("Live preview", isOn: $settings.livePreviewEnabled).labelsHidden()
             }
-            toggle("Mute other apps", isOn: $settings.muteWhileRecording)
-            toggle("Sound cues", isOn: $settings.soundCues)
+            toggle("Mute other apps", tile: IconTile(.volumeX, Color(nsColor: .systemRed)), isOn: $settings.muteWhileRecording)
+            toggle("Sound cues", tile: IconTile(.volume2, Color(nsColor: .systemGreen)), isOn: $settings.soundCues)
         }
     }
 
@@ -121,10 +114,10 @@ struct SettingsPage: View {
     @ViewBuilder
     private var general: some View {
         PanelGroup(title: "App") {
-            toggle("Launch at login", isOn: $settings.launchAtLogin)
-            LinkRow(title: "Product tour", value: "") { model.page = .tour }
-            LinkRow(title: "Privacy and debug log", value: "") { model.page = .privacy }
-            ActionRow(title: "Quit Voz", value: "", action: model.actions.quit)
+            toggle("Launch at login", tile: IconTile(.power, Color(nsColor: .systemGray)), isOn: $settings.launchAtLogin)
+            LinkRow(title: "Product tour", value: "", tile: IconTile(.play, Color(nsColor: .systemBlue))) { model.page = .tour }
+            LinkRow(title: "Privacy and debug log", value: "", tile: IconTile(.shield, Color(nsColor: .systemGreen))) { model.page = .privacy }
+            ActionRow(title: "Quit Voz", value: "", tile: IconTile(.logOut, Color(nsColor: .systemGray)), action: model.actions.quit)
         }
     }
 
@@ -134,8 +127,8 @@ struct SettingsPage: View {
         }
     }
 
-    private func toggle(_ title: String, isOn: Binding<Bool>) -> some View {
-        PanelRow(title: title) {
+    private func toggle(_ title: String, tile: IconTile, isOn: Binding<Bool>) -> some View {
+        PanelRow(title: title, tile: tile) {
             Toggle(title, isOn: isOn).labelsHidden()
         }
     }
@@ -179,11 +172,12 @@ extension AppSettings {
 struct PermissionRow: View {
     let title: String
     var detail: String?
+    var tile: IconTile?
     let granted: Bool
     let fix: () -> Void
 
     var body: some View {
-        PanelRow(title: title, detail: detail) {
+        PanelRow(title: title, detail: detail, tile: tile) {
             if granted {
                 Icon(.circleCheck, size: 16)
                     .foregroundStyle(Theme.accent)

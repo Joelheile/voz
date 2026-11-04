@@ -439,8 +439,8 @@ struct ExtensionHostTests {
         let folder = try ExtensionTemplate.create(named: "voz-hello", in: home.root, from: extensionResources)
         let apiVersion = try ExtensionTemplate.apiVersion(in: extensionResources)
         #expect(fileContents(folder.appendingPathComponent("package.json"))?.contains(#""apiVersion": \#(apiVersion) }"#) == true)
-        #expect(fileContents(folder.appendingPathComponent("AGENTS.md"))?.hasPrefix("# Writing Voz extensions") == true)
-        #expect(fileContents(folder.appendingPathComponent("CLAUDE.md")) == "@AGENTS.md\n")
+        #expect(fileContents(folder.appendingPathComponent("AGENTS.md"))?.contains(VozHome.skillName) == true)
+        #expect(fileContents(folder.appendingPathComponent(".claude/skills/voz-extension/SKILL.md")) != nil)
         let actions = RecordedActions()
         let host = makeHost(packages: [folder.path], actions: actions)
         let manifest = try await host.start()
@@ -589,11 +589,36 @@ struct ExtensionHostTests {
         #expect(try home.packageSources() == ["npm:voz-jira"])
     }
 
-    @Test func authoringFilesPointClaudeCodeAtTheAgentGuide() throws {
+    @Test func authoringFilesGiveEveryAgentTheExtensionSkill() throws {
         let home = temporaryHome()
         try home.writeAuthoringFiles(from: extensionResources)
+        try home.writeAuthoringFiles(from: extensionResources)
+        let skill = extensionResources.appendingPathComponent("voz-extension")
+        for agentFolder in [".claude", ".agents"] {
+            for file in ["SKILL.md", "references/api.md"] {
+                let installed = home.root.appendingPathComponent("\(agentFolder)/skills/voz-extension/\(file)")
+                #expect(fileContents(installed) == fileContents(skill.appendingPathComponent(file)))
+            }
+        }
         #expect(fileContents(home.root.appendingPathComponent("CLAUDE.md")) == "@AGENTS.md\n")
         #expect(fileContents(home.root.appendingPathComponent("AGENTS.md")) == fileContents(extensionResources.appendingPathComponent("AGENTS.md")))
+    }
+
+    @Test func skillInstallsForEveryAgentInTheHomeFolder() throws {
+        let userHome = temporaryHome().root
+        try VozHome.writeSkill(into: userHome, from: extensionResources)
+        try VozHome.writeSkill(into: userHome, from: extensionResources)
+        for agentFolder in [".claude", ".agents"] {
+            let installed = userHome.appendingPathComponent("\(agentFolder)/skills/voz-extension/SKILL.md")
+            #expect(fileContents(installed) == fileContents(extensionResources.appendingPathComponent("voz-extension/SKILL.md")))
+        }
+        #expect(fileContents(userHome.appendingPathComponent("AGENTS.md")) == nil)
+    }
+
+    @Test func skillNameMatchesItsFolderAndTheBuildPrompt() {
+        let skill = fileContents(extensionResources.appendingPathComponent("\(VozHome.skillName)/SKILL.md"))
+        #expect(skill?.hasPrefix("---\nname: \(VozHome.skillName)\n") == true)
+        #expect(ExtensionsModel.buildPrompt.contains("the \(VozHome.skillName) skill"))
     }
 
     @Test func installedPackagesReadTheirDescription() throws {
@@ -627,15 +652,6 @@ struct ExtensionHostTests {
     let script = CommandLineTool.administratorScript(linking: #"/Users/a "b" 'c'\d/voz.app/Contents/MacOS/voz"#)
     #expect(compilesAsAppleScript(script))
     #expect(script.contains(#"'/Users/a \"b\" '\\''c'\\''\\d/voz.app/Contents/MacOS/voz'"#))
-}
-
-@Suite struct ClaudeCommandTests {
-    @Test func promptIsOneSingleQuotedShellArgument() {
-        let command = ExtensionsModel.claudeCommand
-        #expect(command.hasPrefix("cd ~ && claude '"))
-        #expect(command.hasSuffix("'"))
-        #expect(command.filter { $0 == "'" }.count == 2)
-    }
 }
 
 @Test func displayNamesDropTheVozPrefix() {

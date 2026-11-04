@@ -15,10 +15,13 @@ private enum SettingsKey {
     static let cleanupMode = "cleanupMode"
     static let analyticsEnabled = "analyticsEnabled"
     static let receiveBetaUpdates = "receiveBetaUpdates"
+    /// Sparkle's own key, so Sparkle and this setting never disagree.
+    static let installUpdatesAutomatically = "SUAutomaticallyUpdate"
     static let errorReportsEnabled = "errorReportsEnabled"
     static let cleanupPrompt = "cleanupPrompt"
     static let starPromptDismissed = "starPromptDismissed"
     static let starToastShown = "starToastShown"
+    static let starPromptDismissals = "starPromptDismissals"
     static let milestonesSeen = "milestonesSeen"
     static let milestoneShows = "milestoneShows"
     static let logIncludesText = "logIncludesText"
@@ -73,6 +76,9 @@ final class AppSettings: ObservableObject {
     @Published var starToastShown: Bool {
         didSet { defaults.set(starToastShown, forKey: SettingsKey.starToastShown) }
     }
+    @Published var starPromptDismissals: Int {
+        didSet { defaults.set(starPromptDismissals, forKey: SettingsKey.starPromptDismissals) }
+    }
     @Published var milestonesSeen: [String: Int] {
         didSet { defaults.set(milestonesSeen, forKey: SettingsKey.milestonesSeen) }
     }
@@ -97,6 +103,9 @@ final class AppSettings: ObservableObject {
     }
     @Published var receiveBetaUpdates: Bool {
         didSet { defaults.set(receiveBetaUpdates, forKey: SettingsKey.receiveBetaUpdates) }
+    }
+    @Published var installUpdatesAutomatically: Bool {
+        didSet { defaults.set(installUpdatesAutomatically, forKey: SettingsKey.installUpdatesAutomatically) }
     }
     @Published var errorReportsEnabled: Bool {
         didSet { defaults.set(errorReportsEnabled, forKey: SettingsKey.errorReportsEnabled) }
@@ -140,6 +149,7 @@ final class AppSettings: ObservableObject {
             SettingsKey.cleanupEnabled: true,
             SettingsKey.analyticsEnabled: false,
             SettingsKey.receiveBetaUpdates: false,
+            SettingsKey.installUpdatesAutomatically: true,
             SettingsKey.errorReportsEnabled: true,
         ])
         hotkey = defaults.data(forKey: SettingsKey.hotkey)
@@ -154,6 +164,7 @@ final class AppSettings: ObservableObject {
         onboardingCompleted = defaults.bool(forKey: SettingsKey.onboardingCompleted)
         starPromptDismissed = defaults.bool(forKey: SettingsKey.starPromptDismissed)
         starToastShown = defaults.bool(forKey: SettingsKey.starToastShown)
+        starPromptDismissals = defaults.integer(forKey: SettingsKey.starPromptDismissals)
         milestoneShows = defaults.integer(forKey: SettingsKey.milestoneShows)
         milestonesSeen = defaults.dictionary(forKey: SettingsKey.milestonesSeen) as? [String: Int] ?? [:]
         microphone = defaults.string(forKey: SettingsKey.microphone) ?? MicrophoneOptions.systemDefault
@@ -163,6 +174,7 @@ final class AppSettings: ObservableObject {
         cleanupMode = defaults.string(forKey: SettingsKey.cleanupMode).flatMap(CleanupMode.init) ?? .heavy
         analyticsEnabled = defaults.bool(forKey: SettingsKey.analyticsEnabled)
         receiveBetaUpdates = defaults.bool(forKey: SettingsKey.receiveBetaUpdates)
+        installUpdatesAutomatically = defaults.bool(forKey: SettingsKey.installUpdatesAutomatically)
         errorReportsEnabled = defaults.bool(forKey: SettingsKey.errorReportsEnabled)
         logIncludesText = defaults.bool(forKey: SettingsKey.logIncludesText)
         cleanupPrompt = defaults.string(forKey: SettingsKey.cleanupPrompt) ?? CleanupPrompt.standard

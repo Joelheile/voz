@@ -82,6 +82,14 @@ final class HistoryStore: Sendable {
                 table.add(column: "file", .text)
             }
         }
+        migrator.registerMigration("v7-search-index") { database in
+            try database.create(virtualTable: TranscriptSearch.indexTable, using: FTS5()) { table in
+                table.synchronize(withTable: TranscriptRecord.databaseTableName)
+                table.tokenizer = FTS5TokenizerDescriptor(components: ["trigram", "remove_diacritics", "1"])
+                table.column("finalText")
+                table.column("appName")
+            }
+        }
         return migrator
     }
 
@@ -98,20 +106,19 @@ final class HistoryStore: Sendable {
     }
 
     func search(_ query: String) throws -> [TranscriptRecord] {
-        try queue.read { try Self.request(matching: query).fetchAll($0) }
+        try queue.read { try Self.records(matching: query, in: $0) }
     }
 
     func recent(matching query: String = "", app: String? = nil, since: Date? = nil, limit: Int) throws -> [TranscriptRecord] {
-        var request = TranscriptRecord.order(Column("createdAt").desc)
-        if !query.isEmpty { request = request.filter(Self.containsIgnoringCase(Column("finalText"), query)) }
+        var request = TranscriptRecord.all()
         if let app { request = request.filter(Self.containsIgnoringCase(Column("appName"), app)) }
         if let since { request = request.filter(Column("createdAt") >= since) }
-        return try queue.read { try request.limit(limit).fetchAll($0) }
+        return try queue.read { try Self.records(matching: TranscriptSearch(query), in: request, limit: limit, database: $0) }
     }
 
     func observeSearch(_ query: String) -> AnyPublisher<[TranscriptRecord], Error> {
         ValueObservation
-            .tracking { try Self.request(matching: query).fetchAll($0) }
+            .tracking { try Self.records(matching: query, in: $0) }
             .publisher(in: queue)
             .eraseToAnyPublisher()
     }
@@ -138,11 +145,47 @@ final class HistoryStore: Sendable {
         return accumulator.finish()
     }
 
-    private static func request(matching query: String) -> QueryInterfaceRequest<TranscriptRecord> {
-        let newest = TranscriptRecord.order(Column("createdAt").desc)
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return newest.limit(menuLimit) }
-        return newest.filter(containsIgnoringCase(Column("finalText"), trimmed)).limit(searchLimit)
+    private static func records(matching query: String, in database: Database) throws -> [TranscriptRecord] {
+        let search = TranscriptSearch(query)
+        return try records(matching: search, in: TranscriptRecord.all(), limit: search.isEmpty ? menuLimit : searchLimit, database: database)
+    }
+
+    private static func records(
+        matching search: TranscriptSearch,
+        in base: QueryInterfaceRequest<TranscriptRecord>,
+        limit: Int,
+        database: Database
+    ) throws -> [TranscriptRecord] {
+        var request = base
+        if let days = search.days {
+            request = request.filter(Column("createdAt") >= days.start && Column("createdAt") < days.end)
+        }
+        for term in search.shortTerms {
+            request = request.filter(containsIgnoringCase(Column("finalText"), term) || containsIgnoringCase(Column("appName"), term))
+        }
+        let exact = try request
+            .filter(indexed(search.allTermsPattern))
+            .order(Column("createdAt").desc)
+            .limit(limit)
+            .fetchAll(database)
+        guard exact.isEmpty, let anyTrigram = search.anyTrigramPattern else { return exact }
+        return try request
+            .filter(indexed(anyTrigram, best: TranscriptSearch.fuzzyCandidates))
+            .fetchAll(database)
+            .map { (record: $0, share: search.fuzzyShare(of: $0)) }
+            .filter { $0.share >= TranscriptSearch.fuzzyMinimumShare }
+            .sorted { ($0.share, $0.record.createdAt) > ($1.share, $1.record.createdAt) }
+            .prefix(limit)
+            .map(\.record)
+    }
+
+    private static func indexed(_ pattern: String?) -> SQLExpression {
+        guard let pattern else { return true.sqlExpression }
+        return SQL("rowid IN (SELECT rowid FROM \(sql: TranscriptSearch.indexTable) WHERE \(sql: TranscriptSearch.indexTable) MATCH \(pattern))").sqlExpression
+    }
+
+    private static func indexed(_ pattern: String, best limit: Int) -> SQLExpression {
+        SQL("rowid IN (SELECT rowid FROM \(sql: TranscriptSearch.indexTable) WHERE \(sql: TranscriptSearch.indexTable) MATCH \(pattern) ORDER BY rank LIMIT \(limit))").sqlExpression
     }
 }
 

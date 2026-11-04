@@ -47,6 +47,7 @@ fi
 install_name_tool -add_rpath @executable_path/../Frameworks "$APP/Contents/MacOS/voz"
 cp -R Resources/Sounds "$APP/Contents/Resources/Sounds"
 cp -R Resources/Extensions "$APP/Contents/Resources/Extensions"
+cp -R skills/voz-extension "$APP/Contents/Resources/Extensions/voz-extension"
 cp -R Resources/Fonts "$APP/Contents/Resources/Fonts"
 python3 scripts/third-party-notices.py "$APP/Contents/Resources/ThirdPartyNotices.txt"
 cp Resources/AppIcon.icns Resources/MenuBarIcon.png CHANGELOG.md "$APP/Contents/Resources/"

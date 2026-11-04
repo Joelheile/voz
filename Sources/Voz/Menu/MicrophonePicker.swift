@@ -9,7 +9,8 @@ struct MicrophonePicker: View {
         ModelPicker(
             title: "Microphone",
             selection: $selection,
-            options: MicrophoneOptions.make(microphones, defaultName: defaultName, selection: selection)
+            options: MicrophoneOptions.make(microphones, defaultName: defaultName, selection: selection),
+            tile: IconTile(.mic, Color(nsColor: .systemPink))
         )
         .task {
             while !Task.isCancelled {

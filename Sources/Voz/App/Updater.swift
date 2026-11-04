@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Sparkle
 
@@ -10,6 +11,8 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate, @preconcurr
     private let isBusy: () -> Bool
     private var controller: SPUStandardUpdaterController?
     private var pendingInstall: (() -> Void)?
+    private var installDownloaded: (() -> Void)?
+    private var idleCheck: Timer?
 
     init(settings: AppSettings, isBusy: @escaping () -> Bool) {
         self.settings = settings
@@ -21,7 +24,9 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate, @preconcurr
         controller = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: self, userDriverDelegate: self)
     }
 
+    /// Installs an update that already downloaded, or checks for one.
     func checkForUpdates() {
+        guard installDownloaded == nil else { return installNow() }
         controller?.checkForUpdates(nil)
     }
 
@@ -50,9 +55,33 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate, @preconcurr
         settings.receiveBetaUpdates ? [UpdateChannel.beta.rawValue] : []
     }
 
+    /// Holds a silently downloaded update and installs it once you step away, so a restart never interrupts you.
+    func updater(_ updater: SPUUpdater, willInstallUpdateOnQuit item: SUAppcastItem, immediateInstallationBlock immediateInstallHandler: @escaping () -> Void) -> Bool {
+        availableVersion = item.displayVersionString
+        installDownloaded = immediateInstallHandler
+        idleCheck?.invalidate()
+        idleCheck = Timer.scheduledTimer(withTimeInterval: IdleInstall.checkInterval, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.installIfAway() }
+        }
+        return true
+    }
+
+    private func installIfAway() {
+        guard IdleInstall.isDue(busy: isBusy(), secondsSinceInput: IdleInstall.secondsSinceInput()) else { return }
+        installNow()
+    }
+
+    private func installNow() {
+        idleCheck?.invalidate()
+        idleCheck = nil
+        let install = installDownloaded
+        installDownloaded = nil
+        install?()
+    }
+
     var supportsGentleScheduledUpdateReminders: Bool { true }
 
-    /// Scheduled checks only offer the update in the menu, so Sparkle never replaces voz behind your back.
+    /// With automatic installs off, scheduled checks only offer the update in the menu, so Sparkle never replaces voz behind your back.
     func standardUserDriverShouldHandleShowingScheduledUpdate(_ update: SUAppcastItem, andInImmediateFocus immediateFocus: Bool) -> Bool {
         false
     }
@@ -63,6 +92,20 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate, @preconcurr
 
     func standardUserDriverWillFinishUpdateSession() {
         availableVersion = nil
+    }
+}
+
+enum IdleInstall {
+    static let checkInterval: TimeInterval = 60
+    static let awayAfter: TimeInterval = 10 * 60
+
+    static func isDue(busy: Bool, secondsSinceInput: TimeInterval) -> Bool {
+        !busy && secondsSinceInput >= awayAfter
+    }
+
+    static func secondsSinceInput() -> TimeInterval {
+        guard let anyInput = CGEventType(rawValue: ~0) else { return 0 }
+        return CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: anyInput)
     }
 }
 

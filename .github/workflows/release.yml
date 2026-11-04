@@ -2,11 +2,8 @@ name: Release
 
 on:
   push:
-    branches: [main]
     tags: ["v*"]
-    paths-ignore:
-      - appcast.xml
-      - "**.md"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -81,6 +78,7 @@ jobs:
             version=${tag#v}
             [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Tag $tag is not vMAJOR.MINOR.PATCH" >&2; exit 1; }
           else
+            [[ "$GITHUB_REF" == refs/heads/main ]] || { echo "Publish betas from main, not $GITHUB_REF" >&2; exit 1; }
             base=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)
             base=${base#v}
             base=${base:-$(plutil -extract CFBundleShortVersionString raw Resources/Info.plist)}
