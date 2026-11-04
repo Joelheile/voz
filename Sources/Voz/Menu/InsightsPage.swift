@@ -15,6 +15,7 @@ struct InsightsPage: View {
             PageBar(title: "Insights", back: back) {
                 StarButton(title: "Star") { settings.starPromptDismissed = true }
             }
+            TodayHero(stats: model.stats, revealed: revealed).groupCard(padding: 14)
             VStack(alignment: .leading, spacing: 10) {
                 TabBar(tabs: StatsPeriod.allCases, selection: $period)
                 WordsHeadline(stats: stats).padding(.horizontal, 4).padding(.vertical, 6)
@@ -26,7 +27,6 @@ struct InsightsPage: View {
                 if !stats.topApps.isEmpty { TopApps(apps: stats.topApps).groupCard() }
             }
             .animation(Theme.Motion.section, value: period)
-            StreakSection(stats: model.stats, revealed: revealed).groupCard()
         }
         .animation(Theme.Motion.section, value: model.stats)
         .onAppear { revealed = loaded }
@@ -39,35 +39,55 @@ private extension Animation {
     static let revealColumn = Animation.timingCurve(0.23, 1, 0.32, 1, duration: 0.22)
 }
 
-private struct StreakSection: View {
+private struct TodayHero: View {
     let stats: UsageStats
     let revealed: Bool
     @State private var hovered: WordBucket?
 
+    private var today: PeriodStats { stats[.day] }
+    private var dictatedToday: Bool { today.words > 0 }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(stats.streak == 1 ? "1 day streak" : "\(stats.streak.formatted()) day streak")
-                    .font(.ui(13, weight: .medium))
-                    .foregroundStyle(Theme.ink)
-                    .contentTransition(.numericText())
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                streak
                 Spacer(minLength: 0)
-                if stats.longestStreak > 0 {
-                    Text("Longest \(stats.longestStreak) \(stats.longestStreak == 1 ? "day" : "days")")
-                        .font(.meta)
-                        .monospacedDigit()
-                        .foregroundStyle(Theme.inkTertiary)
+                VStack(alignment: .trailing, spacing: 6) {
+                    TodayMetric(value: today.words.formatted(), label: today.words == 1 ? "word today" : "words today")
+                    TodayMetric(value: StatsFormat.duration(today.savedSeconds), label: "saved today")
                 }
             }
             ActivityGrid(days: stats.days, revealed: revealed, hovered: $hovered)
-            Text(caption)
-                .font(.meta)
-                .monospacedDigit()
-                .foregroundStyle(hovered == nil ? Theme.inkSecondary : Theme.ink)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(caption)
+                    .foregroundStyle(hovered == nil ? Theme.inkSecondary : Theme.ink)
+                Spacer(minLength: 0)
+                if stats.longestStreak > 0 {
+                    Text("Longest \(stats.longestStreak) \(stats.longestStreak == 1 ? "day" : "days")")
+                        .foregroundStyle(Theme.inkTertiary)
+                }
+            }
+            .font(.meta)
+            .monospacedDigit()
         }
     }
 
-    private var dictatedToday: Bool { (stats.days.last?.words ?? 0) > 0 }
+    private var streak: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .center, spacing: 6) {
+                Icon(.flame, size: 22, strokeWidth: 2)
+                    .foregroundStyle(dictatedToday ? Theme.accent : Theme.inkTertiary)
+                Text(stats.streak.formatted())
+                    .font(.display(40))
+                    .foregroundStyle(Theme.ink)
+                    .contentTransition(.numericText())
+            }
+            Text("day streak")
+                .font(.ui(13, weight: .medium))
+                .foregroundStyle(Theme.inkSecondary)
+        }
+        .animation(Theme.Motion.section, value: dictatedToday)
+    }
 
     private var caption: String {
         if let hovered {
@@ -77,6 +97,23 @@ private struct StreakSection: View {
         if dictatedToday { return "You dictated today." }
         if stats.streak > 0 { return "Dictate today to keep your streak." }
         return "Dictate today to start a streak."
+    }
+}
+
+private struct TodayMetric: View {
+    let value: String
+    let label: String
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 0) {
+            Text(value)
+                .font(.display(20))
+                .foregroundStyle(Theme.ink)
+                .contentTransition(.numericText())
+            Text(label)
+                .font(.meta)
+                .foregroundStyle(Theme.inkTertiary)
+        }
     }
 }
 
@@ -160,7 +197,7 @@ private struct WordsHeadline: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(stats.words.formatted())
-                .font(.display(32))
+                .font(.display(40))
                 .foregroundStyle(Theme.ink)
                 .contentTransition(.numericText())
             Text(caption)
@@ -198,7 +235,7 @@ private struct PaceGauge: View {
                     .stroke(Theme.accent, style: StrokeStyle(lineWidth: Self.lineWidth, lineCap: .round))
                 VStack(spacing: 0) {
                     Text(wordsPerMinute.map { Int($0.rounded()).formatted() } ?? "–")
-                        .font(.display(22))
+                        .font(.display(28))
                         .foregroundStyle(Theme.ink)
                         .contentTransition(.numericText())
                     Text("wpm")
@@ -245,7 +282,7 @@ private struct TimeSaved: View {
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "Time saved")
             Text(StatsFormat.duration(stats.savedSeconds))
-                .font(.display(22))
+                .font(.display(28))
                 .foregroundStyle(Theme.ink)
                 .contentTransition(.numericText())
             VStack(alignment: .leading, spacing: 10) {
