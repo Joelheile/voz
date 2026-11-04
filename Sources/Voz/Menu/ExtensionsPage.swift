@@ -310,33 +310,40 @@ private struct ListingDetail: View {
     @State private var showsTrust = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 16) {
             header
             MessageView(model: model)
-            if let summary = listing.summary {
-                Text(summary)
-                    .font(.ui(15))
-                    .lineSpacing(4)
-                    .foregroundStyle(Theme.ink)
-                    .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 10) {
+                if let summary = listing.summary {
+                    Text(summary)
+                        .font(.ui(15))
+                        .lineSpacing(4)
+                        .foregroundStyle(Theme.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                facts
             }
-            facts
         }
-        .padding(.bottom, 4)
+        .padding(.bottom, 2)
         .onExitCommand { model.selected = nil }
     }
 
     private var header: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 4) {
             IconButton(icon: .chevronLeft, help: "Back to Browse") { model.selected = nil }
                 .keyboardShortcut("[", modifiers: .command)
-                .padding(.leading, -6)
-                .padding(.trailing, -4)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(ExtensionsModel.displayName(listing.name)).font(.display(17)).foregroundStyle(Theme.ink)
-                Text("\(listing.publisher) \(listing.version)").font(.meta).foregroundStyle(Theme.inkTertiary).textSelection(.enabled)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(ExtensionsModel.displayName(listing.name))
+                    .font(.ui(15, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+                Text(listing.version)
+                    .font(.meta)
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.inkTertiary)
+                    .textSelection(.enabled)
             }
-            Spacer(minLength: 0)
+            .lineLimit(1)
+            Spacer(minLength: 8)
             IconButton(icon: .info, help: Self.trust) { showsTrust.toggle() }
                 .popover(isPresented: $showsTrust, arrowEdge: .bottom) {
                     PageNote(text: Self.trust)
@@ -344,7 +351,9 @@ private struct ListingDetail: View {
                         .padding(12)
                 }
             install
+                .padding(.leading, 4)
         }
+        .padding(.leading, -6)
     }
 
     private var install: some View {
@@ -363,7 +372,8 @@ private struct ListingDetail: View {
     }
 
     private var facts: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 12) {
+            Fact(icon: .user, text: listing.publisher)
             if listing.monthlyDownloads > 0 {
                 Fact(icon: .download, text: "\(listing.monthlyDownloads.formatted(.number.notation(.compactName)))/mo")
                     .help("\(listing.monthlyDownloads.formatted()) downloads in the last month")
@@ -372,12 +382,19 @@ private struct ListingDetail: View {
                 Fact(icon: .clock, text: published.formatted(.relative(presentation: .named)))
                     .help("Updated \(published.formatted(date: .abbreviated, time: .omitted))")
             }
+            Spacer(minLength: 0)
             if let page = listing.page {
-                Link(destination: page) { Fact(icon: .arrowUpRight, text: "npm") }
+                Link(destination: page) {
+                    HStack(spacing: 2) {
+                        Text("npm")
+                        Icon(.arrowUpRight, size: 12)
+                    }
+                }
                     .help("Open the package page")
             }
         }
         .font(.meta)
+        .lineLimit(1)
         .foregroundStyle(Theme.inkTertiary)
     }
 }
