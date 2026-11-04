@@ -310,33 +310,57 @@ private struct ListingDetail: View {
     @State private var showsTrust = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            PageBar(title: "Browse") { model.selected = nil } trailing: {
-                IconButton(icon: .info, help: Self.trust) { showsTrust.toggle() }
-                    .popover(isPresented: $showsTrust, arrowEdge: .bottom) {
-                        PageNote(text: Self.trust)
-                            .frame(width: 240)
-                            .padding(12)
-                    }
-            }
-            DetailHeader(name: listing.name, summary: listing.summary, byline: "\(listing.publisher) \(listing.version)") {
-                Group {
-                    if let stage = model.stage(for: listing.name) {
-                        StageLabel(text: stage.label)
-                    } else {
-                        Button("Install") { Task { await model.install(listing) } }
-                            .buttonStyle(.pill(.accent, .small))
-                            .keyboardShortcut(.defaultAction)
-                            .disabled(model.working != nil)
-                    }
-                }
-                .transition(.blurReplace)
-                .animation(Theme.Motion.section, value: model.stage(for: listing.name))
-            }
+        VStack(alignment: .leading, spacing: 18) {
+            header
             MessageView(model: model)
+            if let summary = listing.summary {
+                Text(summary)
+                    .font(.ui(15))
+                    .lineSpacing(4)
+                    .foregroundStyle(Theme.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             facts
         }
+        .padding(.bottom, 4)
         .onExitCommand { model.selected = nil }
+    }
+
+    private var header: some View {
+        HStack(spacing: 10) {
+            IconButton(icon: .chevronLeft, help: "Back to Browse") { model.selected = nil }
+                .keyboardShortcut("[", modifiers: .command)
+                .padding(.leading, -6)
+                .padding(.trailing, -4)
+            Monogram(name: listing.name, size: 40)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(ExtensionsModel.displayName(listing.name)).font(.display(15)).foregroundStyle(Theme.ink)
+                Text("\(listing.publisher) \(listing.version)").font(.meta).foregroundStyle(Theme.inkTertiary).textSelection(.enabled)
+            }
+            Spacer(minLength: 0)
+            IconButton(icon: .info, help: Self.trust) { showsTrust.toggle() }
+                .popover(isPresented: $showsTrust, arrowEdge: .bottom) {
+                    PageNote(text: Self.trust)
+                        .frame(width: 240)
+                        .padding(12)
+                }
+            install
+        }
+    }
+
+    private var install: some View {
+        Group {
+            if let stage = model.stage(for: listing.name) {
+                StageLabel(text: stage.label)
+            } else {
+                Button("Install") { Task { await model.install(listing) } }
+                    .buttonStyle(.pill(.accent, .small))
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(model.working != nil)
+            }
+        }
+        .transition(.blurReplace)
+        .animation(Theme.Motion.section, value: model.stage(for: listing.name))
     }
 
     private var facts: some View {
