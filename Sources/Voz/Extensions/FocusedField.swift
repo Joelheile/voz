@@ -143,6 +143,15 @@ enum FieldReader {
         return (title, toolbarLabels(of: window), text)
     }
 
+    /// What says a window is private, without reading its text
+    static func windowLabels(pid: pid_t) -> (title: String, toolbar: [String])? {
+        let app = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(app, messagingTimeout)
+        guard AXIsProcessTrusted(), let window = element(kAXFocusedWindowAttribute, of: app),
+              let title = attribute(kAXTitleAttribute, of: window) as? String else { return nil }
+        return (title, toolbarLabels(of: window))
+    }
+
     private static func toolbarLabels(of window: AXUIElement) -> [String] {
         func labels(_ element: AXUIElement, depth: Int) -> [String] {
             let own = [kAXTitleAttribute, kAXDescriptionAttribute].compactMap { attribute($0, of: element) as? String }

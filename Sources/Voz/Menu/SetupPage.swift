@@ -147,8 +147,8 @@ private struct ModelStep: View {
             StepHeader(title: "Pick a model", detail: "All three run on this Mac. You can switch later.")
             SpeechModelPicker(selection: $settings.speechModel, showsTitle: false)
             PanelGroup {
-                PanelRow(title: "Share anonymous usage", detail: "Counts, timings, error codes and npm extensions you add, never text or audio") {
-                    Toggle("Share anonymous usage", isOn: $settings.analyticsEnabled).labelsHidden()
+                PanelRow(title: "Share usage stats", detail: "Timings and totals per known site, tied to a random ID. Anonymous counts always go. Never text or audio") {
+                    Toggle("Share usage stats", isOn: $settings.analyticsEnabled).labelsHidden()
                 }
             }
             .controlSize(.small)

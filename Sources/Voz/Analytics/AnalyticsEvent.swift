@@ -1,7 +1,6 @@
 enum AnalyticsEvent: Equatable, Sendable {
     case appOpened
     case modelFailed(model: SpeechModel)
-    case appLaunched(atLogin: Bool)
     case permissionResult(permission: PermissionName, granted: Bool)
     case dictationCompleted(DictationMetrics)
     case dictationFailed(stage: DictationStage, errorCode: DictationErrorCode, status: Int? = nil)
@@ -21,7 +20,6 @@ enum AnalyticsEvent: Equatable, Sendable {
         switch self {
         case .appOpened: "app_opened"
         case .modelFailed: "model_failed"
-        case .appLaunched: "app_launched"
         case .permissionResult: "permission_result"
         case .dictationCompleted: "dictation_completed"
         case .dictationFailed: "dictation_failed"
@@ -51,8 +49,6 @@ enum AnalyticsEvent: Equatable, Sendable {
             ["reason": .text(reason.rawValue)]
         case let .modelFailed(model):
             ["model": .text(model.rawValue)]
-        case let .appLaunched(atLogin):
-            ["at_login": .flag(atLogin)]
         case .appOpened, .historyOpened, .statsOpened:
             [:]
         case let .modelDownload(model, seconds, success, bytes):
@@ -83,6 +79,31 @@ enum AnalyticsEvent: Equatable, Sendable {
         default: nil
         }
     }
+
+    /// One of each, so `voz telemetry` lists the fields the encoder really sends
+    static let samples: [AnalyticsEvent] = [
+        .appOpened,
+        .modelFailed(model: .parakeetUltra),
+        .permissionResult(permission: .microphone, granted: true),
+        .dictationCompleted(DictationMetrics(
+            audioSeconds: 0, wordCount: 0, sttMs: 0, cleanupMs: 0, insertMs: 0, totalMs: 0, model: "", selectedModel: "",
+            cleanupUsed: false, cleanupTimedOut: false, trigger: .hold, output: .paste
+        )),
+        .dictationFailed(stage: .recording, errorCode: .recorderStartFailed, status: 0),
+        .dictationDiscarded(reason: .silent),
+        .modelDownload(model: .parakeetUltra, seconds: 0, success: true, bytes: 0),
+        .modelLoad(model: .parakeetUltra, coldMs: 0),
+        .vocabularySuggestion(accepted: true),
+        .historyOpened,
+        .statsOpened,
+        .updateInstalled(from: "0.0.0", to: "0.0.0", channel: .stable),
+        .setupStepViewed(.access),
+        .setupCompleted(allPermissionsGranted: true, triedDictation: true),
+        .extensionChanged(change: .install, source: .npm(name: "", spec: "")),
+        .extensionChanged(change: .update, source: .npm(name: "", spec: "")),
+        .extensionChanged(change: .remove, source: .npm(name: "", spec: "")),
+        .extensionFailed(change: .install, source: .npm(name: "", spec: ""), failure: .packageCommand),
+    ]
 
     private static func properties(of source: PackageSource) -> [String: AnalyticsValue] {
         switch source {
@@ -194,11 +215,21 @@ enum ExtensionFailure: String, Sendable {
     case packageCommand = "package_command_failed"
 }
 
-enum AnalyticsValue: Equatable, Sendable {
+enum AnalyticsValue: Equatable, Sendable, Encodable {
     case integer(Int)
     case number(Double)
     case flag(Bool)
     case text(String)
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case let .integer(number): try container.encode(number)
+        case let .number(number): try container.encode(number)
+        case let .flag(flag): try container.encode(flag)
+        case let .text(text): try container.encode(text)
+        }
+    }
 }
 
 struct DictationMetrics: Equatable, Sendable {

@@ -153,6 +153,7 @@ final class ExtensionService {
     let catalog = ExtensionCatalog()
     var liveStatus: LiveStatus { live.status }
     var onWorking: () -> Void = {}
+    var onExtensionUsed: (_ name: String) -> Void = { _ in }
     var onWorked: (_ succeeded: Bool) -> Void = { _ in }
     var onFileProgress: (Double) -> Void = { _ in }
     var onHistory: (ExtensionHistoryEntry) -> Void = { _ in }
@@ -192,6 +193,7 @@ final class ExtensionService {
         catalog.perform = { [weak self] action in self?.runAction(action) }
         catalog.performTool = { [weak self] tool, input in
             guard let host = self?.host else { throw ControlError.failed("Extensions are not running, so \(tool.id) can't run.") }
+            self?.onExtensionUsed(tool.extension)
             return try await host.runTool(tool.id, input: input, app: await HostApp.front().value, timeout: Self.toolTimeout)
         }
         catalog.performList = { [weak self] list, remove in
@@ -364,6 +366,7 @@ final class ExtensionService {
 
     func run(_ command: VoiceCommandMatch, app: HostApp) {
         guard let host else { return }
+        if let source = catalog.commands.first(where: { $0.phrase == command.phrase && $0.at == command.at }) { onExtensionUsed(source.extension) }
         Task {
             let handled = await host.runCommand(command, app: app, timeout: Self.commandTimeout)
             if !handled {
@@ -389,6 +392,7 @@ final class ExtensionService {
 
     func runAction(_ action: ExtensionAction) {
         guard let host else { return }
+        onExtensionUsed(action.extension)
         let app = HostApp.front()
         Task {
             let app = await app.value

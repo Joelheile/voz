@@ -27,6 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         store: history.vocabulary,
         hear: { [transcriber, settings] in await SpokenWord.hear($0, transcriber: transcriber, settings: settings) }
     )
+    private lazy var telemetry = TelemetryReporter(settings: settings, analytics: analytics)
     private lazy var dictation = Dictation(
         pipeline: DictationPipeline(
             engine: speechEngine,
@@ -37,7 +38,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             editObserver: EditObserver(learner: vocabularyLearner),
             vocabularyLearner: vocabularyLearner,
             analytics: analytics,
-            extensions: extensions
+            extensions: extensions,
+            telemetry: telemetry
         ),
         settings: settings,
         analytics: analytics
@@ -124,6 +126,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .sink { [indicator] in indicator.show($0) }
             .store(in: &cancellables)
         extensions.onFileProgress = { [weak self] fraction in self?.indicator.showFileProgress(fraction) }
+        extensions.onExtensionUsed = { [weak self] name in self?.telemetry.recordExtension(named: name) }
         extensions.onWorking = { [weak self] in
             guard let self, self.dictation.phase == .idle else { return }
             self.indicator.showWorking()
@@ -158,10 +161,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let previous = launch.updatedFrom {
             analytics.capture(.updateInstalled(from: previous, to: launch.current, channel: UpdateChannel(version: launch.current)))
         }
-        VersionPinger.sendPending(launch: launch)
+        telemetry.start(launch: launch)
         updater.start()
         LoginItem.sync(enabled: settings.launchAtLogin)
-        analytics.capture(.appLaunched(atLogin: launchedAtLogin))
         if !launchedAtLogin, launch.updatedFrom == nil { statusItemController.open() }
     }
 
@@ -225,7 +227,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard analytics.isEnabled else { return .terminateNow }
+        guard analytics.reportsCrashes else { return .terminateNow }
         analytics.flush()
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             NSApp.reply(toApplicationShouldTerminate: true)
@@ -262,7 +264,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .store(in: &cancellables)
         settings.$analyticsEnabled.combineLatest(settings.$errorReportsEnabled)
             .dropFirst()
-            .sink { [weak self] usage, errors in self?.analytics.setConsent(usage: usage, errors: errors) }
+            .sink { [weak self] usage, errors in
+                self?.analytics.setConsent(usage: usage, errors: errors)
+                if !usage { self?.telemetry.clearSites() }
+            }
             .store(in: &cancellables)
         settings.$microphone
             .dropFirst()
