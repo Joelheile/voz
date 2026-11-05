@@ -153,20 +153,9 @@ func parseSource(_ raw: String) throws(PackageSourceError) -> PackageSource {
     try PackageSource(parsing: raw, relativeTo: URL(fileURLWithPath: "/"))
 }
 
-func makeVersionPingQueue() -> () throws -> VersionPingQueue {
-    let suite = UUID().uuidString
-    let defaults = UserDefaults(suiteName: suite)!
-    return { try VersionPingQueue(defaults: defaults) }
-}
-
 func recordLaunches(_ versions: [String]) -> [LaunchVersion] {
     let defaults = UserDefaults(suiteName: UUID().uuidString)!
     return versions.map { LaunchVersion.record($0, in: defaults) }
-}
-
-func makePingID() -> (UUID, String) {
-    let id = UUID()
-    return (id, id.uuidString)
 }
 
 func makeDefaults() -> UserDefaults {
@@ -177,61 +166,6 @@ func utcDate(_ text: String) -> Date {
     ISO8601DateFormatter().date(from: text)!
 }
 
-func decodeDailyActivePing(_ data: Data) throws -> DailyActivePayload {
-    try JSONDecoder().decode(DailyActivePayload.self, from: data)
-}
-
-struct DailyActivePayload: Decodable {
-    struct Properties: Decodable {
-        let version: String
-        let channel: String
-        let model: String
-        let osMajor: Int
-        let processPersonProfile: Bool
-        let geoIPDisable: Bool
-        enum CodingKeys: String, CodingKey {
-            case version, channel, model
-            case osMajor = "os_major"
-            case processPersonProfile = "$process_person_profile"
-            case geoIPDisable = "$geoip_disable"
-        }
-    }
-    let event: String
-    let distinctID: String
-    let properties: Properties
-    enum CodingKeys: String, CodingKey {
-        case event, properties
-        case distinctID = "distinct_id"
-    }
-}
-
-func decodeVersionPing(_ data: Data) throws -> PingPayload {
-    try JSONDecoder().decode(PingPayload.self, from: data)
-}
-
-struct PingPayload: Decodable {
-    struct Properties: Decodable {
-        let kind: String
-        let channel: String
-        let previous: String?
-        let processPersonProfile: Bool
-        let geoIPDisable: Bool
-        enum CodingKeys: String, CodingKey {
-            case kind, channel, previous
-            case processPersonProfile = "$process_person_profile"
-            case geoIPDisable = "$geoip_disable"
-        }
-    }
-    let event: String
-    let uuid: String
-    let timestamp: String
-    let distinctID: String
-    enum CodingKeys: String, CodingKey {
-        case event, uuid, timestamp, properties
-        case distinctID = "distinct_id"
-    }
-    let properties: Properties
-}
 
 private enum StatsTestError: Error { case updateTimedOut }
 
@@ -352,6 +286,65 @@ func makeControlCommands(_ records: [TranscriptRecord] = [], dictation: FakeDict
 
 func decodeJSON(_ data: Data) throws -> JSONValue {
     try JSONDecoder().decode(JSONValue.self, from: data)
+}
+
+/// Stands in for PostHog: records each event and answers from `accepts`
+final class FakeTelemetryServer: @unchecked Sendable {
+    private let lock = NSLock()
+    private var bodies: [Data] = []
+    private var sleeps: [Duration] = []
+    private var accepts: [Bool]
+    private let onPost: @Sendable () async -> Void
+
+    init(accepts: [Bool] = [], onPost: @escaping @Sendable () async -> Void = {}) {
+        self.accepts = accepts
+        self.onPost = onPost
+    }
+
+    var events: [String] { decoded.compactMap { $0.object?["event"]?.string } }
+    var ids: [String] { decoded.compactMap { $0.object?["distinct_id"]?.string } }
+    var timestamps: [String] { decoded.compactMap { $0.object?["timestamp"]?.string } }
+    var waits: [Duration] { lock.withLock { sleeps } }
+
+    @MainActor
+    func sender(key: String = TelemetrySender.anonymousKey, spacingSeconds: ClosedRange<Int>? = nil, defaults: UserDefaults) -> TelemetrySender {
+        TelemetrySender(
+            key: key, spacingSeconds: spacingSeconds, defaults: defaults,
+            post: { [self] body in
+                await onPost()
+                return lock.withLock {
+                    bodies.append(body)
+                    return accepts.isEmpty ? true : accepts.removeFirst()
+                }
+            },
+            sleep: { [self] duration in lock.withLock { sleeps.append(duration) } }
+        )
+    }
+
+    private var decoded: [JSONValue] {
+        lock.withLock { bodies }.compactMap { try? decodeJSON($0) }
+    }
+}
+
+func testEventBody(_ name: String) throws -> Data {
+    try TelemetryPayload.body(event: name, distinctID: UUID(), timestamp: "2026-10-30T00:00:00Z", properties: [:])
+}
+
+func newInstallID() -> UUID {
+    UUID()
+}
+
+func payloadFields(_ body: Data) throws -> (id: String, timestamp: String, personProfile: Bool?, geoIP: Bool?) {
+    let payload = try decodeJSON(body).object
+    let properties = payload?["properties"]?.object
+    return (
+        payload?["distinct_id"]?.string ?? "", payload?["timestamp"]?.string ?? "",
+        properties?["$process_person_profile"] == .bool(true), properties?["$geoip_disable"] == .bool(true)
+    )
+}
+
+func decodeJSON(text: String) throws -> JSONValue {
+    try decodeJSON(Data(text.utf8))
 }
 
 func makeTemporaryDirectory() throws -> String {

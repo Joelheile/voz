@@ -152,12 +152,12 @@ Voz never records your screen. An extension can read the text of the window in f
 
 Voz sends PostHog, without your IP address:
 
-- An anonymous ping on install, on update and on each day you dictate, with the app version, macOS version, chip and speech model
-- Crash reports, on by default under Privacy, with a stack trace and no text, audio or app names
-- Usage analytics, only if you opt in
+- Anonymous counts you can't turn off, each with a new random ID and only the UTC day as a timestamp, so they can't be linked. They cover pings on install and update, setup and usage milestones, and, after each day you dictate, rounded words, dictations, totals per app, median speed and error codes. Once a week they add your settings and the public npm extensions you have enabled. Only app names on a public list leave your Mac, and everything else counts as `other`
+- Crash reports, on by default under Privacy, with a stack trace, a new random ID each launch and no text, audio or app names
+- Usage stats, only if you opt in, tied to a random ID: timings per dictation and daily totals per website. Only sites on a public list leave your Mac, everything else counts as `other`, and private browser windows count no website
 - Feedback, only when you send it
 
-None of these contain what you dictate. The local log at `~/Library/Logs/Voz/voz-logs.jsonl` includes your text only when you turn on Include text under Privacy.
+None of these contain what you dictate. Run `voz telemetry` to see every event and the list of names. The local log at `~/Library/Logs/Voz/voz-logs.jsonl` includes your text only when you turn on Include text under Privacy.
 
 When an extension types text for you, such as a reply draft, Voz saves it with the window title and reads the field for up to two minutes to see whether you kept, changed or sent it. Dictations also save the window title, such as a chat name. All of this stays in the history on your Mac, and extensions you install can read it.
 

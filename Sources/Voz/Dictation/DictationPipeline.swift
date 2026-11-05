@@ -11,6 +11,7 @@ final class DictationPipeline {
     private let vocabularyLearner: VocabularyLearner
     private let analytics: Analytics
     private let extensions: ExtensionService
+    private let telemetry: TelemetryReporter
 
     init(
         engine: SpeechEngine,
@@ -21,7 +22,8 @@ final class DictationPipeline {
         editObserver: EditObserver,
         vocabularyLearner: VocabularyLearner,
         analytics: Analytics,
-        extensions: ExtensionService
+        extensions: ExtensionService,
+        telemetry: TelemetryReporter
     ) {
         self.engine = engine
         self.cleaner = cleaner
@@ -32,6 +34,7 @@ final class DictationPipeline {
         self.vocabularyLearner = vocabularyLearner
         self.analytics = analytics
         self.extensions = extensions
+        self.telemetry = telemetry
     }
 
     func collectLearnedWords() {
@@ -105,6 +108,7 @@ final class DictationPipeline {
             if recording.inserts, let command = delivery.command { extensions.run(command, app: recording.app) }
             let record = await save(transcript, finalText: delivery.text.isEmpty ? transcript.cleaned.text : delivery.text, app: recording.app, released: released)
             report(record, model: transcript.model, insertMs: insertMs, trigger: recording.trigger)
+            telemetry.recordDictation(app: recording.app, model: transcript.model, words: record.wordCount, totalMs: record.totalMs)
             logDebug(record, transcript, insertMs: insertMs)
             learnSpokenWords(in: transcript.raw)
             return .done
@@ -123,7 +127,6 @@ final class DictationPipeline {
     }
 
     private func report(_ record: TranscriptRecord, model: String, insertMs: Int, trigger: DictationTrigger) {
-        VersionPinger.recordActiveDay(model: SpeechModel.analyticsLabel(for: model))
         analytics.capture(.dictationCompleted(DictationMetrics(
             audioSeconds: record.audioSeconds,
             wordCount: record.wordCount,

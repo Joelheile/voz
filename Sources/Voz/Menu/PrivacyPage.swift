@@ -11,7 +11,10 @@ struct PrivacyPage: View {
         VStack(alignment: .leading, spacing: 16) {
             PageBar(title: "Privacy", back: back)
             PanelGroup {
-                PanelRow(title: "Share usage stats", detail: "Counts and timings, never text or audio") {
+                PanelRow(title: "Anonymous counts", detail: "Always sent, unlinked. Run voz telemetry to see them") {
+                    EmptyView()
+                }
+                PanelRow(title: "Share usage stats", detail: "Timings per dictation and totals per known site, tied to a random ID, never text or audio") {
                     Toggle("Share usage stats", isOn: $settings.analyticsEnabled).labelsHidden()
                 }
                 PanelRow(title: "Send crash reports", detail: "Crashes, freezes and error codes, never text or audio") {

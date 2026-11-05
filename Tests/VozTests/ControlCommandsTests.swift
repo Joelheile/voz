@@ -258,3 +258,35 @@ struct ControlMCPTests {
         #expect(call("initialize", .object(["protocolVersion": "2025-03-26"]))?.object?["result"]?.object?["protocolVersion"] == "2025-03-26")
     }
 }
+
+@MainActor
+struct TelemetryCommandTests {
+    @Test func listsWhatEachLevelSendsAndWhatIsHeldBack() async throws {
+        var (commands, settings) = try makeControlCommands()
+        let store = TelemetryStore(defaults: makeDefaults())
+        store.addDictation(app: .app("com.tinyspeck.slackmacgap"), model: .model("x"), words: 60, totalMs: 500, now: utcDate("2026-10-30T09:00:00Z"))
+        commands.telemetryStore = store
+        commands.telemetryDefaults = makeDefaults()
+        let center = ControlCenter(commands: commands.all)
+
+        let text = await center.handle(["telemetry"], json: false)
+        #expect(text.exit == 0)
+        #expect(text.stdout.contains("daily_active"))
+        #expect(text.stdout.contains("Usage stats: off"))
+        #expect(text.stdout.contains("app_day: app=slack dictations=1 words=50"))
+
+        settings.analyticsEnabled = true
+        let json = try decodeJSON(text: await center.handle(["telemetry"], json: true).stdout)
+        #expect(json.object?["usage"]?.object?["enabled"] == .bool(true))
+        #expect(commands.all().first { $0.name == "telemetry" }?.readOnly == true)
+    }
+
+    @Test func eachTierListsEveryEventItCanSend() {
+        let report = TelemetryReport(usageEnabled: false, errorsEnabled: false, held: [], queued: [])
+        #expect(Set(report.anonymous.events.map(\.event)) == Set(TelemetryFact.samples.filter { !$0.isLinked }.map(\.name)))
+        #expect(!report.anonymous.events.contains { $0.event == "site_day" })
+        let usage = Set(report.usage.events.map(\.event))
+        #expect(usage.contains("site_day"))
+        #expect(usage.isSuperset(of: AnalyticsEvent.samples.map(\.name)))
+    }
+}

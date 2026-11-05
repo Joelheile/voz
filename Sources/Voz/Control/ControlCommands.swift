@@ -9,6 +9,8 @@ struct ControlCommands {
     let catalog: ExtensionCatalog
     let dictation: DictationControl
     var home = VozHome()
+    var telemetryStore = TelemetryStore.shared
+    var telemetryDefaults = UserDefaults.standard
 
     /// What the CLI needs from a dictation, so tests can stand in for the microphone
     struct DictationControl {
@@ -22,7 +24,7 @@ struct ControlCommands {
 
     func all() -> [ControlCommand] {
         [status] + LocalCommands.all(inTerminal: false) + [dictationCommand("start"), dictationCommand("stop"), dictationCommand("toggle"), historyCommand, last, draftList,
-         vocabularyList, vocabularyAdd, vocabularyRemove, extensionList, search, enable(true), enable(false), config, settingsCommand, aiCommand, modelList, feedback, commandList]
+         vocabularyList, vocabularyAdd, vocabularyRemove, extensionList, search, enable(true), enable(false), config, settingsCommand, aiCommand, modelList, feedback, telemetry, commandList]
             + catalog.tools.map(tool) + catalog.actions.filter { !$0.hidden }.map(action)
     }
 
@@ -308,6 +310,18 @@ struct ControlCommands {
         }
     }
 
+    private var telemetry: ControlCommand {
+        ControlCommand(name: "telemetry", summary: "Show exactly what Voz sends and what it holds on this Mac", input: .object([]), readOnly: true) { _ in
+            let report = TelemetryReport(
+                usageEnabled: settings.analyticsEnabled,
+                errorsEnabled: settings.errorReportsEnabled,
+                held: telemetryStore.held(),
+                queued: TelemetrySender.queuedEvents(in: telemetryDefaults)
+            )
+            return try ControlOutput(report, text: report.text)
+        }
+    }
+
     private static func day(_ text: String) throws -> Date {
         let format = DateFormatter()
         format.dateFormat = "yyyy-MM-dd"
@@ -526,7 +540,7 @@ struct ControlCommands {
             ("livePreview", "Show words in the notch while you speak", \.livePreviewEnabled),
             ("launchAtLogin", "Open Voz when you log in", \.launchAtLogin),
             ("cleanup", "Clean up dictations with the model", \.cleanupEnabled),
-            ("analytics", "Share anonymous usage counts", \.analyticsEnabled),
+            ("analytics", "Share per-dictation stats and site totals tied to a random ID", \.analyticsEnabled),
             ("betaUpdates", "Get beta updates", \.receiveBetaUpdates),
             ("autoUpdate", "Install updates while you're away from your Mac", \.installUpdatesAutomatically),
             ("errorReports", "Send crash and error reports", \.errorReportsEnabled),
