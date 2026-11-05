@@ -7,14 +7,10 @@ let size = CGSize(width: 640, height: 360)
 let iconY: CGFloat = 188
 let appX: CGFloat = 176
 let applicationsX: CGFloat = 464
-let floorTop: CGFloat = 258
 
 let canvas = NSColor(srgbRed: 0xF6 / 255, green: 0xF4 / 255, blue: 0xEF / 255, alpha: 1)
 let ink = NSColor(srgbRed: 0x14 / 255, green: 0x14 / 255, blue: 0x14 / 255, alpha: 1)
 let inkSecondary = NSColor(srgbRed: 0x5F / 255, green: 0x5C / 255, blue: 0x55 / 255, alpha: 1)
-// Finder draws icon labels black in light mode and white in dark mode. This stone keeps both readable.
-let floorTopColor = NSColor(srgbRed: 0x93 / 255, green: 0x8F / 255, blue: 0x87 / 255, alpha: 1)
-let floorBottomColor = NSColor(srgbRed: 0x82 / 255, green: 0x7E / 255, blue: 0x76 / 255, alpha: 1)
 let accent = NSColor(srgbRed: 0x00 / 255, green: 0x57 / 255, blue: 0xFF / 255, alpha: 1)
 
 // One spoken phrase, loud in the middle and trailing off, so the arrow reads as Voz's level meter.
@@ -80,13 +76,6 @@ func drawWaveArrow() {
     path.stroke()
 }
 
-func drawFloor() {
-    let rect = CGRect(x: 0, y: 0, width: size.width, height: flipped(floorTop))
-    NSGradient(starting: floorTopColor, ending: floorBottomColor)!.draw(in: rect, angle: -90)
-    NSColor(white: 0, alpha: 0.06).setFill()
-    CGRect(x: 0, y: rect.maxY - 1, width: size.width, height: 1).fill()
-}
-
 func render(scale: CGFloat) -> NSBitmapImageRep {
     let rep = NSBitmapImageRep(
         bitmapDataPlanes: nil, pixelsWide: Int(size.width * scale), pixelsHigh: Int(size.height * scale),
@@ -100,7 +89,6 @@ func render(scale: CGFloat) -> NSBitmapImageRep {
     CGRect(origin: .zero, size: size).fill()
     drawCentered("Drag Voz into Applications", font: font("Geist-Medium", 22), color: ink, top: 40)
     drawCentered("Then open it from Applications or Spotlight.", font: font("Geist-Regular", 13), color: inkSecondary, top: 74)
-    drawFloor()
     drawWaveArrow()
     NSGraphicsContext.restoreGraphicsState()
     return rep
