@@ -88,10 +88,10 @@ struct PermissionTileView: View {
         HStack(spacing: 12) {
             AppDragSource().frame(width: 40, height: 40).help("Drag into the list")
             VStack(alignment: .leading, spacing: 2) {
-                Text("Drag Voz into the list above")
+                Text("Turn on Voz in the list above")
                     .font(.ui(13, weight: .medium))
                     .foregroundStyle(Theme.ink)
-                Text("Then turn it on. Already listed? Just turn it on.")
+                Text("Not in the list? Drag this icon into it.")
                     .font(.meta)
                     .foregroundStyle(Theme.inkSecondary)
             }

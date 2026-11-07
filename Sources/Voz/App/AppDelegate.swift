@@ -164,8 +164,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 dictation.prepareRecorder()
             }
             warmUpModel(settings.localSpeechModel)
-            if !Permissions.accessibilityGranted, !SystemContext.isTestBuild {
-                Permissions.promptForAccessibility()
+            if !SystemContext.isTestBuild {
+                Task { await Permissions.promptForAccessibilityAfterUpdate() }
             }
         } else if !SystemContext.isTestBuild {
             statusItemController.open()
