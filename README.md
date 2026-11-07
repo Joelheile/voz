@@ -131,11 +131,11 @@ Each command becomes a tool, such as `history`, `vocabulary_add` or `voz-jira_is
 ## What's new
 
 <!-- changelog -->
-- Take notes under the notch and copy notes or the transcript from history
-- See the live transcript and elapsed time in the notch during a meeting
-- Pick ChatGPT or Claude under Settings > AI model for better writing
-- Tap right Option in a chat and Reply drafts your answer in your voice
-- Select text and tap right Option to tell Edit how to change it
+- A notice now tells you when an update is ready, with one-click restart
+- Browse history one day at a time with arrows and a calendar
+- Press Cmd+K in the menu to search transcripts, settings and extensions
+- Press Cmd+F in the menu to jump to transcript search
+- Toasts and buttons now share one rounded glass look
 
 [See everything new](CHANGELOG.md)
 <!-- /changelog -->

@@ -4,6 +4,12 @@ Newest first. To get beta changes now, turn on Beta updates under What's new in 
 
 ## In beta
 
+- A notice now tells you when an update is ready, with one-click restart
+- Browse history one day at a time with arrows and a calendar
+- Press Cmd+K in the menu to search transcripts, settings and extensions
+- Press Cmd+F in the menu to jump to transcript search
+- Toasts and buttons now share one rounded glass look
+- Run voz telemetry to see exactly what Voz sends
 - Take notes under the notch and copy notes or the transcript from history
 - See the live transcript and elapsed time in the notch during a meeting
 - Pick ChatGPT or Claude under Settings > AI model for better writing

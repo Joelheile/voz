@@ -3,6 +3,17 @@
   <channel>
     <title>voz</title>
     <item>
+      <title>voz 0.2.0-beta.100066</title>
+      <description>&lt;ul&gt;&lt;li&gt;A notice now tells you when an update is ready, with one-click restart&lt;/li&gt;&lt;li&gt;Browse history one day at a time with arrows and a calendar&lt;/li&gt;&lt;li&gt;Press Cmd+K in the menu to search transcripts, settings and extensions&lt;/li&gt;&lt;li&gt;Press Cmd+F in the menu to jump to transcript search&lt;/li&gt;&lt;li&gt;Toasts and buttons now share one rounded glass look&lt;/li&gt;&lt;li&gt;Run voz telemetry to see exactly what Voz sends&lt;/li&gt;&lt;/ul&gt;</description>
+      <link>https://github.com/Joelheile/voz/releases/tag/beta-100066</link>
+      <pubDate>Sat, 07 Nov 2026 20:53:21 GMT</pubDate>
+      <sparkle:version>100066</sparkle:version>
+      <sparkle:shortVersionString>0.2.0-beta.100066</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100066/voz-0.2.0-beta.100066.zip" length="9228364" sparkle:edSignature="hVSmCJbqt59POy3p8YaK/9dl0XdAaLejUKo8XB1LWeRalwSthR194cmaA1OnjNnEYnzeJeY6bqtEcjwApfSyBw==" type="application/octet-stream" />
+    </item>
+    <item>
       <title>voz 0.2.0-beta.100065</title>
       <description>&lt;ul&gt;&lt;li&gt;Take notes under the notch and copy notes or the transcript from history&lt;/li&gt;&lt;li&gt;See the live transcript and elapsed time in the notch during a meeting&lt;/li&gt;&lt;li&gt;Pick ChatGPT or Claude under Settings &amp;gt; AI model for better writing&lt;/li&gt;&lt;li&gt;Tap right Option in a chat and Reply drafts your answer in your voice&lt;/li&gt;&lt;li&gt;Select text and tap right Option to tell Edit how to change it&lt;/li&gt;&lt;li&gt;See which extensions read your screen before you install them&lt;/li&gt;&lt;li&gt;Reply learns how you write in each app and lists it in Settings&lt;/li&gt;&lt;li&gt;Download Voz as a disk image and open it without a security warning&lt;/li&gt;&lt;li&gt;The star card shows how many words you&amp;#x27;ve dictated with Voz&lt;/li&gt;&lt;li&gt;Cancel a speech model download from the menu bar&lt;/li&gt;&lt;li&gt;Dictated text now pastes into slow apps instead of your old clipboard&lt;/li&gt;&lt;li&gt;See your streak, today&amp;#x27;s words and time saved first in Insights&lt;/li&gt;&lt;li&gt;Insights now comes first in the menu footer&lt;/li&gt;&lt;li&gt;Search history by words in any order, app name, today or yesterday, even with typos&lt;/li&gt;&lt;li&gt;Extension pages show what each one does first, with downloads and last update below&lt;/li&gt;&lt;li&gt;Click Build your own in Extensions, and any coding agent builds one with you&lt;/li&gt;&lt;li&gt;Build your own sets up the extension skill for Claude Code and Codex in every project&lt;/li&gt;&lt;li&gt;The menu bar panel has a cleaner look, with grouped settings and clear status&lt;/li&gt;&lt;li&gt;Updates install on their own while you&amp;#x27;re away from your Mac&lt;/li&gt;&lt;li&gt;Opening Voz from the disk image moves it to Applications and ejects the image&lt;/li&gt;&lt;/ul&gt;</description>
       <link>https://github.com/Joelheile/voz/releases/tag/beta-100065</link>
@@ -110,17 +121,6 @@
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <sparkle:channel>beta</sparkle:channel>
       <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100054/voz-0.1.0-beta.100054.zip" length="8702215" sparkle:edSignature="V6/pOyTS8847vu55GnOSB9/+Hig8wFCcovyN/cm5bb3upH0fw8Nn23aS+s6mI1E1fYxF2d/BYO1MFJ1nn4xtDw==" type="application/octet-stream" />
-    </item>
-    <item>
-      <title>voz 0.1.0-beta.100053</title>
-      <description>&lt;ul&gt;&lt;li&gt;Take a short tour of what Voz can do after setup&lt;/li&gt;&lt;/ul&gt;</description>
-      <link>https://github.com/Joelheile/voz/releases/tag/beta-100053</link>
-      <pubDate>Mon, 02 Nov 2026 00:05:24 GMT</pubDate>
-      <sparkle:version>100053</sparkle:version>
-      <sparkle:shortVersionString>0.1.0-beta.100053</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <sparkle:channel>beta</sparkle:channel>
-      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100053/voz-0.1.0-beta.100053.zip" length="8534620" sparkle:edSignature="Fi27Vib76iL88Cbcux46EbXqyu7SAeNXmCm2UZmN7+pmZ6yx6gR4Zrx7TJMB0UTWY8ROKBPlh9PIZ6GG7HkxDg==" type="application/octet-stream" />
     </item>
     <item>
       <title>voz 0.1.0</title>
