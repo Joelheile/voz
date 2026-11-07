@@ -358,6 +358,29 @@ func swapItems(atPath first: String, withItemAtPath second: String) -> Bool {
     renamex_np(first, second, UInt32(RENAME_SWAP)) == 0
 }
 
+func nowSeconds() -> Double {
+    Date().timeIntervalSince1970
+}
+
+func localToday() -> Date {
+    Calendar.current.startOfDay(for: Date())
+}
+
+func localDayStart(at seconds: Double) -> Date {
+    Calendar.current.startOfDay(for: Date(timeIntervalSince1970: seconds))
+}
+
+func utcDay(at seconds: Double) -> DateInterval {
+    utcCalendar.dateInterval(of: .day, for: Date(timeIntervalSince1970: seconds))!
+}
+
+func utcMonthCells(at seconds: Double, firstWeekday: Int) -> [Int?] {
+    var calendar = utcCalendar
+    calendar.firstWeekday = firstWeekday
+    return CalendarMonth.cells(of: Date(timeIntervalSince1970: seconds), calendar: calendar)
+        .map { day in day.map { calendar.component(.day, from: $0) } }
+}
+
 func utcSearchDays(_ query: String, at seconds: Double) -> [Double]? {
     TranscriptSearch(query, now: Date(timeIntervalSince1970: seconds), calendar: utcCalendar)
         .days.map { [$0.start.timeIntervalSince1970, $0.end.timeIntervalSince1970] }

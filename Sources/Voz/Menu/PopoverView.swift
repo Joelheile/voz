@@ -35,6 +35,24 @@ struct PopoverView: View {
             .padding(Self.shadowInset)
             .onGeometryChange(for: CGSize.self) { $0.size } action: { model.actions.resize($0) }
             .frame(maxHeight: .infinity, alignment: .top)
+            .background { if !model.needsSetup { searchShortcuts } }
+            .onChange(of: model.page) { old, new in
+                guard old == .search || new == .search else { return }
+                sources.history.query = ""
+                sources.history.showsCalendar = false
+            }
+    }
+
+    private var searchShortcuts: some View {
+        ZStack {
+            Button("Search transcripts", action: model.focusTranscriptSearch)
+                .keyboardShortcut("f", modifiers: .command)
+            Button("Search everything", action: model.toggleEverythingSearch)
+                .keyboardShortcut("k", modifiers: .command)
+        }
+        .opacity(0)
+        .frame(width: 0, height: 0)
+        .accessibilityHidden(true)
     }
 
     @ViewBuilder
@@ -71,6 +89,8 @@ struct PopoverView: View {
                 PrivacyPage(settings: sources.settings, back: model.goBack)
             case .whatsNew:
                 WhatsNewPage(settings: sources.settings, updater: sources.updater, releases: Changelog.bundled, checkForUpdates: model.actions.checkForUpdates, back: model.goBack)
+            case .search:
+                SearchPage(model: model, history: sources.history, vocabulary: sources.vocabulary, extensions: sources.extensions)
             case .tour:
                 TourPage(settings: sources.settings, open: { model.page = $0 }, finish: { withAnimation(Theme.Motion.section) { model.page = .home } })
             }
@@ -101,7 +121,8 @@ private struct HomePage: View {
 
     private var records: [TranscriptRecord] { history.records }
     private var isSearching: Bool { !history.query.isEmpty }
-    private var showsSearch: Bool { isSearching || !records.isEmpty }
+    private var hasHistory: Bool { history.days.oldest != nil }
+    private var showsSearch: Bool { isSearching || hasHistory }
 
     /// Recording shows in the notch, so the menu only mentions it with the first dictation's hint
     private var needsAttention: Bool {
@@ -116,6 +137,10 @@ private struct HomePage: View {
                         .transition(.opacity)
                 }
                 header(proxy: proxy)
+                if history.showsCalendar {
+                    DayCalendar(history: history)
+                        .transition(.opacity)
+                }
                 transcripts
                 if let words = starPromptWords {
                     StarCard(
@@ -126,13 +151,21 @@ private struct HomePage: View {
                 }
                 footer
             }
+            .onChange(of: history.listedDay) {
+                if let first = records.first { proxy.scrollTo(first.id, anchor: .top) }
+            }
         }
         .onAppear { searchFocused = showsSearch }
         .task {
             usage = await history.usage()
             countMilestoneShow()
         }
-        .onChange(of: history.query) { selectedID = nil }
+        .onChange(of: history.query) {
+            selectedID = nil
+            history.showsCalendar = false
+        }
+        .onChange(of: history.day) { selectedID = nil }
+        .onChange(of: model.searchFocusRequests) { searchFocused = true }
     }
 
     @ViewBuilder
@@ -159,7 +192,10 @@ private struct HomePage: View {
     @ViewBuilder
     private func header(proxy: ScrollViewProxy) -> some View {
         if showsSearch {
-            search(proxy: proxy)
+            HStack(spacing: 8) {
+                search(proxy: proxy)
+                if !isSearching { DayControl(history: history) }
+            }
         } else {
             Text("Voz").font(.wordmark(17)).foregroundStyle(Theme.ink).padding(.leading, 4)
         }
@@ -185,16 +221,15 @@ private struct HomePage: View {
         }
         .padding(.horizontal, 10)
         .frame(height: 32)
-        .background(Theme.selected, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .background(Theme.selected, in: RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous))
         .animation(Theme.Motion.hover, value: isSearching)
+        .help("Search transcripts (⌘F) or everything (⌘K)")
         .onSubmit(copySelection)
         .onKeyPress(.downArrow) { moveSelection(by: 1, proxy: proxy) }
         .onKeyPress(.upArrow) { moveSelection(by: -1, proxy: proxy) }
-        .onKeyPress(.escape) {
-            guard isSearching else { return .ignored }
-            history.query = ""
-            return .handled
-        }
+        .onKeyPress(.leftArrow) { history.query.isEmpty && history.showEarlierDay() ? .handled : .ignored }
+        .onKeyPress(.rightArrow) { history.query.isEmpty && history.showLaterDay() ? .handled : .ignored }
+        .onKeyPress(.escape) { history.dismissFilter() ? .handled : .ignored }
     }
 
     @ViewBuilder
@@ -205,14 +240,12 @@ private struct HomePage: View {
             TimelineView(.everyMinute) { context in
                 CappedScrollView(maxHeight: CGFloat(Self.visibleRows) * Self.rowHeight) {
                     LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(Array(records.enumerated()), id: \.element.id) { index, record in
-                            if let heading = heading(at: index, now: context.date) {
-                                DayHeading(text: heading)
-                            }
+                        ForEach(records) { record in
                             row(for: record, now: context.date)
                         }
                     }
                     .animation(isSearching ? nil : Theme.Motion.reorder, value: records.map(\.id))
+                    .id(history.listedDay)
                 }
             }
             .padding(.horizontal, -8)
@@ -223,6 +256,9 @@ private struct HomePage: View {
         VStack(alignment: .leading, spacing: 4) {
             if isSearching {
                 Text("No matching transcripts")
+                    .foregroundStyle(Theme.inkTertiary)
+            } else if hasHistory {
+                Text("No dictations yet today")
                     .foregroundStyle(Theme.inkTertiary)
             } else {
                 if !needsAttention, !model.hint.isEmpty {
@@ -236,10 +272,12 @@ private struct HomePage: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func heading(at index: Int, now: Date) -> String? {
-        guard !isSearching, let heading = RecentTime.heading(for: records[index].createdAt, now: now) else { return nil }
-        guard index > 0 else { return heading }
-        return RecentTime.heading(for: records[index - 1].createdAt, now: now) == heading ? nil : heading
+    /// On a past day the date is already at the top, so each row only needs its time
+    private func time(for record: TranscriptRecord, now: Date) -> String {
+        guard let day = history.listedDay, !Calendar.current.isDate(day, inSameDayAs: now) else {
+            return RecentTime.label(for: record.createdAt, now: now)
+        }
+        return RecentTime.clock(for: record.createdAt)
     }
 
     private func row(for record: TranscriptRecord, now: Date) -> some View {
@@ -247,7 +285,7 @@ private struct HomePage: View {
             record: record,
             icon: record.source.map { ExtensionsModel.historyIcon(for: $0, in: extensions.installed) } ?? .puzzle,
             query: history.query,
-            time: RecentTime.label(for: record.createdAt, now: now),
+            time: time(for: record, now: now),
             height: Self.rowHeight,
             selected: selectedID == record.id,
             copied: model.copiedID == record.id,
@@ -372,19 +410,6 @@ private struct HomePage: View {
     private func copySelection() {
         guard let record = records.first(where: { $0.id == selectedID }) ?? records.first else { return }
         model.copy(record)
-    }
-}
-
-private struct DayHeading: View {
-    let text: String
-
-    var body: some View {
-        Text(text)
-            .font(.ui(11, weight: .semibold))
-            .foregroundStyle(Theme.inkTertiary)
-            .padding(.horizontal, 12)
-            .padding(.top, 10)
-            .padding(.bottom, 4)
     }
 }
 

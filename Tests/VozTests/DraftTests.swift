@@ -15,6 +15,22 @@ import Testing
         #expect(try drafts.thread(app: nil, window: "Anna", appName: nil) == nil)
     }
 
+    @Test func deletingADictationErasesItsWordsFromTheDraftThatReplacedIt() throws {
+        let store = try HistoryStore()
+        let dictated = makeRecord("my private words", at: 1)
+        try store.insert(dictated)
+        var replacement = makeDraft("A reply", at: 2, input: "my private words")
+        replacement.transcriptID = dictated.id
+        try store.drafts.insert(replacement)
+        try store.drafts.insert(makeDraft("Unrelated", at: 3, input: "someone else's words"))
+
+        try store.delete(id: dictated.id)
+
+        let drafts = try store.drafts.recent(limit: 10).map(\.draft)
+        #expect(drafts.map(\.output) == ["Unrelated", "A reply"])
+        #expect(drafts.map(\.input) == ["someone else's words", ""])
+    }
+
     @Test func historyMixesDictationsAndDraftsNewestFirstWithYourEdits() throws {
         let store = try HistoryStore()
         let anna = try store.drafts.thread(app: "com.tinyspeck.slackmacgap", title: "Anna").id

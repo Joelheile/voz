@@ -48,6 +48,8 @@ final class AskController {
     private var panel: NotePanel?
     private var waiting: CheckedContinuation<AskAnswer?, Never>?
 
+    var isOpen: Bool { waiting != nil }
+
     /// A new question replaces the open one, which answers `nil`
     func ask(_ params: AskParams) async -> AskAnswer? {
         finish(nil)

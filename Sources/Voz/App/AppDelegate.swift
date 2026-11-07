@@ -60,7 +60,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     )
     private let uninstallWatcher = UninstallWatcher()
     private var controlServer: ControlServer?
-    private lazy var updater = Updater(settings: settings, isBusy: { [weak self] in self?.dictation.phase != .idle })
+    private let notices = NoticeController()
+    private lazy var updater = Updater(
+        settings: settings,
+        isBusy: { [weak self] in
+            guard let self else { return true }
+            return RestartGuard.blocksRestart(
+                dictating: self.dictation.phase != .idle,
+                runningActivities: self.extensions.catalog.activities.count,
+                asking: self.extensions.isAsking
+            )
+        },
+        showNotice: { [notices] notice in
+            await notices.show(title: notice.title, icon: .circleArrowUp, later: UpdateNotice.later, action: notice.action) == notice.action
+        }
+    )
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !LoginItem.isInTrash else {
@@ -150,10 +164,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 dictation.prepareRecorder()
             }
             warmUpModel(settings.localSpeechModel)
-            if !Permissions.accessibilityGranted {
+            if !Permissions.accessibilityGranted, !SystemContext.isTestBuild {
                 Permissions.promptForAccessibility()
             }
-        } else {
+        } else if !SystemContext.isTestBuild {
             statusItemController.open()
         }
         hotkeyMonitor?.checkHealth()
@@ -164,7 +178,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         telemetry.start(launch: launch)
         updater.start()
         LoginItem.sync(enabled: settings.launchAtLogin)
-        if !launchedAtLogin, launch.updatedFrom == nil { statusItemController.open() }
+        if !launchedAtLogin, launch.updatedFrom == nil, !SystemContext.isTestBuild { statusItemController.open() }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {

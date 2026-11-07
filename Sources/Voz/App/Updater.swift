@@ -9,19 +9,26 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate, @preconcurr
 
     private let settings: AppSettings
     private let isBusy: () -> Bool
+    private let showNotice: (UpdateNotice) async -> Bool
     private var controller: SPUStandardUpdaterController?
     private var pendingInstall: (() -> Void)?
     private var installDownloaded: (() -> Void)?
-    private var idleCheck: Timer?
+    /// Set when a scheduled check found the update, so a window you opened yourself gets no notice on top
+    private var foundInBackground = false
+    private var tick: Timer?
 
-    init(settings: AppSettings, isBusy: @escaping () -> Bool) {
+    init(settings: AppSettings, isBusy: @escaping () -> Bool, showNotice: @escaping (UpdateNotice) async -> Bool) {
         self.settings = settings
         self.isBusy = isBusy
+        self.showNotice = showNotice
         super.init()
     }
 
     func start() {
         controller = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: self, userDriverDelegate: self)
+        tick = Timer.scheduledTimer(withTimeInterval: IdleInstall.checkInterval, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.checkOnWaitingUpdate() }
+        }
     }
 
     /// Installs an update that already downloaded, or checks for one.
@@ -59,21 +66,32 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate, @preconcurr
     func updater(_ updater: SPUUpdater, willInstallUpdateOnQuit item: SUAppcastItem, immediateInstallationBlock immediateInstallHandler: @escaping () -> Void) -> Bool {
         availableVersion = item.displayVersionString
         installDownloaded = immediateInstallHandler
-        idleCheck?.invalidate()
-        idleCheck = Timer.scheduledTimer(withTimeInterval: IdleInstall.checkInterval, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.installIfAway() }
-        }
+        foundInBackground = true
         return true
     }
 
-    private func installIfAway() {
-        guard IdleInstall.isDue(busy: isBusy(), secondsSinceInput: IdleInstall.secondsSinceInput()) else { return }
-        installNow()
+    private func checkOnWaitingUpdate() {
+        resumePendingInstall()
+        let busy = isBusy()
+        let secondsSinceInput = IdleInstall.secondsSinceInput()
+        if installDownloaded != nil, IdleInstall.isDue(busy: busy, secondsSinceInput: secondsSinceInput) { return installNow() }
+        offerUpdate(busy: busy, secondsSinceInput: secondsSinceInput)
+    }
+
+    private func offerUpdate(busy: Bool, secondsSinceInput: TimeInterval) {
+        let defaults = UserDefaults.standard
+        let now = Date()
+        let lastShown = defaults.object(forKey: UpdateNotice.lastShownKey) as? Date
+        guard foundInBackground, let version = availableVersion,
+              UpdateNotice.isDue(busy: busy, secondsSinceInput: secondsSinceInput, lastShown: lastShown, now: now) else { return }
+        defaults.set(now, forKey: UpdateNotice.lastShownKey)
+        let notice = UpdateNotice(version: version, isDownloaded: installDownloaded != nil)
+        Task {
+            if await showNotice(notice) { checkForUpdates() }
+        }
     }
 
     private func installNow() {
-        idleCheck?.invalidate()
-        idleCheck = nil
         let install = installDownloaded
         installDownloaded = nil
         install?()
@@ -88,10 +106,46 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate, @preconcurr
 
     func standardUserDriverWillHandleShowingUpdate(_ handleShowingUpdate: Bool, forUpdate update: SUAppcastItem, state: SPUUserUpdateState) {
         availableVersion = update.displayVersionString
+        foundInBackground = !handleShowingUpdate
     }
 
     func standardUserDriverWillFinishUpdateSession() {
         availableVersion = nil
+        foundInBackground = false
+    }
+}
+
+/// Tells you about a waiting update when you're at your Mac and between things. Voz stays out of the way otherwise, and the update waits in the menu.
+struct UpdateNotice: Equatable {
+    static let later = "Later"
+    static let lastShownKey = "updateNoticeShownAt"
+    static let repeatAfter: TimeInterval = 24 * 60 * 60
+    /// Input this recent means you're mid-keystroke
+    static let quietFor: TimeInterval = 3
+    /// No input for this long means nobody would see it
+    static let presentWithin: TimeInterval = 5 * 60
+
+    let title: String
+    let action: String
+
+    init(version: String, isDownloaded: Bool) {
+        // A beta's build number would make the one-line notice too wide
+        let shortVersion = version.replacing(/-beta\.\d+/, with: " beta")
+        title = isDownloaded ? "Voz \(shortVersion) is ready" : "Voz \(shortVersion) is available"
+        action = isDownloaded ? "Restart to update" : "See what's new"
+    }
+
+    static func isDue(busy: Bool, secondsSinceInput: TimeInterval, lastShown: Date?, now: Date) -> Bool {
+        guard !busy, secondsSinceInput >= quietFor, secondsSinceInput < presentWithin else { return false }
+        guard let lastShown else { return true }
+        return now.timeIntervalSince(lastShown) >= repeatAfter
+    }
+}
+
+enum RestartGuard {
+    /// A restart ends a live meeting and drops a question an extension is waiting on, the same as it would lose a dictation
+    static func blocksRestart(dictating: Bool, runningActivities: Int, asking: Bool) -> Bool {
+        dictating || runningActivities > 0 || asking
     }
 }
 

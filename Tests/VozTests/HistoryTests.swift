@@ -196,3 +196,131 @@ import Testing
         #expect(stats.savedSeconds == 0)
     }
 }
+
+@Suite struct TranscriptDayTests {
+    private let day = 86_400.0
+
+    @Test func steppingSkipsDaysWithoutTranscripts() {
+        let days = TranscriptDays([epoch(0), epoch(3 * day), epoch(5 * day)])
+        #expect(days.earlier(than: epoch(5 * day)) == epoch(3 * day))
+        #expect(days.earlier(than: epoch(0)) == nil)
+        #expect(days.later(than: epoch(0)) == epoch(3 * day))
+        #expect(days.later(than: epoch(5 * day)) == nil)
+    }
+
+    @Test func storeListsEachDayOnceAtItsStart() throws {
+        let store = try HistoryStore()
+        try store.insert(makeRecord("morning", at: 3_600))
+        try store.insert(makeRecord("evening", at: 72_000))
+        try store.insert(makeRecord("much later", at: 4 * day + 60))
+        let days = try store.transcriptDays(calendar: utcCalendar)
+        #expect(days == TranscriptDays([epoch(0), epoch(4 * day)]))
+    }
+
+    @Test func aDayListsAllItsTranscriptsNewestFirstAndNoOthers() throws {
+        let store = try HistoryStore()
+        try store.insert(makeRecord("other day", at: 60))
+        let count = HistoryStore.searchLimit + 2
+        for minute in 0..<count {
+            try store.insert(makeRecord("minute \(minute)", at: day + Double(minute) * 60))
+        }
+        let shown = try store.records(on: utcDay(at: day))
+        #expect(shown.count == count, "a day is never cut off by a limit")
+        #expect(shown.first?.finalText == "minute \(count - 1)")
+        #expect(!shown.contains { $0.finalText == "other day" })
+    }
+
+    @Test func aMonthStartsOnTheUsersFirstWeekdayAndAlwaysFillsSixWeeks() {
+        // 1 November 2026 is a Sunday
+        #expect(utcMonthCells(at: 1_793_577_600, firstWeekday: 1).prefix(2) == [1, 2])
+        #expect(utcMonthCells(at: 1_793_577_600, firstWeekday: 2).prefix(7) == [nil, nil, nil, nil, nil, nil, 1])
+        #expect(utcMonthCells(at: 1_793_577_600, firstWeekday: 2).count == 42)
+        #expect(utcMonthCells(at: 1_793_577_600, firstWeekday: 2).compactMap { $0 }.last == 30)
+    }
+}
+
+@MainActor @Suite struct HistoryModelDayTests {
+    private static let day = 86_400.0
+    private let older = 10 * day + 43_200
+    private let newer = 13 * day + 43_200
+
+    private func waitUntil(_ condition: () -> Bool) async {
+        for _ in 0..<300 where !condition() {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+    }
+
+    private func model(store: HistoryStore) async throws -> HistoryModel {
+        try await store.insert(makeRecord("older", at: older))
+        try await store.insert(makeRecord("newer", at: newer))
+        try await store.insert(makeRecord("today", at: nowSeconds()))
+        let model = HistoryModel(store: store)
+        await waitUntil { model.days.oldest != nil && model.records.count == 1 }
+        return model
+    }
+
+    @Test func opensOnTodayWithOnlyTodaysTranscripts() async throws {
+        let model = try await model(store: HistoryStore())
+        #expect(model.day == localToday())
+        #expect(model.records.map(\.finalText) == ["today"])
+    }
+
+    @Test func arrowsStepThroughDaysWithTranscriptsAndStopAtBothEnds() async throws {
+        let model = try await model(store: HistoryStore())
+        #expect(model.showLaterDay() == false, "there is nothing after today")
+        #expect(model.showEarlierDay())
+        #expect(model.day == localDayStart(at: newer))
+        #expect(model.showEarlierDay())
+        #expect(model.day == localDayStart(at: older))
+        #expect(model.showEarlierDay() == false)
+        #expect(model.day == localDayStart(at: older), "the oldest day stays picked")
+        #expect(model.showLaterDay())
+        #expect(model.showLaterDay())
+        #expect(model.day == localToday())
+    }
+
+    @Test func aPickedDayListsItsTranscriptsAndClosesTheCalendar() async throws {
+        let model = try await model(store: HistoryStore())
+        model.showsCalendar = true
+        model.pick(localDayStart(at: older))
+        await waitUntil { model.records.map(\.finalText) == ["older"] }
+        #expect(model.records.map(\.finalText) == ["older"])
+        #expect(model.listedDay == localDayStart(at: older))
+        #expect(model.showsCalendar == false)
+    }
+
+    @Test func searchLooksThroughEveryDay() async throws {
+        let model = try await model(store: HistoryStore())
+        model.query = "older"
+        await waitUntil { model.records.map(\.finalText) == ["older"] }
+        #expect(model.records.map(\.finalText) == ["older"])
+        #expect(model.listedDay == nil)
+    }
+
+    @Test func escapeClosesTheCalendarThenClearsTheSearch() async throws {
+        let model = try await model(store: HistoryStore())
+        model.query = "older"
+        model.showsCalendar = true
+        #expect(model.dismissFilter())
+        #expect(model.showsCalendar == false && model.query == "older")
+        #expect(model.dismissFilter())
+        #expect(model.query.isEmpty)
+        #expect(model.dismissFilter() == false, "with nothing left, Escape closes the panel as before")
+    }
+
+    @Test func resetGoesBackToToday() async throws {
+        let model = try await model(store: HistoryStore())
+        model.pick(localDayStart(at: older))
+        model.reset()
+        #expect(model.day == localToday())
+    }
+
+    @Test func deletingAPastDaysLastTranscriptGoesBackToToday() async throws {
+        let model = try await model(store: HistoryStore())
+        model.pick(localDayStart(at: older))
+        await waitUntil { model.records.map(\.finalText) == ["older"] }
+        model.delete(try #require(model.records.first))
+        await waitUntil { model.day == localToday() }
+        #expect(model.day == localToday())
+    }
+}

@@ -59,6 +59,7 @@ enum PopoverPage {
     case aiModel
     case whatsNew
     case tour
+    case search
 
     var title: String {
         switch self {
@@ -77,6 +78,7 @@ enum PopoverPage {
         case .aiModel: "AI model"
         case .whatsNew: "What's new"
         case .tour: "Tour"
+        case .search: "Search"
         }
     }
 
@@ -84,7 +86,7 @@ enum PopoverPage {
         switch self {
         case .cleanupPrompt, .cleanupSteps: .cleanup
         case .cleanup, .privacy, .speechModel, .languages, .aiModel, .whatsNew, .feedback: .settings
-        case .home, .settings, .dictionary, .insights, .extensions, .tour: .home
+        case .home, .settings, .dictionary, .insights, .extensions, .tour, .search: .home
         }
     }
 }
@@ -109,12 +111,23 @@ final class PopoverModel: ObservableObject {
     @Published var page = PopoverPage.home
     @Published var needsSetup = false
     @Published private(set) var copiedID: UUID?
+    /// Goes up each time Cmd+F asks the home page to put the cursor in its search box
+    @Published private(set) var searchFocusRequests = 0
 
     var actions = PopoverActions()
     private var copiedReset: Task<Void, Never>?
 
     func goBack() {
         page = page.parent
+    }
+
+    func focusTranscriptSearch() {
+        page = .home
+        searchFocusRequests += 1
+    }
+
+    func toggleEverythingSearch() {
+        page = page == .search ? .home : .search
     }
 
     func copy(_ record: TranscriptRecord, part: HistoryCopy? = nil) {

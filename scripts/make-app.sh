@@ -3,6 +3,15 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 CONFIGURATION=release
+APP=build/voz.app
+TEST_BUILD=false
+if [[ "${1:-}" == "--test" ]]; then
+    # Debug app with its own bundle ID, data and permissions. Never ships.
+    CONFIGURATION=debug
+    TEST_BUILD=true
+    APP=build/voz-test.app
+    shift
+fi
 if [[ "${1:-}" == "--debug" ]]; then
     CONFIGURATION=debug
     shift
@@ -12,7 +21,6 @@ BUILD=${2:-}
 
 SIGNING_IDENTITY=${SIGNING_IDENTITY:-8122E8329843B07F07BD077D076ADDE0356739B3}
 TIMESTAMP=${TIMESTAMP:-none}
-APP=build/voz.app
 
 BUILD_FLAGS=(-c "$CONFIGURATION")
 if [[ "$CONFIGURATION" == "release" ]]; then
@@ -28,6 +36,9 @@ cp "$BIN_PATH/Voz" "$APP/Contents/MacOS/voz"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 mkdir -p "$APP/Contents/Library/LaunchAgents"
 cp Resources/com.joelheile.voz.relaunch.plist "$APP/Contents/Library/LaunchAgents/"
+if [[ "$TEST_BUILD" == true ]]; then
+    /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.joelheile.voz.test" -c "Set :CFBundleName Voz Test" -c "Set :CFBundleDisplayName Voz Test" "$APP/Contents/Info.plist"
+fi
 if [[ -n "$VERSION" ]]; then
     /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP/Contents/Info.plist"
 fi

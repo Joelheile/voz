@@ -150,7 +150,7 @@ extension View {
     func fieldBackground(_ size: PillSize = .regular) -> some View {
         padding(.horizontal, 10)
             .frame(height: size.height)
-            .background(Theme.selected, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .background(Theme.selected, in: RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous))
     }
 
     func groupCard(padding: CGFloat = 12) -> some View {

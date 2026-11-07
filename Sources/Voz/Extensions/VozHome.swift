@@ -37,7 +37,7 @@ struct VozHome: Sendable {
     private static let disabledKey = "disabled"
     private static let configKey = "config"
 
-    init(root: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".voz", isDirectory: true)) {
+    init(root: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(SystemContext.isTestBuild ? ".voz-test" : ".voz", isDirectory: true)) {
         self.root = root
     }
 
