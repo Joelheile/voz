@@ -148,6 +148,7 @@ final class ExtensionService {
     private let live: LiveSessions
     private let note: NoteController
     private let asker = AskController()
+    var isAsking: Bool { asker.isOpen }
     private let drafts: DraftStore
     private let draftWatcher: DraftWatcher
     let catalog = ExtensionCatalog()

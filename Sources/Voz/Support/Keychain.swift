@@ -3,7 +3,7 @@ import Security
 
 /// Secrets Voz keeps for you, such as AI sign-ins. The Keychain keeps them from extensions, which run as your user
 enum Keychain {
-    private static let service = "app.voz.ai"
+    private static let service = SystemContext.isTestBuild ? "app.voz.ai.test" : "app.voz.ai"
 
     static func read(_ account: String) throws -> Data? {
         var item: CFTypeRef?

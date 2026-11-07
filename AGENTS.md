@@ -55,7 +55,7 @@ Voz is a dictation app that people and agents drive the same way. Everything you
 ## Design
 
 - Every element earns its place. Signal only states that need attention, such as recording. Keep nav icons visible.
-- Floating surfaces (the panel, ask card, note and permission tile) use system glass through `.glassEffect`, so they adapt to light and dark. The notch stays black in both modes.
+- Floating surfaces (the panel, ask card, note, permission tile, update notice and toast) use system glass through `.glassEffect` and `Theme.Radius.panel`, so they adapt to light and dark. The notch stays black in both modes. Buttons use `.pill`, so they are rounded rectangles everywhere. Keep capsules for chips and progress bars.
 - Group settings in `PanelGroup` cards with dividers. Give top-level settings rows an `IconTile`. Show one status banner above the home search, only for states that need attention.
 - Use Lucide icons through `Icon`, not SF Symbols. Use stroke 1.25 in the popover, 1.75 inside an `IconTile` and 2 to 2.25 in the indicator.
 - Take colors, radii and motion from `Theme`. Reuse `PanelGroup`, `PanelRow`, `IconTile`, `IconButton`, `groupCard` and the `.pill` and `.pressable` styles before you add a component.
@@ -64,11 +64,25 @@ Voz is a dictation app that people and agents drive the same way. Everything you
 
 ## Verify
 
-- `scripts/test.sh`: tests, including Bun integration when Bun is installed.
-- `scripts/test.sh release`: the optimized configuration CI uses.
-- `scripts/make-app.sh [--debug] [version] [build]`: build and verify the signed app.
-- `scripts/run.sh`: build a debug app and launch it.
-- `scripts/install-local.sh [--debug] [version] [build]`: build the signed app and replace /Applications/voz.app.
+Run the cheapest layer that can catch your change, then the ones above it that your diff touches. Scripts print one line per check, so read the output only when something fails. Don't use screenshots or computer use to check something a script can check.
+
+| Layer | Command | Run it when you change | Catches | Time |
+| --- | --- | --- | --- | --- |
+| 0. Unit | `scripts/test.sh` (`scripts/test.sh release` before a pull request) | Anything | Logic | Under a minute after a build |
+| 1. Audio | `scripts/test-audio.sh` | `Transcription`, `Cleanup`, `Text`, `DictationPipeline`, speech models | Wrong words, slow release to text | About 40 s |
+| 2. Real app | `scripts/test-real-app.sh` | `Audio`, `Dictation`, `Control`, `History`, launch code | Microphone path, CLI socket, history, no-speech exit code | About 1 min |
+| 3. UI | `scripts/test-design.sh`, then read the listed images | `Menu`, `Indicator`, `Design`, any visible copy | Layout and copy | About 1 min |
+| 4. Clean Mac | By hand or in a VM, before a stable release | `Updater`, `Launch`, `Permissions`, `TextOutput`, `Hotkey`, signing, `install.sh` | Paste, hotkey, first run, DMG install, updating from an old version | Manual |
+
+- Write a failing test first for a bug. Tests must fail when the logic changes.
+- `scripts/make-app.sh --test` builds `build/voz-test.app`, with the bundle ID `com.joelheile.voz.test`. It keeps its own data in `~/Library/Application Support/voz-test` and `~/.voz-test`, sends no telemetry and opens no panel at launch, so it runs beside your installed Voz. Never ship it.
+- Layer 2 records from BlackHole 2ch, a silent virtual microphone, and `say -a` speaks into it. You hear nothing and nothing types into your apps, because insertion is off. It needs one microphone grant and shows the notch pill while it runs. It can't test real paste or the hotkey, which need Accessibility and the front app. That's layer 4.
+- Layer 3 compares bytes against a baseline. Run `scripts/test-design.sh --update` on `main` before you change UI. It skips animated screens and can still list images that didn't change, so treat its output as what to look at, not as pass or fail. Check light and dark.
+- Use `agent-desktop` (ref actions only, never `--headed`) for flows a render can't show, and only on windows it can list. It sees no windows for `NotePanel` surfaces such as the ask card and update notice.
+- `build/voz-test.app/Contents/MacOS/voz --demo-update-notice` shows the real update notice and prints the button you pressed.
+- Say which layers you ran and which you didn't. A passing layer 2 doesn't prove paste, updates or permissions.
+
+Also: `scripts/make-app.sh [--debug] [version] [build]` builds and verifies the signed app, `scripts/run.sh` builds a debug app and launches it, and `scripts/install-local.sh [--debug] [version] [build]` builds the signed app and replaces /Applications/voz.app.
 
 ## Release hazards
 

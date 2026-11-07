@@ -254,11 +254,12 @@ enum UpdateChannel: String, Sendable {
 enum AppStorage {
     static let directoryPermissions = 0o700
     static let filePermissions = 0o600
+    static let folderName = SystemContext.isTestBuild ? "voz-test" : "voz"
 
     static func directory() throws -> URL {
         let directory = try FileManager.default
             .url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-            .appendingPathComponent("voz", isDirectory: true)
+            .appendingPathComponent(folderName, isDirectory: true)
         try FileManager.default.createDirectory(
             at: directory,
             withIntermediateDirectories: true,

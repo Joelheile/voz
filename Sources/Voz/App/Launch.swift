@@ -162,7 +162,7 @@ final class SingleInstance {
 }
 
 enum OpenRequest {
-    private static let name = Notification.Name("com.joelheile.voz.open")
+    private static let name = Notification.Name("\(Bundle.main.bundleIdentifier ?? SystemContext.bundleID).open")
 
     static func send() {
         DistributedNotificationCenter.default().postNotificationName(name, object: nil, userInfo: nil, deliverImmediately: true)

@@ -13,10 +13,10 @@ import Testing
         #expect(RecentTime.label(for: listDate(day: 3, hour: 9, year: 2025), now: listNow, calendar: listCalendar) == "3 Oct 2025")
     }
 
-    @Test func headingGroupsTodayYesterdayAndEarlier() {
-        #expect(RecentTime.heading(for: listDate(day: 22, hour: 1), now: listNow, calendar: listCalendar) == nil)
-        #expect(RecentTime.heading(for: listDate(day: 21, hour: 23), now: listNow, calendar: listCalendar) == "Yesterday")
-        #expect(RecentTime.heading(for: listDate(day: 20, hour: 12), now: listNow, calendar: listCalendar) == "Earlier")
+    @Test func dayLabelNamesTheDateAndAddsTheYearOnlyWhenItDiffers() {
+        #expect(RecentTime.dayLabel(for: listDate(day: 22, hour: 1), now: listNow, calendar: listCalendar) == "Thu, 22.10")
+        #expect(RecentTime.dayLabel(for: listDate(day: 3, hour: 9), now: listNow, calendar: listCalendar) == "Sat, 3.10")
+        #expect(RecentTime.dayLabel(for: listDate(day: 3, hour: 9, year: 2025), now: listNow, calendar: listCalendar) == "Fri, 3.10.25")
     }
 }
 

@@ -64,7 +64,7 @@ private struct ToastView: View {
             .lineLimit(3)
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
-            .hud(RoundedRectangle(cornerRadius: 17, style: .continuous))
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous))
             .scaleEffect(reduceMotion || model.isShown ? 1 : 0.9, anchor: .top)
             .opacity(model.isShown ? 1 : 0)
             .animation(reduceMotion ? IndicatorMotion.reducedMotion : IndicatorMotion.open, value: model.isShown)

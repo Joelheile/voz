@@ -94,6 +94,8 @@ struct InstallID {
 
 enum SystemContext {
     static let bundleID = "com.joelheile.voz"
+    /// `scripts/make-app.sh --test` builds this one. It keeps its own data, so tests can run beside your installed Voz.
+    static let isTestBuild = Bundle.main.bundleIdentifier == "\(bundleID).test"
     static let isOfficialBuild = Bundle.main.bundleIdentifier == bundleID
     static let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
     static let sendsTelemetry = isOfficialBuild && UpdateChannel(version: appVersion) != .dev

@@ -24,6 +24,15 @@ if arguments.contains(IndicatorDemo.launchArgument) {
     application.run()
 }
 
+if arguments.contains(NoticeDemo.launchArgument) {
+    application.setActivationPolicy(.accessory)
+    Task {
+        await NoticeDemo.run()
+        exit(0)
+    }
+    application.run()
+}
+
 let instance = SingleInstance()
 let claimed: Bool
 do {

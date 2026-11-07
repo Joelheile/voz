@@ -25,6 +25,26 @@ enum DesignRender {
             for (title, activity) in Fixture.meetingActivities {
                 try write(fixture.popover(activity: activity), to: outputDirectory, name: "popover-meeting-\(title)-\(suffix)", appearance: appearance)
             }
+            let history = fixture.sources.history
+            try write(fixture.popover(page: .search), to: outputDirectory, name: "popover-search-\(suffix)", appearance: appearance)
+            history.query = "invoice"
+            try await Task.sleep(for: .milliseconds(300))
+            try write(fixture.popover(page: .search), to: outputDirectory, name: "popover-search-results-\(suffix)", appearance: appearance)
+            history.query = "model"
+            try await Task.sleep(for: .milliseconds(300))
+            try write(fixture.popover(page: .search), to: outputDirectory, name: "popover-search-places-\(suffix)", appearance: appearance)
+            history.query = ""
+            try await Task.sleep(for: .milliseconds(300))
+            history.showsCalendar = true
+            try write(fixture.popover(), to: outputDirectory, name: "popover-calendar-\(suffix)", appearance: appearance)
+            history.showsCalendar = false
+            _ = history.showEarlierDay()
+            try await Task.sleep(for: .milliseconds(200))
+            try write(fixture.popover(), to: outputDirectory, name: "popover-day-\(suffix)", appearance: appearance)
+            history.showsCalendar = true
+            try write(fixture.popover(), to: outputDirectory, name: "popover-calendar-day-\(suffix)", appearance: appearance)
+            history.reset()
+            try await Task.sleep(for: .milliseconds(200))
             fixture.sources.extensions.selected = "voz-tone"
             try write(fixture.popover(page: .extensions), to: outputDirectory, name: "popover-extension-detail-\(suffix)", appearance: appearance)
             fixture.sources.extensions.selected = nil
@@ -151,6 +171,12 @@ enum DesignRender {
             try write(AskView(model: ask, onAnswer: { _ in }, onClose: {}), to: outputDirectory, name: "ask-calendar-\(suffix)", appearance: appearance)
             ask.load(Self.meetingAsk)
             try write(AskView(model: ask, onAnswer: { _ in }, onClose: {}), to: outputDirectory, name: "ask-meeting-\(suffix)", appearance: appearance)
+            for (name, notice) in [("ready", UpdateNotice(version: "0.2.0-beta.100065", isDownloaded: true)), ("available", UpdateNotice(version: "0.3.0", isDownloaded: false))] {
+                let shown = NoticeVisibility()
+                shown.isShown = true
+                let capsule = NoticeView(title: notice.title, icon: .circleArrowUp, later: UpdateNotice.later, action: notice.action, visibility: shown, onAnswer: { _ in }, onHover: { _ in })
+                try write(capsule, to: outputDirectory, name: "update-notice-\(name)-\(suffix)", appearance: appearance)
+            }
             for step in SetupStep.allCases {
                 fixture.sources.setup.step = step
                 try write(fixture.popover(needsSetup: true), to: outputDirectory, name: "popover-setup-\(step)-\(suffix)", appearance: appearance)
@@ -304,7 +330,7 @@ private final class Fixture {
             setup: SetupModel(analytics: analytics) {},
             extensions: ExtensionsModel(analytics: analytics, home: home, cache: nil, fetch: { url in url.lastPathComponent == "latest" ? Self.screenReader : Self.listings }),
             catalog: ExtensionCatalog(actions: [Self.meetingAction]),
-            updater: Updater(settings: settings, isBusy: { false })
+            updater: Updater(settings: settings, isBusy: { false }, showNotice: { _ in false })
         )
         status.update(.parakeetUltra, .ready(bytes: 483_000_000))
     }

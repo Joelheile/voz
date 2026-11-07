@@ -108,6 +108,36 @@ struct ControlCommandsTests {
         #expect(!IdleInstall.isDue(busy: true, secondsSinceInput: IdleInstall.awayAfter * 2))
     }
 
+    @Test func aLiveMeetingOrOpenQuestionBlocksARestart() {
+        #expect(RestartGuard.blocksRestart(dictating: true, runningActivities: 0, asking: false))
+        #expect(RestartGuard.blocksRestart(dictating: false, runningActivities: 1, asking: false))
+        #expect(RestartGuard.blocksRestart(dictating: false, runningActivities: 0, asking: true))
+        #expect(!RestartGuard.blocksRestart(dictating: false, runningActivities: 0, asking: false))
+    }
+
+    @Test func theUpdateNoticeWaitsForAPauseWhileYouArePresent() {
+        let now = epoch(0)
+        #expect(UpdateNotice.isDue(busy: false, secondsSinceInput: UpdateNotice.quietFor, lastShown: nil, now: now))
+        #expect(!UpdateNotice.isDue(busy: false, secondsSinceInput: UpdateNotice.quietFor - 1, lastShown: nil, now: now), "you're mid-keystroke")
+        #expect(!UpdateNotice.isDue(busy: false, secondsSinceInput: UpdateNotice.presentWithin, lastShown: nil, now: now), "nobody is there to see it")
+        #expect(!UpdateNotice.isDue(busy: true, secondsSinceInput: UpdateNotice.quietFor, lastShown: nil, now: now))
+    }
+
+    @Test func theUpdateNoticeComesBackAfterADayNotBefore() {
+        let now = epoch(UpdateNotice.repeatAfter)
+        let justUnderADay = epoch(1)
+        let aDayAgo = epoch(0)
+        #expect(!UpdateNotice.isDue(busy: false, secondsSinceInput: UpdateNotice.quietFor, lastShown: justUnderADay, now: now))
+        #expect(UpdateNotice.isDue(busy: false, secondsSinceInput: UpdateNotice.quietFor, lastShown: aDayAgo, now: now))
+    }
+
+    @Test func theUpdateNoticeNamesWhatItsButtonDoes() {
+        #expect(UpdateNotice(version: "1.2", isDownloaded: true).action == "Restart to update")
+        #expect(UpdateNotice(version: "1.2", isDownloaded: false).action == "See what's new")
+        #expect(UpdateNotice(version: "1.2", isDownloaded: true).title == "Voz 1.2 is ready")
+        #expect(UpdateNotice(version: "0.2.0-beta.100065", isDownloaded: false).title == "Voz 0.2.0 beta is available")
+    }
+
     @Test func repeatingASettingSucceedsWithoutChange() async throws {
         let (commands, settings) = try makeControlCommands()
         let center = ControlCenter(commands: commands.all)

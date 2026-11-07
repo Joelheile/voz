@@ -257,6 +257,7 @@ final class StatusItemController: NSObject {
     }
 
     private func showPanel() {
+        history.reset()
         analytics.capture(.appOpened)
         refresh()
         if !model.needsSetup { analytics.capture(.historyOpened) }
@@ -298,7 +299,7 @@ final class StatusItemController: NSObject {
         outsideClickMonitor = nil
         permissionPoll?.cancel()
         permissionPoll = nil
-        history.query = ""
+        history.reset()
     }
 
     private func dismissThen(_ action: () -> Void) {

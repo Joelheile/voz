@@ -18,7 +18,7 @@ struct ControlResponse: Codable, Sendable {
 /// A Unix socket only your user can open, in Voz's Application Support folder
 enum ControlSocket {
     static var path: String {
-        FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Application Support/voz/control.sock").path
+        FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Application Support/\(AppStorage.folderName)/control.sock").path
     }
 
     static func address(_ path: String) -> sockaddr_un? {

@@ -137,11 +137,38 @@ final class HistoryStore: Sendable {
     }
 
     func delete(id: UUID) throws {
-        _ = try queue.write { try TranscriptRecord.deleteOne($0, key: id) }
+        _ = try queue.write { database in
+            // A draft outlives the dictation it replaced, but not the copy of its words
+            try DraftRecord.filter(Column("transcriptID") == id).updateAll(database, Column("input").set(to: ""))
+            return try TranscriptRecord.deleteOne(database, key: id)
+        }
     }
 
     func search(_ query: String) throws -> [TranscriptRecord] {
         try queue.read { try Self.records(matching: query, in: $0) }
+    }
+
+    func records(on day: DateInterval) throws -> [TranscriptRecord] {
+        try queue.read { try Self.records(on: day, in: $0) }
+    }
+
+    func observeRecords(on day: DateInterval) -> AnyPublisher<[TranscriptRecord], Error> {
+        ValueObservation
+            .tracking { try Self.records(on: day, in: $0) }
+            .publisher(in: queue)
+            .eraseToAnyPublisher()
+    }
+
+    func transcriptDays(calendar: Calendar = .current) throws -> TranscriptDays {
+        try queue.read { try Self.transcriptDays(in: $0, calendar: calendar) }
+    }
+
+    func observeTranscriptDays(calendar: Calendar = .current) -> AnyPublisher<TranscriptDays, Error> {
+        ValueObservation
+            .tracking { try Self.transcriptDays(in: $0, calendar: calendar) }
+            .removeDuplicates()
+            .publisher(in: queue)
+            .eraseToAnyPublisher()
     }
 
     func recent(matching query: String = "", app: String? = nil, since: Date? = nil, limit: Int) throws -> [TranscriptRecord] {
@@ -183,6 +210,20 @@ final class HistoryStore: Sendable {
     private static func records(matching query: String, in database: Database) throws -> [TranscriptRecord] {
         let search = TranscriptSearch(query)
         return try records(matching: search, in: TranscriptRecord.all(), limit: search.isEmpty ? menuLimit : searchLimit, database: database)
+    }
+
+    private static func records(on day: DateInterval, in database: Database) throws -> [TranscriptRecord] {
+        try TranscriptRecord
+            .filter(Column("createdAt") >= day.start && Column("createdAt") < day.end)
+            .order(Column("createdAt").desc)
+            .fetchAll(database)
+    }
+
+    private static func transcriptDays(in database: Database, calendar: Calendar) throws -> TranscriptDays {
+        var days = Set<Date>()
+        let dates = try TranscriptRecord.select(Column("createdAt"), as: Date.self).fetchCursor(database)
+        while let date = try dates.next() { days.insert(calendar.startOfDay(for: date)) }
+        return TranscriptDays(days)
     }
 
     private static func records(
