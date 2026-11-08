@@ -91,10 +91,8 @@ struct SettingsPage: View {
         PanelGroup(title: "Needs access") {
             if access.microphone != .authorized {
                 allowRow("Microphone") {
-                    if access.microphone == .notDetermined {
-                        Task { await Permissions.requestMicrophone() }
-                    } else {
-                        Permissions.openSettings(.microphone)
+                    Task {
+                        await access.microphone == .notDetermined ? Permissions.requestMicrophone() : Permissions.requestBlockedMicrophone()
                     }
                 }
             }

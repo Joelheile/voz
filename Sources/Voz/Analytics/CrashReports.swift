@@ -34,15 +34,21 @@ final class CrashReports {
 
     nonisolated static func capture(stage: String, code: String, details: [String: Any] = [:]) {
         guard enabled.load(ordering: .relaxed) else { return }
-        PostHogSDK.shared.capture("$exception", properties: details.merging([
-            "$exception_list": [["type": "VozError", "value": code, "mechanism": ["type": "handled", "handled": true]]],
+        PostHogSDK.shared.capture("$exception", properties: exception(stage: stage, code: code, details: details))
+    }
+
+    /// The code names the issue in PostHog, and the details in the message tell reports of one issue apart
+    nonisolated static func exception(stage: String, code: String, details: [String: Any]) -> [String: Any] {
+        let message = ([code] + details.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }).joined(separator: " ")
+        return details.merging([
+            "$exception_list": [["type": code, "value": message, "mechanism": ["type": "handled", "handled": true]]],
             "$exception_fingerprint": "voz.\(stage).\(code)",
             "stage": stage,
             "error_code": code,
             "app_version": SystemContext.appVersion,
             "$process_person_profile": false,
             "$geoip_disable": true,
-        ]) { $1 })
+        ]) { $1 }
     }
 
     /// The SDK also sends crash reports it captured itself, so this runs once more right before anything leaves

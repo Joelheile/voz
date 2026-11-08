@@ -23,19 +23,50 @@ enum Permissions {
 
     static var inputMonitoringGranted: Bool { CGPreflightListenEventAccess() }
 
+    /// Clears grants left over from an older signature once per build, so macOS lists Voz again and asks once instead of at every launch
+    static func repairStaleGrants() async {
+        let defaults = UserDefaults.standard
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown"
+        guard defaults.string(forKey: StaleGrant.repairedBuildKey) != build else { return }
+        defaults.set(build, forKey: StaleGrant.repairedBuildKey)
+        if !inputMonitoringGranted {
+            await StaleGrant.clear(.inputMonitoring)
+            CGRequestListenEventAccess()
+        }
+        if !accessibilityGranted {
+            await StaleGrant.clear(.accessibility)
+            promptForAccessibility()
+        }
+    }
+
     static func requestAccessibility() {
-        PermissionTile.show(.accessibility) { accessibilityGranted }
+        Task {
+            await StaleGrant.clear(.accessibility)
+            promptForAccessibility()
+            PermissionTile.show(.accessibility) { accessibilityGranted }
+        }
     }
 
     static func requestInputMonitoring() {
-        CGRequestListenEventAccess()
-        PermissionTile.show(.inputMonitoring) { inputMonitoringGranted }
+        Task {
+            await StaleGrant.clear(.inputMonitoring)
+            CGRequestListenEventAccess()
+            PermissionTile.show(.inputMonitoring) { inputMonitoringGranted }
+        }
+    }
+
+    /// A blocked microphone is often a grant from an older signature, so clear it and ask again before sending you to System Settings
+    static func requestBlockedMicrophone() async {
+        await StaleGrant.clear(.microphone)
+        await requestMicrophone()
+        if !microphoneGranted { openSettings(.microphone) }
     }
 
     static var systemAudioGranted: Bool { SystemAudioAccess.preflight() == 0 }
 
     static func requestSystemAudio() async {
         guard !systemAudioGranted else { return }
+        await StaleGrant.clear(.systemAudio)
         let granted = await SystemAudioAccess.request()
         Log.app.notice("System audio access granted: \(granted)")
         if !granted { openSettings(.systemAudio) }
@@ -59,6 +90,38 @@ enum Permissions {
 
     static var microphoneUndecided: Bool {
         AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined
+    }
+}
+
+/// macOS ties each grant to the certificate that signed Voz. After an update signed differently, System Settings still shows Voz switched on,
+/// but macOS ignores that entry and turning it on again does nothing. Resetting Voz's own entry lets macOS list it fresh.
+enum StaleGrant {
+    static let repairedBuildKey = "staleGrantsRepairedBuild"
+
+    nonisolated static func arguments(for pane: Permissions.PrivacyPane, bundleID: String) -> [String] {
+        let service = switch pane {
+        case .microphone: "Microphone"
+        case .accessibility: "Accessibility"
+        case .inputMonitoring: "ListenEvent"
+        case .systemAudio: "AudioCapture"
+        }
+        return ["reset", service, bundleID]
+    }
+
+    /// Only call this when the grant is missing: it also clears one that works
+    @concurrent static func clear(_ pane: Permissions.PrivacyPane) async {
+        guard let bundleID = Bundle.main.bundleIdentifier else { return }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+        process.arguments = arguments(for: pane, bundleID: bundleID)
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            Log.app.error("Could not reset \(pane.rawValue, privacy: .public): \(error.localizedDescription, privacy: .public)")
+        }
     }
 }
 

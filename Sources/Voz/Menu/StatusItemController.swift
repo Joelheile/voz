@@ -229,7 +229,7 @@ final class StatusItemController: NSObject {
     private func fix(_ fix: PermissionFix) {
         switch fix {
         case .microphone: Task { await Permissions.requestMicrophone() }
-        case .microphoneBlocked: Permissions.openSettings(.microphone)
+        case .microphoneBlocked: Task { await Permissions.requestBlockedMicrophone() }
         case .accessibility: Permissions.requestAccessibility()
         }
     }

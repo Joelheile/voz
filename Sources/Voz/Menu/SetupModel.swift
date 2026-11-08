@@ -53,13 +53,9 @@ final class SetupModel: ObservableObject {
     }
 
     func requestMicrophone() {
-        if microphoneStatus == .notDetermined {
-            Task {
-                await Permissions.requestMicrophone()
-                refreshPermissions()
-            }
-        } else {
-            Permissions.openSettings(.microphone)
+        Task {
+            await microphoneStatus == .notDetermined ? Permissions.requestMicrophone() : Permissions.requestBlockedMicrophone()
+            refreshPermissions()
         }
     }
 

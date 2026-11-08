@@ -19,7 +19,9 @@ fi
 VERSION=${1:-}
 BUILD=${2:-}
 
-SIGNING_IDENTITY=${SIGNING_IDENTITY:-8122E8329843B07F07BD077D076ADDE0356739B3}
+# Releases and local installs share the Developer ID signature, so macOS keeps permissions across updates
+SIGNING_IDENTITY=${SIGNING_IDENTITY:-$(security find-identity -v -p codesigning | sed -n 's/.*) \([0-9A-F]\{40\}\) .*G2CSKBA739.*/\1/p' | head -1)}
+[[ -n "$SIGNING_IDENTITY" ]] || { echo "No Developer ID Application identity for team G2CSKBA739. Set SIGNING_IDENTITY." >&2; exit 1; }
 TIMESTAMP=${TIMESTAMP:-none}
 
 BUILD_FLAGS=(-c "$CONFIGURATION")
@@ -76,4 +78,11 @@ codesign --force --options runtime --timestamp="$TIMESTAMP" \
     --entitlements Resources/voz.entitlements \
     --sign "$SIGNING_IDENTITY" "$APP"
 codesign --verify --deep --strict "$APP"
+
+# macOS ties every permission grant to this requirement. If it changes, updated installs lose their grants.
+SHIPPED_REQUIREMENT='designated => identifier "com.joelheile.voz" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = G2CSKBA739'
+if [[ "$TEST_BUILD" == false ]]; then
+    requirement=$(codesign -d -r- "$APP" 2>&1 | grep '^designated')
+    [[ "$requirement" == "$SHIPPED_REQUIREMENT" ]] || { echo "Signature requirement changed, so updates would lose permissions: $requirement" >&2; exit 1; }
+fi
 echo "Built $APP ($CONFIGURATION)"

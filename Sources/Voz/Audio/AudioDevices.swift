@@ -167,7 +167,7 @@ final class OutputMuter: @unchecked Sendable {
             Log.app.notice("Muted other apps in \((ContinuousClock.now - started).wholeMilliseconds) ms")
         } catch {
             Log.app.error("Mute failed: \(error.localizedDescription, privacy: .public)")
-            Analytics.report(.muteFailed)
+            Analytics.report(.muteFailed, cause: error)
             stopMuting()
         }
     }

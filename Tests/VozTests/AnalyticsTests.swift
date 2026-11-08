@@ -37,6 +37,21 @@ struct AnalyticsEventTests {
         #expect(!CrashReports.allows("dictation_completed", errors: true))
     }
 
+    @Test func errorReportsNameTheErrorAndItsCause() {
+        let report = CrashReports.exception(stage: "launch", code: "login_item_failed", details: ["cause_domain": "SMAppServiceErrorDomain", "cause_code": 1])
+        let entry = (report["$exception_list"] as? [[String: Any]])?.first
+        #expect(entry?["type"] as? String == "login_item_failed")
+        #expect(entry?["value"] as? String == "login_item_failed cause_code=1 cause_domain=SMAppServiceErrorDomain")
+        #expect(report["$exception_fingerprint"] as? String == "voz.launch.login_item_failed")
+        #expect(report["cause_domain"] as? String == "SMAppServiceErrorDomain")
+    }
+
+    @Test func errorCausesKeepOnlyDomainAndCode() {
+        let cause = Analytics.cause(CleanupError.timedOut)
+        #expect(cause["cause_domain"] as? String == "Voz.CleanupError")
+        #expect(cause.count == 2)
+    }
+
     @Test func crashReportsCarryTheVersionThatCrashed() {
         let crash = CrashReports.stampingAppVersion(["$app_version": "0.0.4"])
         #expect(crash["app_version"] as? String == "0.0.4")

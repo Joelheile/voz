@@ -132,7 +132,7 @@ final class TextCleaner {
             return ChunkResult(text: chunk, removed: 0, timedOut: true, rejection: nil)
         } catch {
             Log.app.error("Cleanup chunk failed, using raw text: \(error.localizedDescription, privacy: .private)")
-            Analytics.report(.cleanupFailed)
+            Analytics.report(.cleanupFailed, cause: error)
             return unchanged
         }
     }
