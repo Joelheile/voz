@@ -165,7 +165,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             warmUpModel(settings.localSpeechModel)
             if !SystemContext.isTestBuild {
-                Task { await Permissions.promptForAccessibilityAfterUpdate() }
+                Task { await Permissions.repairStaleGrants() }
             }
         } else if !SystemContext.isTestBuild {
             statusItemController.open()

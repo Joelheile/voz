@@ -4,7 +4,9 @@ cd "$(dirname "$0")/.."
 
 OUTPUT=${1:-build/voz.dmg}
 APP=build/voz.app
-SIGNING_IDENTITY=${SIGNING_IDENTITY:-8122E8329843B07F07BD077D076ADDE0356739B3}
+# Releases and local installs share the Developer ID signature, so macOS keeps permissions across updates
+SIGNING_IDENTITY=${SIGNING_IDENTITY:-$(security find-identity -v -p codesigning | sed -n 's/.*) \([0-9A-F]\{40\}\) .*G2CSKBA739.*/\1/p' | head -1)}
+[[ -n "$SIGNING_IDENTITY" ]] || { echo "No Developer ID Application identity for team G2CSKBA739. Set SIGNING_IDENTITY." >&2; exit 1; }
 TIMESTAMP=${TIMESTAMP:-none}
 
 [[ -d "$APP" ]] || { echo "Run scripts/make-app.sh first" >&2; exit 1; }

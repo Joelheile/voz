@@ -23,11 +23,20 @@ enum Permissions {
 
     static var inputMonitoringGranted: Bool { CGPreflightListenEventAccess() }
 
-    /// Clears a grant left over from an older signature, so macOS lists Voz again and asks once
-    static func promptForAccessibilityAfterUpdate() async {
-        guard !accessibilityGranted else { return }
-        await StaleGrant.clear(.accessibility)
-        promptForAccessibility()
+    /// Clears grants left over from an older signature once per build, so macOS lists Voz again and asks once instead of at every launch
+    static func repairStaleGrants() async {
+        let defaults = UserDefaults.standard
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown"
+        guard defaults.string(forKey: StaleGrant.repairedBuildKey) != build else { return }
+        defaults.set(build, forKey: StaleGrant.repairedBuildKey)
+        if !inputMonitoringGranted {
+            await StaleGrant.clear(.inputMonitoring)
+            CGRequestListenEventAccess()
+        }
+        if !accessibilityGranted {
+            await StaleGrant.clear(.accessibility)
+            promptForAccessibility()
+        }
     }
 
     static func requestAccessibility() {
@@ -87,6 +96,8 @@ enum Permissions {
 /// macOS ties each grant to the certificate that signed Voz. After an update signed differently, System Settings still shows Voz switched on,
 /// but macOS ignores that entry and turning it on again does nothing. Resetting Voz's own entry lets macOS list it fresh.
 enum StaleGrant {
+    static let repairedBuildKey = "staleGrantsRepairedBuild"
+
     nonisolated static func arguments(for pane: Permissions.PrivacyPane, bundleID: String) -> [String] {
         let service = switch pane {
         case .microphone: "Microphone"
