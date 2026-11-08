@@ -38,7 +38,7 @@ enum LoginItem {
             try service.register()
         } catch {
             Log.app.error("Login item register failed: \(error.localizedDescription, privacy: .private)")
-            Analytics.report(.loginItemFailed)
+            Analytics.report(.loginItemFailed, cause: error)
         }
     }
 

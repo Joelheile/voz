@@ -44,9 +44,15 @@ final class Analytics {
         for fact in facts { enqueue { try TelemetryPayload.body(fact, installID: installID, environment: .current) } }
     }
 
-    nonisolated static func report(_ error: AppError, details: [String: Any] = [:]) {
+    nonisolated static func report(_ error: AppError, cause: (any Error)? = nil, details: [String: Any] = [:]) {
         if SystemContext.sendsTelemetry { TelemetryStore.shared.addFailure(.failure(error), now: Date()) }
-        CrashReports.capture(stage: error.stage, code: error.rawValue, details: details)
+        CrashReports.capture(stage: error.stage, code: error.rawValue, details: details.merging(cause.map(Self.cause) ?? [:]) { $1 })
+    }
+
+    /// Only the error's type and number leave the Mac, never its message, which can hold paths or text
+    nonisolated static func cause(_ error: any Error) -> [String: Any] {
+        let error = error as NSError
+        return ["cause_domain": error.domain, "cause_code": error.code]
     }
 
     func flush() {

@@ -260,7 +260,7 @@ final class ExtensionService {
             try await launch()
         } catch {
             Log.extensions.error("Extensions failed to start: \(String(describing: error), privacy: .public)")
-            Analytics.report(.extensionsStartFailed)
+            Analytics.report(.extensionsStartFailed, cause: error)
             toast.show("Could not start extensions")
             catalog.fail("Extensions could not start: \(error)")
         }

@@ -183,7 +183,7 @@ final class DictationPipeline {
             try await history.insert(record)
         } catch {
             Log.app.error("History save failed: \(error.localizedDescription, privacy: .private)")
-            Analytics.report(.historySaveFailed)
+            Analytics.report(.historySaveFailed, cause: error)
         }
         return record
     }

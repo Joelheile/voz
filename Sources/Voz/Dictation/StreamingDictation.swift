@@ -244,7 +244,7 @@ final class StreamingDictation {
                 return result
             } catch {
                 Log.app.error("Segment transcription failed: \(error.localizedDescription, privacy: .private)")
-                Analytics.report(.segmentTranscriptionFailed)
+                Analytics.report(.segmentTranscriptionFailed, cause: error)
                 return nil
             }
         }
