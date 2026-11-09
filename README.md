@@ -12,7 +12,7 @@ Free, open source dictation that runs on your Mac. Missing a feature? Your codin
 [![Latest release](https://img.shields.io/github/v/release/Joelheile/voz)](https://github.com/Joelheile/voz/releases/latest)
 ![macOS 26, Apple Silicon](https://img.shields.io/badge/macOS_26-Apple_Silicon-black)
 
-<a href="https://voz.tools"><img src=".github/images/demo.webp" width="720" alt="The Voz launch film: dictation cleaned in real time, spoken commands for your calendar, todos and notes, and a coding agent building a missing feature as an extension."></a>
+<a href="https://voz.tools"><img src=".github/images/demo.webp" width="720" alt="The Voz launch film: you talk three times faster than you type, Voz turns speech into clean text in any app for free and on your Mac, and extensions add replies, file transcription, meeting notes, todos and a calendar a coding agent builds."></a>
 
 [Download](https://voz.tools/download), [Website](https://voz.tools), [Extensions](https://voz.tools/extensions/)
 
