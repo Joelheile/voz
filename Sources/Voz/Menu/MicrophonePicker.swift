@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MicrophonePicker: View {
     @Binding var selection: String
+    @Binding var headphoneQuality: Bool
     @State private var microphones = InputDevice.microphones()
     @State private var defaultName = InputDevice.defaultName()
 
@@ -11,7 +12,21 @@ struct MicrophonePicker: View {
             selection: $selection,
             options: MicrophoneOptions.make(microphones, defaultName: defaultName, selection: selection),
             tile: IconTile(.mic, Color(nsColor: .systemPink))
-        )
+        ) {
+            HStack(spacing: 8) {
+                Icon(.headphones, size: 13)
+                    .foregroundStyle(Theme.inkSecondary)
+                    .frame(width: 14)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("High quality headphones").font(.ui(13)).foregroundStyle(Theme.ink)
+                    Text("Keep this mic when headphones connect").font(.meta).foregroundStyle(Theme.inkTertiary)
+                }
+                Spacer(minLength: 0)
+                Toggle("High quality headphones", isOn: $headphoneQuality).labelsHidden()
+            }
+            .padding(.horizontal, 8)
+            .padding(.top, 6)
+        }
         .task {
             while !Task.isCancelled {
                 refresh()

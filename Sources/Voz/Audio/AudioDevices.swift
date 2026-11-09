@@ -81,6 +81,21 @@ enum InputDevice {
         return status == noErr && device != kAudioObjectUnknown ? device : nil
     }
 
+    static func inputUIDs() -> Set<String> {
+        Set(allDevices().filter(hasInputStreams).compactMap(uid))
+    }
+
+    static func setDefaultInput(_ device: AudioDeviceID) -> Bool {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var device = device
+        let size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        return AudioObjectSetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, size, &device) == noErr
+    }
+
     private static func allDevices() -> [AudioDeviceID] {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDevices,
@@ -129,7 +144,7 @@ enum InputDevice {
         return value.takeRetainedValue() as String
     }
 
-    private static func isBluetooth(_ device: AudioDeviceID) -> Bool {
+    static func isBluetooth(_ device: AudioDeviceID) -> Bool {
         let transport = transportType(device)
         return transport == kAudioDeviceTransportTypeBluetooth || transport == kAudioDeviceTransportTypeBluetoothLE
     }

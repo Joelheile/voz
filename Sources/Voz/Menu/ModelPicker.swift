@@ -10,11 +10,13 @@ struct ModelOption: Hashable {
     }
 }
 
-struct ModelPicker: View {
+struct ModelPicker<Footer: View>: View {
     let title: String
     @Binding var selection: String
     let options: [ModelOption]
     var tile: IconTile?
+    /// Shown under the options while the picker is open
+    @ViewBuilder var footer: Footer
     @State private var expanded = false
     @Namespace private var highlight
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -39,6 +41,7 @@ struct ModelPicker: View {
                             removal: .opacity.animation(.easeOut(duration: 0.12))
                         ))
                     }
+                    footer
                 }
                 .padding(.horizontal, -6)
                 .padding(.bottom, 8)
@@ -75,6 +78,12 @@ struct ModelPicker: View {
         .frame(minHeight: Theme.Size.row)
         .padding(.vertical, 4)
         .contentShape(Rectangle())
+    }
+}
+
+extension ModelPicker where Footer == EmptyView {
+    init(title: String, selection: Binding<String>, options: [ModelOption], tile: IconTile? = nil) {
+        self.init(title: title, selection: selection, options: options, tile: tile) { EmptyView() }
     }
 }
 

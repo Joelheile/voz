@@ -53,27 +53,27 @@ struct SettingsPage: View {
                 }
                 .buttonStyle(.pill(capture.isListening ? .accent : .quiet, .small))
             }
-            PanelRow(title: "Mode", tile: IconTile(.mic, Color(nsColor: .systemIndigo))) {
+            PanelRow(title: "Mode", tile: IconTile(.hand, Color(nsColor: .systemIndigo))) {
                 TabBar(tabs: TalkMode.allCases, selection: settings.talkMode)
                     .frame(width: 120)
             }
-            LinkRow(title: "Speech model", value: speechModelName, tile: IconTile(.cpu, Color(nsColor: .systemTeal))) { model.page = .speechModel }
-            LinkRow(title: "Languages", value: SpeechLanguage.summary(of: settings.languages), tile: IconTile(.globe, Color(nsColor: .systemBlue))) { model.page = .languages }
-        }
-        PanelGroup(title: "Text") {
             PanelRow(title: "Output", tile: IconTile(.type, Color(nsColor: .systemOrange))) {
                 TabBar(tabs: OutputMode.allCases, selection: settings.outputMode)
                     .frame(width: 156)
             }
-            LinkRow(title: "Cleanup", value: settings.cleanupEnabled ? "On" : "Off", tile: IconTile(.wandSparkles, Color(nsColor: .systemPurple))) { model.page = .cleanup }
-            LinkRow(title: "AI model", value: settings.aiModel.name, tile: IconTile(.bot, Color(nsColor: .systemIndigo))) { model.page = .aiModel }
-        }
-        PanelGroup(title: "While recording") {
-            MicrophonePicker(selection: $settings.microphone)
             PanelRow(title: "Live preview", detail: "Draft text under the indicator", tile: IconTile(.textCursorInput, Color(nsColor: .systemCyan))) {
                 Toggle("Live preview", isOn: $settings.livePreviewEnabled).labelsHidden()
             }
-            toggle("Mute other apps", tile: IconTile(.volumeX, Color(nsColor: .systemRed)), isOn: $settings.muteWhileRecording)
+        }
+        PanelGroup(title: "Models") {
+            LinkRow(title: "Speech model", value: speechModelName, tile: IconTile(.cpu, Color(nsColor: .systemTeal))) { model.page = .speechModel }
+            LinkRow(title: "Languages", value: SpeechLanguage.summary(of: settings.languages), tile: IconTile(.globe, Color(nsColor: .systemBlue))) { model.page = .languages }
+            LinkRow(title: "Cleanup", value: settings.cleanupEnabled ? "On" : "Off", tile: IconTile(.wandSparkles, Color(nsColor: .systemPurple))) { model.page = .cleanup }
+            LinkRow(title: "AI model", value: settings.aiModel.name, tile: IconTile(.bot, Color(nsColor: .systemIndigo))) { model.page = .aiModel }
+        }
+        PanelGroup(title: "Sound") {
+            MicrophonePicker(selection: $settings.microphone, headphoneQuality: $settings.headphoneQuality)
+            toggle("Mute apps while dictating", tile: IconTile(.volumeX, Color(nsColor: .systemRed)), isOn: $settings.muteWhileRecording)
             toggle("Sound cues", tile: IconTile(.volume2, Color(nsColor: .systemGreen)), isOn: $settings.soundCues)
         }
     }

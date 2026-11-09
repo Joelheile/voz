@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var output = TextOutput(settings: settings)
     private let cleaner = TextCleaner()
     private let toast = ToastController()
+    private let headphoneQuality = HeadphoneQuality()
     private lazy var extensions = ExtensionService(
         output: output,
         toast: toast,
@@ -266,6 +267,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .sink { [weak self] hotkey, holdToTalk in
                 self?.hotkeyMonitor?.configure(hotkey: hotkey, holdToTalk: holdToTalk)
             }
+            .store(in: &cancellables)
+        settings.$headphoneQuality
+            .sink { [headphoneQuality] in headphoneQuality.isOn = $0 }
             .store(in: &cancellables)
         settings.$launchAtLogin
             .dropFirst()
