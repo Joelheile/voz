@@ -2,6 +2,11 @@
 
 Newest first. To get beta changes now, turn on Beta updates under What's new in Settings.
 
+## 0.3.1 (November 9, 2026)
+
+- Bluetooth headphones keep full sound quality in meetings while Voz is open
+- Find settings faster, grouped into Dictation, Models and Sound
+
 ## 0.3.0 (November 9, 2026)
 
 - After updating, allowing Accessibility again now works on the first try
