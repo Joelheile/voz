@@ -59,9 +59,10 @@ enum AppSearch {
 
     private static let settings = [
         AppSearchItem(section: .app, title: "Shortcut", detail: "Settings", keywords: ["hotkey", "key"], icon: .keyboard, target: .page(.settings)),
-        AppSearchItem(section: .app, title: "Mode", detail: "Settings", keywords: ["tap", "hold", "talk"], icon: .mic, target: .page(.settings)),
+        AppSearchItem(section: .app, title: "Mode", detail: "Settings", keywords: ["tap", "hold", "talk"], icon: .hand, target: .page(.settings)),
         AppSearchItem(section: .app, title: "Output", detail: "Settings", keywords: ["type", "paste", "copy", "clipboard"], icon: .type, target: .page(.settings)),
         AppSearchItem(section: .app, title: "Microphone", detail: "Settings", keywords: ["input", "audio"], icon: .mic, target: .page(.settings)),
+        AppSearchItem(section: .app, title: "High quality headphones", detail: "Settings", keywords: ["bluetooth", "airpods", "call quality", "muffled"], icon: .headphones, target: .page(.settings)),
         AppSearchItem(section: .app, title: "Live preview", detail: "Settings", keywords: ["draft"], icon: .textCursorInput, target: .page(.settings)),
         AppSearchItem(section: .app, title: "Mute other apps", detail: "Settings", keywords: ["silence", "sound"], icon: .volumeX, target: .page(.settings)),
         AppSearchItem(section: .app, title: "Sound cues", detail: "Settings", keywords: ["audio"], icon: .volume2, target: .page(.settings)),

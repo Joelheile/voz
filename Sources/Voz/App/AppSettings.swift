@@ -5,6 +5,7 @@ private enum SettingsKey {
     static let hotkey = "hotkey"
     static let holdToTalk = "holdToTalk"
     static let muteWhileRecording = "muteWhileRecording"
+    static let headphoneQuality = "headphoneQuality"
     static let copyToClipboard = "copyToClipboard"
     static let insertIntoApp = "insertIntoApp"
     static let soundCues = "soundCues"
@@ -42,6 +43,9 @@ final class AppSettings: ObservableObject {
     }
     @Published var muteWhileRecording: Bool {
         didSet { defaults.set(muteWhileRecording, forKey: SettingsKey.muteWhileRecording) }
+    }
+    @Published var headphoneQuality: Bool {
+        didSet { defaults.set(headphoneQuality, forKey: SettingsKey.headphoneQuality) }
     }
     @Published var copyToClipboard: Bool {
         didSet { defaults.set(copyToClipboard, forKey: SettingsKey.copyToClipboard) }
@@ -151,6 +155,7 @@ final class AppSettings: ObservableObject {
         defaults.register(defaults: [
             SettingsKey.holdToTalk: false,
             SettingsKey.muteWhileRecording: true,
+            SettingsKey.headphoneQuality: true,
             SettingsKey.copyToClipboard: true,
             SettingsKey.insertIntoApp: true,
             SettingsKey.soundCues: false,
@@ -167,6 +172,7 @@ final class AppSettings: ObservableObject {
             .flatMap { try? JSONDecoder().decode(Hotkey.self, from: $0) } ?? .rightCommand
         holdToTalk = defaults.bool(forKey: SettingsKey.holdToTalk)
         muteWhileRecording = defaults.bool(forKey: SettingsKey.muteWhileRecording)
+        headphoneQuality = defaults.bool(forKey: SettingsKey.headphoneQuality)
         copyToClipboard = defaults.bool(forKey: SettingsKey.copyToClipboard)
         insertIntoApp = defaults.bool(forKey: SettingsKey.insertIntoApp)
         soundCues = defaults.bool(forKey: SettingsKey.soundCues)
