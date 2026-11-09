@@ -2,7 +2,7 @@
 
 Newest first. To get beta changes now, turn on Beta updates under What's new in Settings.
 
-## In beta
+## 0.3.0 (November 9, 2026)
 
 - After updating, allowing Accessibility again now works on the first try
 - After an update, Voz asks for missing access once instead of at every launch
