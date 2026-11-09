@@ -64,7 +64,7 @@ enum AppSearch {
         AppSearchItem(section: .app, title: "Microphone", detail: "Settings", keywords: ["input", "audio"], icon: .mic, target: .page(.settings)),
         AppSearchItem(section: .app, title: "High quality headphones", detail: "Settings", keywords: ["bluetooth", "airpods", "call quality", "muffled"], icon: .headphones, target: .page(.settings)),
         AppSearchItem(section: .app, title: "Live preview", detail: "Settings", keywords: ["draft"], icon: .textCursorInput, target: .page(.settings)),
-        AppSearchItem(section: .app, title: "Mute other apps", detail: "Settings", keywords: ["silence", "sound"], icon: .volumeX, target: .page(.settings)),
+        AppSearchItem(section: .app, title: "Mute apps while dictating", detail: "Settings", keywords: ["silence", "sound"], icon: .volumeX, target: .page(.settings)),
         AppSearchItem(section: .app, title: "Sound cues", detail: "Settings", keywords: ["audio"], icon: .volume2, target: .page(.settings)),
         AppSearchItem(section: .app, title: "Launch at login", detail: "Settings", keywords: ["startup", "open"], icon: .power, target: .page(.settings)),
     ]

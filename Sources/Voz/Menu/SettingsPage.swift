@@ -72,11 +72,8 @@ struct SettingsPage: View {
             LinkRow(title: "AI model", value: settings.aiModel.name, tile: IconTile(.bot, Color(nsColor: .systemIndigo))) { model.page = .aiModel }
         }
         PanelGroup(title: "Sound") {
-            MicrophonePicker(selection: $settings.microphone)
-            PanelRow(title: "High quality headphones", detail: "Keep your mic when they connect", tile: IconTile(.headphones, Color(nsColor: .systemBlue))) {
-                Toggle("High quality headphones", isOn: $settings.headphoneQuality).labelsHidden()
-            }
-            toggle("Mute other apps", tile: IconTile(.volumeX, Color(nsColor: .systemRed)), isOn: $settings.muteWhileRecording)
+            MicrophonePicker(selection: $settings.microphone, headphoneQuality: $settings.headphoneQuality)
+            toggle("Mute apps while dictating", tile: IconTile(.volumeX, Color(nsColor: .systemRed)), isOn: $settings.muteWhileRecording)
             toggle("Sound cues", tile: IconTile(.volume2, Color(nsColor: .systemGreen)), isOn: $settings.soundCues)
         }
     }
