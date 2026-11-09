@@ -3,6 +3,17 @@
   <channel>
     <title>voz</title>
     <item>
+      <title>voz 0.2.0-beta.100067</title>
+      <description>&lt;ul&gt;&lt;li&gt;After updating, allowing Accessibility again now works on the first try&lt;/li&gt;&lt;li&gt;After an update, Voz asks for missing access once instead of at every launch&lt;/li&gt;&lt;/ul&gt;</description>
+      <link>https://github.com/Joelheile/voz/releases/tag/beta-100067</link>
+      <pubDate>Mon, 09 Nov 2026 04:02:50 GMT</pubDate>
+      <sparkle:version>100067</sparkle:version>
+      <sparkle:shortVersionString>0.2.0-beta.100067</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100067/voz-0.2.0-beta.100067.zip" length="9234528" sparkle:edSignature="sK/mJXDZ4EixiLe/b/J/9jZuXFxOyk2mjgmiBXHlhNgkP8vu3yscSJp9jimDqurFmsB9dcH6H9hxivBred36DA==" type="application/octet-stream" />
+    </item>
+    <item>
       <title>voz 0.2.0-beta.100066</title>
       <description>&lt;ul&gt;&lt;li&gt;A notice now tells you when an update is ready, with one-click restart&lt;/li&gt;&lt;li&gt;Browse history one day at a time with arrows and a calendar&lt;/li&gt;&lt;li&gt;Press Cmd+K in the menu to search transcripts, settings and extensions&lt;/li&gt;&lt;li&gt;Press Cmd+F in the menu to jump to transcript search&lt;/li&gt;&lt;li&gt;Toasts and buttons now share one rounded glass look&lt;/li&gt;&lt;li&gt;Run voz telemetry to see exactly what Voz sends&lt;/li&gt;&lt;/ul&gt;</description>
       <link>https://github.com/Joelheile/voz/releases/tag/beta-100066</link>
@@ -110,17 +121,6 @@
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <sparkle:channel>beta</sparkle:channel>
       <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100055/voz-0.1.0-beta.100055.zip" length="8707803" sparkle:edSignature="BdjwWf4NgpbZBnXjSq2LrtpVN3pwbky3xrvI75m03cIAhgv5RcxaFl/v3aOISXLqCTKMm5Pmf3MpLO6unnrtDA==" type="application/octet-stream" />
-    </item>
-    <item>
-      <title>voz 0.1.0-beta.100054</title>
-      <description>&lt;ul&gt;&lt;li&gt;Control Voz from the terminal: run voz help to see every command&lt;/li&gt;&lt;li&gt;Connect Claude, Codex and other AI apps to Voz with voz mcp&lt;/li&gt;&lt;li&gt;Print a dictation in the terminal with voz dictation stop --print&lt;/li&gt;&lt;li&gt;Extensions can take live notes while you talk, in a panel by the notch&lt;/li&gt;&lt;/ul&gt;</description>
-      <link>https://github.com/Joelheile/voz/releases/tag/beta-100054</link>
-      <pubDate>Mon, 02 Nov 2026 00:11:32 GMT</pubDate>
-      <sparkle:version>100054</sparkle:version>
-      <sparkle:shortVersionString>0.1.0-beta.100054</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <sparkle:channel>beta</sparkle:channel>
-      <enclosure url="https://github.com/Joelheile/voz/releases/download/beta-100054/voz-0.1.0-beta.100054.zip" length="8702215" sparkle:edSignature="V6/pOyTS8847vu55GnOSB9/+Hig8wFCcovyN/cm5bb3upH0fw8Nn23aS+s6mI1E1fYxF2d/BYO1MFJ1nn4xtDw==" type="application/octet-stream" />
     </item>
     <item>
       <title>voz 0.1.0</title>

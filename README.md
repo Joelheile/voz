@@ -131,11 +131,11 @@ Each command becomes a tool, such as `history`, `vocabulary_add` or `voz-jira_is
 ## What's new
 
 <!-- changelog -->
+- After updating, allowing Accessibility again now works on the first try
+- After an update, Voz asks for missing access once instead of at every launch
 - A notice now tells you when an update is ready, with one-click restart
 - Browse history one day at a time with arrows and a calendar
 - Press Cmd+K in the menu to search transcripts, settings and extensions
-- Press Cmd+F in the menu to jump to transcript search
-- Toasts and buttons now share one rounded glass look
 
 [See everything new](CHANGELOG.md)
 <!-- /changelog -->
