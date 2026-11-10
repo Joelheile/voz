@@ -137,6 +137,8 @@ struct SettingsPage: View {
 enum TalkMode: String, CaseIterable {
     case tap = "Tap"
     case hold = "Tap or hold"
+
+    static let barWidth: CGFloat = 176
 }
 
 enum OutputMode: String, CaseIterable {
@@ -154,10 +156,6 @@ enum OutputMode: String, CaseIterable {
 
     var pastes: Bool { self != .copy }
     var copies: Bool { self != .type }
-}
-
-extension TalkMode {
-    static let barWidth: CGFloat = 176
 }
 
 extension AppSettings {

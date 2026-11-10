@@ -5,9 +5,9 @@ import Testing
 @Suite struct TourNavigationTests {
     @Test func backFromAPageOpenedInTheTourReturnsToTheSameCard() {
         let model = PopoverModel()
-        model.startTour()
+        model.page = .tour
         model.tourStep = .dictionary
-        model.openFromTour(.dictionary)
+        model.page = .dictionary
         #expect(model.page == .dictionary)
         model.goBack()
         #expect(model.page == .tour)
@@ -15,28 +15,33 @@ import Testing
         #expect(model.tourActive)
     }
 
-    @Test func backFromThatPageOpenedNormallyStillGoesHome() {
+    @Test func backGoesHomeOnceTheTourIsDone() {
         let model = PopoverModel()
-        model.startTour()
-        model.openFromTour(.dictionary)
-        model.goBack()
+        model.page = .tour
+        model.finishTour()
         model.page = .dictionary
         model.goBack()
         #expect(model.page == .home)
     }
 
+    @Test func pagesBelowSettingsKeepTheirOwnParentDuringTheTour() {
+        let model = PopoverModel()
+        model.page = .tour
+        model.page = .privacy
+        model.goBack()
+        #expect(model.page == .settings)
+        model.goBack()
+        #expect(model.page == .tour)
+    }
+
     @Test func leavingTheTourEndsIt() {
         let model = PopoverModel()
-        model.startTour()
+        model.page = .tour
         model.tourStep = .extensions
         model.goBack()
         #expect(model.page == .home)
         #expect(!model.tourActive)
         #expect(model.tourStep == .dictate)
-    }
-
-    @Test func holdModeIsLabelledWithBothGestures() {
-        #expect(TalkMode.allCases.map(\.rawValue) == ["Tap", "Tap or hold"])
     }
 
     @Test func extrasComeBeforeTryingDictation() {

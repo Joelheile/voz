@@ -109,15 +109,14 @@ final class PopoverModel: ObservableObject {
     @Published var status = PopoverStatus.ready
     @Published var hint = ""
     @Published var page = PopoverPage.home {
-        didSet { if page == returnPage || page == .home { returnPage = nil } }
+        didSet { if page == .tour { tourActive = true } }
     }
     @Published var needsSetup = false
     /// The tour's current card, kept here so opening the Dictionary or Extensions from it and coming back resumes it
     @Published var tourStep = TourStep.dictate
-    /// True from the end of setup until the tour's Done or Skip, so the panel reopens on the tour
+    /// True from opening the tour until its Done or Skip. The tour stands in for home that long.
     @Published private(set) var tourActive = false
-    /// Where Back goes from a page opened from somewhere other than its parent, such as the tour
-    private(set) var returnPage: PopoverPage?
+    var root: PopoverPage { tourActive ? .tour : .home }
     @Published private(set) var copiedID: UUID?
     /// Goes up each time Cmd+F asks the home page to put the cursor in its search box
     @Published private(set) var searchFocusRequests = 0
@@ -127,19 +126,7 @@ final class PopoverModel: ObservableObject {
 
     func goBack() {
         if page == .tour { return finishTour() }
-        page = returnPage ?? page.parent
-    }
-
-    func startTour() {
-        tourStep = .dictate
-        tourActive = true
-        page = .tour
-    }
-
-    /// Opens a page from the tour, so its Back button returns to the tour
-    func openFromTour(_ destination: PopoverPage) {
-        page = destination
-        returnPage = .tour
+        page = page.parent == .home ? root : page.parent
     }
 
     func finishTour() {

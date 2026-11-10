@@ -69,7 +69,7 @@ struct TourPage: View {
             StepHeader(title: step.title, detail: step.detail)
             ZStack(alignment: .leading) {
                 if let action = step.action {
-                    Button(action.title) { model.openFromTour(action.page) }
+                    Button(action.title) { model.page = action.page }
                         .buttonStyle(.pill(.quiet, .small))
                 }
             }
