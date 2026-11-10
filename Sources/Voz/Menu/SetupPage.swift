@@ -4,6 +4,7 @@ struct SetupPage: View {
     @ObservedObject var model: SetupModel
     @ObservedObject var settings: AppSettings
     @ObservedObject var history: HistoryModel
+    let extensions: ExtensionsModel
     let status: PopoverStatus
     let retryModel: () -> Void
     let finish: () -> Void
@@ -28,6 +29,7 @@ struct SetupPage: View {
         case .access: AccessStep(model: model)
         case .languages: LanguagesStep(settings: settings)
         case .model: ModelStep(settings: settings)
+        case .extras: ExtrasStep(settings: settings, extensions: extensions)
         case .tryIt: TryStep(settings: settings, history: history, status: status, retryModel: retryModel, tried: $model.triedDictation)
         }
     }
@@ -52,7 +54,7 @@ struct SetupPage: View {
     private var primaryTitle: String {
         switch model.step {
         case .access: model.allGranted ? "Continue" : "Skip for now"
-        case .languages, .model: "Continue"
+        case .languages, .model, .extras: "Continue"
         case .tryIt: "Start using Voz"
         }
     }
@@ -156,6 +158,108 @@ private struct ModelStep: View {
     }
 }
 
+/// Optional choices people otherwise find only later: keeping dictations on the clipboard, and a few popular extensions
+private struct ExtrasStep: View {
+    private static let suggestionCount = 3
+
+    @ObservedObject var settings: AppSettings
+    @ObservedObject var extensions: ExtensionsModel
+
+    /// Stays the same while you install, so a row you added doesn't jump away
+    private var suggestions: [PackageListing] {
+        Array(extensions.listings.ordered(by: .popular).prefix(Self.suggestionCount))
+    }
+
+    /// Turning copying off while Voz only copies would deliver nothing, so it types again
+    private var copies: Binding<Bool> {
+        Binding { settings.copyToClipboard } set: { copies in
+            settings.copyToClipboard = copies
+            if !copies { settings.insertIntoApp = true }
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            StepHeader(title: "Add extras", detail: "All optional. Change them later in Settings and Extensions.")
+            PanelGroup {
+                PanelRow(title: "Copy to clipboard", detail: "Paste your last dictation again with ⌘V", tile: IconTile(.type, Color(nsColor: .systemOrange))) {
+                    Toggle("Copy to clipboard", isOn: copies).labelsHidden()
+                }
+            }
+            .controlSize(.small)
+            if !suggestions.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    PanelGroup(title: "Popular extensions") {
+                        ForEach(suggestions) { listing in
+                            SuggestedExtensionRow(listing: listing, extensions: extensions)
+                        }
+                    }
+                    Text(extensions.message ?? "The first one also downloads Bun, which runs extensions.")
+                        .font(.meta)
+                        .foregroundStyle(Theme.inkTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.leading, 4)
+                }
+            } else if extensions.loading {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .task { await extensions.load() }
+    }
+}
+
+private struct SuggestedExtensionRow: View {
+    let listing: PackageListing
+    @ObservedObject var extensions: ExtensionsModel
+
+    private var isInstalled: Bool {
+        extensions.installed.contains { $0.name == listing.name }
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(ExtensionsModel.displayName(listing.name))
+                    .font(.ui(13, weight: .medium))
+                    .foregroundStyle(Theme.ink)
+                if let summary = listing.summary {
+                    Text(summary)
+                        .font(.ui(11.5))
+                        .lineSpacing(1)
+                        .lineLimit(2)
+                        .foregroundStyle(Theme.inkTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 0)
+            trailing
+        }
+        .frame(minHeight: Theme.Size.row)
+        .padding(.vertical, 6)
+        .animation(Theme.Motion.section, value: isInstalled)
+    }
+
+    @ViewBuilder
+    private var trailing: some View {
+        if let stage = extensions.stage(for: listing.name) {
+            StageLabel(text: stage.label)
+        } else if isInstalled {
+            HStack(spacing: 4) {
+                Icon(.check, size: 13)
+                Text("Added").font(.ui(12))
+            }
+            .foregroundStyle(Theme.inkSecondary)
+            .popIn()
+        } else {
+            Button("Add") { Task { await extensions.install(listing) } }
+                .buttonStyle(.pill(.quiet, .small))
+                .disabled(extensions.working != nil)
+        }
+    }
+}
+
 private struct TryStep: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var history: HistoryModel
@@ -194,7 +298,7 @@ private struct TryStep: View {
                     }
                     .buttonStyle(.pill(.quiet, .small))
                     TabBar(tabs: TalkMode.allCases, selection: settings.talkMode)
-                        .frame(width: 120)
+                        .frame(width: TalkMode.barWidth)
                 }
                 if let warning = capture.warning {
                     Text(warning)

@@ -50,6 +50,7 @@ extension AnalyticsEvent {
             case .access: .setupAccess
             case .languages: .setupLanguages
             case .model: .setupModel
+            case .extras: .setupExtras
             case .tryIt: .setupTryIt
             }
         case .setupCompleted: .setupCompleted
@@ -100,6 +101,7 @@ enum UsageMilestone: String, Codable, Sendable {
     case setupAccess = "setup_access"
     case setupLanguages = "setup_languages"
     case setupModel = "setup_model"
+    case setupExtras = "setup_extras"
     case setupTryIt = "setup_try_it"
     case setupCompleted = "setup_completed"
     case permissionMicrophone = "permission_microphone"

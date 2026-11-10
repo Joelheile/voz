@@ -58,7 +58,7 @@ struct PopoverView: View {
     @ViewBuilder
     private var page: some View {
         if model.needsSetup {
-            SetupPage(model: sources.setup, settings: sources.settings, history: sources.history, status: model.status, retryModel: model.actions.retryModel, finish: model.actions.finishSetup)
+            SetupPage(model: sources.setup, settings: sources.settings, history: sources.history, extensions: sources.extensions, status: model.status, retryModel: model.actions.retryModel, finish: model.actions.finishSetup)
         } else {
             switch model.page {
             case .home:
@@ -92,7 +92,7 @@ struct PopoverView: View {
             case .search:
                 SearchPage(model: model, history: sources.history, vocabulary: sources.vocabulary, extensions: sources.extensions)
             case .tour:
-                TourPage(settings: sources.settings, open: { model.page = $0 }, finish: { withAnimation(Theme.Motion.section) { model.page = .home } })
+                TourPage(model: model, settings: sources.settings)
             }
         }
     }

@@ -55,7 +55,7 @@ struct SettingsPage: View {
             }
             PanelRow(title: "Mode", tile: IconTile(.hand, Color(nsColor: .systemIndigo))) {
                 TabBar(tabs: TalkMode.allCases, selection: settings.talkMode)
-                    .frame(width: 120)
+                    .frame(width: TalkMode.barWidth)
             }
             PanelRow(title: "Output", tile: IconTile(.type, Color(nsColor: .systemOrange))) {
                 TabBar(tabs: OutputMode.allCases, selection: settings.outputMode)
@@ -133,9 +133,10 @@ struct SettingsPage: View {
     }
 }
 
+/// Hold mode also starts with a quick tap and stops on the next one, so its label names both
 enum TalkMode: String, CaseIterable {
     case tap = "Tap"
-    case hold = "Hold"
+    case hold = "Tap or hold"
 }
 
 enum OutputMode: String, CaseIterable {
@@ -153,6 +154,10 @@ enum OutputMode: String, CaseIterable {
 
     var pastes: Bool { self != .copy }
     var copies: Bool { self != .type }
+}
+
+extension TalkMode {
+    static let barWidth: CGFloat = 176
 }
 
 extension AppSettings {

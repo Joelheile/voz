@@ -129,7 +129,7 @@ final class StatusItemController: NSObject {
             retryModel: retryModel,
             checkForUpdates: { [weak self] in self?.dismissThen(checkForUpdates) },
             finishSetup: { [weak self] in
-                self?.model.page = .tour
+                self?.model.startTour()
                 finishSetup()
             },
             resize: { [weak self] in self?.resize(to: $0) },
@@ -163,8 +163,9 @@ final class StatusItemController: NSObject {
         refresh()
     }
 
-    func open(_ page: PopoverPage = .home) {
-        model.page = page
+    /// Without a page, opens home, or the tour while it is unfinished
+    func open(_ page: PopoverPage? = nil) {
+        model.page = page ?? (model.tourActive ? .tour : .home)
         guard !panel.isVisible else { return }
         showPanel()
     }

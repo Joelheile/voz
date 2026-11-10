@@ -193,6 +193,7 @@ enum SetupStage: String, Sendable {
     case access
     case languages
     case model
+    case extras
     case tryIt = "try_it"
 }
 

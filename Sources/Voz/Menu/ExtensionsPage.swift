@@ -546,7 +546,7 @@ private struct InstalledDetail: View {
     }
 }
 
-private struct StageLabel: View {
+struct StageLabel: View {
     let text: String
 
     var body: some View {

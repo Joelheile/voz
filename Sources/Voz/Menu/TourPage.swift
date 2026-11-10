@@ -32,13 +32,12 @@ enum TourStep: Int, CaseIterable {
 }
 
 struct TourPage: View {
+    @ObservedObject var model: PopoverModel
     @ObservedObject var settings: AppSettings
-    let open: (PopoverPage) -> Void
-    let finish: () -> Void
-    @State private var step = TourStep.dictate
     @State private var forward = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    private var step: TourStep { model.tourStep }
     private var isLast: Bool { step == TourStep.allCases.last }
 
     var body: some View {
@@ -70,7 +69,7 @@ struct TourPage: View {
             StepHeader(title: step.title, detail: step.detail)
             ZStack(alignment: .leading) {
                 if let action = step.action {
-                    Button(action.title) { open(action.page) }
+                    Button(action.title) { model.openFromTour(action.page) }
                         .buttonStyle(.pill(.quiet, .small))
                 }
             }
@@ -111,7 +110,11 @@ struct TourPage: View {
     private func go(to index: Int) {
         guard let next = TourStep(rawValue: index) else { return }
         forward = next.rawValue > step.rawValue
-        withAnimation(.spring(duration: 0.28, bounce: 0)) { step = next }
+        withAnimation(.spring(duration: 0.28, bounce: 0)) { model.tourStep = next }
+    }
+
+    private func finish() {
+        withAnimation(Theme.Motion.section) { model.finishTour() }
     }
 }
 
