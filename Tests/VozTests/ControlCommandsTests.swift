@@ -182,6 +182,24 @@ struct ControlCommandsTests {
         #expect(silent.stderr.contains("no speech"))
     }
 
+    @Test func stopCanSendAndCancelThrowsTheRecordingAway() async throws {
+        let dictation = FakeDictation()
+        let (commands, settings) = try makeControlCommands(dictation: dictation)
+        let center = ControlCenter(commands: commands.all)
+        #expect(await center.handle(["dictation", "stop", "--send"], json: false).stdout == "Not recording.\n")
+        dictation.phase = .recording
+        #expect(await center.handle(["dictation", "stop", "--send", "--print"], json: false).exit == 2)
+        #expect(await center.handle(["dictation", "stop", "--send"], json: false).exit == 0)
+        #expect(dictation.sent == 1)
+        #expect(await center.handle(["dictation", "cancel"], json: false).stdout == "Not recording.\n")
+        dictation.phase = .recording
+        #expect(await center.handle(["dictation", "cancel"], json: false).exit == 0)
+        #expect(dictation.phase == .idle)
+        #expect(!settings.quickSend)
+        #expect(await center.handle(["settings", "quickSend", "on"], json: false).exit == 0)
+        #expect(settings.quickSend)
+    }
+
     @Test func terminalOnlyCommandsStayOffMCP() async throws {
         let (commands, _) = try makeControlCommands()
         let center = ControlCenter(commands: commands.all)

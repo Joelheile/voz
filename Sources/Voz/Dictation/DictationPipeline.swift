@@ -106,6 +106,9 @@ final class DictationPipeline {
             }
             let insertMs = (ContinuousClock.now - insertStarted).wholeMilliseconds
             if recording.inserts, let command = delivery.command { extensions.run(command, app: recording.app) }
+            if recording.sends, recording.inserts, delivery.command == nil, !delivery.text.isEmpty, settings.insertIntoApp {
+                await send(to: recording.app)
+            }
             let record = await save(transcript, finalText: delivery.text.isEmpty ? transcript.cleaned.text : delivery.text, app: recording.app, released: released)
             report(record, model: transcript.model, insertMs: insertMs, trigger: recording.trigger)
             telemetry.recordDictation(app: recording.app, model: transcript.model, words: record.wordCount, totalMs: record.totalMs)
@@ -119,6 +122,20 @@ final class DictationPipeline {
             return .failed
         }
     }
+
+    /// Presses Return for quick send, unless you switched apps meanwhile, so it can't trigger anything in the wrong window
+    private func send(to app: HostApp) async {
+        // The paste is still on its way to the app, and Return must land after it
+        try? await Task.sleep(for: Self.sendDelay)
+        guard NSWorkspace.shared.frontmostApplication?.bundleIdentifier == app.bundleID else {
+            Log.app.notice("Quick send skipped: the front app changed")
+            return
+        }
+        if let key = Self.sendKey { output.press(key) }
+    }
+
+    private static let sendDelay = Duration.milliseconds(120)
+    private static let sendKey = try? KeyChord(parsing: "return")
 
     private func learnSpokenWords(in raw: String) {
         let candidates = SpokenCandidates.find(in: raw, isKnownWord: EditObserver.isKnownWord)

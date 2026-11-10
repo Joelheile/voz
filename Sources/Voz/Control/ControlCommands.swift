@@ -17,13 +17,15 @@ struct ControlCommands {
         let phase: @MainActor () -> DictationPhase
         let handle: @MainActor (HotkeyAction) -> Void
         let stopWithoutInserting: @MainActor () -> Void
+        var stopAndSend: @MainActor () -> Void = {}
+        var cancel: @MainActor () -> Void = {}
     }
 
     /// How long `dictation stop --print` waits for the text: a long recording plus model cleanup
     static let printWait = Duration.seconds(90)
 
     func all() -> [ControlCommand] {
-        [status] + LocalCommands.all(inTerminal: false) + [dictationCommand("start"), dictationCommand("stop"), dictationCommand("toggle"), historyCommand, last, draftList,
+        [status] + LocalCommands.all(inTerminal: false) + [dictationCommand("start"), dictationCommand("stop"), dictationCommand("toggle"), dictationCancel, historyCommand, last, draftList,
          vocabularyList, vocabularyAdd, vocabularyRemove, extensionList, search, enable(true), enable(false), config, settingsCommand, aiCommand, modelList, feedback, telemetry, commandList]
             + catalog.tools.map(tool) + catalog.actions.filter { !$0.hidden }.map(action)
     }
@@ -61,12 +63,22 @@ struct ControlCommands {
     private func dictationCommand(_ verb: String) -> ControlCommand {
         let summaries = ["start": "Start recording, like tapping the hotkey", "stop": "Stop recording and insert the text", "toggle": "Start or stop recording"]
         let input: [GenerationSpec.Property] = verb == "stop"
-            ? [.init(name: "print", schema: .boolean("Print the text here instead of inserting it, once Voz has transcribed it"), optional: true)]
+            ? [
+                .init(name: "print", schema: .boolean("Print the text here instead of inserting it, once Voz has transcribed it"), optional: true),
+                .init(name: "send", schema: .boolean("Press Return after inserting the text, so a chat message goes out"), optional: true),
+            ]
             : []
         return ControlCommand(name: "dictation/\(verb)", summary: summaries[verb]!, input: .object(input)) { arguments in
             let before = dictation.phase()
             if before == .transcribing { throw ControlError.failed("Voz is still transcribing. Try again in a moment.") }
-            if arguments["print"] == .bool(true) { return try await stopAndPrint(recording: before == .recording) }
+            let prints = arguments["print"] == .bool(true), sends = arguments["send"] == .bool(true)
+            if prints, sends { throw ControlError.usage("Use --print or --send, not both.") }
+            if prints { return try await stopAndPrint(recording: before == .recording) }
+            if sends {
+                guard before == .recording else { return .message("Not recording.", changed: false) }
+                dictation.stopAndSend()
+                return .message("Stopped. Voz inserts the text and presses Return when it's ready.")
+            }
             let starts = verb == "start" || (verb == "toggle" && before == .idle)
             if starts == (before == .recording) { return .message(starts ? "Already recording." : "Not recording.", changed: false) }
             dictation.handle(.toggle)
@@ -74,6 +86,14 @@ struct ControlCommands {
                 throw ControlError.failed("Voz could not start recording. Run voz status to check microphone access.")
             }
             return .message(starts ? "Recording. Run voz dictation stop to finish." : "Stopped. Voz inserts the text when it's ready.")
+        }
+    }
+
+    private var dictationCancel: ControlCommand {
+        ControlCommand(name: "dictation/cancel", summary: "Stop recording and throw the audio away, like Esc", input: .object([])) { _ in
+            guard dictation.phase() == .recording else { return .message("Not recording.", changed: false) }
+            dictation.cancel()
+            return .message("Canceled. Voz kept nothing.")
         }
     }
 
@@ -537,6 +557,7 @@ struct ControlCommands {
             ("headphoneQuality", "Keep your mic when Bluetooth headphones connect, so they keep full sound quality", \.headphoneQuality),
             ("copyToClipboard", "Copy each dictation to the clipboard", \.copyToClipboard),
             ("insertIntoApp", "Type each dictation into the front app", \.insertIntoApp),
+            ("quickSend", "Press Return while recording to insert the text and send it", \.quickSend),
             ("soundCues", "Play a sound when recording starts and stops", \.soundCues),
             ("livePreview", "Show words in the notch while you speak", \.livePreviewEnabled),
             ("launchAtLogin", "Open Voz when you log in", \.launchAtLogin),
