@@ -163,7 +163,7 @@ final class AppSettings: ObservableObject {
             SettingsKey.headphoneQuality: true,
             SettingsKey.copyToClipboard: true,
             SettingsKey.insertIntoApp: true,
-            SettingsKey.quickSend: false,
+            SettingsKey.quickSend: true,
             SettingsKey.soundCues: false,
             SettingsKey.livePreviewEnabled: false,
             SettingsKey.launchAtLogin: true,

@@ -43,7 +43,7 @@ Speech to text runs on your Mac with NVIDIA's Parakeet model in 25 languages, an
   <img src=".github/images/ready-light.png" width="380" alt="The Voz menu bar panel with recent transcripts">
 </picture>
 
-Press Esc while you talk to throw a recording away. Turn on Quick send under Settings, and Return stops the recording, types the text and sends it, which suits chats and coding agents.
+Press Esc while you talk to throw a recording away. Press Return, and Voz stops the recording, types the text and sends it, which suits chats and coding agents. Turn that off with Quick send under Settings.
 
 Voz lives in the menu bar and keeps your history on your Mac. Click a transcript to copy it, or search for older ones.
 

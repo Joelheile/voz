@@ -32,43 +32,65 @@ struct RecordingKeyFilter: Equatable, Sendable {
 
 /// Lives on the tap's thread and decides there, so Return and Esc never wait for the main thread
 private final class RecordingKeyRelay: @unchecked Sendable {
+    /// Set once, before the first filter
     var port: CFMachPort?
-    let filter: RecordingKeyFilter
-    let deliver: @Sendable (RecordingKey) -> Void
+    private let lock = NSLock()
+    private var filter: RecordingKeyFilter?
     /// Key codes whose key down Voz kept, so their key up stays away from the app too
     private var held: Set<UInt16> = []
+    private let deliver: @Sendable (RecordingKey) -> Void
 
-    init(filter: RecordingKeyFilter, deliver: @escaping @Sendable (RecordingKey) -> Void) {
-        self.filter = filter
+    init(deliver: @escaping @Sendable (RecordingKey) -> Void) {
         self.deliver = deliver
+    }
+
+    /// Nil stops taking keys. Returns false when macOS refuses to turn the tap on, as it does after Accessibility was revoked
+    func take(_ filter: RecordingKeyFilter?) -> Bool {
+        lock.withLock {
+            self.filter = filter
+            return syncTap()
+        }
+    }
+
+    /// The tap outlives the recording until the keys it kept are released, because the recording ends on their key down
+    @discardableResult
+    private func syncTap() -> Bool {
+        guard let port else { return false }
+        let wanted = filter != nil || !held.isEmpty
+        CGEvent.tapEnable(tap: port, enable: wanted)
+        return CGEvent.tapIsEnabled(tap: port) == wanted
     }
 
     /// Returns false to keep the event from the front app
     func passes(type: CGEventType, event: CGEvent) -> Bool {
         let keyCode = UInt16(truncatingIfNeeded: event.getIntegerValueField(.keyboardEventKeycode))
-        switch type {
-        case .tapDisabledByTimeout, .tapDisabledByUserInput:
-            if let port { CGEvent.tapEnable(tap: port, enable: true) }
-            return true
-        case .keyDown:
-            if held.contains(keyCode) { return false }
-            guard event.getIntegerValueField(.keyboardEventAutorepeat) == 0,
-                  let key = filter.key(for: keyCode, flags: event.flags) else { return true }
-            held.insert(keyCode)
-            deliver(key)
-            return false
-        case .keyUp:
-            return held.remove(keyCode) == nil
-        default:
-            return true
+        return lock.withLock {
+            switch type {
+            case .tapDisabledByTimeout, .tapDisabledByUserInput:
+                held = []
+                syncTap()
+                return true
+            case .keyDown:
+                if held.contains(keyCode) { return false }
+                guard event.getIntegerValueField(.keyboardEventAutorepeat) == 0,
+                      let key = filter?.key(for: keyCode, flags: event.flags) else { return true }
+                held.insert(keyCode)
+                deliver(key)
+                return false
+            case .keyUp:
+                guard held.remove(keyCode) != nil else { return true }
+                syncTap()
+                return false
+            default:
+                return true
+            }
         }
     }
 }
 
-/// An event tap that exists only while Voz records, so Return and Esc reach your apps as usual the rest of the time
+/// An event tap that is on only while Voz records, so Return and Esc reach your apps as usual the rest of the time
 @MainActor
 final class RecordingKeys {
-    private var tap: CFMachPort?
     private var relay: RecordingKeyRelay?
     private let onKey: @MainActor (RecordingKey) -> Void
 
@@ -77,8 +99,18 @@ final class RecordingKeys {
     }
 
     func start(_ filter: RecordingKeyFilter) {
-        guard tap == nil else { return }
-        let relay = RecordingKeyRelay(filter: filter) { [weak self] key in
+        if relay?.take(filter) == true { return }
+        if let port = relay?.port { CFMachPortInvalidate(port) }
+        relay = makeTap()
+        if relay?.take(filter) != true { Log.app.error("Recording key tap failed, Return and Esc pass through to the app") }
+    }
+
+    func stop() {
+        _ = relay?.take(nil)
+    }
+
+    private func makeTap() -> RecordingKeyRelay? {
+        let relay = RecordingKeyRelay { [weak self] key in
             DispatchQueue.main.async { MainActor.assumeIsolated { self?.onKey(key) } }
         }
         let callback: CGEventTapCallBack = { _, type, event, userInfo in
@@ -94,10 +126,8 @@ final class RecordingKeys {
             eventsOfInterest: mask,
             callback: callback,
             userInfo: Unmanaged.passUnretained(relay).toOpaque()
-        ) else {
-            Log.app.error("Recording key tap failed, Return and Esc pass through to the app")
-            return
-        }
+        ) else { return nil }
+        CGEvent.tapEnable(tap: tap, enable: false)
         relay.port = tap
         let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
         let thread = Thread {
@@ -107,14 +137,6 @@ final class RecordingKeys {
         thread.name = "voz.recording-keys"
         thread.qualityOfService = .userInteractive
         thread.start()
-        CGEvent.tapEnable(tap: tap, enable: true)
-        self.tap = tap
-        self.relay = relay
-    }
-
-    func stop() {
-        if let tap { CFMachPortInvalidate(tap) }
-        tap = nil
-        relay = nil
+        return relay
     }
 }

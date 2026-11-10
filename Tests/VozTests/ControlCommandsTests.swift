@@ -195,9 +195,9 @@ struct ControlCommandsTests {
         dictation.phase = .recording
         #expect(await center.handle(["dictation", "cancel"], json: false).exit == 0)
         #expect(dictation.phase == .idle)
-        #expect(!settings.quickSend)
-        #expect(await center.handle(["settings", "quickSend", "on"], json: false).exit == 0)
         #expect(settings.quickSend)
+        #expect(await center.handle(["settings", "quickSend", "off"], json: false).exit == 0)
+        #expect(!settings.quickSend)
     }
 
     @Test func terminalOnlyCommandsStayOffMCP() async throws {

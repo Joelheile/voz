@@ -17,8 +17,8 @@ struct ControlCommands {
         let phase: @MainActor () -> DictationPhase
         let handle: @MainActor (HotkeyAction) -> Void
         let stopWithoutInserting: @MainActor () -> Void
-        var stopAndSend: @MainActor () -> Void = {}
-        var cancel: @MainActor () -> Void = {}
+        let stopAndSend: @MainActor () -> Void
+        let cancel: @MainActor () -> Void
     }
 
     /// How long `dictation stop --print` waits for the text: a long recording plus model cleanup

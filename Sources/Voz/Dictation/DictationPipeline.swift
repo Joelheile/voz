@@ -105,9 +105,10 @@ final class DictationPipeline {
                 extensions.inserted(delivery.text, raw: transcript.raw, app: recording.app)
             }
             let insertMs = (ContinuousClock.now - insertStarted).wholeMilliseconds
-            if recording.inserts, let command = delivery.command { extensions.run(command, app: recording.app) }
-            if recording.sends, recording.inserts, delivery.command == nil, !delivery.text.isEmpty, settings.insertIntoApp {
-                await send(to: recording.app)
+            if recording.inserts, let command = delivery.command {
+                extensions.run(command, app: recording.app)
+            } else if let target = recording.sendTarget, !delivery.text.isEmpty, settings.insertIntoApp {
+                await send(to: target)
             }
             let record = await save(transcript, finalText: delivery.text.isEmpty ? transcript.cleaned.text : delivery.text, app: recording.app, released: released)
             report(record, model: transcript.model, insertMs: insertMs, trigger: recording.trigger)
@@ -124,10 +125,10 @@ final class DictationPipeline {
     }
 
     /// Presses Return for quick send, unless you switched apps meanwhile, so it can't trigger anything in the wrong window
-    private func send(to app: HostApp) async {
+    private func send(to target: pid_t) async {
         // The paste is still on its way to the app, and Return must land after it
         try? await Task.sleep(for: Self.sendDelay)
-        guard NSWorkspace.shared.frontmostApplication?.bundleIdentifier == app.bundleID else {
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == target else {
             Log.app.notice("Quick send skipped: the front app changed")
             return
         }
