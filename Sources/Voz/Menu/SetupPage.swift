@@ -182,7 +182,7 @@ private struct ExtrasStep: View {
         VStack(alignment: .leading, spacing: 16) {
             StepHeader(title: "Add extras", detail: "All optional. Change them later in Settings and Extensions.")
             PanelGroup {
-                PanelRow(title: "Copy to clipboard", detail: "Paste your last dictation again with ⌘V", tile: IconTile(.type, Color(nsColor: .systemOrange))) {
+                PanelRow(title: "Copy to clipboard", detail: "Paste your last dictation again with ⌘V", tile: IconTile(.clipboard, Color(nsColor: .systemOrange))) {
                     Toggle("Copy to clipboard", isOn: copies).labelsHidden()
                 }
             }
