@@ -61,7 +61,7 @@ struct SettingsPage: View {
                 TabBar(tabs: OutputMode.allCases, selection: settings.outputMode)
                     .frame(width: 156)
             }
-            PanelRow(title: "Quick send", detail: "Press Return while you talk to insert and send", tile: IconTile(.arrowRight, Color(nsColor: .systemGreen))) {
+            PanelRow(title: "Quick send", detail: "Press Return while you talk to insert and send", tile: IconTile(.send, Color(nsColor: .systemGreen))) {
                 Toggle("Quick send", isOn: $settings.quickSend).labelsHidden()
             }
             .disabled(!settings.insertIntoApp)
