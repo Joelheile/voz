@@ -321,17 +321,28 @@ final class StatusItemController: NSObject {
         guard let buttonWindow = statusItem.button?.window, let button = statusItem.button else { return }
         let anchor = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
         let anchorIsOnScreen = NSScreen.screens.contains { $0.frame.contains(anchor) }
-        guard anchorIsOnScreen else {
+        let visible = (buttonWindow.screen ?? NSScreen.main)?.visibleFrame ?? anchor
+        let current = panel.isVisible && panel.frame.height > 0 ? panel.frame : nil
+        guard let frame = Self.panelFrame(size: size, anchor: anchorIsOnScreen ? anchor : nil, current: current, visible: visible) else {
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.anchorRetry) { [weak self] in
                 guard let self, self.panel.isVisible else { return }
-                self.layoutPanel(size: size)
+                self.layoutPanel(size: self.contentSize)
             }
             return
         }
-        let visible = (buttonWindow.screen ?? NSScreen.main)?.visibleFrame ?? anchor
+        panel.setFrame(frame, display: true)
+    }
+
+    /// Hangs the panel below the menu bar icon. In a full-screen space the menu bar slides away once the pointer leaves it,
+    /// which moves the icon off screen. An open panel then keeps its top edge, so it still grows and shrinks downward.
+    static func panelFrame(size: CGSize, anchor: NSRect?, current: NSRect?, visible: NSRect) -> NSRect? {
+        guard let anchor else {
+            guard let current else { return nil }
+            return NSRect(x: current.minX, y: current.maxY - size.height, width: size.width, height: size.height)
+        }
         let inset = PopoverView.shadowInset
-        let x = min(max(anchor.midX - size.width / 2, visible.minX + Self.screenMargin - inset), visible.maxX - size.width - Self.screenMargin + inset)
-        panel.setFrame(NSRect(x: x, y: anchor.minY - Self.panelGap + inset - size.height, width: size.width, height: size.height), display: true)
+        let x = min(max(anchor.midX - size.width / 2, visible.minX + screenMargin - inset), visible.maxX - size.width - screenMargin + inset)
+        return NSRect(x: x, y: anchor.minY - panelGap + inset - size.height, width: size.width, height: size.height)
     }
 
     private func showFallbackMenu() {
