@@ -257,6 +257,7 @@ final class FakeDictation {
     /// What `stop --print` transcribes. Nil saves nothing, as when Voz hears no speech
     var heard: String?
     var history: HistoryStore?
+    var sent = 0
 
     var control: ControlCommands.DictationControl {
         .init(
@@ -268,7 +269,12 @@ final class FakeDictation {
                     if let heard = self.heard { try? self.history?.insert(makeRecord(heard, at: Date().timeIntervalSince1970)) }
                     self.phase = .idle
                 }
-            }
+            },
+            stopAndSend: {
+                self.sent += 1
+                self.phase = .transcribing
+            },
+            cancel: { self.phase = .idle }
         )
     }
 }

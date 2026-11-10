@@ -8,6 +8,7 @@ private enum SettingsKey {
     static let headphoneQuality = "headphoneQuality"
     static let copyToClipboard = "copyToClipboard"
     static let insertIntoApp = "insertIntoApp"
+    static let quickSend = "quickSend"
     static let soundCues = "soundCues"
     static let livePreviewEnabled = "livePreviewEnabled"
     static let launchAtLogin = "launchAtLogin"
@@ -52,6 +53,10 @@ final class AppSettings: ObservableObject {
     }
     @Published var insertIntoApp: Bool {
         didSet { defaults.set(insertIntoApp, forKey: SettingsKey.insertIntoApp) }
+    }
+    /// Return while recording stops, inserts the text and presses Return
+    @Published var quickSend: Bool {
+        didSet { defaults.set(quickSend, forKey: SettingsKey.quickSend) }
     }
     @Published var speechModel: String {
         didSet { storePipeline() }
@@ -158,6 +163,7 @@ final class AppSettings: ObservableObject {
             SettingsKey.headphoneQuality: true,
             SettingsKey.copyToClipboard: true,
             SettingsKey.insertIntoApp: true,
+            SettingsKey.quickSend: true,
             SettingsKey.soundCues: false,
             SettingsKey.livePreviewEnabled: false,
             SettingsKey.launchAtLogin: true,
@@ -175,6 +181,7 @@ final class AppSettings: ObservableObject {
         headphoneQuality = defaults.bool(forKey: SettingsKey.headphoneQuality)
         copyToClipboard = defaults.bool(forKey: SettingsKey.copyToClipboard)
         insertIntoApp = defaults.bool(forKey: SettingsKey.insertIntoApp)
+        quickSend = defaults.bool(forKey: SettingsKey.quickSend)
         soundCues = defaults.bool(forKey: SettingsKey.soundCues)
         livePreviewEnabled = defaults.bool(forKey: SettingsKey.livePreviewEnabled)
         launchAtLogin = defaults.bool(forKey: SettingsKey.launchAtLogin)

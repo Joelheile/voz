@@ -61,6 +61,10 @@ struct SettingsPage: View {
                 TabBar(tabs: OutputMode.allCases, selection: settings.outputMode)
                     .frame(width: 156)
             }
+            PanelRow(title: "Quick send", detail: "Return while talking sends the text", tile: IconTile(.send, Color(nsColor: .systemGreen))) {
+                Toggle("Quick send", isOn: $settings.quickSend).labelsHidden()
+            }
+            .disabled(!settings.insertIntoApp)
             PanelRow(title: "Live preview", detail: "Draft text under the indicator", tile: IconTile(.textCursorInput, Color(nsColor: .systemCyan))) {
                 Toggle("Live preview", isOn: $settings.livePreviewEnabled).labelsHidden()
             }
