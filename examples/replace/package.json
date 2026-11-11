@@ -1,0 +1,14 @@
+{
+  "name": "voz-replace",
+  "version": "0.1.0",
+  "description": "Replace words you say with the words you want, and expand short phrases into your email, links or a signature",
+  "keywords": ["voz-package"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Joelheile/voz.git",
+    "directory": "examples/replace"
+  },
+  "files": ["index.ts", "rules.ts"],
+  "voz": { "apiVersion": 8 }
+}

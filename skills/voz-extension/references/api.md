@@ -57,6 +57,7 @@ Each example is a published package you can install or copy as a starting point:
 | [voz-launcher](https://github.com/Joelheile/voz/tree/main/examples/launcher) | Runs dictations that start with "computer" instead of typing them | `beforeInsert`, `settings`    |
 | [voz-edit](https://github.com/Joelheile/voz/tree/main/examples/edit)         | Changes what you just dictated when you say "edit shorter"        | `ctx.field`, `ctx.busy`, `afterInsert`, `voz.history` |
 | [voz-reply](https://github.com/Joelheile/voz/tree/main/examples/reply)       | Drafts a reply in your tone from the conversation on screen       | `ctx.field`, `ctx.busy`, `voz.history`, `voz.screen` |
+| [voz-replace](https://github.com/Joelheile/voz/tree/main/examples/replace)   | Replaces words and expands phrases such as "my email" into text   | `beforeInsert`, `registerList`, `registerTool`, `ctx.ask` |
 
 ## Loose files
 
