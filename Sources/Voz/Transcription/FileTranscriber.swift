@@ -196,10 +196,9 @@ actor SpeakerDiarizer {
     private static let blockSamples = 30 * Int(RecordingFilter.sampleRate)
     private var models: Nemotron3Models?
 
-    // Runs on the GPU so it doesn't wait for the Neural Engine, which Parakeet uses at the same time
     private func loadedModels() async throws -> Nemotron3Models {
         if let models { return models }
-        let loaded = try await Nemotron3Models.loadFromHuggingFace(config: Self.config, computeUnits: .cpuAndGPU)
+        let loaded = try await Nemotron3Models.loadGuarded(config: Self.config)
         models = loaded
         return loaded
     }

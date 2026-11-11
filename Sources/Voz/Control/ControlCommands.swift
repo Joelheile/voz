@@ -8,6 +8,7 @@ struct ControlCommands {
     let extensions: ExtensionsModel
     let catalog: ExtensionCatalog
     let dictation: DictationControl
+    var modelStatus = ModelStatus()
     var home = VozHome()
     var telemetryStore = TelemetryStore.shared
     var telemetryDefaults = UserDefaults.standard
@@ -24,7 +25,7 @@ struct ControlCommands {
 
     func all() -> [ControlCommand] {
         [status] + LocalCommands.all(inTerminal: false) + [dictationCommand("start"), dictationCommand("stop"), dictationCommand("toggle"), historyCommand, last, draftList,
-         vocabularyList, vocabularyAdd, vocabularyRemove, extensionList, search, enable(true), enable(false), config, settingsCommand, aiCommand, modelList, feedback, telemetry, commandList]
+         vocabularyList, vocabularyAdd, vocabularyRemove, extensionList, search, enable(true), enable(false), config, settingsCommand, aiCommand, modelList, modelCancel, feedback, telemetry, commandList]
             + catalog.tools.map(tool) + catalog.actions.filter { !$0.hidden }.map(action)
     }
 
@@ -288,6 +289,16 @@ struct ControlCommands {
     }
 
     // MARK: Feedback
+
+    private var modelCancel: ControlCommand {
+        ControlCommand(name: "model/cancel", summary: "Stop the speech model download and go back to the model you had before", input: .object([])) { _ in
+            let model = settings.localSpeechModel
+            guard modelStatus.isDownloading(model) else { return .message("No speech model is downloading.", changed: false) }
+            settings.cancelModelDownload()
+            let current = SpeechModel(rawValue: settings.speechModel)?.name ?? settings.speechModel
+            return .message("Stopped downloading \(model.name). Voz uses \(current) again. Run voz settings speechModel \(model.rawValue) to download it later.")
+        }
+    }
 
     private var feedback: ControlCommand {
         ControlCommand(

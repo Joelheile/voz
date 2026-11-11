@@ -19,6 +19,11 @@ final class ModelStatus: ObservableObject {
         return states[model] ?? .notLoaded
     }
 
+    func isDownloading(_ model: SpeechModel) -> Bool {
+        if case .downloading = state(for: model) { return true }
+        return false
+    }
+
     func downloadElapsed(for model: SpeechModel) -> TimeInterval {
         downloadStarts[model].map { Date().timeIntervalSince($0) } ?? 0
     }

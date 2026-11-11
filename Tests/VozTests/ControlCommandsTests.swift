@@ -320,3 +320,36 @@ struct TelemetryCommandTests {
         #expect(usage.isSuperset(of: AnalyticsEvent.samples.map(\.name)))
     }
 }
+
+@Suite @MainActor struct ModelCancelTests {
+    @Test func cancelStopsTheDownloadOnce() async throws {
+        let (commands, settings) = try makeControlCommands()
+        settings.speechModel = SpeechModel.parakeetUltra.rawValue
+        commands.modelStatus.update(.parakeetUltra, .downloading(fraction: 0.4))
+        let center = ControlCenter(commands: commands.all)
+        #expect(await center.handle(["model", "cancel"], json: false).exit == 0)
+        #expect(settings.speechModel == SpeechModel.appleSpeech.rawValue)
+        let again = await center.handle(["model", "cancel"], json: true)
+        #expect(again.exit == 0)
+        #expect(again.stdout.contains("\"changed\" : false"))
+    }
+
+    @Test func cancelGoesBackToTheModelYouHadBefore() async throws {
+        let (commands, settings) = try makeControlCommands()
+        settings.speechModel = "voz-whisper/large"
+        settings.speechModel = SpeechModel.parakeetUltra.rawValue
+        commands.modelStatus.update(.parakeetUltra, .downloading(fraction: 0.1))
+        let reply = await ControlCenter(commands: commands.all).handle(["model", "cancel"], json: false)
+        #expect(reply.exit == 0)
+        #expect(settings.speechModel == "voz-whisper/large")
+        #expect(reply.stdout.contains("Voz uses voz-whisper/large again"))
+    }
+
+    @Test func cancelLeavesAReadyModelAlone() async throws {
+        let (commands, settings) = try makeControlCommands()
+        settings.speechModel = SpeechModel.parakeetUltra.rawValue
+        commands.modelStatus.update(.parakeetUltra, .ready(bytes: 1))
+        #expect(await ControlCenter(commands: commands.all).handle(["model", "cancel"], json: false).exit == 0)
+        #expect(settings.speechModel == SpeechModel.parakeetUltra.rawValue)
+    }
+}
