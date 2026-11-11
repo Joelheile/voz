@@ -163,8 +163,9 @@ final class StatusItemController: NSObject {
         refresh()
     }
 
-    func open(_ page: PopoverPage = .home) {
-        model.page = page
+    /// Without a page, opens home, or the tour while it is unfinished
+    func open(_ page: PopoverPage? = nil) {
+        model.page = page ?? model.root
         guard !panel.isVisible else { return }
         showPanel()
     }

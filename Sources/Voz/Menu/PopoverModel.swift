@@ -108,8 +108,15 @@ final class PopoverModel: ObservableObject {
 
     @Published var status = PopoverStatus.ready
     @Published var hint = ""
-    @Published var page = PopoverPage.home
+    @Published var page = PopoverPage.home {
+        didSet { if page == .tour { tourActive = true } }
+    }
     @Published var needsSetup = false
+    /// The tour's current card, kept here so opening the Dictionary or Extensions from it and coming back resumes it
+    @Published var tourStep = TourStep.dictate
+    /// True from opening the tour until its Done or Skip. The tour stands in for home that long.
+    @Published private(set) var tourActive = false
+    var root: PopoverPage { tourActive ? .tour : .home }
     @Published private(set) var copiedID: UUID?
     /// Goes up each time Cmd+F asks the home page to put the cursor in its search box
     @Published private(set) var searchFocusRequests = 0
@@ -118,7 +125,14 @@ final class PopoverModel: ObservableObject {
     private var copiedReset: Task<Void, Never>?
 
     func goBack() {
-        page = page.parent
+        if page == .tour { return finishTour() }
+        page = page.parent == .home ? root : page.parent
+    }
+
+    func finishTour() {
+        tourActive = false
+        tourStep = .dictate
+        page = .home
     }
 
     func focusTranscriptSearch() {
