@@ -53,6 +53,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var extensionsModel = ExtensionsModel(analytics: analytics)
     private var statusItemController: StatusItemController?
     private var hotkeyMonitor: HotkeyMonitor?
+    private lazy var recordingKeys = RecordingKeys { [weak self] key in
+        switch key {
+        case .send: self?.dictation.stopAndSend()
+        case .cancel: self?.dictation.cancel()
+        }
+    }
     private let indicator = IndicatorController()
     private lazy var dropSensor = DropSensor(
         onInvite: { [weak self] screen in self?.inviteDrop(on: screen) },
@@ -110,6 +116,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.statusItemController = statusItemController
         dictation.onChange = { [weak self] in
             guard let self else { return }
+            self.syncRecordingKeys()
             self.statusItemController?.dictationChanged()
             self.indicator.sync(phase: self.dictation.phase)
             self.updater.resumePendingInstall()
@@ -225,7 +232,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             dictation: .init(
                 phase: { [dictation] in dictation.phase },
                 handle: { [dictation] in dictation.handle($0) },
-                stopWithoutInserting: { [dictation] in dictation.stopWithoutInserting() }
+                stopWithoutInserting: { [dictation] in dictation.stopWithoutInserting() },
+                stopAndSend: { [dictation] in dictation.stopAndSend() },
+                cancel: { [dictation] in dictation.cancel() }
             ),
             modelStatus: modelStatus
         )
@@ -260,6 +269,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             fatalError("History store failed to open: \(error)")
         }
+    }
+
+    /// Return and Esc belong to Voz only while it records
+    private func syncRecordingKeys() {
+        guard dictation.isRecording else { return recordingKeys.stop() }
+        recordingKeys.start(RecordingKeyFilter(hotkey: settings.hotkey, quickSend: settings.quickSend && settings.insertIntoApp))
     }
 
     private func observeSettings() {

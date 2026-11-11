@@ -43,6 +43,8 @@ Speech to text runs on your Mac with NVIDIA's Parakeet model in 25 languages, an
   <img src=".github/images/ready-light.png" width="380" alt="The Voz menu bar panel with recent transcripts">
 </picture>
 
+Press Esc while you talk to throw a recording away. Press Return, and Voz stops the recording, types the text and sends it, which suits chats and coding agents. Turn that off with Quick send under Settings.
+
 Voz lives in the menu bar and keeps your history on your Mac. Click a transcript to copy it, or search for older ones.
 
 ## Why Voz
@@ -95,6 +97,8 @@ voz start                         # open Voz in the background
 voz status                        # permissions, model and extensions
 voz dictation start               # record, then voz dictation stop
 voz dictation stop --print        # print the text instead of typing it
+voz dictation stop --send         # type it, then press Return
+voz dictation cancel              # throw the recording away
 voz logs --extensions --since 5m  # what extensions logged
 voz history invoice --limit 5     # find what you dictated
 voz vocabulary add Kubernetes     # teach Voz a word

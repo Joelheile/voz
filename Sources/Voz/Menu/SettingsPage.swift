@@ -55,12 +55,16 @@ struct SettingsPage: View {
             }
             PanelRow(title: "Mode", tile: IconTile(.hand, Color(nsColor: .systemIndigo))) {
                 TabBar(tabs: TalkMode.allCases, selection: settings.talkMode)
-                    .frame(width: 120)
+                    .frame(width: TalkMode.barWidth)
             }
             PanelRow(title: "Output", tile: IconTile(.type, Color(nsColor: .systemOrange))) {
                 TabBar(tabs: OutputMode.allCases, selection: settings.outputMode)
                     .frame(width: 156)
             }
+            PanelRow(title: "Quick send", detail: "Return while talking sends the text", tile: IconTile(.send, Color(nsColor: .systemGreen))) {
+                Toggle("Quick send", isOn: $settings.quickSend).labelsHidden()
+            }
+            .disabled(!settings.insertIntoApp)
             PanelRow(title: "Live preview", detail: "Draft text under the indicator", tile: IconTile(.textCursorInput, Color(nsColor: .systemCyan))) {
                 Toggle("Live preview", isOn: $settings.livePreviewEnabled).labelsHidden()
             }
@@ -133,9 +137,12 @@ struct SettingsPage: View {
     }
 }
 
+/// Hold mode also starts with a quick tap and stops on the next one, so its label names both
 enum TalkMode: String, CaseIterable {
     case tap = "Tap"
-    case hold = "Hold"
+    case hold = "Tap or hold"
+
+    static let barWidth: CGFloat = 176
 }
 
 enum OutputMode: String, CaseIterable {

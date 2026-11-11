@@ -6,6 +6,7 @@ enum SetupStep: Int, CaseIterable {
     case access
     case languages
     case model
+    case extras
     case tryIt
 
     var stage: SetupStage {
@@ -13,6 +14,7 @@ enum SetupStep: Int, CaseIterable {
         case .access: .access
         case .languages: .languages
         case .model: .model
+        case .extras: .extras
         case .tryIt: .tryIt
         }
     }
