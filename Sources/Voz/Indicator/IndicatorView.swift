@@ -374,7 +374,7 @@ struct IndicatorTrailing: View {
             case .done:
                 ResultSymbol(icon: .check, color: Theme.success, effect: .reveal).transition(swap)
             case .failed:
-                ResultSymbol(icon: .triangleAlert, color: Theme.failure, effect: .bounce).transition(swap)
+                ResultSymbol(icon: .triangleExclamationPoint, color: Theme.failure, effect: .bounce).transition(swap)
             case .dropTarget:
                 DropArrow(isTargeted: model.isDropTargeted).transition(swap)
             case .activity:
@@ -383,7 +383,7 @@ struct IndicatorTrailing: View {
                 } else if !model.canStop {
                     ProgressDots().transition(swap)
                 } else if model.live?.stalled == true {
-                    ResultSymbol(icon: .triangleAlert, color: Theme.failure, effect: .bounce)
+                    ResultSymbol(icon: .triangleExclamationPoint, color: Theme.failure, effect: .bounce)
                         .help("Voz can't hear the meeting and is reconnecting")
                         .transition(swap)
                 } else if model.live?.running == true {

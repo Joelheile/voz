@@ -734,7 +734,7 @@ private struct StatusBanner<Action: View>: View {
     private var mark: some View {
         switch status {
         case .recording: RecordingMark()
-        case .modelFailed: Icon(.triangleAlert, size: 16, strokeWidth: 1.5).foregroundStyle(Theme.recording)
+        case .modelFailed: Icon(.triangleExclamationPoint, size: 16, strokeWidth: 1.5).foregroundStyle(Theme.recording)
         case .permissionNeeded: Icon(.shield, size: 16, strokeWidth: 1.5).foregroundStyle(Color(nsColor: .systemYellow))
         case .loadingModel: Icon(.download, size: 16, strokeWidth: 1.5).foregroundStyle(Theme.accent)
         default: ProgressView().controlSize(.small)
