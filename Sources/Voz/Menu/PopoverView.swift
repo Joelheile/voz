@@ -172,10 +172,10 @@ private struct HomePage: View {
     private var statusAction: some View {
         switch model.status {
         case .loadingModel:
-            Button("Cancel") { settings.speechModel = SpeechModel.appleSpeech.rawValue }
+            Button("Cancel", action: settings.cancelModelDownload)
                 .buttonStyle(.pill(.quiet, .small))
                 .fixedSize()
-                .help("Stop the download and use Apple speech")
+                .help("Stop the download and go back to the model you had before")
         case let .permissionNeeded(fix):
             Button(fix.buttonTitle) { model.actions.fixPermission(fix) }
                 .buttonStyle(.pill(.ink, .small))
@@ -734,7 +734,7 @@ private struct StatusBanner<Action: View>: View {
     private var mark: some View {
         switch status {
         case .recording: RecordingMark()
-        case .modelFailed: Icon(.triangleAlert, size: 16, strokeWidth: 1.5).foregroundStyle(Theme.recording)
+        case .modelFailed: Icon(.triangleExclamationPoint, size: 16, strokeWidth: 1.5).foregroundStyle(Theme.recording)
         case .permissionNeeded: Icon(.shield, size: 16, strokeWidth: 1.5).foregroundStyle(Color(nsColor: .systemYellow))
         case .loadingModel: Icon(.download, size: 16, strokeWidth: 1.5).foregroundStyle(Theme.accent)
         default: ProgressView().controlSize(.small)

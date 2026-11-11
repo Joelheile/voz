@@ -13,6 +13,7 @@ actor VocabularyBooster {
     }
 
     private var prepared: Prepared?
+    private var models: Task<CtcModels?, Error>?
 
     func prepare(terms: [VocabularyTerm]) async throws {
         guard !terms.isEmpty else {
@@ -21,7 +22,11 @@ actor VocabularyBooster {
         }
         if prepared?.terms == terms { return }
         let started = Date()
-        let ctcModels = try await CtcModels.downloadAndLoad()
+        guard let ctcModels = try await loadModels() else {
+            prepared = nil
+            Log.app.error("Vocabulary boosting off: its model failed to load three times in a row")
+            return
+        }
         let context = CustomVocabularyContext(terms: terms.map {
             CustomVocabularyTerm(text: $0.word, aliases: $0.aliases.isEmpty ? nil : $0.aliases)
         })
@@ -40,6 +45,19 @@ actor VocabularyBooster {
             sizeConfig: ContextBiasingConstants.rescorerConfig(forVocabSize: tokenized.terms.count)
         )
         Log.app.notice("Vocabulary boosting ready with \(terms.count) words in \(Date().timeIntervalSince(started), format: .fixed(precision: 1))s")
+    }
+
+    /// Loads the models once per launch and reuses them when the vocabulary changes
+    private func loadModels() async throws -> CtcModels? {
+        if let models { return try await models.value }
+        let task = Task { try await ModelLoadGuard.vocabularyModel.run { start in try await CtcModels.downloadAndLoad { start.coreML(on: $0) } } }
+        models = task
+        do {
+            return try await task.value
+        } catch {
+            models = nil
+            throw error
+        }
     }
 
     func rescore(_ result: ASRResult, samples: [Float], words: [String]) async -> String {

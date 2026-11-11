@@ -400,3 +400,44 @@ func fakeIDToken(_ claims: String) -> String {
 func manifestReadsScreen(_ json: String) -> Bool {
     PackageListing.readsScreen(Data(json.utf8))
 }
+
+/// `loadsInChild` stands in for the child process that loads the cache with CoreML after a load never finished
+func makeModelLoadGuard(build: String = "1.0", loadsInChild: Bool = false) throws -> ModelLoadGuard {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("voz-models-\(UUID().uuidString)")
+    let cache = root.appendingPathComponent("ctc")
+    let bundle = cache.appendingPathComponent("Encoder.mlmodelc")
+    try writeFile("x", named: "coremldata.bin", in: bundle)
+    try writeFile("func main() { weight = blob(path = \"@model_path/weights/weight.bin\") }", named: "model.mil", in: bundle)
+    try writeFile("x", named: "weight.bin", in: bundle.appendingPathComponent("weights"))
+    try writeFile("{}", named: "vocab.json", in: cache)
+    return ModelLoadGuard(cache: cache, files: ["vocab.json"], build: build, loadsInChild: { _ in loadsInChild })
+}
+
+/// A load that reached CoreML and never finished, as when CoreML crashes Voz
+func crashLoad(_ loadGuard: ModelLoadGuard) async throws {
+    _ = try await loadGuard.begin()
+    try loadGuard.markCoreML()
+}
+
+func cacheFileExists(_ path: String, in loadGuard: ModelLoadGuard) -> Bool {
+    FileManager.default.fileExists(atPath: loadGuard.cache.appendingPathComponent(path).path)
+}
+
+final class LoadOrder: Sendable {
+    private let events = Mutex<[String]>([])
+    func append(_ event: String) { events.withLock { $0.append(event) } }
+    var all: [String] { events.withLock { $0 } }
+}
+
+func removeCacheFile(_ path: String, from loadGuard: ModelLoadGuard) throws {
+    try FileManager.default.removeItem(at: loadGuard.cache.appendingPathComponent(path))
+}
+
+func writeCacheFile(_ path: String, in loadGuard: ModelLoadGuard) throws {
+    let url = loadGuard.cache.appendingPathComponent(path)
+    try writeFile("x", named: url.lastPathComponent, in: url.deletingLastPathComponent())
+}
+
+func cacheExists(_ loadGuard: ModelLoadGuard) -> Bool {
+    FileManager.default.fileExists(atPath: loadGuard.cache.path)
+}

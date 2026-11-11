@@ -11,6 +11,7 @@ struct TranscriptionResult: Sendable {
 enum TranscriberError: Error {
     case notParakeet(String)
     case superseded
+    case modelKeepsFailing
 }
 
 actor Transcriber {
@@ -39,29 +40,38 @@ actor Transcriber {
         scriptFilter = SpeechLanguage.scriptFilter(for: languages)
     }
 
+    /// Choosing a model stops the download of any other, also when the chosen one is already loaded, and deletes its partial files
     func prepare(_ model: SpeechModel) async throws {
-        guard model.modelVersion != nil else {
-            loading?.task.cancel()
-            loading = nil
-            return
+        if let loading, loading.model != model {
+            loading.task.cancel()
+            self.loading = nil
+            if let version = loading.model.modelVersion, !loading.model.isDownloaded {
+                Task { await remove(version) }
+            }
         }
+        guard model.modelVersion != nil else { return }
         _ = try await manager(for: model)
     }
 
-    func removeUnusedModels(keeping model: SpeechModel) {
+    func removeUnusedModels(keeping model: SpeechModel) async {
         let inUse = [model.modelVersion, loading?.model.modelVersion].compactMap { $0 }
         for version in Self.downloadableVersions where !inUse.contains(version) {
-            let directory = AsrModels.defaultCacheDirectory(for: version)
-            guard FileManager.default.fileExists(atPath: directory.path) else { continue }
-            do {
-                try FileManager.default.removeItem(at: directory)
-                if let removed = SpeechModel.allCases.first(where: { $0.modelVersion == version }) {
-                    report(removed, .notLoaded)
-                }
-                Log.app.notice("Removed unused model \(directory.lastPathComponent)")
-            } catch {
-                Log.app.error("Removing unused model \(directory.lastPathComponent) failed: \(error.localizedDescription, privacy: .private)")
+            await remove(version)
+        }
+    }
+
+    /// Waits for a load of the model to end, also one that was just cancelled, before deleting its files
+    private func remove(_ version: AsrModelVersion) async {
+        let directory = AsrModels.defaultCacheDirectory(for: version)
+        guard FileManager.default.fileExists(atPath: directory.path) else { return }
+        do {
+            try await ModelLoadGuard.speechModel(version).remove()
+            if let removed = SpeechModel.allCases.first(where: { $0.modelVersion == version }) {
+                report(removed, .notLoaded)
             }
+            Log.app.notice("Removed unused model \(directory.lastPathComponent)")
+        } catch {
+            Log.app.error("Removing unused model \(directory.lastPathComponent) failed: \(error.localizedDescription, privacy: .private)")
         }
     }
 
@@ -107,6 +117,10 @@ actor Transcriber {
         } catch where task.isCancelled {
             report(model, .notLoaded)
             throw TranscriberError.superseded
+        } catch TranscriberError.modelKeepsFailing {
+            Log.app.error("Model \(model.rawValue) skipped: its last three loads never finished")
+            report(model, .failed("This model keeps failing to load. Pick another one"))
+            throw TranscriberError.modelKeepsFailing
         } catch {
             Log.app.error("Model \(model.rawValue) failed: \(error.localizedDescription, privacy: .public)")
             report(model, .failed(model.isDownloaded ? "Could not load the model" : "Download failed. Check your connection"))
@@ -120,16 +134,21 @@ actor Transcriber {
             guard let version = model.modelVersion else { throw TranscriberError.notParakeet(model.rawValue) }
             let loadStart = ContinuousClock.now
             report(model, .downloading(fraction: 0))
-            let models = try await AsrModels.downloadAndLoad(version: version) { progress in
-                switch progress.phase {
-                case .listing, .downloading:
-                    report(model, .downloading(fraction: progress.fractionCompleted))
-                case .compiling:
-                    report(model, .compiling)
+            let loaded = try await ModelLoadGuard.speechModel(version).run { start in
+                let models = try await AsrModels.downloadAndLoad(version: version) { progress in
+                    start.coreML(on: progress)
+                    switch progress.phase {
+                    case .listing, .downloading:
+                        report(model, .downloading(fraction: progress.fractionCompleted))
+                    case .compiling:
+                        report(model, .compiling)
+                    }
                 }
+                let manager = AsrManager(config: .default)
+                try await manager.loadModels(models)
+                return manager
             }
-            let manager = AsrManager(config: .default)
-            try await manager.loadModels(models)
+            guard let manager = loaded else { throw TranscriberError.modelKeepsFailing }
             let loadMs = (ContinuousClock.now - loadStart).wholeMilliseconds
             let warmStart = ContinuousClock.now
             await Self.warmUp(manager)

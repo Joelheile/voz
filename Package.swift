@@ -10,11 +10,11 @@ let package = Package(
     name: "voz",
     platforms: [.macOS("26.0")],
     dependencies: [
-        .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.17.7", traits: []),
+        .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.18.3", traits: ["Diarizer"]),
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.11.1"),
         .package(url: "https://github.com/PostHog/posthog-ios.git", from: "3.92.0"),
         .package(url: "https://github.com/sparkle-project/Sparkle.git", from: "2.10.0"),
-        .package(url: "https://github.com/ajaxjiang96/lucide-swift.git", exact: "0.9.20"),
+        .package(url: "https://github.com/ajaxjiang96/lucide-swift.git", exact: "0.9.28"),
     ],
     targets: [
         .executableTarget(

@@ -235,7 +235,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 stopWithoutInserting: { [dictation] in dictation.stopWithoutInserting() },
                 stopAndSend: { [dictation] in dictation.stopAndSend() },
                 cancel: { [dictation] in dictation.cancel() }
-            )
+            ),
+            modelStatus: modelStatus
         )
         let server = ControlServer(center: ControlCenter(commands: commands.all))
         do {

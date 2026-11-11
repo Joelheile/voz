@@ -59,8 +59,13 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(quickSend, forKey: SettingsKey.quickSend) }
     }
     @Published var speechModel: String {
-        didSet { storePipeline() }
+        didSet {
+            if oldValue != speechModel { speechModelBefore = oldValue }
+            storePipeline()
+        }
     }
+    /// The speech model you had before the current one, so cancelling a download goes back to it
+    private(set) var speechModelBefore: String?
     @Published var cleanupModel: String {
         didSet { storePipeline() }
     }
@@ -148,6 +153,16 @@ final class AppSettings: ObservableObject {
 
     var localSpeechModel: SpeechModel {
         SpeechModel(rawValue: speechModel) ?? .parakeetUltra
+    }
+
+    /// Goes back to the speech model you had before, or to Apple speech when that one isn't downloaded.
+    /// Switching stops the download, and Voz deletes its partial files once the model you go back to is ready.
+    func cancelModelDownload() {
+        guard let before = speechModelBefore, SpeechModel(rawValue: before)?.isDownloaded ?? true else {
+            speechModel = SpeechModel.appleSpeech.rawValue
+            return
+        }
+        speechModel = before
     }
 
     var pipelineChoices: PipelineChoices {

@@ -273,7 +273,7 @@ struct NoteView: View {
         Label {
             Text("Can't hear the meeting. Reconnecting")
         } icon: {
-            Icon(.triangleAlert, size: 13, strokeWidth: 2)
+            Icon(.triangleExclamationPoint, size: 13, strokeWidth: 2)
         }
         .font(.ui(13, weight: .medium))
         .foregroundStyle(Theme.failure)

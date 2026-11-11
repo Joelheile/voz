@@ -4,7 +4,7 @@ import Synchronization
 
 @MainActor
 enum Headless {
-    private nonisolated static let flags = ["--transcribe", "--benchmark-speech", "--clean", "--eval", "--simulate-dictation", "--render-design", "--measure-recorder"]
+    private nonisolated static let flags = ["--transcribe", "--benchmark-speech", "--clean", "--eval", "--simulate-dictation", "--render-design", "--measure-recorder", "--check-models"]
 
     nonisolated static func handles(_ arguments: [String]) -> Bool {
         flags.contains(where: arguments.contains)
@@ -47,6 +47,9 @@ enum Headless {
             guard arguments.contains("--speakers") else { return await transcribe(url, arguments: arguments) }
             return await transcribeSpeakers(url, model: speechModel(in: arguments))
         }
+        if let path = value(of: "--check-models", in: arguments) {
+            return ModelProbe.check(URL(fileURLWithPath: path))
+        }
         if let seconds = value(of: "--measure-recorder", in: arguments).flatMap(Double.init) {
             return await measureRecorder(seconds: seconds)
         }
@@ -54,7 +57,7 @@ enum Headless {
             return await simulateDictation(URL(fileURLWithPath: path), arguments: arguments)
         }
         let models = SpeechModel.allCases.map(\.rawValue).joined(separator: "|")
-        printError("usage: voz --transcribe <audio file> [--model \(models)] [--vocab a,b] [--speakers]\n       voz --benchmark-speech <audio file> [--model \(models)] [--repeat 2...1000] [--vocab a,b]\n       voz --clean <text> [--vocab a,b] [--mode light|heavy] [--languages de,en]\n       voz --eval <cases.json> [--repeat n] [--budget-ms n] [--mode light|heavy] [--languages de,en]\n       voz --simulate-dictation <audio file> [--model \(models)] [--speed n] [--no-cleanup]\n       voz --measure-recorder <seconds>\n       voz --render-design <directory>")
+        printError("usage: voz --transcribe <audio file> [--model \(models)] [--vocab a,b] [--speakers]\n       voz --benchmark-speech <audio file> [--model \(models)] [--repeat 2...1000] [--vocab a,b]\n       voz --clean <text> [--vocab a,b] [--mode light|heavy] [--languages de,en]\n       voz --eval <cases.json> [--repeat n] [--budget-ms n] [--mode light|heavy] [--languages de,en]\n       voz --simulate-dictation <audio file> [--model \(models)] [--speed n] [--no-cleanup]\n       voz --measure-recorder <seconds>\n       voz --render-design <directory>\n       voz --check-models <model folder>")
         return 64
     }
 

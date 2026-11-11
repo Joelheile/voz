@@ -127,7 +127,7 @@ actor LiveTranscriber {
         guard model.modelVersion != nil else { throw FileTranscriberError.needsParakeet }
         try await transcriber.prepare(model)
         guard speakers else { return }
-        let models = try await Nemotron3Models.loadFromHuggingFace(config: Self.diarizerConfig, computeUnits: .cpuAndGPU)
+        let models = try await Nemotron3Models.loadGuarded(config: Self.diarizerConfig)
         diarizer = Nemotron3Diarizer(config: Self.diarizerConfig, models: models)
     }
 
